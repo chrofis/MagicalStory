@@ -1,8 +1,9 @@
 // Runs the Lab stage avatar_sheet_variant over the 10 characters of the 2026-10-10 costume-sheet test (stored staging characters).
-// usage (from the repo root): node run.js <label> <variant> <costume> <ageLine 0|1> <outfile> [names comma list]
+// usage (from the repo root): node run.js <label> <variant> <costume> <ageLine 0|1> <outfile> [names comma list] [extra stage params as JSON, e.g. '{"grokModel":"2.0","anchor":false}']
+// (the 2026-10-10 Grok 2.0 sheet matrix used the extra-params argument and the 3 characters Emma, Lukas, Hans)
 const { execSync } = require('child_process');
 const fs = require('fs');
-const [label, variant, costume, ageLine, out, only] = process.argv.slice(2);
+const [label, variant, costume, ageLine, out, only, extraJson] = process.argv.slice(2);
 const BASE = 'https://staging.magicalstory.ch';
 const token = execSync('node scripts/admin/get-admin-token.js', { cwd: require('path').join(__dirname, '../..') }).toString().trim();
 const H = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -14,7 +15,7 @@ const all = [
 const want = only ? only.split(',') : all.map(a => a[0]);
 const targets = all.filter(a => want.includes(a[0])).map(([n, s]) => ({ storyId: s, character: n.replace(/\d$/, '') }));
 (async () => {
-  const body = { stage: 'avatar_sheet_variant', label, params: { variant, costume, skipReview: true, ...(ageLine === '1' ? { ageLine: true } : {}) }, targets };
+  const body = { stage: 'avatar_sheet_variant', label, params: { variant, costume, skipReview: true, ...(ageLine === '1' ? { ageLine: true } : {}), ...(extraJson ? JSON.parse(extraJson) : {}) }, targets };
   const r = await fetch(`${BASE}/api/admin/testlab/experiments`, { method: 'POST', headers: H, body: JSON.stringify(body) });
   const j = await r.json(); console.log('start', r.status, JSON.stringify(j).slice(0, 200));
   if (!j.id) process.exit(1);
