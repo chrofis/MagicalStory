@@ -4176,7 +4176,7 @@
       "source": "owner iPhone trial, staging job_1791612491444_ezf1ksaku: TypeError ERR_INVALID_ARG_TYPE at r2.contentKey <- keyForVbReference <- extractInlineImagesToR2 (database.js:1507); introduced by f18b47ab9",
       "status": "fixed",
       "fixedAt": "2026-10-10",
-      "fixedIn": "PENDING",
+      "fixedIn": "692267323",
       "fix": "skip locations without bytes before computing the key; tests/unit/r2-extract-location-without-photo.test.ts (fails before with ERR_INVALID_ARG_TYPE)"
     }
   ]
