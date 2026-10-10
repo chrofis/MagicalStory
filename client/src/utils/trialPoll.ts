@@ -62,17 +62,6 @@ export function avatarFigureOf(src: string): string {
 export const HERO_FIGURE = 'standard-front-body';
 
 /**
- * The picture to show NOW. `displayed` is what is on screen; while it is still in the pool that is it. When the pool was
- * replaced under it (the hero gave way to the first slide list) the next figure that was not shown is chosen, with the
- * hero counted as the standard front body. `shown` is not changed.
- */
-export function resolveCurrentAvatar(pool: string[], shown: Set<string>, displayed: string | null, hero?: string | null): string | null {
-  if (displayed && pool.includes(displayed)) return displayed;
-  if (displayed && hero && displayed === hero) return nextAvatarSource(pool, new Set(shown), displayed, hero);
-  return pool[0] ?? null;
-}
-
-/**
  * The waiting-screen avatar pool: the slides once the server has any, the hero's front picture only until then.
  * The hero IS the front body cell of the standard sheet, which is also the first body slide: keeping both showed that
  * figure three times in the first five slots (owner iPhone, 2026-10-09: "the main avatar comes up too often at the
@@ -114,3 +103,4 @@ export function nextAvatarSource(pool: string[], shown: Set<string>, current: st
   }
   return pool[0];
 }
+

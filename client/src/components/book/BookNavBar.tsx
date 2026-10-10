@@ -61,3 +61,31 @@ export default function BookNavBar({ currentPage, totalPages, onPrev, onNext, on
     </div>
   );
 }
+
+const overlayBtn = 'absolute top-1/2 -translate-y-1/2 z-30 p-2 rounded-full bg-white/90 shadow-lg border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors';
+
+interface OverlayArrowsProps {
+  onPrev: () => void;
+  onNext: () => void;
+  prevDisabled?: boolean;
+  nextDisabled?: boolean;
+  labels: { prevPage: string; nextPage: string };
+}
+
+/**
+ * Previous / next chevrons over the left and right edge of the picture, vertically centred. The parent must be
+ * `relative`. Used on the trial book and on the waiting screen's picture slot, where a bar below the picture was
+ * out of sight on a phone (owner iPhone 2026-10-10: "arrows must be next to or over the image").
+ */
+export function OverlayArrows({ onPrev, onNext, prevDisabled, nextDisabled, labels }: OverlayArrowsProps) {
+  return (
+    <>
+      <button type="button" onClick={onPrev} disabled={prevDisabled} className={`${overlayBtn} left-1.5`} aria-label={labels.prevPage}>
+        <ChevronLeft className="w-6 h-6" />
+      </button>
+      <button type="button" onClick={onNext} disabled={nextDisabled} className={`${overlayBtn} right-1.5`} aria-label={labels.nextPage}>
+        <ChevronRight className="w-6 h-6" />
+      </button>
+    </>
+  );
+}

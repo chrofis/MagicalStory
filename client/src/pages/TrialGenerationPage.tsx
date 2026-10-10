@@ -10,7 +10,7 @@ import { trackEmailLead, trackTrialStoryCompleted } from '@/utils/gtagConversion
 import { trackEvent } from '@/utils/analytics';
 import { trackTrialStep } from '@/utils/trialFunnel';
 import { FUNNY_MESSAGES, NAMELESS_FUNNY_MESSAGES, funnyDeck, funnyLine } from '@/utils/funnyMessages';
-import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs, mergeAvatarSlides, shouldRedirectToStories, avatarPoolSources, nextAvatarSource, resolveCurrentAvatar, HERO_FIGURE } from '@/utils/trialPoll';
+import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs, mergeAvatarSlides, shouldRedirectToStories, avatarPoolSources, nextAvatarSource, HERO_FIGURE } from '@/utils/trialPoll';
 import { Navigation } from '@/components/common';
 import RenderErrorBoundary from '@/components/common/RenderErrorBoundary';
 import TrialBook, { TrialGateProvider } from '@/components/book/TrialBook';
@@ -747,7 +747,9 @@ export default function TrialGenerationPage() {
   const avatarPool = useMemo(() => avatarPoolSources(state?.heroAvatar, avatarSlides), [state?.heroAvatar, avatarSlides]);
   const shownAvatarsRef = useRef<Set<string>>(new Set());
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
-  const currentAvatar = resolveCurrentAvatar(avatarPool, shownAvatarsRef.current, avatarSrc, state?.heroAvatar);
+  // What is on screen stays on screen until the timer (or an arrow) changes it: a pool update (hero -> body-row slides ->
+  // sheet slides) must not swap the picture under the visitor (owner iPhone 2026-10-10: "vanishes almost immediately").
+  const currentAvatar = avatarSrc;
   // The first picture on screen is recorded at once: it is the hero when no slide exists yet, and the hero's figure then
   // counts as shown when the slide lists arrive (HERO_FIGURE).
   useEffect(() => {
@@ -798,8 +800,10 @@ export default function TrialGenerationPage() {
   }, [avatarPool.length > 0, state?.characterName, state?.storyInput?.language, language, t, funnyOrder]);
 
   // Rotate slideshow — info messages stay up longer so they're readable;
-  // funny + image-only slides tick faster. The interval re-fires on every
-  // slide change because the next slide's caption type drives the next dwell.
+  // funny + image-only slides tick faster. The timer restarts on every picture change (auto or arrow tap) and on
+  // nothing else: pool updates are read through a ref, so they neither cut a picture short nor stretch it.
+  const rotationRef = useRef({ pool: avatarPool, current: currentAvatar, hero: state?.heroAvatar });
+  rotationRef.current = { pool: avatarPool, current: currentAvatar, hero: state?.heroAvatar };
   useEffect(() => {
     if (slideshowItems.length === 0) return;
     const currentSlide = slideshowItems[slideshowIndex % slideshowItems.length];
@@ -811,11 +815,12 @@ export default function TrialGenerationPage() {
     if (currentSlide.caption.kind === 'message') dwellMs = 9000;
     else if (currentSlide.caption.kind === 'none') dwellMs = 10000;
     const id = setTimeout(() => {
+      const { pool, current, hero } = rotationRef.current;
       setSlideshowIndex(prev => (prev + 1) % Math.max(1, slideshowItems.length));
-      setAvatarSrc(nextAvatarSource(avatarPool, shownAvatarsRef.current, currentAvatar, state?.heroAvatar));
+      setAvatarSrc(nextAvatarSource(pool, shownAvatarsRef.current, current, hero));
     }, dwellMs);
     return () => clearTimeout(id);
-  }, [slideshowIndex, slideshowItems, avatarPool, currentAvatar, state?.heroAvatar]);
+  }, [slideshowIndex, slideshowItems, avatarSrc]);
 
   // Smoothed-progress driver. Floors the visible bar with a time-based optimistic
   // curve so the user sees forward motion immediately, even when the server
@@ -1035,6 +1040,7 @@ export default function TrialGenerationPage() {
           titlePageImage={titlePageImage}
           pages={pages}
           pendingImageLabel={t.imagePending}
+          showArrows={pageState === 'completed'}
           titlePendingNode={imagePlaceholder}
         />
         </RenderErrorBoundary>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { avatarPoolSources, nextAvatarSource, resolveCurrentAvatar, avatarFigureOf, HERO_FIGURE } from '../../client/src/utils/trialPoll';
+import { avatarPoolSources, nextAvatarSource, avatarFigureOf, HERO_FIGURE } from '../../client/src/utils/trialPoll';
 
 // Owner iPhone trial (user 10e1d43c, 2026-10-10): "the full body comes twice at the start". The hero (a data URI, the front
 // body cell of the standard sheet) is shown first; the slide lists then carry that very figure as standard-front-body.
@@ -20,12 +20,13 @@ function simulate(stages: { atStep: number; slides: string[] }[], steps: number)
   for (let step = 0; step < steps; step++) {
     for (const s of stages) if (s.atStep === step) slides = s.slides;
     const pool = avatarPoolSources(HERO, slides);
-    const current = resolveCurrentAvatar(pool, shown, displayed, HERO);
     if (displayed === null && pool[0]) { if (pool[0] === HERO) shown.add(HERO_FIGURE); displayed = pool[0]; }
+    const current = displayed;
     seen.push(current!);
     displayed = nextAvatarSource(pool, shown, current, HERO);
   }
-  return seen.map(s => (s === HERO ? HERO_FIGURE : avatarFigureOf(s)));
+  // The hero alone stays on screen while no slide exists yet (one picture, not a repeat): consecutive duplicates collapse.
+  return seen.map(s => (s === HERO ? HERO_FIGURE : avatarFigureOf(s))).filter((f, i, a) => i === 0 || f !== a[i - 1]);
 }
 
 describe('waiting screen: the first pictures are distinct figures', () => {
@@ -39,12 +40,8 @@ describe('waiting screen: the first pictures are distinct figures', () => {
     expect(new Set(f.slice(0, 6)).size).toBe(6);
   });
   it('slides arriving right after the hero never repeat the hero figure', () => {
-    const f = simulate([{ atStep: 1, slides: FINAL }], 6);
+    const f = simulate([{ atStep: 1, slides: FINAL }], 8);
     expect(f[0]).toBe(HERO_FIGURE);
     expect(f.slice(1)).not.toContain(HERO_FIGURE);
-  });
-  it('without a hero the old behaviour is unchanged', () => {
-    const shown = new Set<string>();
-    expect(resolveCurrentAvatar(['x', 'y'], shown, 'gone', null)).toBe('x');
   });
 });

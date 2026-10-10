@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import BookViewer, { type BookViewerHandle } from './BookViewer';
-import BookNavBar, { bookNavLabelsFor } from './BookNavBar';
+import { OverlayArrows, bookNavLabelsFor } from './BookNavBar';
 import { buildTrialBook, type TrialPreviewPage } from '@/utils/trialBook';
 
 // The sign-in gate is a page of the book. Its content changes with every
@@ -50,6 +50,8 @@ interface TrialBookProps {
   pendingImageLabel: string;
   /** Rendered as the title page while it is still being drawn. */
   titlePendingNode: React.ReactNode;
+  /** Page arrows on the book: only once the story is complete (owner: no arrows while it is generating). */
+  showArrows: boolean;
 }
 
 function samePages(a: TrialPreviewPage[], b: TrialPreviewPage[]) {
@@ -62,7 +64,7 @@ function samePages(a: TrialPreviewPage[], b: TrialPreviewPage[]) {
  * preview. Memoized on content, so the 3 s poll (new array identity, same data)
  * does not re-render the viewer; when an image lands only that page's props change.
  */
-const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePageImage, pages, pendingImageLabel, titlePendingNode }: TrialBookProps) {
+const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePageImage, pages, pendingImageLabel, titlePendingNode, showArrows }: TrialBookProps) {
   const isMobile = useIsMobile();
   // Desktop spread: picture on the left page, its text on the right page.
   const { storyPages, entries } = useMemo(
@@ -95,7 +97,7 @@ const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePag
 
   return (
     <>
-      <div className="h-[72vh] min-h-[440px] max-h-[780px] w-full lg:w-[min(1000px,calc(100vw-4rem))] lg:relative lg:left-1/2 lg:-translate-x-1/2">
+      <div className="relative h-[72vh] min-h-[440px] max-h-[780px] w-full lg:w-[min(1000px,calc(100vw-4rem))] lg:relative lg:left-1/2 lg:-translate-x-1/2">
         <BookViewer
           key={structureKey}
           ref={bookRef}
@@ -108,22 +110,20 @@ const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePag
           showTextOverlay={false}
           pendingImageLabel={pendingImageLabel}
         />
-      </div>
-      {/* Same page buttons as the story viewer: a swipe is not discoverable on its own. */}
-      <div className="mt-2">
-        <BookNavBar
-          currentPage={Math.min(currentPage, pageList.length - 1)}
-          totalPages={pageList.length}
+        {/* Previous / next over the page edges, as on the waiting screen: a swipe is not discoverable on its own. */}
+        {showArrows && <OverlayArrows
           onPrev={() => bookRef.current?.flipPrev()}
           onNext={() => bookRef.current?.flipNext()}
-          onFirst={() => bookRef.current?.flipTo(0)}
+          prevDisabled={currentPage === 0}
+          nextDisabled={currentPage >= pageList.length - 1}
           labels={bookNavLabelsFor(language)}
-        />
+        />}
       </div>
+      <p className="mt-1 text-center text-indigo-400 text-sm font-medium">{Math.min(currentPage, pageList.length - 1) + 1} / {pageList.length}</p>
     </>
   );
 }, (a, b) =>
   a.storyTitle === b.storyTitle && a.language === b.language && a.titlePageImage === b.titlePageImage &&
-  a.pendingImageLabel === b.pendingImageLabel && samePages(a.pages, b.pages));
+  a.pendingImageLabel === b.pendingImageLabel && a.showArrows === b.showArrows && samePages(a.pages, b.pages));
 
 export default TrialBook;
