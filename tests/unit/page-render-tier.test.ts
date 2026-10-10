@@ -120,7 +120,9 @@ describe('keys that must not follow the page tier', () => {
     const src = fs.readFileSync(
       new URL('../../server/lib/character2x4Sheet.js', import.meta.url), 'utf8',
     );
-    expect(src).toMatch(/model: GROK_MODELS\.STANDARD/);
+    // Since 2026-10-10 the tier is a `grokModel` option whose DEFAULT is Standard (Test Lab avatar_sheet_variant passes another);
+    // no production caller passes it and nothing reads a MODEL_DEFAULTS key.
+    expect(src).toMatch(/grokModel = GROK_MODELS\.STANDARD/);
     expect(src).not.toMatch(/pageRenderImage/);
   });
 });

@@ -2921,7 +2921,7 @@ async function runAvatarRealisticStage(target, { experimentId, params = {} }) {
   };
 }
 
-// The Grok tiers a sheet variant may name (params.model). Ids come from GROK_MODELS, the one definition.
+// The Grok tiers a sheet variant may name (params.grokModel). Ids come from GROK_MODELS, the one definition.
 const SHEET_VARIANT_MODELS = { standard: 'STANDARD', 'grok-imagine-image-2.0': 'IMAGE_2', '2.0': 'IMAGE_2', pro: 'PRO' };
 const SHEET_VARIANTS = ['current', 'oneCall', 'styledBodyRow'];
 
@@ -2930,7 +2930,7 @@ const SHEET_VARIANTS = ['current', 'oneCall', 'styledBodyRow'];
  * Runs the REAL sheet code of character2x4Sheet.js on a stored character, the way the trial runs it, with the options threaded through:
  *   params.variant  'current' (body row -> head row -> pass 2; fastPass1), 'oneCall' (photo -> styled 2x4 in one call),
  *                   'styledBodyRow' (photo -> styled body row, then the head row against it; no photoreal pass, no pass 2)
- *   params.model    Grok tier: standard | grok-imagine-image-2.0 | pro (every Grok call of the sheet)
+ *   params.grokModel  Grok tier: standard | grok-imagine-image-2.0 | pro (every Grok call of the sheet)
  *   params.passTwoAttempts  total pass-2 attempts ('current' only)   params.anchor false = no style anchor ('current' only)
  *   params.skipReview  true = no Gemini row/sheet judges (default false, as the trial runs a costumed sheet)
  *   params.costume  'standard' | 'trial' (the character's own stored costume type) | a trial costume key (pirate, knight, ...)
@@ -2946,8 +2946,8 @@ async function runAvatarSheetVariantStage(target, { experimentId, params = {} })
   const { priceUsage } = require('../config/models');
   const variant = params.variant || 'current';
   if (!SHEET_VARIANTS.includes(variant)) throw new Error(`avatar_sheet_variant: unknown variant "${variant}" (${SHEET_VARIANTS.join(' | ')})`);
-  const modelKey = params.model || 'standard';
-  if (!SHEET_VARIANT_MODELS[modelKey]) throw new Error(`avatar_sheet_variant: unknown model "${modelKey}" (${Object.keys(SHEET_VARIANT_MODELS).join(' | ')})`);
+  const modelKey = params.grokModel || 'standard';
+  if (!SHEET_VARIANT_MODELS[modelKey]) throw new Error(`avatar_sheet_variant: unknown grokModel "${modelKey}" (${Object.keys(SHEET_VARIANT_MODELS).join(' | ')})`);
   const grokModel = GROK_MODELS[SHEET_VARIANT_MODELS[modelKey]];
   const artStyle = params.artStyle || 'watercolor';
   const { character } = await loadCharacterContext(target.storyId, target.character);
