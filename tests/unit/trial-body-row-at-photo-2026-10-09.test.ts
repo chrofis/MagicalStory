@@ -66,24 +66,12 @@ function fakePool(state: { char: any }) {
     },
   };
 }
-// The analyzer is a separate service: its edge-detecting split is stood in for by a split on the given column edges
-// (default: equal quarters). `splitCalls` records what the cutter asked for.
-const splitCalls: any[] = [];
-function fakeAnalyzerSplit(edges = [0, 320, 640, 960, 1280]) {
-  splitCalls.length = 0;
-  return vi.spyOn(sceneComposite, 'splitSheetByEdgeDetection').mockImplementation(async (buf: Buffer, opts: any) => {
-    splitCalls.push({ buf, opts });
-    const { height } = await sharp(buf).metadata();
-    return Promise.all([0, 1, 2, 3].map((i) => sharp(buf).extract({ left: edges[i], top: 0, width: edges[i + 1] - edges[i], height: height! }).png().toBuffer()));
-  });
-}
 // pass 1 draws a white-background row; the styled row has another background, so a cell shows which row it was cut from
 const STYLED_BG = '#eeeedd';
 const photoreal = () => bodyRow('#fff');
 const fakeStyle = () => vi.spyOn(sheetLib, 'styleBodyRow').mockImplementation(async () => bodyRow(STYLED_BG));
 const cellIsStyled = async (uri: string) => { const { data } = await sharp(Buffer.from(uri.split(',')[1], 'base64')).raw().toBuffer({ resolveWithObject: true }); return Math.abs(data[0] - 0xee) < 6; };
 const origGetPool = database.getPool;
-beforeEach(() => { fakeAnalyzerSplit(); });
 afterEach(() => {
   database.getPool = origGetPool;
   trialRouter.inFlightStandardAvatarPromises.clear();
@@ -150,9 +138,9 @@ describe('2. who the row is drawn for, and when it is redrawn', () => {
     expect(sheet).not.toHaveBeenCalled();     // the first picture does not wait for, or start, the sheet
     // one cut figure: a quarter of the row's width, never the row
     expect(Object.keys(res.body)).toEqual(['avatarImage']);
-    const meta = await sharp(Buffer.from(res.body.avatarImage.split(',')[1], 'base64')).metadata();
-    expect(meta.width).toBe(320);
-    expect(meta.height).toBe(720);
+    const meta = await sharp(Buffer.from(res.body.avatarImage.split(",")[1], "base64")).metadata();
+    expect(meta.width).toBe(232);    // the figure (160 px) plus the cutter margin (6% of its 600 px height), nothing of a neighbour
+    expect(meta.height).toBe(672);
     // the cell is cut from the STYLED row (the trial's art style), never from the photoreal pass-1 row
     expect(style).toHaveBeenCalledTimes(1);
     expect(style.mock.calls[0][1]).toBe(trialRouter.TRIAL_ART_STYLE);
@@ -257,23 +245,28 @@ describe('2. who the row is drawn for, and when it is redrawn', () => {
 });
 
 describe('3. the client never receives a row or a sheet', () => {
-  it("a body row is cut by the analyzer's edge detection (1 row x 4 columns), never by fixed quarters", async () => {
-    // columns the analyzer found, uneven like the drift measured on a stored row: [273, 365, 251, 391]
-    const split = fakeAnalyzerSplit([0, 273, 638, 889, 1280]);
-    const cells = await avatarSlides.bodyRowCells(await bodyRow());
-    expect(split).toHaveBeenCalledTimes(1);
-    expect(splitCalls[0].opts).toEqual({ cols: 4, rows: 1 });
+  it('a body row is cut at its FIGURES (1 row x 4 columns): one whole figure per cell with a margin, never fixed quarters', async () => {
+    // four figures 160 px wide on four 320 px columns, drifted off their column the way a drawn row drifts
+    const buf = await sharp({ create: { width: 1280, height: 720, channels: 3, background: '#fff' } })
+      .composite([30, 400, 700, 1000].map((x, c) => ({ input: { create: { width: 160, height: 600, channels: 3, background: { r: 40 * (c + 1), g: 90, b: 160 } } }, left: x, top: 60 })))
+      .jpeg().toBuffer();
+    const cells = await avatarSlides.bodyRowCells(`data:image/jpeg;base64,${buf.toString('base64')}`);
     expect(cells).toHaveLength(4);
-    const widths = [];
-    for (const c of cells) widths.push((await sharp(Buffer.from(c.split(',')[1], 'base64')).metadata()).width);
-    expect(widths).toEqual([273, 365, 251, 391]);   // the detected columns, not 320 x 4
+    for (const [c, cell] of cells.entries()) {
+      const img = sharp(Buffer.from(cell.split(',')[1], 'base64'));
+      const { width, height } = await img.metadata();
+      expect(width!).toBeGreaterThan(160);            // the whole figure plus a margin
+      expect(width!).toBeLessThan(320);               // and nothing of a neighbour
+      expect(height!).toBeGreaterThan(600);
+      const { data } = await img.raw().toBuffer({ resolveWithObject: true });
+      const mid = (Math.floor(height! / 2) * width! + Math.floor(width! / 2)) * 3;
+      expect(Math.abs(data[mid] - 40 * (c + 1))).toBeLessThan(12);   // this cell's own figure
+    }
     expect(read('server/lib/avatarSlides.js')).not.toMatch(/Math\.floor\(width \/ 4\)/);
   });
-  it('a split that is not a plausible grid, or an analyzer that cannot answer, gives no cells (no fixed-quarter fallback)', async () => {
-    vi.spyOn(sceneComposite, 'splitSheetByEdgeDetection').mockResolvedValue(null);
-    await expect(avatarSlides.bodyRowCells(await bodyRow())).rejects.toThrow(/not a plausible 4-column grid/);
-    vi.spyOn(sceneComposite, 'splitSheetByEdgeDetection').mockRejectedValue(new Error('analyzer unavailable'));
-    await expect(avatarSlides.bodyRowCells(await bodyRow())).rejects.toThrow(/analyzer unavailable/);
+  it('a row without four figures gives no cells (no fixed-quarter fallback)', async () => {
+    const blank = await sharp({ create: { width: 1280, height: 720, channels: 3, background: '#fff' } }).jpeg().toBuffer();
+    await expect(avatarSlides.bodyRowCells(`data:image/jpeg;base64,${blank.toString('base64')}`)).rejects.toThrow(/holds no figure|no figures/);
   });
   it('a sheet or a single figure is refused as a body row', async () => {
     await expect(avatarSlides.bodyRowCells(await wholeSheet())).rejects.toThrow(/not a 1x4 body row/);

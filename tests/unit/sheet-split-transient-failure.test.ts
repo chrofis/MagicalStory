@@ -1,29 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 const sharp = require('sharp');
 const { _internal, POSE_CELL } = require('../../server/lib/sceneComposite');
 const { cropSheetCell, sheetSplitCalls, resetSheetCaches } = _internal;
 
-// Code review 2026-10 C5: a transient analyzer failure must not pin the sheet
-// to the fixed-grid crop for the life of the process.
-describe('transient /split-reference-sheet failure is not cached', () => {
-  let analyzerUp = false;
-  let sheet: Buffer;
-  beforeEach(async () => {
-    resetSheetCaches();
-    analyzerUp = false;
-    sheet = await sharp({ create: { width: 256, height: 192, channels: 3, background: { r: 250, g: 250, b: 250 } } }).png().toBuffer();
-    const cell = (await sharp({ create: { width: 64, height: 96, channels: 3, background: { r: 255, g: 255, b: 255 } } }).png().toBuffer()).toString('base64');
-    vi.stubGlobal('fetch', vi.fn(async () => (analyzerUp
-      ? { ok: true, status: 200, json: async () => ({ success: true, cells: Array(8).fill(cell) }) }
-      : { ok: false, status: 503, json: async () => ({}) }) as any));
-  });
-  afterEach(() => { vi.unstubAllGlobals(); resetSheetCaches(); });
+// A sheet that cannot be cut (no figures) throws, and the failure is not cached: the same sheet is cut again on the next ask
+// (code review 2026-10 C5, kept through the move from the analyzer split to the figure cutter, docs/decisions.md 2026-10-10).
+describe('a failed sheet cut is not cached', () => {
+  beforeEach(() => resetSheetCaches());
+  afterEach(() => resetSheetCaches());
 
-  it('asks the analyzer again after it recovers', async () => {
-    await cropSheetCell(Buffer.from(sheet), POSE_CELL.front); // analyzer down -> fixed grid
+  it('throws on a sheet without figures (no fixed-grid fallback) and cuts again on the next call', async () => {
+    const blank = await sharp({ create: { width: 256, height: 192, channels: 3, background: { r: 250, g: 250, b: 250 } } }).png().toBuffer();
+    await expect(cropSheetCell(Buffer.from(blank), POSE_CELL.front)).rejects.toThrow(/no figure/);
     expect(sheetSplitCalls()).toBe(1);
-    analyzerUp = true;
-    await cropSheetCell(Buffer.from(sheet), POSE_CELL.front);
+    await expect(cropSheetCell(Buffer.from(blank), POSE_CELL.front)).rejects.toThrow(/no figure/);
     expect(sheetSplitCalls()).toBe(2);
   });
 });

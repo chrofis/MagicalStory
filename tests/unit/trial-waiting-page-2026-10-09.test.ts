@@ -32,12 +32,12 @@ describe('avatar slides are whole cells (not 1:4 column strips)', () => {
     expect(slides).toHaveLength(6);
     const dims: any[] = [];
     for (const s of slides) dims.push(await sharp(Buffer.from(s.split(',')[1], 'base64')).metadata());
-    for (const m of dims) expect(m.width).toBe(256);                       // one column wide, never a strip of columns
+    for (const m of dims) { expect(m.width).toBeGreaterThan(140); expect(m.width).toBeLessThanOrEqual(256); } // one figure plus its margin, never a strip of columns
     dims.forEach((m, i) => {
       const isHead = i % 2 === 0;
-      expect(m.height).toBeGreaterThan(isHead ? 380 : 520);                 // head cell ~440 tall, body cell ~570
+      expect(m.height).toBeGreaterThan(isHead ? 380 : 500);                 // the figure (396 / 480 tall) plus its margin
       expect(m.height).toBeLessThan(isHead ? 470 : 600);
-      expect(m.height / m.width).toBeLessThan(2.5);                         // the old strip was 4:1
+      expect(m.height / m.width).toBeLessThan(3.5);                         // the old strip was 4:1 (a slim standing body is ~2.7)
     });
   });
 

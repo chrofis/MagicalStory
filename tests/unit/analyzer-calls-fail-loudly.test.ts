@@ -158,7 +158,6 @@ describe('callers report through reportAnalyzerFailure (source pins)', () => {
   });
   it('sheet split callers, garment fix, ArcFace, the scene composite and the routes report', () => {
     for (const [f, re] of [
-      ['server/lib/sceneComposite.js', /reportAnalyzerFailure\('\[SCENE COMPOSITE\] edge-detection split → fixed-math crop'/],
       ['server/lib/sceneComposite.js', /rembg unavailable — cut-out DEGRADED/],
       ['server/lib/coverComposite.js', /rembg unavailable — cut-out DEGRADED/],
       ['server/lib/referenceSheets.js', /reportAnalyzerFailure\('\[REF-SHEET\] split-reference-sheet/],

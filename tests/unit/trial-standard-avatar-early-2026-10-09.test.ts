@@ -354,11 +354,12 @@ describe('4. the preview avatar is gone: its decision and what read it', () => {
 describe('the front body cell the wizard shows', () => {
   it('is cut from a 2x4 sheet as one whole front-facing body cell and refuses a portrait', async () => {
     const sharp = require('sharp');
-    const sheet = await sharp({ create: { width: 1024, height: 1024, channels: 3, background: { r: 255, g: 255, b: 255 } } }).jpeg().toBuffer();
+    const sheet = require('fs').readFileSync(require('path').resolve(__dirname, 'fixtures/costumed-sheet-blank-headroom-2026-10-10.jpg'));
     const cell = await avatarSlides.frontBodyCell(sheet);
     expect(cell).toMatch(/^data:image\/jpeg;base64,/);
     const meta = await sharp(Buffer.from(cell.split(',')[1], 'base64')).metadata();
-    expect(meta.width).toBeLessThan(1024);
+    expect(meta.width).toBeLessThan(512 * 0.35);   // one column of the 512 px fixture sheet
+    expect(meta.height).toBeGreaterThan(512 * 0.4); // the whole body, head to toe
     const portrait = await sharp({ create: { width: 300, height: 900, channels: 3, background: { r: 255, g: 255, b: 255 } } }).jpeg().toBuffer();
     await expect(avatarSlides.frontBodyCell(portrait)).rejects.toThrow(/not a 2x4 sheet/);
   });

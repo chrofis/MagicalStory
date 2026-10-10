@@ -820,9 +820,34 @@ async function frameCharacterImage(buffer, color) {
 // within [startFrac, endFrac] of the dimension so figures near the edges don't
 // win. axis 'h' → returns a Y (row split); 'v' → returns an X (column split).
 // The split point is wherever the line actually is, never assumed to be half.
+// First and last row holding painted content (>= 2% of the row differs from the paper tone, the image median, by more than
+// 40 grey levels), or null. A blank band above the heads is as uniform as a gutter and used to win the minimum-variance
+// search (staging 2026-10-05..10: 9 of ~72 stored styled sheets split at y=153..196 of 1024, cutting the heads off).
+// Mirror of _content_row_span in photo_analyzer.py, which the analyzer's /split-reference-sheet uses.
+function contentRowSpan(data, width, height) {
+  const hist = new Array(256).fill(0);
+  for (let i = 0; i < width * height; i++) hist[data[i]]++;
+  let acc = 0, paper = 0;
+  for (; paper < 255 && acc + hist[paper] < (width * height) / 2; paper++) acc += hist[paper];
+  let first = -1, last = -1;
+  for (let y = 0; y < height; y++) {
+    let ink = 0;
+    for (let x = 0; x < width; x++) if (Math.abs(data[y * width + x] - paper) > 40) ink++;
+    if (ink / width >= 0.02) { if (first < 0) first = y; last = y; }
+  }
+  return first < 0 ? null : { first, last };
+}
+
 function detectMinVarianceSeparator(data, width, height, axis, startFrac, endFrac) {
   if (axis === 'h') {
-    const start = Math.floor(height * startFrac), end = Math.floor(height * endFrac);
+    let start = Math.floor(height * startFrac), end = Math.floor(height * endFrac);
+    // The row divider lies between the figures: search inside the painted content, inset a tenth of it from either end.
+    const content = contentRowSpan(data, width, height);
+    if (content) {
+      const inset = Math.floor((content.last - content.first) * 0.10);
+      start = Math.max(start, content.first + inset);
+      end = Math.min(end, content.last - inset);
+    }
     let minVar = Infinity, sep = Math.floor(height / 2);
     for (let y = start; y < end; y++) {
       let sum = 0, sumSq = 0;
@@ -2111,6 +2136,7 @@ module.exports = {
   // four character cards just to read back two numbers.
   composeCharWithVbRow,
   detectMinVarianceSeparator,
+  contentRowSpan,
   buildCharacterGroupSlot,
   // Pure arithmetic, exported for its unit test — the layout decision is the
   // part worth pinning, and testing it through buildCharacterGroupSlot would

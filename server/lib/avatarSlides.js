@@ -6,8 +6,7 @@
  * a quarter of the frame wide, and only front / three-quarter / profile of the head-over-body
  * pair ever showed (owner, iPhone: "the avatar is not cut properly", "I only get head avatars").
  * Each slide is now a single cell cut with the same splitter the page references use
- * (cropAvatarCell: analyzer edge detection, fixed-math fallback that honours the unequal head
- * and body rows), so a slide is a whole head or a whole body, never a slice of either.
+ * (cropAvatarCell, which cuts at the figures: sheetCut.js), so a slide is a whole head or a whole body, never a slice of either.
  * See docs/decisions.md 2026-10-09 "Trial avatar slides".
  */
 const sharp = require('sharp');
@@ -67,10 +66,9 @@ async function singleCellJpeg(cell, sourceWidth) {
 
 /**
  * The cells of a 1x4 FULL-BODY row (the body stage of a sheet, drawn before the head row): [front, threeQuarter, profile,
- * back] as JPEG data URIs. Cut with the analyzer's edge detection (the splitter the sheet cells and page references use),
+ * back] as JPEG data URIs. Cut with the figure cutter (sheetCut.js, the one the sheet cells and page references use),
  * never by fixed quarters: a fixed quarter sliced heads and feet off figures that drift off their column (owner, iPhone
- * 2026-10-10: "the full body images are cut at head and feet"). An analyzer that cannot answer, or a split whose columns are
- * not a plausible grid, throws: no slide is better than a wrongly cut one. An image that is not wide is refused.
+ * 2026-10-10: "the full body images are cut at head and feet"). A row without four figures throws. An image that is not wide is refused.
  * docs/decisions.md 2026-10-10 "Trial: the early full-body figures are styled".
  */
 async function bodyRowCells(source) {
@@ -78,9 +76,7 @@ async function bodyRowCells(source) {
   if (!buf) throw new Error('body row could not be read');
   const { width, height } = await sharp(buf).metadata();
   if (!width || !height || width / height < 1.5) throw new Error(`image ${width}x${height} is not a 1x4 body row`);
-  const { splitSheetByEdgeDetection } = require('./sceneComposite');
-  const parts = await splitSheetByEdgeDetection(buf, { cols: 4, rows: 1 });
-  if (!parts || parts.length !== 4 || parts.some(p => !p)) throw new Error('body row: the edge-detected split is not a plausible 4-column grid');
+  const parts = await require('./sheetCut').cutSheet(buf, { rows: 1, cols: 4 });
   const cells = [];
   for (const part of parts) cells.push(await singleCellJpeg(part, width));
   return brandCutList(cells);

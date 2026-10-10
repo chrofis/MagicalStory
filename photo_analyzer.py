@@ -4042,6 +4042,21 @@ def split_grid():
         }), 500
 
 
+def _content_row_span(gray, min_ink=0.02, tone_delta=40):
+    """
+    First and last row that hold painted content, or None when the sheet has none.
+
+    A row counts as content when at least `min_ink` of its pixels differ from the sheet's paper tone (the image median)
+    by more than `tone_delta` grey levels. A one- or two-pixel gutter line crossing the rows stays below `min_ink`.
+    """
+    paper = np.median(gray)
+    ink = (np.abs(gray.astype(np.int16) - paper) > tone_delta).mean(axis=1)
+    rows = np.where(ink >= min_ink)[0]
+    if len(rows) == 0:
+        return None
+    return int(rows[0]), int(rows[-1])
+
+
 def _detect_separators(gray, axis, num_separators, search_range=(0.15, 0.85)):
     """
     Detect the N strongest separator lines along the given axis using variance.
@@ -4068,6 +4083,14 @@ def _detect_separators(gray, axis, num_separators, search_range=(0.15, 0.85)):
         dim = gray.shape[0]
         start = int(dim * search_range[0])
         end = int(dim * search_range[1])
+        # A row of blank paper is as uniform as a gutter, so a sheet whose head row leaves a tall empty band above the
+        # heads (the styled costumed sheets: staging 2026-10-05..10, 5 of 24) used to put its "separator" in that band,
+        # at the first row the search could reach (y=153 of 1024). The row divider lies BETWEEN the figures, so the
+        # search is confined to the rows inside the painted content, inset a tenth of it from either end.
+        content = _content_row_span(gray)
+        if content:
+            inset = int((content[1] - content[0]) * 0.10)
+            start, end = max(start, content[0] + inset), min(end, content[1] - inset)
         variances = [(np.var(gray[y, :].astype(float)), y) for y in range(start, end)]
     else:
         # Find columns

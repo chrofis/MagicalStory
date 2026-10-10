@@ -9783,6 +9783,38 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "sheet-cut-at-figures-2026-10-10",
+      "title": "Every sheet cell and slide is one whole figure with a margin (head row, body row, costumed and standard)",
+      "commits": [],
+      "addedAt": "2026-10-10",
+      "status": "pending",
+      "evidence": [],
+      "claim": "The trial's waiting-page slides and the page references cut from a 2x4 sheet are whole heads and whole bodies; no blank head cell, no body cell holding the head row, including costumed sheets whose head row leaves a tall blank band above the heads.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "One /try on staging (costume theme): the costumed sheet's six slides on the waiting page are a head, a body, a head, a body ... each one figure with white margin, none blank; no \"sheet cut:\" error in the Railway log. Replayed on 44 stored sheets of the last 15 staging trials: 44/44 whole (before 35/44)."
+      }
+    },
+    {
+      "id": "trial-sheet-pass1-judges-deferred-2026-10-10",
+      "title": "Trial sheet: the pass-1 row judges no longer sit between two renders",
+      "commits": [],
+      "addedAt": "2026-10-10",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On a trial costumed/standard sheet the body judge runs while the head row renders and the head and identity judges while pass 2 runs, so the sheet is stored about 8 s earlier than before; the stored verdict (finalVerdict, passes.pass1.attempts scores) is unchanged.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "One /try on staging: in the Railway log the \"body eval\" judge calls start right after the body row (before the head row's 'Edit complete'), the pass-1 line '[CHARACTER 2x4] ... pass-1 (decoupled 2-call): ... final=' appears after pass 2 attempt 1 and carries a score; the costumed sheet is stored at most ~35 s after pass 2 starts instead of ~47 s."
+      }
     }
   ],
   "runs": [

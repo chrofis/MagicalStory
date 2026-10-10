@@ -40,13 +40,13 @@ describe('resolveCellPose sends a face-away figure the rear cell', () => {
 
 describe('applyStoryCellRefs crops the rear cells for an over-the-shoulder figure', () => {
   it('the ref is the back cell stacked with the back-of-head card', async () => {
-    // A 4x2 sheet (each cell 40x40) of flat, distinct colours: row 1 heads,
+    // A 4x2 sheet (each cell 40x40) of flat, distinct colours (a figure on paper in each cell, the way the figure cutter reads a sheet): row 1 heads,
     // row 2 bodies — enough to prove which cells were cut.
     const W = 160, H = 80, cell = 40;
     const composites = [];
     for (let i = 0; i < 8; i++) {
-      const tile = await sharp({ create: { width: cell, height: cell, channels: 3, background: { r: i * 30, g: 10, b: 10 } } }).png().toBuffer();
-      composites.push({ input: tile, left: (i % 4) * cell, top: Math.floor(i / 4) * cell });
+      const tile = await sharp({ create: { width: 20, height: 24, channels: 3, background: { r: i * 30, g: 10, b: 10 } } }).png().toBuffer();
+      composites.push({ input: tile, left: (i % 4) * cell + 10, top: Math.floor(i / 4) * cell + 8 });
     }
     const sheet = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 255, g: 255, b: 255 } } })
       .composite(composites).png().toBuffer();
