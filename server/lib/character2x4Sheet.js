@@ -144,6 +144,13 @@ const SHEET_GROUND_RULE = "The ground stays plain white paper and the thin cell 
 // A label that names a cell or a view ("Front", "Profile") is a caption like any other: the 2026-10-07
 // showcase (job_1791315635053_t0t8qpebu) printed them under the head row of Daniel's sheet and the
 // body judge excused them as "part of the reference sheet structure".
+// Empty hands, on every sheet prompt (docs/decisions.md 2026-10-10). A reference photo that shows the child holding a hoop,
+// a toy or a bag (or wearing a backpack) came out of the body row holding it; a sheet is an identity anchor, and every page
+// is drawn from its cells. The one wording lives here so the body row, head row, style transfer and the avatar-main-prompt
+// template cannot drift. An item the COSTUME names is part of the outfit and stays.
+const SHEET_EMPTY_HANDS_RULE = 'Empty hands: nothing is held or carried in any cell, and no bag or backpack is worn — drop any ring, hoop, ball, toy, bag, backpack, phone or tool that a reference photo shows, with the arms relaxed at the sides; only an item the costume text names stays.';
+// The head row's crop never reaches the hands, so its half of the rule is the one the crop can break: a strap.
+const SHEET_HEAD_SAME_CLOTHES_RULE = 'Where the neckline shows, it is the one Image 3 wears. The clothing at the neck and shoulders is EXACTLY what Image 3 wears: the same garments, colours, collar or hood, straps, emblem and print, nothing added, nothing dropped and no other garment drawn (no bib, straps or layer that Image 3 does not wear); no bag or backpack strap.';
 const SHEET_NO_LETTERING_RULE = 'The sheet is pictures only: the paper around every figure stays blank, with no caption, label, word, letter or number in or between the cells. A label naming a cell or a view (front, profile, …) is a caption too.';
 // Row generators name the cells (front, three-quarter, …); those names are
 // what the model printed. Generator-only: judges never see the cell names.
@@ -341,8 +348,8 @@ function buildGarmentRule() {
 // sheets of two characters (staging job_1790100385959_1nitlympp). On a redress
 // sheet the costume text is the whole outfit; otherwise the body reference is
 // part of the outfit too, so what it shows is not an invention.
-function buildUnnamedTrimRule(redress = false, bodyRef = true) {
-  return redress || !bodyRef
+function buildUnnamedTrimRule(redress = false) {
+  return redress
     ? 'No collar, placket, hood or trim the costume does not name.'
     : 'No collar, placket, hood or trim that neither the costume nor the body reference shows.';
 }
@@ -367,7 +374,7 @@ function buildBodyRowPrompt(costumeDescription, character = null, redress = fals
   const hairBlock = buildHairBlock(character);
   const bodyRef = redress
     ? `Image 2 shows the character's body shape, build, and identity ONLY — IGNORE the clothing in Image 2, it is the wrong outfit. Image 3 is the character's face.`
-    : `Image 2 is the character's body. Image 3 is the character's face.`;
+    : `Image 2 is the character's body: take its CLOTHING ONLY. Whatever the person holds or carries in Image 2 — a hoop, ball or toy in the hands, a backpack or bag on the back or shoulders — is NOT part of the character: the hands are empty and the back and shoulders are bare, with no strap anywhere. Image 3 is the character's face.`;
   // The costume NAME, not just its garments. Without it the model gets a bare
   // garment list and renders each item by its most common association — a cloth
   // head wrap on a small child reads as a headband bow, not as pirate headwear.
@@ -396,14 +403,16 @@ Output a 1×4 grid: ONE row, four cells side by side, thin black vertical divide
 Each cell shows the SAME PERSON as Image 3 rendered as a COMPLETE FULL BODY from the very top of the head to the figure's lowest point, wearing the costume. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 is a REAR TURN: ${REAR_TURN_POSE}. Cell 4 is never a profile and never a flat back view with no face showing — Image 1's cell 4 is a plain reference silhouette only, ignore its exact head angle. Normally that lowest point is both feet with shoes, and the whole figure — head, hair, face, torso, legs, feet — sits inside its cell. When the costume replaces the legs (a tail, a fin, a single fused lower body), the figure has NO legs, NO feet and NO footwear: it ends at the tip of that form, which is then the lowest point. ${TAIL_POSE_RULE} Image 1's standing silhouette applies to the head and torso only. Never crop the head and never crop the lowest point; if the figure does not fit, scale it down until the whole figure is inside the cell, with white margin above and below. ${proportionsRule}
 ${buildFootwearRule(redress, seasonOutfit?.footwear)}
 ${buildGarmentRule()}
+${SHEET_EMPTY_HANDS_RULE}
 The outfit is identical in all four cells, layers included. ${buildUnnamedTrimRule(redress)} When the costume has an outer layer — vest, jacket, cardigan, coat, or overshirt — it stays on in the profile and back cells. Seen edge-on in the profile, its front opening runs as a vertical band down the side of the torso, with the shoulder seam, armhole, and the back panel visible behind the arm. No arrows or symbols anywhere. ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
 }
 
 // Head-row prompt (call 2): one row of 4 head-shots that match the body sheet.
 // Refs: Image 1 = mannequin head row (angles), Image 2 = face photo (identity),
 // Image 3 = the body row from call 1 (match its rendered face/hair).
-// bodyRef false is the PARALLEL trial path: no body row exists yet, so Image 3 is not sent and the prompt says nothing about it.
-function buildHeadRowPrompt(character = null, costumeDescription = '', redress = false, { bodyRef = true } = {}) {
+// The head row is ALWAYS drawn against the body row (Image 3): head and body wear the same clothes (docs/decisions.md 2026-10-10,
+// which replaced the 2026-10-08 parallel rows).
+function buildHeadRowPrompt(character = null, costumeDescription = '', redress = false) {
   const hairBlock = buildHairBlock(character);
   // The costume text reaches this call at all only since the dungaree fault
   // (2026-09-14): the row was generated from the body IMAGE alone, so a part
@@ -413,11 +422,11 @@ function buildHeadRowPrompt(character = null, costumeDescription = '', redress =
 Costume: ${costumeDescription} — the same garment the body sheet wears. Every part of it that the head-and-shoulders crop reaches, straps and neckline included, is drawn.` : '';
   return `Image 1 shows the four camera angles for a head-shot row — use it ONLY for facing direction; ignore its face and features, and never draw arrows.
 Image 2 is the character's face photo — the identity; match this exact face.
-${bodyRef ? `Image 3 is the character's full-body reference sheet — match the SAME face, hair colour, hairstyle, and skin tone shown there so the heads belong to that body.` : 'Hair colour, hairstyle and skin tone are the face photo\'s, with the hair exactly as described below.'}${outfitLine}
-${buildGarmentRule()}${bodyRef ? ' Where the neckline shows, it is the one Image 3 wears.' : ''} ${buildUnnamedTrimRule(redress, bodyRef)}${hairBlock}${buildGlassesBlock(character)}
+Image 3 is the character's full-body reference sheet — match the SAME face, hair colour, hairstyle, and skin tone shown there so the heads belong to that body.${outfitLine}
+${buildGarmentRule()} ${SHEET_HEAD_SAME_CLOTHES_RULE} ${SHEET_EMPTY_HANDS_RULE} ${buildUnnamedTrimRule(redress)}${hairBlock}${buildGlassesBlock(character)}
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background. Each cell is framed like a passport photo of the SAME PERSON: head, neck and the top of the shoulders wearing the costume, cut off at the upper chest, with plain white above the hair and filling the rest of the cell; no bare skin below the neck. No waist, hands or lower body in any cell. Never crop the top of the head. Cell 1 front, cell 2 three-quarter, cell 3 profile.
 Cell 4 is a REAR TURN, distinct from cell 3's profile: ${REAR_TURN_POSE}. Cell 4 is never a second profile and never a flat back of the head with no face showing — Image 1's cell 4 is a plain placeholder silhouette, ignore its exact head angle entirely.
-Photographic / lifelike; identity from Image 2; hair, skin tone, and costume ${bodyRef ? 'consistent with Image 3' : 'as stated above'}.${declaredAgeBlock(character)} No arrows or symbols. ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
+Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3.${declaredAgeBlock(character)} No arrows or symbols. ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
 }
 
 // Pure: the pixels of headroom to add on top of the head row so the sheet stack lands exactly on an aspect preset the
@@ -651,11 +660,10 @@ async function runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skip
 // Two-call generation → one composited 2×4 sheet, WITH review between the calls.
 // (1) body row, reviewed (pose + bodies eval); up to rowTries tries (default 2), keep least-bad.
 // (2) head row on the ACCEPTED body, reviewed (heads + identity); same tries,
-// keep least-bad. parallelRows + rowTries 1 is the trial prewarm only (decisions
-// 2026-10-08): both rows start together and the head row has no body reference. Then composite. Rejected rows are discarded. Returns a verdict
+// keep least-bad. rowTries 1 is the trial prewarm (fastPass1). Then composite. Rejected rows are discarded. Returns a verdict
 // in the evaluateSheetSplit shape so generateCharacter2x4Sheet / styledAvatars
 // consume it unchanged. skipReview → 1 try each, no eval (fast path for tests).
-async function generateComposited2x4(character, { costumeDescription, costumeName = null, redress = false, usageTracker = null, skipReview = false, seasonOutfit = null, rowTries = PASS1_ROW_TRIES, parallelRows = false, precomputedBody = null } = {}) {
+async function generateComposited2x4(character, { costumeDescription, costumeName = null, redress = false, usageTracker = null, skipReview = false, seasonOutfit = null, rowTries = PASS1_ROW_TRIES, precomputedBody = null } = {}) {
   const facePhoto = await resolveFacePhoto(character);
   if (!facePhoto) throw new Error(`No face photo for ${character?.name || 'character'}.`);
   const standardAvatar = await resolveStandardAvatar(character);
@@ -666,7 +674,6 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   const bodyRefs = standardAvatar ? [bodyPhantom, standardAvatar, facePhoto] : [bodyPhantom, facePhoto];
   const bodyPrompt = buildBodyRowPrompt(costumeDescription, character, redress, costumeName, seasonOutfit);
   const headPrompt = buildHeadRowPrompt(character, costumeDescription, redress);
-  const headPromptNoBody = parallelRows ? buildHeadRowPrompt(character, costumeDescription, redress, { bodyRef: false }) : null;
   const attemptHistory = [];
   let usage = { input_tokens: 0, output_tokens: 0 };
   const addUsage = (u, fn, id) => { if (u) { usage.input_tokens += u.input_tokens || 0; usage.output_tokens += u.output_tokens || 0; if (usageTracker) usageTracker('grok', u, fn, id); } };
@@ -680,7 +687,7 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
     // (16:3 is not allowed). Stacked under the 16:9 body row the composite is
     // ~1:1 (720 + 576 ≈ 1280 tall), a native preset for the Pass-2 style call, so
     // no padding/squeeze; full-width, no side margins. See stackRowsInto2x4.
-    const headRefs = bodyRow ? [headPhantom, facePhoto, bodyRow] : [headPhantom, facePhoto]; // 3 behind an accepted body, 2 in parallel
+    const headRefs = [headPhantom, facePhoto, bodyRow];
     let bestHead = null;
     let headGenError = null;
     for (let t = 1; t <= rowTries; t++) {
@@ -690,7 +697,7 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
       // A thrown backend call consumes ONE try — see the body row above.
       let res;
       try {
-        res = await editWithGrok(bodyRow ? headPrompt : headPromptNoBody, headRefs, { aspectRatio: '20:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
+        res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '20:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
       } catch (err) {
         headGenError = err?.message || String(err);
         attemptHistory.push({ stage: 'head', try: t, error: `gen-error: ${headGenError}` });
@@ -720,22 +727,11 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
     return bestHead;
   };
 
-  // SEQUENTIAL (default): the head row is drawn against the ACCEPTED body row (decisions 2026-08-09), so the heads belong to that
-  // body. PARALLEL (trial prewarm, decisions 2026-10-08): both rows start at once and the head row has no body reference, only the
-  // face photo, the costume text and the hair block — the two calls overlap instead of adding up.
-  let bestBody;
-  let bestHead;
-  if (parallelRows) {
-    const [bodyS, headS] = await Promise.allSettled([runBodyRow(), runHeadRow(null)]);
-    if (bodyS.status === 'rejected') throw bodyS.reason;
-    if (headS.status === 'rejected') throw headS.reason;
-    bestBody = bodyS.value;
-    bestHead = headS.value;
-  } else {
-    bestBody = await runBodyRow();
-    bestHead = await runHeadRow(bestBody.row);
-  }
-
+  // The head row is drawn against the ACCEPTED body row (decisions 2026-08-09), so the heads belong to that body and wear its
+  // clothes. The 2026-10-08 parallel mode (head row without the body) is gone: costumed head and body differed in emblem and
+  // collar (docs/decisions.md 2026-10-10).
+  const bestBody = await runBodyRow();
+  const bestHead = await runHeadRow(bestBody.row);
 
   // ── Composite + build the evaluateSheetSplit-shape verdict from the reviews ──
   const { imageData, splitY } = await stackRowsInto2x4(bestHead.row, bestBody.row);
@@ -1112,7 +1108,7 @@ function buildStyleTransferPrompt(artStyle, { hasAnchor = false } = {}) {
   return `Change the art style of Image 1 — a 2×4 character reference sheet (8 cells) — to: ${styleLine}
 Render all 8 cells uniformly in this style — no cell left photographic.
 
-Keep the content of Image 1 unchanged; only the art style changes. Every cell shows the same single character as Image 1, alone — no other person or figure anywhere on the sheet. Hair colour and skin tone stay as Image 1 shows them, with no colour patch on the face that Image 1 does not have. ${garmentColourRule('Image 1')} ${SHEET_GROUND_RULE} ${SHEET_NO_LETTERING_RULE}${anchorLine}`;
+Keep the content of Image 1 unchanged; only the art style changes. Every cell shows the same single character as Image 1, alone — no other person or figure anywhere on the sheet. Hair colour and skin tone stay as Image 1 shows them, with no colour patch on the face that Image 1 does not have. ${garmentColourRule('Image 1')} ${SHEET_GROUND_RULE} ${SHEET_EMPTY_HANDS_RULE} ${SHEET_NO_LETTERING_RULE}${anchorLine}`;
 }
 
 // Optional per-art-style STYLE ANCHOR asset (server/assets/style-anchor-<style>.jpg|png)
@@ -1961,7 +1957,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     // child is wearing. Never touches identity; ignored on a redress sheet,
     // where the costume owns the outfit.
     seasonOutfit = null,
-    // fastPass1 = the trial prewarm (decisions 2026-10-08): pass 1 draws the body row and the head row AT THE SAME TIME, one
+    // fastPass1 = the trial prewarm (decisions 2026-10-08, parallel rows replaced 2026-10-10): pass 1 draws the body row, then the head row against it, one
     // try each, and pass 2 restyles whatever comes back. The full-story path leaves it false: sequential rows, two tries each.
     fastPass1 = false,
     // A body row drawn ahead of the sheet by generateBodyRow (the trial draws it at the photo); stage 1 is skipped.
@@ -1987,7 +1983,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     composed = await generateComposited2x4(character, {
       costumeDescription, costumeName, redress, usageTracker, skipReview: skipQualityEval, seasonOutfit,
       precomputedBody,
-      ...(fastPass1 ? { rowTries: 1, parallelRows: true } : {}),
+      ...(fastPass1 ? { rowTries: 1 } : {}),
     });
   } catch (err) {
     throw new Error(`[CHARACTER 2×4] pass-1 generation failed for ${character?.name}: ${err.message}`);
@@ -2597,5 +2593,5 @@ module.exports = {
   buildStyleTransferPrompt,
   // exposed for tests
   readAvatarHair,
-  _internal: { SHEET_HARD_FAIL_MAX, hardFailFeedback, buildFedBackPrompt, stampVerdict, sheetStackPad, stackRowsInto2x4, mergeRowObservations, observeStyledRow, hairRequest, headRowCropFraction, cropHeadRowToShoulders, applyRowConsistencyAxes, applyStyledSheetConsistencyAxes, TAIL_POSE_RULE, applyGlassesAxis, applyPoseHeadGate, detectBodyRowHeads, detectSheetRowDivider, parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, SHEET_NO_LETTERING_RULE, CELL_NAMES_NOT_DRAWN, garmentColourRule, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
+  _internal: { generateComposited2x4, SHEET_HARD_FAIL_MAX, hardFailFeedback, buildFedBackPrompt, stampVerdict, sheetStackPad, stackRowsInto2x4, mergeRowObservations, observeStyledRow, hairRequest, headRowCropFraction, cropHeadRowToShoulders, applyRowConsistencyAxes, applyStyledSheetConsistencyAxes, TAIL_POSE_RULE, applyGlassesAxis, applyPoseHeadGate, detectBodyRowHeads, detectSheetRowDivider, parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, SHEET_NO_LETTERING_RULE, CELL_NAMES_NOT_DRAWN, garmentColourRule, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
 };

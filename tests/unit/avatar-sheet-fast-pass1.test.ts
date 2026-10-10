@@ -1,6 +1,6 @@
 /**
- * Trial prewarm: the realistic pass-1 sheet draws the body row and the head row AT THE SAME TIME and
- * takes ONE try per row (docs/decisions.md 2026-10-08, "Trial avatar sheet: parallel rows, one try").
+ * Trial prewarm: the realistic pass-1 sheet takes ONE try per row (docs/decisions.md 2026-10-08), the head row
+ * drawn after and against the body row (parallel rows were replaced 2026-10-10: head and body must wear the same clothes).
  *
  * Origin: the trial's costumed avatar took 133 s on staging, every step sequential: body try 1 (21 s),
  * body try 2 (12 s), head try 1 (31 s), head try 2 (20 s), then pass 2 twice. Full stories keep the
@@ -36,7 +36,7 @@ function extractFunction(src: string, name: string): string {
   return src.slice(start, i);
 }
 
-type Opts = { rowTries?: number; parallelRows?: boolean };
+type Opts = { rowTries?: number };
 
 /** Both rows take `ms` to draw. `bodyScores` / `headScores` give the review score of try 1, 2, ... */
 async function runPass1(opts: Opts, { bodyScores = [9], headScores = [9], ms = 30 } = {}) {
@@ -57,7 +57,7 @@ async function runPass1(opts: Opts, { bodyScores = [9], headScores = [9], ms = 3
     loadPhantomVariant: () => 'phantom',
     phantomRow: async () => 'PHANTOM',
     buildBodyRowPrompt: () => 'BODY PROMPT',
-    buildHeadRowPrompt: (_c: any, _d: any, _r: any, o: any) => (o && o.bodyRef === false ? 'HEAD PROMPT NO BODY' : 'HEAD PROMPT'),
+    buildHeadRowPrompt: () => 'HEAD PROMPT',
     editWithGrok: async (prompt: string, refs: string[]) => {
       const row = prompt === 'BODY PROMPT' ? 'body' : 'head';
       const t = row === 'body' ? ++calls.body : ++calls.head;
@@ -89,40 +89,36 @@ ${extractFunction(SRC, 'generateComposited2x4')}\nmodule.exports = generateCompo
   return { out, calls, log };
 }
 
-describe('pass 1 rows: parallel (trial prewarm)', () => {
-  it('starts the body row and the head row before either finishes', async () => {
-    const { calls, log } = await runPass1({ rowTries: 1, parallelRows: true });
-    expect(calls.maxInFlight).toBe(2);
-    expect(log.slice(0, 2).sort()).toEqual(['start body1', 'start head1']);
+describe('pass 1 rows: one try each, head row after the body row (trial prewarm)', () => {
+  it('never starts the head row before the body row has finished (head and body wear the same clothes, decisions 2026-10-10)', async () => {
+    const { calls, log } = await runPass1({ rowTries: 1 });
+    expect(calls.maxInFlight).toBe(1);
+    expect(log).toEqual(['start body1', 'end body1', 'start head1', 'end head1']);
   });
 
-  it('draws the head row from the phantom and the face photo only, with the no-body prompt', async () => {
-    const { calls } = await runPass1({ rowTries: 1, parallelRows: true });
-    expect(calls.headRefs[0]).toEqual(['PHANTOM', 'FACE']);
-    expect(calls.headPrompts[0]).toBe('HEAD PROMPT NO BODY');
+  it('draws the head row against the body row as Image 3, never without it', async () => {
+    const { calls } = await runPass1({ rowTries: 1 });
+    expect(calls.headRefs[0]).toEqual(['PHANTOM', 'FACE', 'BODY1']);
   });
 
   it('composites the one body row with the one head row', async () => {
-    const { out } = await runPass1({ rowTries: 1, parallelRows: true });
+    const { out } = await runPass1({ rowTries: 1 });
     expect(out.imageData).toBe('SHEET(HEAD1|BODY1)');
   });
 
   it('two invalid rows still composite, and the verdict reports them invalid', async () => {
-    const { out } = await runPass1({ rowTries: 1, parallelRows: true }, { bodyScores: [1], headScores: [3] });
-    // the sheet still composites (pass 2 restyles it); the verdict reports it invalid, loudly
+    const { out } = await runPass1({ rowTries: 1 }, { bodyScores: [1], headScores: [3] });
     expect(out.verdict.valid).toBe(false);
   });
-});
 
-describe('pass 1 rows: one try each (rowTries 1)', () => {
   it('an invalid body and an invalid head are NOT retried', async () => {
-    const { out, calls } = await runPass1({ rowTries: 1, parallelRows: true }, { bodyScores: [4, 9], headScores: [4, 9] });
+    const { out, calls } = await runPass1({ rowTries: 1 }, { bodyScores: [4, 9], headScores: [4, 9] });
     expect(calls.body).toBe(1);
     expect(calls.head).toBe(1);
     expect(out.attemptHistory.map((a: any) => `${a.stage}${a.try}`).sort()).toEqual(['body1', 'head1']);
   });
 
-  it('the sequential default still retries each row once', async () => {
+  it('the default still retries each row once', async () => {
     const { calls } = await runPass1({}, { bodyScores: [4, 9], headScores: [4, 9] });
     expect(calls.body).toBe(2);
     expect(calls.head).toBe(2);
@@ -143,21 +139,15 @@ describe('the trial prewarm is the one caller that asks for it', () => {
   const sheet = require('../../server/lib/character2x4Sheet.js');
   const { buildHeadRowPrompt } = sheet;
 
-  it('the no-body head prompt never mentions an Image 3 and states the hair and the costume itself', () => {
-    const p = buildHeadRowPrompt({ name: 'A', age: 9 }, 'a blue robe', false, { bodyRef: false });
-    expect(p).not.toMatch(/Image 3/);
-    expect(p).toContain('a blue robe');
-  });
-
-  it('the default head prompt is unchanged and still binds the heads to Image 3', () => {
+  it('there is no parallel mode and no head prompt without a body reference', () => {
+    expect(SRC).not.toMatch(/parallelRows/);
+    expect(SRC).not.toMatch(/bodyRef: false/);
     const p = buildHeadRowPrompt({ name: 'A', age: 9 }, 'a blue robe', false);
     expect(p).toMatch(/Image 3 is the character's full-body reference sheet/);
-    expect(p).toMatch(/Where the neckline shows, it is the one Image 3 wears/);
   });
 
-  it('generateCharacter2x4Sheet maps fastPass1 to one try and parallel rows, nothing else does', () => {
-    expect(SRC).toMatch(/fastPass1 \? \{ rowTries: 1, parallelRows: true \} : \{\}/);
-    expect(SRC.match(/parallelRows: true/g)).toHaveLength(1);
+  it('generateCharacter2x4Sheet maps fastPass1 to one try per row, nothing else does', () => {
+    expect(SRC).toMatch(/fastPass1 \? \{ rowTries: 1 \} : \{\}/);
   });
 
   it('styledAvatars threads fastPass1 down to the sheet builder, and only the trial prewarm sets it', () => {

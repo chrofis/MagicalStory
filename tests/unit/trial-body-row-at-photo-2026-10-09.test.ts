@@ -81,7 +81,7 @@ describe('1. the body row is its own render, before the head row', () => {
     expect(typeof require('../../server/lib/character2x4Sheet.js').generateBodyRow).toBe('function');
   });
   it('the sequential sheet draws the body row first, the head row after it against the accepted body', () => {
-    expect(SRC).toMatch(/bestBody = await runBodyRow\(\);\s*\n\s*bestHead = await runHeadRow\(bestBody\.row\);/);
+    expect(SRC).toMatch(/bestBody = await runBodyRow\(\);\s*\n\s*const bestHead = await runHeadRow\(bestBody\.row\);/);
   });
   it('a precomputed body row is threaded through the styling chain and the sheet skips stage 1', () => {
     const s = read('server/lib/styledAvatars.js');
