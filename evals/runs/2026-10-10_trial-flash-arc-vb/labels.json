@@ -1,0 +1,20 @@
+{
+ "note": "One reader (the agent), arm hidden by blind-key-run.json; unblinded afterwards.",
+ "verdicts": {
+  "job_1791579344291_rk2bno6av": "medium better (clear): test drops plush elephant Eli (character special details), absent from arc and bible",
+  "job_1791496820206_qwcnrq30r": "medium slightly better: spells the word letter by letter as the idea says; test less faithful",
+  "job_1791391658361_4eylyr1w4": "test better: medium says Natel in an Iowa park",
+  "job_1791554548909_kl0phznw2": "tie: test Betonwand and invented Mutter; medium Mehr hatte sie nicht",
+  "job_1791551298726_19tfcxccl": "tie",
+  "job_1791450452362_pv0l5hf49": "medium better: test writes the goose face in the text (soft and calm), against the rule",
+  "job_1791450270543_n1iu8ipsu": "tie: medium invents Mama",
+  "job_1790769860433_2bhhj0pyi": "medium better: test turns the crystal bridge into a wooden one, long adult sentences",
+  "job_1790680992018_nd95o89r7": "test better: medium leaves the wounded unicorn to change clothes, loses the feather twice",
+  "job_1791500208126_at0wow7xa": "test better: medium invents a flute, gnome Burr, no walk home proud"
+ },
+ "tally": {
+  "test_better": 3,
+  "tie": 3,
+  "medium_better": 4
+ }
+}
