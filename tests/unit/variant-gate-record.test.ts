@@ -3,7 +3,7 @@
  *
  * Staging job_1791145238223_50osg2osm: two off-garment variants were made and
  * served, the garment-gone check ran twice and was billed, and its answer was
- * stored nowhere. Pinned: every attempt carries its gate answer (style verdict,
+ * stored nowhere. Pinned: every attempt carries its gate answer (the sheet judge's flags,
  * each per-garment question and answer, accept/reject), a rejected redress still
  * returns that record, and the log entry built from it holds text only.
  * The model is stubbed (fetch for the judges, the Grok edit for the generator).
@@ -16,8 +16,13 @@ const { loadPromptTemplates } = cjs('../../server/services/prompts.js');
 
 // Big enough to split into its two rows (the styled judge asks its per-cell checks of each row).
 const PIXEL = 'data:image/jpeg;base64,/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAQABADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKpAB//Z';
-const ROW_OK = { cells: Object.fromEntries([1, 2, 3, 4].map(i => [`cell${i}`, { medium: 'illustrated', hair: 'match', person: 'same' }])), letteringSeen: false, letteringQuoted: 'none', reason: 'cell1: brown hair, no glasses, illustrated' };
-const STYLE_OK = { layoutScore: 9, identityScore: 9, styleScore: 9, cleanScore: 9, bodyFaceScore: 9, ageScore: 9, soloScore: 9, backgroundScore: 9 };
+// The ONE sheet judge's clean answer (every type ok, 8 cells without a defect); stored sheet flags are [] for it.
+const JUDGE_OK = {
+  cells: [1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ cell: n, headgear: 'none', hairVisible: 'full', hairColour: 'brown', hairStyle: 'down', head: 'present', top: 'grey tunic', extras: 'none', heldObject: 'none' })),
+  hat: { verdict: 'ok', cells: [] }, hair: { verdict: 'ok', cells: [] }, bald: { verdict: 'ok', cells: [] }, costume: { verdict: 'ok', cells: [] },
+  rowMatch: { verdict: 'ok', cells: [] }, held: { verdict: 'ok', cells: [] }, tail: { verdict: 'ok', cells: [] }, layout: { verdict: 'ok', cells: [] },
+  identity: { verdict: 'ok', cells: [] }, age: { verdict: 'ok', cells: [] }, evidence: 'none',
+};
 
 let SHEET: any;
 let SA: any;
@@ -32,7 +37,6 @@ function stubJudges(garmentAnswers: boolean[], keptAnswers: boolean[] = [true, t
   let k = 0;
   sentQuestions.length = 0;
   globalThis.fetch = (async (_u: any, init: any) => {
-    if (!JSON.parse(init.body).contents) return { ok: true, status: 200, json: async () => ({}), text: async () => '' }; // the analyzer's row-divider call
     const text = JSON.parse(init.body).contents[0].parts.map((p: any) => p.text || '').join('\n');
     if (/is .+ visible on the figure in cells 5 to 8/.test(text)) sentQuestions.push(text);
     const keptAns = /is .+ visible on the figure in cells 5 to 8/.test(text) ? keptAnswers[k++] : null;
@@ -40,8 +44,7 @@ function stubJudges(garmentAnswers: boolean[], keptAnswers: boolean[] = [true, t
       ? { cells: 'cell5: yes; cell6: yes; cell7: yes; cell8: yes', visible: keptAns, reason: keptAns ? 'all four show it' : 'cells 5-8 show no strap' }
       : /is .+ visible on the figure/.test(text)
       ? { cells: 'cell1: red coat; cell2: red coat', visible: garmentAnswers[q++], reason: garmentAnswers[q - 1] ? 'cell 3 shows a mitten' : 'no cell shows it' }
-      : /ONE row of a styled character reference sheet/.test(text) ? ROW_OK
-      : STYLE_OK;
+      : JUDGE_OK;
     return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(verdict) }] }, finishReason: 'STOP' }], usageMetadata: {} }), text: async () => '' };
   }) as any;
 }
@@ -59,12 +62,11 @@ afterEach(() => { globalThis.fetch = realFetch; editCalls = 0; });
 
 const OPTS = {
   characterName: 'Daniel', authoredWardrobe: 'The bolt is off; the tunic stays.', removedItems: ['bolt'],
-  facePhoto: PIXEL, realisticSheet: PIXEL, artStyle: 'watercolor', characterAge: 8,
   keptGarments: [{ type: 'baldric', colour: 'brown', details: 'leather, wide' }, { type: 'tunic', colour: 'grey', details: 'wool' }],
 };
 
 describe('redressSheetVariant stores the gate answer', () => {
-  it('a rejected first attempt and an accepted second both carry their style verdict and per-garment answer', async () => {
+  it('a rejected first attempt and an accepted second both carry the sheet-judge flags and the per-garment answer', async () => {
     process.env.GEMINI_API_KEY ||= 'test-key';
     stubJudges([true, false]); // attempt 1: bolt still visible; attempt 2: gone
     const out = await SHEET.redressSheetVariant(PIXEL, OPTS);
@@ -72,7 +74,7 @@ describe('redressSheetVariant stores the gate answer', () => {
     expect(out.attempts).toHaveLength(2);
     const [a1, a2] = out.attempts;
     expect(a1.accepted).toBe(false);
-    expect(a1.gate.style).toMatchObject({ score: 9, valid: true });
+    expect(a1.gate.sheetFlags).toEqual([]);
     expect(a1.gate.garmentChecks).toHaveLength(1);
     expect(a1.gate.garmentChecks[0]).toMatchObject({ garment: 'bolt', visible: true, reason: 'cell 3 shows a mitten' });
     expect(a1.gate.garmentChecks[0].question).toContain('is bolt visible');

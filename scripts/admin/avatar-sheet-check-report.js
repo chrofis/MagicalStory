@@ -18,8 +18,6 @@ require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 const flag = (n, d = null) => { const a = process.argv.find(x => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : d; };
 const env = flag('env', 'staging');
 const since = flag('since', '2026-10-10');
-const url = env === 'prod' ? process.env.DATABASE_URL : process.env.STAGING_DATABASE_URL;
-if (!url) throw new Error(`no database url for --env=${env}`);
 
 /** Pure: the counts of a list of sheetCheck records. Exported for the unit test. */
 function summarize(checks) {
@@ -47,6 +45,8 @@ function summarize(checks) {
 }
 
 async function main() {
+  const url = env === 'prod' ? process.env.DATABASE_URL : process.env.STAGING_DATABASE_URL;
+  if (!url) throw new Error(`no database url for --env=${env}`);
   const { Pool } = require('pg');
   const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
   const res = await pool.query(
