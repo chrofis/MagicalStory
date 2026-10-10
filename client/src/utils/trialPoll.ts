@@ -55,6 +55,24 @@ export function avatarFigureOf(src: string): string {
 }
 
 /**
+ * The hero picture IS the front cell of the standard body row / sheet, which the slide lists then carry as
+ * `standard-front-body`. The hero's string (a data URI) cannot say so, so this label stands in for it: after the hero was
+ * on screen, that figure counts as shown (owner iPhone 2026-10-10: "the full body comes twice at the start").
+ */
+export const HERO_FIGURE = 'standard-front-body';
+
+/**
+ * The picture to show NOW. `displayed` is what is on screen; while it is still in the pool that is it. When the pool was
+ * replaced under it (the hero gave way to the first slide list) the next figure that was not shown is chosen, with the
+ * hero counted as the standard front body. `shown` is not changed.
+ */
+export function resolveCurrentAvatar(pool: string[], shown: Set<string>, displayed: string | null, hero?: string | null): string | null {
+  if (displayed && pool.includes(displayed)) return displayed;
+  if (displayed && hero && displayed === hero) return nextAvatarSource(pool, new Set(shown), displayed, hero);
+  return pool[0] ?? null;
+}
+
+/**
  * The waiting-screen avatar pool: the slides once the server has any, the hero's front picture only until then.
  * The hero IS the front body cell of the standard sheet, which is also the first body slide: keeping both showed that
  * figure three times in the first five slots (owner iPhone, 2026-10-09: "the main avatar comes up too often at the
@@ -79,10 +97,10 @@ export function avatarPoolSources(hero: string | null | undefined, slides: strin
  * while the slideshow runs (body-row slides, then the finished sheet's) never restarts it and never repeats a figure.
  * Returns the pool's first picture when nothing is current.
  */
-export function nextAvatarSource(pool: string[], shown: Set<string>, current: string | null): string | null {
+export function nextAvatarSource(pool: string[], shown: Set<string>, current: string | null, hero?: string | null): string | null {
   if (pool.length === 0) return null;
   const figures = pool.map(avatarFigureOf);
-  const curFigure = current ? avatarFigureOf(current) : null;
+  const curFigure = current ? (hero && current === hero ? HERO_FIGURE : avatarFigureOf(current)) : null;
   const at = curFigure ? figures.indexOf(curFigure) : -1;
   if (curFigure) shown.add(curFigure);
   if (figures.every(f => shown.has(f))) {

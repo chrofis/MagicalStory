@@ -10,7 +10,7 @@ import { trackEmailLead, trackTrialStoryCompleted } from '@/utils/gtagConversion
 import { trackEvent } from '@/utils/analytics';
 import { trackTrialStep } from '@/utils/trialFunnel';
 import { FUNNY_MESSAGES, NAMELESS_FUNNY_MESSAGES, funnyDeck, funnyLine } from '@/utils/funnyMessages';
-import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs, mergeAvatarSlides, shouldRedirectToStories, avatarPoolSources, nextAvatarSource } from '@/utils/trialPoll';
+import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs, mergeAvatarSlides, shouldRedirectToStories, avatarPoolSources, nextAvatarSource, resolveCurrentAvatar, HERO_FIGURE } from '@/utils/trialPoll';
 import { Navigation } from '@/components/common';
 import RenderErrorBoundary from '@/components/common/RenderErrorBoundary';
 import TrialBook, { TrialGateProvider } from '@/components/book/TrialBook';
@@ -746,7 +746,14 @@ export default function TrialGenerationPage() {
   const avatarPool = useMemo(() => avatarPoolSources(state?.heroAvatar, avatarSlides), [state?.heroAvatar, avatarSlides]);
   const shownAvatarsRef = useRef<Set<string>>(new Set());
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
-  const currentAvatar = avatarSrc && avatarPool.includes(avatarSrc) ? avatarSrc : avatarPool[0] ?? null;
+  const currentAvatar = resolveCurrentAvatar(avatarPool, shownAvatarsRef.current, avatarSrc, state?.heroAvatar);
+  // The first picture on screen is recorded at once: it is the hero when no slide exists yet, and the hero's figure then
+  // counts as shown when the slide lists arrive (HERO_FIGURE).
+  useEffect(() => {
+    if (avatarSrc !== null || !avatarPool[0]) return;
+    if (avatarPool[0] === state?.heroAvatar) shownAvatarsRef.current.add(HERO_FIGURE);
+    setAvatarSrc(avatarPool[0]);
+  }, [avatarPool, avatarSrc, state?.heroAvatar]);
 
   const slideshowItems = useMemo<Slide[]>(() => {
     const items: Slide[] = [];
@@ -804,10 +811,10 @@ export default function TrialGenerationPage() {
     else if (currentSlide.caption.kind === 'none') dwellMs = 10000;
     const id = setTimeout(() => {
       setSlideshowIndex(prev => (prev + 1) % Math.max(1, slideshowItems.length));
-      setAvatarSrc(nextAvatarSource(avatarPool, shownAvatarsRef.current, currentAvatar));
+      setAvatarSrc(nextAvatarSource(avatarPool, shownAvatarsRef.current, currentAvatar, state?.heroAvatar));
     }, dwellMs);
     return () => clearTimeout(id);
-  }, [slideshowIndex, slideshowItems, avatarPool, currentAvatar]);
+  }, [slideshowIndex, slideshowItems, avatarPool, currentAvatar, state?.heroAvatar]);
 
   // Smoothed-progress driver. Floors the visible bar with a time-based optimistic
   // curve so the user sees forward motion immediately, even when the server
