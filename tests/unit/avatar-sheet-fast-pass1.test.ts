@@ -1,10 +1,8 @@
 /**
- * Trial prewarm: the realistic pass-1 sheet takes ONE try per row (docs/decisions.md 2026-10-08), the head row
- * drawn after and against the body row (parallel rows were replaced 2026-10-10: head and body must wear the same clothes).
- *
- * Origin: the trial's costumed avatar took 133 s on staging, every step sequential: body try 1 (21 s),
- * body try 2 (12 s), head try 1 (31 s), head try 2 (20 s), then pass 2 twice. Full stories keep the
- * sequential, head-after-accepted-body, two-try chain (decisions 2026-08-09).
+ * The full-story sheet's pass 1 (generateComposited2x4): body row, then the head row drawn after and against the accepted body
+ * (parallel rows were replaced 2026-10-10: head and body must wear the same clothes), two tries per row by default.
+ * The trial used to run it with ONE try per row (fastPass1, decisions 2026-10-08) and deferred judges; it now draws its sheet in
+ * one call (oneCallSheet.js, tests/unit/trial-one-call-sheet-2026-10-10.test.ts), and that mode was deleted.
  *
  * The real generateComposited2x4 source is sliced out and run in an isolated vm with the backend and
  * the row judges stubbed (the module itself pulls native sharp).
@@ -36,7 +34,7 @@ function extractFunction(src: string, name: string): string {
   return src.slice(start, i);
 }
 
-type Opts = { rowTries?: number; deferJudges?: boolean };
+type Opts = { rowTries?: number };
 
 /** Both rows take `ms` to draw. `bodyScores` / `headScores` give the review score of try 1, 2, ... */
 async function runPass1(opts: Opts, { bodyScores = [9], headScores = [9], ms = 30, judgeMs = 0 } = {}) {
@@ -92,7 +90,7 @@ ${extractFunction(SRC, 'generateComposited2x4')}\nmodule.exports = generateCompo
   return { out, calls, log: log.filter(e => /^(start|end) (body|head)\d/.test(e)), events: log };
 }
 
-describe('pass 1 rows: one try each, head row after the body row (trial prewarm)', () => {
+describe('pass 1 rows: rowTries 1 = one try each, head row after the body row', () => {
   it('never starts the head row before the body row has finished (head and body wear the same clothes, decisions 2026-10-10)', async () => {
     const { calls, log } = await runPass1({ rowTries: 1 });
     expect(calls.maxInFlight).toBe(1);
@@ -138,9 +136,8 @@ describe('pass 1 rows: sequential default is unchanged (full stories)', () => {
   });
 });
 
-describe('the trial prewarm is the one caller that asks for it', () => {
-  const sheet = require('../../server/lib/character2x4Sheet.js');
-  const { buildHeadRowPrompt } = sheet;
+describe('the trial no longer uses the row chain (docs/decisions.md 2026-10-10 "one-call sheets in the trial")', () => {
+  const { buildHeadRowPrompt } = require('../../server/lib/character2x4Sheet.js');
 
   it('there is no parallel mode and no head prompt without a body reference', () => {
     expect(SRC).not.toMatch(/parallelRows/);
@@ -149,76 +146,10 @@ describe('the trial prewarm is the one caller that asks for it', () => {
     expect(p).toMatch(/Image 3 is the character's full-body reference sheet/);
   });
 
-  it('generateCharacter2x4Sheet maps fastPass1 to one try per row, nothing else does', () => {
-    expect(SRC).toMatch(/fastPass1 \? \{ rowTries: 1, deferJudges: true \} : \{\}/);
-  });
-
-  it('styledAvatars threads fastPass1 down to the sheet builder, and only the trial prewarm sets it', () => {
-    const styled = fs.readFileSync(path.join(ROOT, 'server/lib/styledAvatars.js'), 'utf8');
-    expect(styled.match(/fastPass1/g)!.length).toBeGreaterThanOrEqual(8);
-    const trial = fs.readFileSync(path.join(ROOT, 'server/routes/trial.js'), 'utf8');
-    expect(trial.match(/fastPass1: true/g)).toHaveLength(1);
-    // prepare-title hands it to the one styling helper (styleAndPersistTrialSheets -> prepareStyledAvatars); the standard
-    // sheet endpoint does not set it: its head row has no costume text, so it must agree with the body row on the garment
-    expect(trial).toContain('styleOptions: { seasonOutfit: seasonOutfitGuidance({ storyCategory }), fastPass1: true }');
-    for (const f of ['server/lib/storyAvatars.js', 'storyJobPipeline.js']) {
+  it('the trial-only chain is deleted: no fastPass1, deferred judges, precomputed body row, early body row or row styling', () => {
+    for (const f of ['server/lib/character2x4Sheet.js', 'server/lib/styledAvatars.js', 'server/lib/trialSheets.js', 'server/lib/avatarSlides.js', 'server/routes/trial.js', 'server/lib/testlab.js', 'storyJobPipeline.js']) {
       const t = fs.readFileSync(path.join(ROOT, f), 'utf8');
-      expect(t).not.toMatch(/fastPass1/);
+      expect(t, f).not.toMatch(/fastPass1|deferJudges|precomputedBod|verdictPromise|generateBodyRow|generateStandardBodyRow|styleBodyRow|bodyRowCells|slidesOfBodyRowCells|persistBodyRowSlides|standardBodyRows/);
     }
-    // The Test Lab may replay the trial's mode in exactly one stage, avatar_sheet_variant (params.fastPass1, default on): it
-    // measures the trial's own sheet. Every other Lab stage stays off it (docs/decisions.md 2026-10-10 "avatar sheet variants").
-    const lab = fs.readFileSync(path.join(ROOT, 'server/lib/testlab.js'), 'utf8');
-    const start = lab.indexOf('// The Grok tiers a sheet variant may name');
-    const end = lab.indexOf('/** Pass 2: style transfer of an existing realistic sheet');
-    expect(start).toBeGreaterThan(0);
-    expect(end).toBeGreaterThan(start);
-    expect(lab.slice(0, start) + lab.slice(end)).not.toMatch(/fastPass1/);
-  });
-});
-
-describe('pass 1 rows: a body row drawn ahead of the sheet (trial, at the photo)', () => {
-  it('skips stage 1: no body call, the head row is drawn against the precomputed row, and the sheet composites it', async () => {
-    const pre = { row: 'PREBODY', review: { valid: true, score: null, evaluated: false, bodies: null }, attemptHistory: [{ stage: 'body', try: 1 }] };
-    const { out, calls } = await runPass1({ precomputedBody: pre });
-    expect(calls.body).toBe(0);
-    expect(calls.head).toBe(1);
-    expect(calls.headRefs[0]).toEqual(['PHANTOM', 'FACE', 'PREBODY']);
-    expect(out.imageData).toBe('SHEET(HEAD1|PREBODY)');
-    expect(out.attemptHistory.map((a: any) => `${a.stage}${a.try}`)).toEqual(['body1', 'head1']);
-  });
-});
-
-describe('deferred judges (trial prewarm, one try per row): the verdict never stands between two renders', () => {
-  it('the body judge runs while the head row renders; the head judge is still running when the sheet is returned', async () => {
-    const { out, events: log } = await runPass1({ rowTries: 1, deferJudges: true }, { ms: 60, judgeMs: 30 });
-    // body judge starts the moment the body row exists, in parallel with the head render (not before it)
-    expect(log.indexOf('start bodyJudge')).toBeGreaterThan(log.indexOf('end body1'));
-    expect(log.indexOf('start bodyJudge')).toBeLessThan(log.indexOf('end head1'));
-    expect(log.indexOf('end bodyJudge')).toBeGreaterThan(-1);
-    expect(log.indexOf('end bodyJudge')).toBeLessThan(log.indexOf('end head1')); // the 30 ms judge finishes inside the 60 ms head render
-    // the sheet is returned before the head judge has answered, and carries no verdict yet
-    expect(log).not.toContain('end headJudge');
-    expect(out.verdict).toBeUndefined();
-    expect(out.imageData).toBe('SHEET(HEAD1|BODY1)');
-    // the verdict arrives afterwards and is the one the sequential run gives
-    const settled = await out.verdictPromise;
-    expect(settled.verdict.valid).toBe(true);
-    expect(settled.verdict.finalScore).toBe(9);
-    expect(out.attemptHistory.map((a: any) => `${a.stage}${a.try}:${a.score}`).sort()).toEqual(['body1:9', 'head1:9']);
-  });
-  it('an invalid deferred verdict is still reported invalid, and nothing is retried', async () => {
-    const { out, calls } = await runPass1({ rowTries: 1, deferJudges: true }, { bodyScores: [1], headScores: [3] });
-    expect((await out.verdictPromise).verdict.valid).toBe(false);
-    expect(calls.body).toBe(1);
-    expect(calls.head).toBe(1);
-  });
-  it('two tries per row ignore the deferral: the judge decides whether to retry, so it is awaited in sequence', async () => {
-    const { out, events: log } = await runPass1({ rowTries: 2, deferJudges: true }, { bodyScores: [4, 9], headScores: [9], judgeMs: 5 });
-    expect(out.verdict).toBeDefined();
-    expect(log.indexOf('end bodyJudge')).toBeLessThan(log.indexOf('start body2'));
-  });
-  it('without the deferral (the full story) the judges are awaited before the head row starts', async () => {
-    const { events: log } = await runPass1({ rowTries: 1 }, { judgeMs: 10 });
-    expect(log.indexOf('end bodyJudge')).toBeLessThan(log.indexOf('start head1'));
   });
 });

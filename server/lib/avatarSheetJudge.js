@@ -9,7 +9,8 @@
  * humans reading the audit and is never parsed. Classification lives in the PROMPT; code only (a) validates the
  * enums, (b) compares per-cell ENUM answers across cells, and (c) maps verdict words to a defect list.
  *
- * NOT WIRED into the pipeline. The measurement is scripts/analysis/eval-avatar-sheet-judge.js.
+ * WIRED into the trial's one-call sheets (server/lib/oneCallSheet.js, docs/decisions.md 2026-10-10 "one-call sheets in the trial").
+ * The measurement is scripts/analysis/eval-avatar-sheet-judge.js.
  */
 
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
@@ -138,10 +139,71 @@ function defectsOf(parsed, use = {}) {
   return found;
 }
 
+// The types a redo is triggered by: the ones the 117-sheet measurement labelled against the pixels (recall 35/35, precision 44%).
+// Identity and age were not labelled reliably: they are logged by the caller, never counted.
+const REDO_TYPES = ['hat', 'hair', 'bald', 'costume', 'rowMatch', 'held', 'layout'];
+
+/** The defect types a judged sheet fails, as { type, verdict, cells } (verdict word per type; the measured deciders). */
+function sheetDefects(parsed) {
+  return defectsOf(parsed).filter(t => REDO_TYPES.includes(t)).map(t => ({ type: t, verdict: parsed.verdicts[t].verdict, cells: parsed.verdicts[t].cells }));
+}
+
+// One fixed instruction per verdict word, written here, never read from the judge's prose. The redo is told what to fix, not who the person is.
+const REDO_INSTRUCTIONS = {
+  hat: {
+    missing_in_some_cells: 'Headgear must be identical in all eight cells: if one cell shows it, every cell shows it, the same shape and size, also on the full-body cells.',
+    differs_between_cells: 'Headgear must be the same shape, size, colour and trim in all eight cells.',
+    deformed: 'Headgear must have a natural size and shape, not stretched, towering or melted, in every cell.',
+    unexpected: 'This person wears no hat or other headgear on this sheet: draw none.',
+  },
+  hair: {
+    colour_differs: 'The hair colour must be the same in every cell that shows hair.',
+    style_differs: 'The hair must be worn the same way in every cell (the same length, down or tied up).',
+    differs_from_photo: 'The hair must match the hair of the person in Image 2: its colour, length and style.',
+  },
+  bald: {
+    bald_cell: 'Every cell shows the person with a full head of hair exactly as the other cells show it: no bald or thin-cropped cell.',
+    headless_or_blank_face: 'Every cell shows a complete head with a face.',
+  },
+  costume: {
+    pieces_differ: 'The same garments and accessories (vest, belt, cape, collar, straps, sleeves, pouch) appear in every cell where they can be seen.',
+    colours_differ: 'Each garment keeps one colour in every cell.',
+    emblem_differs: 'A chest emblem, print or pattern is the same design in every cell where it can be seen.',
+  },
+  rowMatch: {
+    head_row_differs: 'Each top-row cell wears the same top, collar, neckline and straps as the full-body cell below it.',
+  },
+  held: {
+    object_in_hand: 'No cell shows anything held or carried: both hands are empty in every cell.',
+  },
+  layout: {
+    not_a_grid: 'The output is exactly one 2×4 grid: two rows of four cells, one figure per cell.',
+    extra_figures: 'Only the one person appears, once per cell: no second person, ghost figure or part of another person.',
+    lettering: 'No caption, label, word or number is written anywhere on the paper.',
+    not_illustrated: 'Every cell is a painted illustration, not a photograph or a cut-out.',
+  },
+};
+
+/** The correction block a redo is sent with: one instruction per failed type, naming the cells (1-4 top row, 5-8 bottom row). Throws on a defect it has no sentence for. */
+function redoFeedback(defects) {
+  return defects.map(({ type, verdict, cells }) => {
+    const text = REDO_INSTRUCTIONS[type] && REDO_INSTRUCTIONS[type][verdict];
+    if (!text) throw new Error(`avatarSheetJudge: no redo instruction for ${type}/${verdict}`);
+    return cells.length ? `${text} (the previous attempt went wrong in cell${cells.length > 1 ? 's' : ''} ${cells.join(', ')})` : text;
+  }).join('\n');
+}
+
+/** Which of two judged sheets is better: fewer failed types, then fewer flagged cells; a tie keeps the first. Returns 'first' | 'second'. */
+function betterSheet(firstDefects, secondDefects) {
+  const cellCount = (d) => d.reduce((n, x) => n + x.cells.length, 0);
+  if (secondDefects.length !== firstDefects.length) return secondDefects.length < firstDefects.length ? 'second' : 'first';
+  return cellCount(secondDefects) < cellCount(firstDefects) ? 'second' : 'first';
+}
+
 /**
  * Judge one sheet. `sheet` / `photo` are data URIs or base64 strings with a data: prefix (as askSheetJudge expects).
  * Returns { parsed, raw, prompt }. Throws when the judge fails; the caller decides what a failed judge means
- * (the pipeline wiring proposal in docs/decisions.md: fail loudly).
+ * (oneCallSheet.js: log an error and ship the first sheet, the 2026-09-11 gate precedent).
  */
 async function judgeAvatarSheet({ sheet, photo = null, kind, model, usageTracker = null, apiKey = null }) {
   const { askSheetJudge, inlinePartOf } = require('./character2x4Sheet')._internal;
@@ -153,4 +215,4 @@ async function judgeAvatarSheet({ sheet, photo = null, kind, model, usageTracker
   return { parsed: parseAvatarSheetVerdict(raw), raw, prompt };
 }
 
-module.exports = { VERDICTS, DEFECT_TYPES, CELL_ENUMS, buildAvatarSheetJudgePrompt, parseAvatarSheetVerdict, cellSignals, defectsOf, judgeAvatarSheet };
+module.exports = { VERDICTS, DEFECT_TYPES, CELL_ENUMS, REDO_TYPES, REDO_INSTRUCTIONS, buildAvatarSheetJudgePrompt, parseAvatarSheetVerdict, cellSignals, defectsOf, sheetDefects, redoFeedback, betterSheet, judgeAvatarSheet };

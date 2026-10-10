@@ -2928,7 +2928,7 @@ const SHEET_VARIANTS = ['current', 'oneCall', 'styledBodyRow'];
 /**
  * Avatar sheet variants (owner, 2026-10-10: "avatar creation takes too long - one expensive call instead of four cheaper ones?").
  * Runs the REAL sheet code of character2x4Sheet.js on a stored character, the way the trial runs it, with the options threaded through:
- *   params.variant  'current' (body row -> head row -> pass 2; fastPass1), 'oneCall' (photo -> styled 2x4 in one call),
+ *   params.variant  'current' (the full-story chain: body row -> head row -> pass 2, two tries per row), 'oneCall' (photo -> styled 2x4 in one call, unjudged; the trial's sheet is this plus the judge and one redo, oneCallSheet.js),
  *                   'styledBodyRow' (photo -> styled body row, then the head row against it; no photoreal pass, no pass 2)
  *   params.grokModel  Grok tier: standard | grok-imagine-image-2.0 | pro (every Grok call of the sheet)
  *   params.passTwoAttempts  total pass-2 attempts ('current' only)   params.anchor false = no style anchor ('current' only)
@@ -2980,7 +2980,6 @@ async function runAvatarSheetVariantStage(target, { experimentId, params = {} })
     const r = await sheet.generateCharacter2x4Sheet(character, {
       clothingCategory, costumeDescription, costumeName, artStyle, usageTracker, seasonOutfit,
       skipQualityEval: params.skipReview === true,
-      fastPass1: params.fastPass1 !== false,
       grokModel,
       ...(params.passTwoAttempts != null ? { passTwoAttempts: Number(params.passTwoAttempts) } : {}),
       styleAnchor: params.anchor !== false,
@@ -3010,7 +3009,7 @@ async function runAvatarSheetVariantStage(target, { experimentId, params = {} })
   return {
     character: character.name, declaredAge: character.age ?? null, imageType: 'tl_avatar', versionIndex, realisticVersionIndex,
     variant, model: grokModel, costume: costumeParam, artStyle,
-    options: { passTwoAttempts: params.passTwoAttempts ?? null, anchor: params.anchor !== false, skipReview: params.skipReview === true, fastPass1: params.fastPass1 !== false },
+    options: { passTwoAttempts: params.passTwoAttempts ?? null, anchor: params.anchor !== false, skipReview: params.skipReview === true },
     totalMs, steps, grokCalls, costUsd, cut, finalScore, styleJudgeRejected,
     promptUsed: prompt ? String(prompt).slice(0, 12000) : undefined,
   };

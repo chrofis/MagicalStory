@@ -1,0 +1,267 @@
+{
+ "sheets": 12,
+ "characters": 6,
+ "redone": 4,
+ "redoRate": 0.3333333333333333,
+ "judgeErrors": 0,
+ "shippedFlagged": 3,
+ "wallSMean": 27.0,
+ "wallSMedian": 21.1,
+ "wallSMax": 57.3,
+ "wallSMin": 14.0,
+ "wallSMeanNoRedo": 19.2,
+ "wallSMeanRedo": 42.7,
+ "judgeSMean": 4.3,
+ "spentUsd": 0.3728,
+ "redoReasons": [
+  "Lukas/costume: hair:differs_from_photo -> shipped first",
+  "Emma/standard: hair:style_differs -> shipped first",
+  "Noah/costume: hair:differs_from_photo,costume:pieces_differ,rowMatch:head_row_differs -> shipped second",
+  "Omar/standard: rowMatch:head_row_differs -> shipped second"
+ ],
+ "viewedMissed": [
+  "Lukas/costume front body cell bald (judge said hair:differs_from_photo, no bald)",
+  "Lily/costume head cell 3 (profile) without the hat"
+ ],
+ "records": [
+  {
+   "name": "Lukas",
+   "kind": "standard",
+   "wallMs": 18709,
+   "judged": true,
+   "redone": false,
+   "shipped": "first",
+   "firstDefects": [],
+   "secondDefects": null,
+   "judgeError": null,
+   "judgeMs": 3663,
+   "totalMs": 18708
+  },
+  {
+   "name": "Lukas",
+   "kind": "costume",
+   "wallMs": 41045,
+   "judged": true,
+   "redone": true,
+   "shipped": "first",
+   "firstDefects": [
+    {
+     "type": "hair",
+     "verdict": "differs_from_photo",
+     "cells": []
+    }
+   ],
+   "secondDefects": [
+    {
+     "type": "hair",
+     "verdict": "differs_from_photo",
+     "cells": []
+    }
+   ],
+   "judgeError": null,
+   "judgeMs": 4422,
+   "totalMs": 41045
+  },
+  {
+   "name": "Emma",
+   "kind": "costume",
+   "wallMs": 29365,
+   "judged": true,
+   "redone": false,
+   "shipped": "first",
+   "firstDefects": [],
+   "secondDefects": null,
+   "judgeError": null,
+   "judgeMs": 4195,
+   "totalMs": 29365
+  },
+  {
+   "name": "Emma",
+   "kind": "standard",
+   "wallMs": 36295,
+   "judged": true,
+   "redone": true,
+   "shipped": "first",
+   "firstDefects": [
+    {
+     "type": "hair",
+     "verdict": "style_differs",
+     "cells": [
+      1,
+      5
+     ]
+    }
+   ],
+   "secondDefects": [
+    {
+     "type": "hair",
+     "verdict": "style_differs",
+     "cells": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ]
+    }
+   ],
+   "judgeError": null,
+   "judgeMs": 4749,
+   "totalMs": 36294
+  },
+  {
+   "name": "Noah",
+   "kind": "standard",
+   "wallMs": 13997,
+   "judged": true,
+   "redone": false,
+   "shipped": "first",
+   "firstDefects": [],
+   "secondDefects": null,
+   "judgeError": null,
+   "judgeMs": 4387,
+   "totalMs": 13997
+  },
+  {
+   "name": "Noah",
+   "kind": "costume",
+   "wallMs": 57323,
+   "judged": true,
+   "redone": true,
+   "shipped": "second",
+   "firstDefects": [
+    {
+     "type": "hair",
+     "verdict": "differs_from_photo",
+     "cells": []
+    },
+    {
+     "type": "costume",
+     "verdict": "pieces_differ",
+     "cells": [
+      1,
+      2,
+      3,
+      4
+     ]
+    },
+    {
+     "type": "rowMatch",
+     "verdict": "head_row_differs",
+     "cells": [
+      1,
+      2,
+      3,
+      4
+     ]
+    }
+   ],
+   "secondDefects": [
+    {
+     "type": "hair",
+     "verdict": "differs_from_photo",
+     "cells": []
+    },
+    {
+     "type": "costume",
+     "verdict": "pieces_differ",
+     "cells": [
+      8
+     ]
+    }
+   ],
+   "judgeError": null,
+   "judgeMs": 4366,
+   "totalMs": 57321
+  },
+  {
+   "name": "Lily",
+   "kind": "standard",
+   "wallMs": 15970,
+   "judged": true,
+   "redone": false,
+   "shipped": "first",
+   "firstDefects": [],
+   "secondDefects": null,
+   "judgeError": null,
+   "judgeMs": 4456,
+   "totalMs": 15969
+  },
+  {
+   "name": "Lily",
+   "kind": "costume",
+   "wallMs": 22599,
+   "judged": true,
+   "redone": false,
+   "shipped": "first",
+   "firstDefects": [],
+   "secondDefects": null,
+   "judgeError": null,
+   "judgeMs": 4030,
+   "totalMs": 22598
+  },
+  {
+   "name": "Rohan",
+   "kind": "standard",
+   "wallMs": 15381,
+   "judged": true,
+   "redone": false,
+   "shipped": "first",
+   "firstDefects": [],
+   "secondDefects": null,
+   "judgeError": null,
+   "judgeMs": 3534,
+   "totalMs": 15380
+  },
+  {
+   "name": "Rohan",
+   "kind": "costume",
+   "wallMs": 17699,
+   "judged": true,
+   "redone": false,
+   "shipped": "first",
+   "firstDefects": [],
+   "secondDefects": null,
+   "judgeError": null,
+   "judgeMs": 4711,
+   "totalMs": 17699
+  },
+  {
+   "name": "Omar",
+   "kind": "costume",
+   "wallMs": 19560,
+   "judged": true,
+   "redone": false,
+   "shipped": "first",
+   "firstDefects": [],
+   "secondDefects": null,
+   "judgeError": null,
+   "judgeMs": 4445,
+   "totalMs": 19560
+  },
+  {
+   "name": "Omar",
+   "kind": "standard",
+   "wallMs": 36088,
+   "judged": true,
+   "redone": true,
+   "shipped": "second",
+   "firstDefects": [
+    {
+     "type": "rowMatch",
+     "verdict": "head_row_differs",
+     "cells": [
+      3
+     ]
+    }
+   ],
+   "secondDefects": [],
+   "judgeError": null,
+   "judgeMs": 4937,
+   "totalMs": 36088
+  }
+ ]
+}

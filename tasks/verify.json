@@ -9529,7 +9529,7 @@
         "0a919f0c0"
       ],
       "addedAt": "2026-10-09",
-      "status": "pending",
+      "status": "superseded",
       "evidence": [],
       "claim": "The first full-body cell shows on the character step within about 40 s of the photo landing, before the sheet exists; no row or whole sheet reaches any client page.",
       "runShape": [
@@ -9547,6 +9547,11 @@
         "checkedAt": "2026-10-09 22:58:52 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: One /try on staging with a photo, form left empty for 20 s: trial_events avatar_ready minus photo_analyzed <= 40 s; Railway log shows \"Standard body row ready ... in Ns\" and either \"reusing the body row drawn at the photo\" or the \"drawn for ... but the visitor declared\" warning; every avatar image on wizard, slides and spinner is a single figure."
+      },
+      "triage": {
+        "date": "2026-10-10",
+        "status": "superseded",
+        "note": "The early body row, its styling and the deferred pass-1 judges no longer exist: the trial draws each sheet in one Grok call, judged, one redo. See docs/decisions.md 2026-10-10 \"One-call sheets in the trial\" and entry trial-one-call-sheets-2026-10-10."
       }
     },
     {
@@ -9757,7 +9762,7 @@
       "title": "Trial: the early full-body figures are watercolour, whole, and arrive within about 15 s of the photoreal ones",
       "commits": [],
       "addedAt": "2026-10-10",
-      "status": "pending",
+      "status": "superseded",
       "evidence": [],
       "claim": "The hero full-body figure and the first waiting-page slides (the body-row cells) are watercolour and show the whole figure (head and feet, margin around); the first one appears at most about 15 s after the pass-1 body row is drawn.",
       "runShape": [
@@ -9766,6 +9771,11 @@
       "check": {
         "kind": "human",
         "what": "One /try on staging from the iPhone: the hero on the character step and the first three waiting-page slides are painted, whole bodies, no photoreal image at any moment; Railway log shows \"Drawing the standard body row\" then \"Standard body row styled and cut for user ... in Ns\" with N <= 15 and the later \"reusing the body row drawn at the photo\"; no \"body row styling ... failed\"."
+      },
+      "triage": {
+        "date": "2026-10-10",
+        "status": "superseded",
+        "note": "The early body row, its styling and the deferred pass-1 judges no longer exist: the trial draws each sheet in one Grok call, judged, one redo. See docs/decisions.md 2026-10-10 \"One-call sheets in the trial\" and entry trial-one-call-sheets-2026-10-10."
       }
     },
     {
@@ -9805,7 +9815,7 @@
       "title": "Trial sheet: the pass-1 row judges no longer sit between two renders",
       "commits": [],
       "addedAt": "2026-10-10",
-      "status": "pending",
+      "status": "superseded",
       "evidence": [],
       "claim": "On a trial costumed/standard sheet the body judge runs while the head row renders and the head and identity judges while pass 2 runs, so the sheet is stored about 8 s earlier than before; the stored verdict (finalVerdict, passes.pass1.attempts scores) is unchanged.",
       "runShape": [
@@ -9814,6 +9824,27 @@
       "check": {
         "kind": "human",
         "what": "One /try on staging: in the Railway log the \"body eval\" judge calls start right after the body row (before the head row's 'Edit complete'), the pass-1 line '[CHARACTER 2x4] ... pass-1 (decoupled 2-call): ... final=' appears after pass 2 attempt 1 and carries a score; the costumed sheet is stored at most ~35 s after pass 2 starts instead of ~47 s."
+      },
+      "triage": {
+        "date": "2026-10-10",
+        "status": "superseded",
+        "note": "The early body row, its styling and the deferred pass-1 judges no longer exist: the trial draws each sheet in one Grok call, judged, one redo. See docs/decisions.md 2026-10-10 \"One-call sheets in the trial\" and entry trial-one-call-sheets-2026-10-10."
+      }
+    },
+    {
+      "id": "trial-one-call-sheets-2026-10-10",
+      "title": "Trial: standard and costumed sheet are one Grok call each, judged as a whole, one redo; the sheet starts at the photo",
+      "commits": [],
+      "addedAt": "2026-10-10",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On a trial the avatar wait is shorter (standard sheet drawn at the photo in about 15-35 s; costumed sheet about 15-40 s, up to about 60 s with a redo), every sheet is judged (log lines \"[ONE-CALL SHEET] ... judged clean\" or \"failed the judge ... one redo\"), a redo happens on roughly a third of the sheets, and the waiting-page slides and hero are whole single figures. Validated on stored staging characters (docs/decisions.md 2026-10-10 \"One-call sheets in the trial\"); this is the first real trial.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Owner, one /try on iPhone on staging: (1) the hero picture appears about 15-35 s after the photo; (2) Railway log: grep \"[ONE-CALL SHEET]\" and \"[STYLED AVATAR] ... one-call sheet\": count redos (expect about 1 in 3), note which defect types, any \"judge FAILED\"; (3) the costumed sheet is stored in under about 60 s; (4) look at the waiting-page slides: every slide a whole figure, no bald body figure, no figure that lost its hat in one view, no row or sheet shown."
       }
     }
   ],

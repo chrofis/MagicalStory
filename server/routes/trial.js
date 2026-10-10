@@ -463,7 +463,7 @@ const TRIAL_FUNNEL_STEPS = [
   // The standard avatar sheet starts once the account exists and the form is quiet, so this step now follows
   // character_saved (until 2026-10-09 it was the preview avatar and came before it). OPTIONAL: a visitor
   // who presses Next before the sheet is drawn never emits it, which is not a loss.
-  'avatar_ready',         // the hero's first picture (front cell of the standard body row) arrived while still in the wizard
+  'avatar_ready',         // the hero's first picture (front body cell of the standard sheet) arrived while still in the wizard
   'character_done',       // left step 1 for the topic step
   'topic_selected',       // left the topic step
   'ideas_generated',      // ideas came back
@@ -1025,7 +1025,7 @@ function startTraitSave({ userId, characterId, facePhoto }) {
         const { clamp } = applyTrialPhotoTraits(physical, t, charData.characters[0].age);
         if (clamp?.clamped) log.info(`[AGE CLAMP] trial ${characterId}: ${clamp.reason}`);
         charData.characters[0].physical = physical;
-        // The photo's own age/gender estimate: what the body row is drawn from before the visitor declares them.
+        // The photo's own age/gender estimate: what the standard sheet is drawn from before the visitor declares them.
         const estimate = photoEstimateOf(t);
         if (estimate) charData.characters[0].photoEstimate = estimate;
       });
@@ -1050,12 +1050,12 @@ function startTraitSave({ userId, characterId, facePhoto }) {
  */
 // The per-IP limiter (2 accounts/day) sits HERE only: update-photo / prepare-standard-body / prepare-standard-avatar are bound by the
 // session token, one call per account and the global DAILY_TRIAL_AVATAR_CAP. Fronting them too made one trial cost 4 hits against a
-// budget of 2, so the body row and the sheet were refused with a silent 429 (docs/decisions.md 2026-10-09 "limiter budget").
+// budget of 2, so the early sheet and the form-time call were refused with a silent 429 (docs/decisions.md 2026-10-09 "limiter budget").
 router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) => {
   try {
     const { name, age, gender, traits, customTraits, facePhoto, bodyPhoto, bodyNoBgPhoto, faceBox, turnstileToken, fingerprint } = req.body;
     // PROVISIONAL account (docs/decisions.md 2026-10-09): created the moment the photo is analysed, before the visitor has typed
-    // a name or an age, so the standard avatar's body row can start then. Name, age and gender may be missing; whatever is
+    // a name or an age, so the standard sheet can start then. Name, age and gender may be missing; whatever is
     // given is validated as always, and the row stays ageless until update-character-details declares one (create-story
     // refuses an ageless row), so the mandatory-age ruling still holds.
     const provisional = req.body.provisional === true;
@@ -1246,8 +1246,8 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
         if (clamp?.clamped) log.info(`[AGE CLAMP] trial ${characterId}: ${clamp.reason}`);
       }
       c.gender = gender || '';
-      // Measurement: how often the declared age lands in another band than the photo's estimate. The drawn body row is
-      // kept anyway (docs/decisions.md 2026-10-09 "Trial keeps the drawn body row"); only a gender change redraws it.
+      // Measurement: how often the declared age lands in another band than the photo's estimate. The drawn sheet is
+      // kept anyway (docs/decisions.md 2026-10-09 "Trial keeps the drawn sheet"); only a gender change redraws it.
       if (c.photoEstimate) {
         const estAge = representativeTrialAge(c.photoEstimate.apparentAge);
         const { getAgeCategory } = require('../lib/promptBuilders');
@@ -1255,7 +1255,7 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
         const bandDiffers = estAge != null && getAgeCategory(estAge) !== getAgeCategory(parseInt(declaredAge, 10));
         const genderDiffers = !!(c.photoEstimate.gender && gender && c.photoEstimate.gender !== gender)
           && !trialSheets.keepsDrawnBody(`gender:${c.photoEstimate.gender}`, c);
-        log.info(`[TRIAL AVATARS] photo estimate (${c.photoEstimate.apparentAge || '-'}, ${c.photoEstimate.gender || '-'}) vs declared (${declaredAge}, ${gender || '-'}): age band ${bandDiffers ? 'DIFFERENT, the drawn body row is kept' : 'same'}, gender ${genderDiffers ? 'DIFFERENT, the body row is redrawn' : 'same or declared age 2 or under, the body row is reused'}`);
+        log.info(`[TRIAL AVATARS] photo estimate (${c.photoEstimate.apparentAge || '-'}, ${c.photoEstimate.gender || '-'}) vs declared (${declaredAge}, ${gender || '-'}): age band ${bandDiffers ? 'DIFFERENT, the drawn sheet is kept' : 'same'}, gender ${genderDiffers ? 'DIFFERENT, the sheet is redrawn' : 'same or declared age 2 or under, the sheet is reused'}`);
       }
       c.traits = structuredTraits;
       if (customTraits != null) c.customTraits = customTraits;
@@ -1277,7 +1277,7 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
  *
  * The visitor changed the photo (or the picked face) AFTER the provisional account was created at the first analysis: the same
  * account takes the new photo (one account per visitor per day, so a second create-anonymous-account would be refused). Waits
- * for any avatar drawing still running on the old photo, clears everything derived from it (traits, estimate, body row,
+ * for any avatar drawing still running on the old photo, clears everything derived from it (traits, estimate, standard sheet,
  * sheets, slides), stores the new photos and starts the trait extraction again. docs/decisions.md 2026-10-09.
  */
 router.put('/update-photo', verifySessionToken, async (req, res) => {
@@ -1291,8 +1291,8 @@ router.put('/update-photo', verifySessionToken, async (req, res) => {
     // Drawings on the old photo must finish (or fail) before their results are cleared, or they would land after the clear.
     await inFlightStandardAvatarPromises.get(userId);
     await inFlightTitlePagePromises.get(userId);
-    await standardBodyRows.get(userId)?.cellsPromise.catch(() => {});
-    standardBodyRows.delete(userId);
+    await standardSheetDraws.get(userId)?.promise.catch(() => {});
+    standardSheetDraws.delete(userId);
     await inFlightTraitSaves.get(userId);
 
     const { stripExif } = require('../lib/imageMetadata');
@@ -2370,7 +2370,7 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
       log.debug('[TRIAL] [PHOTO] Sending response (face/body detection)');
       res.json(response);
       // The traits the avatar is drawn with take ~10 s; start them now, while the visitor fills the form, so the account's
-      // trait save and the body row find them done (docs/decisions.md 2026-10-09). Never rejects; one call per photo.
+      // trait save and the early sheet find them done (docs/decisions.md 2026-10-09). Never rejects; one call per photo.
       if (faceThumbnail) photoTraitsFor(faceThumbnail).catch(() => {});
 
     } catch (fetchErr) {
@@ -2695,22 +2695,22 @@ async function trialAvatarAccountProblem(userId) {
   return null;
 }
 
-// The standard sheet's FULL-BODY row, drawn at the photo (prepare-standard-body) and reused by the sheet (prepare-standard-avatar)
-// when the gender it was drawn for still holds. userId -> { stamp, promise -> { row, review, attemptHistory } }.
-// In memory on purpose: a row is a large image, and a lost one only means the sheet draws its own body row (logged).
-const standardBodyRows = new Map();
-const STANDARD_BODY_ROW_TTL_MS = 30 * 60 * 1000;
+// The standard sheet, drawn ONCE per photo: either at the photo (prepare-standard-body, from the photo's own estimates) or at the form
+// (prepare-standard-avatar, from the declaration). userId -> { stamp, promise -> { avatarImage }, at }. The entry stays after the sheet
+// is done so a repeat or the later call returns the same hero; in memory on purpose (the sheet itself is on the character row).
+const standardSheetDraws = new Map();
+const STANDARD_SHEET_DRAW_TTL_MS = 30 * 60 * 1000;
 setInterval(() => {
-  const cutoff = Date.now() - STANDARD_BODY_ROW_TTL_MS;
-  for (const [userId, entry] of standardBodyRows) if (entry.at < cutoff) standardBodyRows.delete(userId);
+  const cutoff = Date.now() - STANDARD_SHEET_DRAW_TTL_MS;
+  for (const [userId, entry] of standardSheetDraws) if (entry.at < cutoff) standardSheetDraws.delete(userId);
 }, 5 * 60 * 1000).unref();
 
 /**
- * Who the body row is drawn for BEFORE the visitor has declared anything: the declared age/gender when the row has them,
+ * Who the standard sheet is drawn for BEFORE the visitor has declared anything: the declared age/gender when the row has them,
  * else the photo's own estimates (apparentAge category -> its representative whole year, gender). Null when there is no age
  * to draw for (no declaration and no usable estimate): the caller stops, loudly, and the sheet waits for the declaration.
  */
-function bodyRowIdentity(mainChar) {
+function earlySheetIdentity(mainChar) {
   const declaredAge = parseTrialAge(mainChar.age);
   const estimate = mainChar.photoEstimate || null;
   const age = declaredAge.ok ? declaredAge.years : (estimate?.apparentAge ? representativeTrialAge(estimate.apparentAge) : null);
@@ -2719,23 +2719,60 @@ function bodyRowIdentity(mainChar) {
 }
 
 /**
+ * THE one implementation behind both standard-sheet endpoints: styles the STANDARD sheet (one Grok call, judged, one redo:
+ * oneCallSheet.js) for `character`, persists it with the waiting-page slides, and resolves to the sheet's front body cell (the hero).
+ * Registered before any await, so create-story / update-photo / the other endpoint find it: the in-flight registry (awaited whole),
+ * the sheets-on-row registry (the story job waits for the row only) and `standardSheetDraws`.
+ */
+function startStandardSheet({ userId, characterId, character, stamp }) {
+  const { seasonOutfitGuidance } = require('../lib/season');
+  const { frontBodyCell } = require('../lib/avatarSlides');
+  let resolveInFlight;
+  const inFlightPromise = new Promise(resolve => { resolveInFlight = resolve; });
+  inFlightStandardAvatarPromises.set(userId, inFlightPromise);
+  const standardOnRow = openSheetsOnRow(inFlightStandardSheetsOnRow, userId);
+  const promise = (async () => {
+    try {
+      const clothing = { [character.name]: { standard: { used: true, signature: 'none' }, costumed: { used: false } } };
+      const requirements = [{ pageNumber: 'pre-cover', clothingCategory: 'standard', characterNames: [character.name] }];
+      // Same options the story job styles a missing standard sheet with (storyJobPipeline runTrialEarlyStyling): the season the job would
+      // resolve from the date (the story category is not known yet, so a historical story's standard sheet carries the season outfit too).
+      const { slides } = await trialSheets.styleAndPersistTrialSheets({
+        userId, characterId, character, requirements, clothingRequirements: clothing,
+        styleOptions: { skipQualityEval: true, seasonOutfit: seasonOutfitGuidance({}), oneCall: true },
+        fields: { preGeneratedStandardFor: stamp },
+        onSheetsMerged: standardOnRow.merged,
+      });
+      const standard = (await loadTrialSheetCharacter(userId))?.mainChar.preGeneratedStyledAvatars?.[character.name]?.standard;
+      if (!standard) throw new Error('the standard sheet is not on the row after styling');
+      log.info(`[TRIAL AVATARS] Standard sheet ready for "${character.name}" (${slides.length} slides stored)`);
+      return { avatarImage: heroForClient(await frontBodyCell(standard)) };
+    } finally {
+      if (inFlightStandardAvatarPromises.get(userId) === inFlightPromise) inFlightStandardAvatarPromises.delete(userId);
+      standardOnRow.release();
+      resolveInFlight();
+    }
+  })();
+  const entry = { stamp, promise, at: Date.now() };
+  standardSheetDraws.set(userId, entry);
+  promise.catch(() => { if (standardSheetDraws.get(userId) === entry) standardSheetDraws.delete(userId); });
+  return entry;
+}
+
+/**
  * POST /api/trial/prepare-standard-body
  *
- * Draws the standard sheet's FULL-BODY row (the body stage of the 2x4, its own render before the head row) the moment the
- * photo is analysed, from the photo's age/gender estimates when the form is still empty, and answers with the row's FIRST
- * cell (front view) as the hero picture. The row's other cells feed the waiting-page slides. The row itself never leaves the
- * server: only cut cells are sent (clientAvatarImages). prepare-standard-avatar reuses the row unless the declared gender changed (an age band or tier difference keeps it),
- * and then draws its own. One call per account.
- * docs/decisions.md 2026-10-09 "Trial: the body row starts at the photo".
+ * Starts the STANDARD sheet the moment the photo is analysed, from the photo's age/gender estimates when the form is still empty
+ * (the one-call sheet takes about as long as the early full-body figure used to: docs/decisions.md 2026-10-10 "one-call sheets in
+ * the trial"), and answers with the sheet's front body cell as the hero picture. Only cut cells reach the client (clientAvatarImages).
+ * prepare-standard-avatar takes this sheet unless the declared gender changed (an age band or tier difference keeps it).
+ * One call per account.
  */
 router.post('/prepare-standard-body', verifySessionToken, async (req, res) => {
   const { userId } = req.sessionUser;
   try {
-    const existing = standardBodyRows.get(userId);
-    if (existing) {
-      const { cell } = await existing.cellsPromise;
-      return res.json({ avatarImage: heroForClient(cell) });
-    }
+    const existing = standardSheetDraws.get(userId);
+    if (existing) return res.json(await existing.promise);
     const problem = await trialAvatarAccountProblem(userId);
     if (problem) return res.status(problem.status).json(problem.body);
 
@@ -2744,51 +2781,27 @@ router.post('/prepare-standard-body', verifySessionToken, async (req, res) => {
     const loaded = await loadTrialSheetCharacter(userId);
     if (!loaded) return res.status(404).json({ error: 'Character not found', code: 'CHARACTER_NOT_FOUND' });
     const { characterId, mainChar, character } = loaded;
-    if (!mainChar.photos?.face || !mainChar.photos?.bodyNoBg) return res.status(400).json({ error: 'The character has no photo' });
-    const who = bodyRowIdentity(mainChar);
+    if (!mainChar.photos?.face) return res.status(400).json({ error: 'The character has no photo' });
+    const who = earlySheetIdentity(mainChar);
     if (!who) {
-      log.error(`❌ [TRIAL AVATARS] prepare-standard-body for user ${userId}: no declared age and no photo age estimate — the body row waits for the declaration`);
+      log.error(`❌ [TRIAL AVATARS] prepare-standard-body for user ${userId}: no declared age and no photo age estimate — the sheet waits for the declaration`);
       return res.status(422).json({ error: 'No age to draw for' });
     }
-    // Concurrent first calls: the registry entry is set before any await below, so a second call finds it.
-    const drawFor = { ...character, age: who.age, gender: who.gender };
-    const stamp = trialSheets.standardSheetStamp(drawFor);
+    // A concurrent first call finds the registry entry set synchronously below (no await between this check and startStandardSheet).
+    if (standardSheetDraws.get(userId)) return res.json(await standardSheetDraws.get(userId).promise);
     if (!checkAndIncrementTrialCap('avatar')) {
       return res.status(503).json({ error: 'Service temporarily unavailable. Please try again tomorrow.', code: 'DAILY_CAPACITY_REACHED' });
     }
-    const { seasonOutfitGuidance } = require('../lib/season');
-    const { generateStandardBodyRow } = require('../lib/styledAvatars');
-    const { bodyRowCells, slidesOfBodyRowCells } = require('../lib/avatarSlides');
-    const { styleBodyRow } = require('../lib/character2x4Sheet');
+    const drawFor = { ...character, age: who.age, gender: who.gender };
+    const stamp = trialSheets.standardSheetStamp(drawFor);
+    log.info(`[TRIAL AVATARS] Drawing the standard sheet at the photo for user ${userId} (${who.fromEstimate ? 'photo estimate' : 'declared'}: age ${who.age}, gender ${who.gender || 'unset'}, stamp ${stamp})`);
     const startedAt = Date.now();
-    log.info(`[TRIAL AVATARS] Drawing the standard body row at the photo for user ${userId} (${who.fromEstimate ? 'photo estimate' : 'declared'}: age ${who.age}, gender ${who.gender || 'unset'}, stamp ${stamp})`);
-    const promise = generateStandardBodyRow(drawFor, { seasonOutfit: seasonOutfitGuidance({}) });
-    let drawn = false;
-    // The client only ever gets cells cut (edge-detected) from the row STYLED in the story's art style (docs/decisions.md 2026-10-10).
-    // The photoreal row stays on the server: the sheet reuses it from `promise` the moment it is drawn, without waiting for the
-    // styling, and restyles the whole sheet itself.
-    const cellsPromise = promise.then(async (body) => {
-      drawn = true;
-      const drawnAt = Date.now();
-      const cells = await bodyRowCells(await styleBodyRow(body.row, TRIAL_ART_STYLE));
-      log.info(`[TRIAL AVATARS] Standard body row styled and cut for user ${userId} in ${Math.round((Date.now() - drawnAt) / 1000)}s (${Math.round((drawnAt - startedAt) / 1000)}s to draw it)`);
-      return { cell: cells[0], cells };
-    });
-    standardBodyRows.set(userId, { stamp, promise, cellsPromise, at: Date.now() });
-    const forget = (what) => (err) => {
-      log.error(`[TRIAL AVATARS] body row ${what} for user ${userId} failed: ${err.message}${what === 'drawing' ? ' — the sheet draws its own body row' : ' — no early full-body figure is shown'}`);
-      if (what === 'drawing' && standardBodyRows.get(userId)?.promise === promise) standardBodyRows.delete(userId);
-    };
-    promise.catch(forget('drawing'));
-    cellsPromise.catch((err) => { if (drawn) forget('styling')(err); });
-    const done = await cellsPromise;
-    log.info(`[TRIAL AVATARS] Standard body row ready for user ${userId} in ${Math.round((Date.now() - startedAt) / 1000)}s`);
-    res.json({ avatarImage: heroForClient(done.cell) });
-    // The other cells feed the slides, after the answer (the row's first cell is what the wizard waits for).
-    trialSheets.persistBodyRowSlides({ userId, characterId, slides: slidesOfBodyRowCells(done.cells) })
-      .catch((err) => log.error(`[TRIAL AVATARS] body row slides not stored for user ${userId}: ${err.message}`));
+    const entry = startStandardSheet({ userId, characterId, character: drawFor, stamp });
+    const out = await entry.promise;
+    log.info(`[TRIAL AVATARS] Standard sheet (at the photo) ready for user ${userId} in ${Math.round((Date.now() - startedAt) / 1000)}s`);
+    res.json(out);
   } catch (err) {
-    log.error(`[TRIAL AVATARS] prepare-standard-body failed for user ${userId}: ${err.message}`);
+    log.error(`[TRIAL AVATARS] prepare-standard-body failed for user ${userId}: ${err.message} — the form-time call draws the sheet`);
     if (!res.headersSent) res.status(500).json({ error: 'Avatar generation failed', code: 'AVATAR_FAILED' });
   }
 });
@@ -2796,30 +2809,39 @@ router.post('/prepare-standard-body', verifySessionToken, async (req, res) => {
 /**
  * POST /api/trial/prepare-standard-avatar
  *
- * Styles the STANDARD 2×4 sheet (everyday clothes) once the form is filled: it needs the photo, the DECLARED age and the
- * gender, never the topic. Runs in the background of the wizard (the client does not wait), persists the sheet on the
- * character row, and answers with the sheet's whole front body cell, which the wizard shows as the hero's picture.
- * prepare-title (costumed sheet) and the story job reuse the sheet; the job awaits this call when it is still in flight
- * (create-story hands the promise over), so the standard sheet is styled once per trial. The sheet's body row is the one
- * prepare-standard-body drew at the photo whenever the gender is the declared one (an age band or tier difference keeps it); after a
- * gender change the body row is drawn again, loudly. docs/decisions.md 2026-10-09.
+ * The STANDARD 2×4 sheet (everyday clothes) once the form is filled: it needs the photo, the DECLARED age and the gender, never the
+ * topic. Runs in the background of the wizard (the client does not wait), persists the sheet on the character row, and answers with
+ * the sheet's whole front body cell, which the wizard shows as the hero's picture. prepare-title (costumed sheet) and the story job
+ * reuse the sheet; the job awaits this call when it is still in flight (create-story hands the promise over), so the standard sheet
+ * is drawn once per trial. When prepare-standard-body already drew it at the photo this call waits for that sheet and returns it,
+ * whenever the gender is the declared one (an age band or tier difference keeps it); after a gender change at an age above 2 the
+ * sheet is drawn again, loudly (docs/decisions.md 2026-10-09; one-call sheets 2026-10-10).
  *
- * One sheet per account: a repeat call after the sheet exists returns it without styling again. A sheet
- * whose gender no longer matches the row is not re-styled here; the job notices (usablePreparedAvatars)
- * and styles it itself, loudly, so this endpoint cannot be driven to style sheets without bound.
- * Protected by: session token + the avatar limiter + the daily avatar cap.
+ * One sheet per account: a repeat call after the sheet exists returns it without drawing again. Protected by: session token +
+ * the avatar limiter + the daily avatar cap.
  */
 router.post('/prepare-standard-avatar', verifySessionToken, async (req, res) => {
   const { userId } = req.sessionUser;
-  if (inFlightStandardAvatarPromises.has(userId)) {
-    log.warn(`[TRIAL AVATARS] prepare-standard-avatar called concurrently for user ${userId} — rejecting duplicate (first call still running)`);
-    return res.status(409).json({ error: 'Standard avatar already in progress', retryable: true });
-  }
-  let resolveInFlight;
-  const inFlightPromise = new Promise(resolve => { resolveInFlight = resolve; });
-  inFlightStandardAvatarPromises.set(userId, inFlightPromise);
-  const standardOnRow = openSheetsOnRow(inFlightStandardSheetsOnRow, userId);
   try {
+    const early = standardSheetDraws.get(userId);
+    let redraw = false;
+    if (early) {
+      let out = null;
+      try { out = await early.promise; } catch { log.warn(`[TRIAL AVATARS] prepare-standard-avatar for user ${userId}: the sheet drawn at the photo failed — drawing it now`); redraw = true; }
+      if (out) {
+        const kept = (await loadTrialSheetCharacter(userId))?.mainChar;
+        if (kept && trialSheets.keepsDrawnBody(early.stamp, kept)) {
+          log.info(`[TRIAL AVATARS] prepare-standard-avatar for user ${userId}: taking the sheet drawn at the photo (stamp ${early.stamp})`);
+          return res.json(out);
+        }
+        log.warn(`⚠️ [TRIAL AVATARS] prepare-standard-avatar for user ${userId}: the sheet was drawn for "${early.stamp}" but the visitor declared another gender (age above 2) — drawing it again (one extra call)`);
+        redraw = true;
+      }
+    }
+    if (inFlightStandardAvatarPromises.has(userId)) {
+      log.warn(`[TRIAL AVATARS] prepare-standard-avatar called concurrently for user ${userId} — rejecting duplicate (first call still running)`);
+      return res.status(409).json({ error: 'Standard avatar already in progress', retryable: true });
+    }
     const problem = await trialAvatarAccountProblem(userId);
     if (problem) return res.status(problem.status).json(problem.body);
 
@@ -2839,58 +2861,20 @@ router.post('/prepare-standard-avatar', verifySessionToken, async (req, res) => 
 
     const { frontBodyCell } = require('../lib/avatarSlides');
     const stored = mainChar.preGeneratedStyledAvatars?.[mainChar.name]?.standard;
-    if (stored) {
+    if (stored && !redraw) {
       log.info(`[TRIAL AVATARS] prepare-standard-avatar repeat for user ${userId}: returning the stored sheet (no regeneration)`);
       return res.json({ avatarImage: heroForClient(await frontBodyCell(stored)) });
     }
-
-    const stamp = trialSheets.standardSheetStamp(mainChar);
-    // The body row drawn at the photo is part of this sheet (its cap use was counted there). Reused only when it was drawn for the
-    // gender the visitor declared; otherwise the sheet draws its own and says so.
-    const preBody = standardBodyRows.get(userId);
-    standardBodyRows.delete(userId);
-    const precomputedBodies = {};
-    if (preBody) {
-      try {
-        const drawn = await preBody.promise;
-        if (trialSheets.keepsDrawnBody(preBody.stamp, mainChar)) {
-          precomputedBodies[`${character.name}:standard`] = { row: drawn.row, review: drawn.review, attemptHistory: drawn.attemptHistory };
-          log.info(`[TRIAL AVATARS] prepare-standard-avatar for user ${userId}: reusing the body row drawn at the photo (stamp ${stamp})`);
-        } else {
-          log.warn(`⚠️ [TRIAL AVATARS] prepare-standard-avatar for user ${userId}: the body row was drawn for "${preBody.stamp}" but the visitor declared "${stamp}" (a gender change at age above 2) — the sheet draws its own body row (one extra body-row call)`);
-        }
-      } catch {
-        log.warn(`[TRIAL AVATARS] prepare-standard-avatar for user ${userId}: the body row from the photo failed — the sheet draws its own`);
-      }
-    }
-    if (!preBody && !checkAndIncrementTrialCap('avatar')) {
+    // The cap use of a sheet drawn at the photo was counted there.
+    if (!early && !checkAndIncrementTrialCap('avatar')) {
       return res.status(503).json({ error: 'Service temporarily unavailable. Please try again tomorrow.', code: 'DAILY_CAPACITY_REACHED' });
     }
-
-    log.info(`[TRIAL AVATARS] Styling the standard sheet for user ${userId} (age ${mainChar.age}, gender ${mainChar.gender || 'unset'}) at the form, before any topic`);
-    const { seasonOutfitGuidance } = require('../lib/season');
-    const clothing = { [character.name]: { standard: { used: true, signature: 'none' }, costumed: { used: false } } };
-    const requirements = [{ pageNumber: 'pre-cover', clothingCategory: 'standard', characterNames: [character.name] }];
-    // Same options the story job styled this sheet with (storyJobPipeline runTrialEarlyStyling): sequential
-    // rows, no sheet reviews (decisions 2026-08-15), the season the job would resolve from the date. The
-    // story category is not known yet, so a historical story's standard sheet carries the season outfit too.
-    const { slides } = await trialSheets.styleAndPersistTrialSheets({
-      userId, characterId, character, requirements, clothingRequirements: clothing,
-      styleOptions: { skipQualityEval: true, seasonOutfit: seasonOutfitGuidance({}), precomputedBodies },
-      fields: { preGeneratedStandardFor: stamp },
-      onSheetsMerged: standardOnRow.merged,
-    });
-    const standard = (await loadTrialSheetCharacter(userId))?.mainChar.preGeneratedStyledAvatars?.[character.name]?.standard;
-    if (!standard) throw new Error('the standard sheet is not on the row after styling');
-    log.info(`[TRIAL AVATARS] Standard sheet ready for "${character.name}" (${slides.length} slides stored)`);
-    res.json({ avatarImage: heroForClient(await frontBodyCell(standard)) });
+    const stamp = trialSheets.standardSheetStamp(mainChar);
+    log.info(`[TRIAL AVATARS] Drawing the standard sheet for user ${userId} (age ${mainChar.age}, gender ${mainChar.gender || 'unset'}) at the form, before any topic`);
+    res.json(await startStandardSheet({ userId, characterId, character, stamp }).promise);
   } catch (err) {
     log.error(`[TRIAL AVATARS] prepare-standard-avatar failed for user ${userId}: ${err.message} — the story job styles the standard sheet itself`);
     if (!res.headersSent) res.status(500).json({ error: 'Avatar generation failed', code: 'AVATAR_FAILED' });
-  } finally {
-    if (inFlightStandardAvatarPromises.get(userId) === inFlightPromise) inFlightStandardAvatarPromises.delete(userId);
-    standardOnRow.release();
-    resolveInFlight();
   }
 });
 
@@ -2998,7 +2982,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     const { seasonOutfitGuidance } = require('../lib/season');
     const { slides } = await trialSheets.styleAndPersistTrialSheets({
       userId, characterId, character, requirements: avatarRequirements, clothingRequirements: avatarClothingRequirements,
-      styleOptions: { seasonOutfit: seasonOutfitGuidance({ storyCategory }), fastPass1: true }, // body+head rows in parallel, one try each (docs/decisions.md 2026-10-08)
+      styleOptions: { seasonOutfit: seasonOutfitGuidance({ storyCategory }), oneCall: true }, // one Grok call, judged, one redo (docs/decisions.md 2026-10-10 "one-call sheets in the trial")
       fields: { preGeneratedCostumeType: costumeType },
       onSheetsMerged: titleOnRow.merged,
     });
@@ -3630,7 +3614,7 @@ module.exports.resolveTrialWindow = resolveTrialWindow;
 module.exports.loadTrialCountersFromDb = loadTrialCountersFromDb;
 module.exports.checkAndIncrementTrialCap = checkAndIncrementTrialCap;
 module.exports.resetTrialRateLimits = resetTrialRateLimits;
-module.exports.standardBodyRows = standardBodyRows; // test hook: the body rows drawn at the photo, reused by prepare-standard-avatar
+module.exports.standardSheetDraws = standardSheetDraws; // test hook: the standard sheet drawn at the photo, taken by prepare-standard-avatar
 module.exports.inFlightStandardAvatarPromises = inFlightStandardAvatarPromises; // test hook: the prepare-standard-avatar registry create-story hands to the job
 module.exports.inFlightTitleSheetsOnRow = inFlightTitleSheetsOnRow; // test hook: what create-story hands to the job (resolves when the sheets are on the row)
 module.exports.inFlightStandardSheetsOnRow = inFlightStandardSheetsOnRow;
