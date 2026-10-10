@@ -985,3 +985,6 @@ f18b47ab9 made the VB-reference key content-hashed; a caller computed it eagerly
 
 ## 2026-10-10 — Analysis scripts must exit when done
 Eight finished measurement scripts (eval-trial-*, scratch replays) were still alive hours later: requiring server modules opens a DB pool / timers, so node never exits, and the 16 GB machine hit "critically low memory". Rule: every script under scripts/analysis/ and every scratch replay ends with `await pool.end()` and `process.exit(0)` (also on error), and an agent checks for its own leftover processes (by PID, never by image name) before reporting done.
+
+## 2026-10-10 — Search decisions.md / SETTLED.md BEFORE testing an architecture change, not after
+I proposed and wired "one Grok call for the whole avatar sheet" to save time. decisions.md 2026-08-09 records exactly why the sheet is two calls (one call: headless/distorted bodies, ~70%), and a code comment in character2x4Sheet.js says so too; the Lab agent even quoted it, and I went ahead. Cost: ~USD 2.2 of Lab/judge/wiring work and the owner's time re-judging pictures. Rule: before any proposal that merges, splits or removes a pipeline step, grep docs/decisions.md and docs/SETTLED.md for that step and quote the record in the proposal; if a record says it failed, the proposal must name what is different now and be framed to the owner as a reversal.
