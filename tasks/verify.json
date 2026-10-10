@@ -9767,6 +9767,22 @@
         "kind": "human",
         "what": "One /try on staging from the iPhone: the hero on the character step and the first three waiting-page slides are painted, whole bodies, no photoreal image at any moment; Railway log shows \"Drawing the standard body row\" then \"Standard body row styled and cut for user ... in Ns\" with N <= 15 and the later \"reusing the body row drawn at the photo\"; no \"body row styling ... failed\"."
       }
+    },
+    {
+      "id": "trial-sheets-on-row-before-slides-2026-10-10",
+      "title": "Trial job waits for the sheets on the row, not for the waiting-page slides",
+      "commits": [],
+      "addedAt": "2026-10-10",
+      "claim": "On a live /try the Railway log shows the story job's \"prepare-title wait complete after N ms\" about 4-5 s earlier than \"Avatars ready for ...\" (the handler return), because the job is released once the sheets are merged on the character row; the waiting-page slides still appear (avatarSlides in job-status within a few seconds). Baseline job_1791637887327_v1qm6s7u2: prepare-title started 15:10:58 CH, costumed sheet stored 15:12:43, wait complete 77203 ms after job start at 15:12:48, first page image 15:12:50.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "On the next staging /try with a costume: read from the Railway log (scripts/lib/chTime, Swiss time) the \"Stored 1/1 styled avatars ... (1 costumed\" line, the \"[TRIAL] prepare-title wait complete after N ms\" line, the \"[TRIAL AVATARS] Avatars ready\" line and the first \"TRIAL-STREAM Page N image generation starting\" line. Record the prepare-title wait seconds (baseline 77.2 s on a 108 s sheet) and the gap stored -> wait complete (baseline 5 s; expected under 2 s). Check the waiting-page slides still arrive."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

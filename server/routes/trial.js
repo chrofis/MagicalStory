@@ -193,6 +193,18 @@ const titlePageLimiter = rateLimit({
 // before it reads the character row, so each sheet is styled once (docs/decisions.md 2026-10-08, 2026-10-09).
 const inFlightTitlePagePromises = new Map(); // userId -> Promise
 const inFlightStandardAvatarPromises = new Map(); // userId -> Promise
+// The same two calls, resolved EARLIER: the moment the finished sheets are on the character row (before the waiting-page
+// slides are cut and uploaded, ~5 s). The story job awaits these, because the row is all it reads; update-photo still awaits
+// the full promises above, since the slide write must land before it clears the row (docs/decisions.md 2026-10-10).
+const inFlightTitleSheetsOnRow = new Map(); // userId -> Promise
+const inFlightStandardSheetsOnRow = new Map(); // userId -> Promise
+/** Register a "sheets are on the row" promise; `merged()` resolves it, `release()` resolves and unregisters it (always, in finally). */
+function openSheetsOnRow(registry, userId) {
+  let merged;
+  const promise = new Promise(resolve => { merged = resolve; });
+  registry.set(userId, promise);
+  return { merged, release: () => { if (registry.get(userId) === promise) registry.delete(userId); merged(); } };
+}
 // create-anonymous-account's background photo-trait save; the standard sheet awaits it so it is drawn with the traits.
 const inFlightTraitSaves = new Map(); // userId -> Promise (never rejects)
 
@@ -1531,8 +1543,8 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     // and started at once, and the JOB awaits these promises right before the step that needs the styled
     // sheets, so the writer runs meanwhile and each sheet is still styled once (the job claims the prepared
     // result instead of styling a second set).
-    const titleAvatarsReady = inFlightTitlePagePromises.get(userId) || null;
-    const standardAvatarsReady = inFlightStandardAvatarPromises.get(userId) || null;
+    const titleAvatarsReady = inFlightTitleSheetsOnRow.get(userId) || null;
+    const standardAvatarsReady = inFlightStandardSheetsOnRow.get(userId) || null;
 
     const characterId = `characters_${userId}`;
     const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
@@ -2806,6 +2818,7 @@ router.post('/prepare-standard-avatar', verifySessionToken, async (req, res) => 
   let resolveInFlight;
   const inFlightPromise = new Promise(resolve => { resolveInFlight = resolve; });
   inFlightStandardAvatarPromises.set(userId, inFlightPromise);
+  const standardOnRow = openSheetsOnRow(inFlightStandardSheetsOnRow, userId);
   try {
     const problem = await trialAvatarAccountProblem(userId);
     if (problem) return res.status(problem.status).json(problem.body);
@@ -2865,6 +2878,7 @@ router.post('/prepare-standard-avatar', verifySessionToken, async (req, res) => 
       userId, characterId, character, requirements, clothingRequirements: clothing,
       styleOptions: { skipQualityEval: true, seasonOutfit: seasonOutfitGuidance({}), precomputedBodies },
       fields: { preGeneratedStandardFor: stamp },
+      onSheetsMerged: standardOnRow.merged,
     });
     const standard = (await loadTrialSheetCharacter(userId))?.mainChar.preGeneratedStyledAvatars?.[character.name]?.standard;
     if (!standard) throw new Error('the standard sheet is not on the row after styling');
@@ -2875,6 +2889,7 @@ router.post('/prepare-standard-avatar', verifySessionToken, async (req, res) => 
     if (!res.headersSent) res.status(500).json({ error: 'Avatar generation failed', code: 'AVATAR_FAILED' });
   } finally {
     if (inFlightStandardAvatarPromises.get(userId) === inFlightPromise) inFlightStandardAvatarPromises.delete(userId);
+    standardOnRow.release();
     resolveInFlight();
   }
 });
@@ -2907,6 +2922,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
   let resolveInFlight;
   const inFlightPromise = new Promise(resolve => { resolveInFlight = resolve; });
   inFlightTitlePagePromises.set(userId, inFlightPromise);
+  const titleOnRow = openSheetsOnRow(inFlightTitleSheetsOnRow, userId);
 
   try {
     const { storyTopic, storyCategory, storyTheme } = req.body;
@@ -2984,6 +3000,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       userId, characterId, character, requirements: avatarRequirements, clothingRequirements: avatarClothingRequirements,
       styleOptions: { seasonOutfit: seasonOutfitGuidance({ storyCategory }), fastPass1: true }, // body+head rows in parallel, one try each (docs/decisions.md 2026-10-08)
       fields: { preGeneratedCostumeType: costumeType },
+      onSheetsMerged: titleOnRow.merged,
     });
     log.info(`[TRIAL AVATARS] Avatars ready for "${character.name}" (costumeType: ${costumeType}, avatarSlides: ${slides.length})`);
     res.json({ costumeType, avatarSlides: slidesForClient(slides) });
@@ -2997,6 +3014,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     if (inFlightTitlePagePromises.get(userId) === inFlightPromise) {
       inFlightTitlePagePromises.delete(userId);
     }
+    titleOnRow.release();
     resolveInFlight();
   }
 });
@@ -3614,6 +3632,8 @@ module.exports.checkAndIncrementTrialCap = checkAndIncrementTrialCap;
 module.exports.resetTrialRateLimits = resetTrialRateLimits;
 module.exports.standardBodyRows = standardBodyRows; // test hook: the body rows drawn at the photo, reused by prepare-standard-avatar
 module.exports.inFlightStandardAvatarPromises = inFlightStandardAvatarPromises; // test hook: the prepare-standard-avatar registry create-story hands to the job
+module.exports.inFlightTitleSheetsOnRow = inFlightTitleSheetsOnRow; // test hook: what create-story hands to the job (resolves when the sheets are on the row)
+module.exports.inFlightStandardSheetsOnRow = inFlightStandardSheetsOnRow;
 module.exports.inFlightTitlePagePromises = inFlightTitlePagePromises; // test hook: the prepare-title registry create-story hands to the job
 module.exports.triggerAvatarGenerationForUser = triggerAvatarGenerationForUser;
 module.exports.TRIAL_FREE_PAGES = TRIAL_FREE_PAGES;

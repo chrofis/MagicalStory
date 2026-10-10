@@ -140,9 +140,13 @@ const MAX_SLIDE_ATTEMPTS = 3;
  *    exactly those sheets — otherwise the other endpoint landed meanwhile and the cut is redone,
  *    so the last writer never leaves slides that lack the other sheet.
  *
+ * `onSheetsMerged` is called once step 1 has landed: the sheets are then on the row, which is all the story job reads
+ * (docs/decisions.md 2026-10-10 "the job waits for the sheets on the row, not for the waiting-page slides"). The slide cut
+ * and upload of step 2 (about 5 s on staging) only feeds the waiting page.
+ *
  * @returns {Promise<string[]>} the slides as stored (R2 URLs)
  */
-async function persistPreparedSheets({ userId, characterId, exported, fields = {} }, deps = defaultDeps(), log = defaultLog) {
+async function persistPreparedSheets({ userId, characterId, exported, fields = {}, onSheetsMerged = null }, deps = defaultDeps(), log = defaultLog) {
   const names = Object.keys(exported || {});
   if (names.length !== 1) throw new Error(`persistPreparedSheets: exactly one character expected, got ${names.length}`);
   const name = names[0];
@@ -160,6 +164,7 @@ async function persistPreparedSheets({ userId, characterId, exported, fields = {
     Object.assign(c, fields);
   });
   if (!saved) throw new Error(`persistPreparedSheets: character row ${characterId} is gone`);
+  if (onSheetsMerged) onSheetsMerged();
 
   for (let attempt = 1; attempt <= MAX_SLIDE_ATTEMPTS; attempt++) {
     const character = await deps.readCharacter(characterId);
@@ -212,9 +217,10 @@ async function persistBodyRowSlides({ userId, characterId, slides }, deps = defa
  * @param {object} p.clothingRequirements
  * @param {object} p.styleOptions prepareStyledAvatars options (skipQualityEval, seasonOutfit, fastPass1)
  * @param {object} [p.fields]     extra character-row fields written with the sheets (preGeneratedStandardFor, preGeneratedCostumeType)
+ * @param {Function} [p.onSheetsMerged] called when the sheets are on the row (before the waiting-page slides are cut)
  * @returns {Promise<{ slides: string[] }>}
  */
-async function styleAndPersistTrialSheets({ userId, characterId, character, requirements, clothingRequirements, styleOptions, fields = {} }, deps = {}) {
+async function styleAndPersistTrialSheets({ userId, characterId, character, requirements, clothingRequirements, styleOptions, fields = {}, onSheetsMerged = null }, deps = {}) {
   const styled = deps.styledAvatars || require('./styledAvatars');
   const persist = deps.persist || ((args) => persistPreparedSheets(args));
   const characters = [character];
@@ -230,7 +236,7 @@ async function styleAndPersistTrialSheets({ userId, characterId, character, requ
     styled.retainCacheScopeForHandoff(`trial-${userId}`);
     styled.clearStyledAvatarCache();
 
-    const slides = await persist({ userId, characterId, exported, fields });
+    const slides = await persist({ userId, characterId, exported, fields, onSheetsMerged });
     return { slides };
   });
 }

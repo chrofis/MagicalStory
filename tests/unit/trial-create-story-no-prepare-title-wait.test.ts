@@ -50,6 +50,8 @@ afterEach(() => {
   database.getPool = origGetPool;
   trialRouter.inFlightTitlePagePromises.clear();
   trialRouter.inFlightStandardAvatarPromises.clear();
+  trialRouter.inFlightTitleSheetsOnRow.clear();
+  trialRouter.inFlightStandardSheetsOnRow.clear();
 });
 
 describe('create-story does not await an in-flight prepare-title', () => {
@@ -60,7 +62,7 @@ describe('create-story does not await an in-flight prepare-title', () => {
 
     // A prepare-title that never finishes during this test.
     const never = new Promise<void>(() => {});
-    trialRouter.inFlightTitlePagePromises.set('u1', never);
+    trialRouter.inFlightTitleSheetsOnRow.set('u1', never);
 
     const res: any = { statusCode: 200, body: null };
     res.status = (c: number) => { res.statusCode = c; return res; };

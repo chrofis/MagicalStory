@@ -58,6 +58,8 @@ afterEach(() => {
   database.getPool = origGetPool;
   trialRouter.inFlightTitlePagePromises.clear();
   trialRouter.inFlightStandardAvatarPromises.clear();
+  trialRouter.inFlightTitleSheetsOnRow.clear();
+  trialRouter.inFlightStandardSheetsOnRow.clear();
   vi.restoreAllMocks();
 });
 
@@ -179,7 +181,7 @@ describe('2. prepare-title and the job reuse it', () => {
 
   it('create-story hands BOTH in-flight promises to the job', () => {
     const src = read('server/routes/trial.js');
-    expect(src).toContain('const standardAvatarsReady = inFlightStandardAvatarPromises.get(userId) || null;');
+    expect(src).toContain('const standardAvatarsReady = inFlightStandardSheetsOnRow.get(userId) || null;');
     expect(src).toContain('deps.processStoryJob(jobId, { titleAvatarsReady, standardAvatarsReady })');
   });
 
