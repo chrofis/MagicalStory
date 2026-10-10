@@ -10,6 +10,7 @@ import { ChangePasswordModal } from '@/components/auth/ChangePasswordModal';
 import { CreditsModal } from '@/components/common/CreditsModal';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import { BookViewer } from '@/components/book';
+import BookNavBar, { bookNavLabels } from '@/components/book/BookNavBar';
 import type { BookViewerHandle } from '@/components/book';
 
 interface SharedStoryPage {
@@ -108,7 +109,7 @@ export default function SharedStoryViewer() {
       isPublic: 'Public', isPrivate: 'Private',
       publicTitle: 'Public — anyone with the link can view', privateTitle: 'Private — only you can view',
       share: 'Share', edit: 'Edit', menu: 'Menu',
-      prevPage: 'Previous page', nextPage: 'Next page', firstPage: 'Go to first page', storyPage: 'Story page',
+      ...bookNavLabels.en, storyPage: 'Story page',
     },
     de: {
       invalidLink: 'Ungültiger Link', unavailable: 'Diese Geschichte ist nicht mehr verfügbar oder der Link ist ungültig.', loadFailed: 'Die Geschichte konnte nicht geladen werden. Bitte versuche es später erneut.', offline: 'Die Geschichte konnte nicht geladen werden. Bitte prüfe deine Internetverbindung.',
@@ -118,7 +119,7 @@ export default function SharedStoryViewer() {
       isPublic: 'Öffentlich', isPrivate: 'Privat',
       publicTitle: 'Öffentlich: Alle mit dem Link können sie ansehen', privateTitle: 'Privat: Nur du kannst sie ansehen',
       share: 'Teilen', edit: 'Bearbeiten', menu: 'Menü',
-      prevPage: 'Vorherige Seite', nextPage: 'Nächste Seite', firstPage: 'Zur ersten Seite', storyPage: 'Seite der Geschichte',
+      ...bookNavLabels.de, storyPage: 'Seite der Geschichte',
     },
     fr: {
       invalidLink: 'Lien de partage invalide', unavailable: "Cette histoire n'est plus disponible ou le lien n'est pas valide.", loadFailed: "Impossible de charger l'histoire. Veuillez réessayer plus tard.", offline: "Impossible de charger l'histoire. Veuillez vérifier votre connexion.",
@@ -128,7 +129,7 @@ export default function SharedStoryViewer() {
       isPublic: 'Publique', isPrivate: 'Privée',
       publicTitle: 'Publique : toute personne ayant le lien peut la voir', privateTitle: 'Privée : vous seul pouvez la voir',
       share: 'Partager', edit: 'Modifier', menu: 'Menu',
-      prevPage: 'Page précédente', nextPage: 'Page suivante', firstPage: 'Aller à la première page', storyPage: "Page de l'histoire",
+      ...bookNavLabels.fr, storyPage: "Page de l'histoire",
     },
     it: {
       invalidLink: 'Link non valido', unavailable: 'Questa storia non è più disponibile o il link non è valido.', loadFailed: 'Impossibile caricare la storia. Riprova più tardi.', offline: 'Impossibile caricare la storia. Controlla la connessione.',
@@ -138,7 +139,7 @@ export default function SharedStoryViewer() {
       isPublic: 'Pubblica', isPrivate: 'Privata',
       publicTitle: 'Pubblica: chiunque abbia il link può vederla', privateTitle: 'Privata: solo tu puoi vederla',
       share: 'Condividi', edit: 'Modifica', menu: 'Menu',
-      prevPage: 'Pagina precedente', nextPage: 'Pagina successiva', firstPage: 'Vai alla prima pagina', storyPage: 'Pagina della storia',
+      ...bookNavLabels.it, storyPage: 'Pagina della storia',
     },
   } as const)[(['en', 'de', 'fr', 'it'] as const).find(l => l === language) ?? 'en'];
   const [story, setStory] = useState<SharedStoryData | null>(null);
@@ -850,47 +851,17 @@ export default function SharedStoryViewer() {
         </button>
       </div>
 
-      {/* Text overlay toggle + page counter. In squat landscape viewports the
+      {/* Page counter + (phone) first/prev/next buttons. In squat landscape viewports the
           row floats over the book instead of consuming layout height. */}
-      <div className="flex items-center justify-center gap-3 md:gap-4 pb-0.5 short:absolute short:left-1/2 short:-translate-x-1/2 short:z-20 short:pb-0 short:bottom-[max(4px,env(safe-area-inset-bottom))]">
-        {/* Mobile: first page button */}
-        <div className="md:hidden">
-          {currentPage > 1 && (
-            <button
-              onClick={() => bookRef.current?.flipTo(0)}
-              className="p-1.5 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-400"
-              aria-label={sv.firstPage}
-            >
-              <ChevronsLeft className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Mobile: prev button */}
-        <button
-          onClick={flipPrev}
-          disabled={currentPage === 0}
-          className="md:hidden p-2 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label={sv.prevPage}
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-
-        {/* Page counter */}
-        <span className="text-indigo-400 text-sm font-medium min-w-[3rem] text-center">
-          {currentPage + 1} / {totalPages}
-        </span>
-
-        {/* Mobile: next button */}
-        <button
-          onClick={flipNext}
-          disabled={currentPage >= totalPages - 1}
-          className="md:hidden p-2 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label={sv.nextPage}
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </div>
+      <BookNavBar
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPrev={flipPrev}
+        onNext={flipNext}
+        onFirst={() => bookRef.current?.flipTo(0)}
+        labels={sv}
+        mobileOnly
+      />
 
       {/* Fullscreen image viewer */}
       <ImageLightbox

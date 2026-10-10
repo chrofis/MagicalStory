@@ -9691,6 +9691,21 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-iphone-avatar-frames-and-book-width",
+      "commits": [],
+      "addedAt": "2026-10-10",
+      "claim": "On an iPhone the trial hero picture (character and topic step) shows the whole figure head to feet in a fixed frame, and the finished trial story fills the full phone width with visible previous/next buttons and an 'n / total' counter under the book.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Owner's next iPhone trial: the figure on the character/topic step is not cut at head or feet; once the story shows, the book touches both screen edges and the round prev/next buttons under it turn the page."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

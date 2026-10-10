@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import BookViewer from './BookViewer';
+import BookViewer, { type BookViewerHandle } from './BookViewer';
+import BookNavBar, { bookNavLabelsFor } from './BookNavBar';
 import { buildTrialBook, type TrialPreviewPage } from '@/utils/trialBook';
 
 // The sign-in gate is a page of the book. Its content changes with every
@@ -84,26 +85,42 @@ const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePag
   // remounts the viewer, on the page the visitor was reading. Image/text updates keep the same structure.
   const structureKey = `${isMobile ? 'm' : 'd'}:${titlePageImage ? 'cover' : 'pending'}:${pages.length}`;
   const logicalPageRef = useRef(0);
-  const onPageChange = useCallback((i: number) => { logicalPageRef.current = i; }, []);
+  const [currentPage, setCurrentPage] = useState(0);
+  const bookRef = useRef<BookViewerHandle>(null);
+  const onPageChange = useCallback((i: number) => { logicalPageRef.current = i; setCurrentPage(i); }, []);
   const pageList = useMemo(() => entries.map(e => {
     if (e.type === 'titlePending') return { type: 'custom' as const, key: 'title-pending', node: titlePendingNode };
     return e;
   }), [entries, titlePendingNode]);
 
   return (
-    <div className="h-[72vh] min-h-[440px] max-h-[780px] w-full lg:w-[min(1000px,calc(100vw-4rem))] lg:relative lg:left-1/2 lg:-translate-x-1/2">
-      <BookViewer
-        key={structureKey}
-        initialLogicalPage={logicalPageRef.current}
-        onPageChange={onPageChange}
-        textOnSidePage
-        pageList={pageList}
-        story={story}
-        shareToken=""
-        showTextOverlay={false}
-        pendingImageLabel={pendingImageLabel}
-      />
-    </div>
+    <>
+      <div className="h-[72vh] min-h-[440px] max-h-[780px] w-full lg:w-[min(1000px,calc(100vw-4rem))] lg:relative lg:left-1/2 lg:-translate-x-1/2">
+        <BookViewer
+          key={structureKey}
+          ref={bookRef}
+          initialLogicalPage={logicalPageRef.current}
+          onPageChange={onPageChange}
+          textOnSidePage
+          pageList={pageList}
+          story={story}
+          shareToken=""
+          showTextOverlay={false}
+          pendingImageLabel={pendingImageLabel}
+        />
+      </div>
+      {/* Same page buttons as the story viewer: a swipe is not discoverable on its own. */}
+      <div className="mt-2">
+        <BookNavBar
+          currentPage={Math.min(currentPage, pageList.length - 1)}
+          totalPages={pageList.length}
+          onPrev={() => bookRef.current?.flipPrev()}
+          onNext={() => bookRef.current?.flipNext()}
+          onFirst={() => bookRef.current?.flipTo(0)}
+          labels={bookNavLabelsFor(language)}
+        />
+      </div>
+    </>
   );
 }, (a, b) =>
   a.storyTitle === b.storyTitle && a.language === b.language && a.titlePageImage === b.titlePageImage &&

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import TrialHeroAvatar from './TrialHeroAvatar';
 import { Camera, Loader2, X, ArrowRight, CheckSquare, Square } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Turnstile } from '@marsidev/react-turnstile';
@@ -1176,7 +1177,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
           {/* The hero's picture: one figure, shown the moment the body row's first cell is drawn (same frame as the topic step). */}
           {heroAvatar && (
             <div className="flex justify-center">
-              <img src={heroAvatar} alt={characterData.name || 'Character'} className="w-40 h-auto max-h-56 rounded-xl object-contain shadow-lg" />
+              <TrialHeroAvatar src={heroAvatar} alt={characterData.name || 'Character'} />
             </div>
           )}
 

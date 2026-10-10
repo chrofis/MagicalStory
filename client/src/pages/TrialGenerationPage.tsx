@@ -1003,6 +1003,7 @@ export default function TrialGenerationPage() {
   // locked page arrives with a teaser only, and the sign-in block sits under it
   // (see TrialBook). Once nothing is locked (unlocked / contact left) the same
   // block continues below the book as the success / check-your-email state.
+  const bookBleed = storyReady && pageState !== 'failed';
   const hasLockedPage = pages.some(p => p.locked);
   const imagePlaceholder = (
     <div className="w-full aspect-square flex flex-col items-center justify-center gap-2 rounded-xl bg-indigo-50 text-indigo-400 text-sm">
@@ -1012,7 +1013,7 @@ export default function TrialGenerationPage() {
   );
   const storyPreview = (
     <div className="mb-4">
-      <div className="text-center mb-4">
+      <div className="text-center mb-4 px-4 md:px-0">
         {pageState !== 'completed' && (
           <p className="text-sm text-indigo-600 font-medium mb-1">{t.storyReadyKicker}</p>
         )}
@@ -1030,7 +1031,7 @@ export default function TrialGenerationPage() {
         />
         </RenderErrorBoundary>
       </TrialGateProvider>
-      {!hasLockedPage && isLinked && <div className="mt-4">{signInBlock}</div>}
+      {!hasLockedPage && isLinked && <div className="mt-4 px-4 md:px-0">{signInBlock}</div>}
     </div>
   );
 
@@ -1045,11 +1046,12 @@ export default function TrialGenerationPage() {
       <Navigation minimal brandLink={false} />
 
       {/* Content */}
-      <div className="px-3 md:px-8 py-4 md:py-8">
-        <div className="max-w-lg mx-auto bg-white rounded-2xl shadow-xl p-5 md:p-8">
+      {/* The finished story uses the whole phone width: no outer gutter, no card padding or frame (md+ keeps the card). */}
+      <div className={bookBleed ? 'px-0 md:px-8 py-0 md:py-8' : 'px-3 md:px-8 py-4 md:py-8'}>
+        <div className={`max-w-lg mx-auto bg-white ${bookBleed ? 'p-0 md:p-8 md:rounded-2xl md:shadow-xl' : 'rounded-2xl shadow-xl p-5 md:p-8'}`}>
 
           {/* ── Progress / Status (compact, on top) ────────────────── */}
-          <div className="flex flex-col items-center text-center mb-3">
+          <div className={`flex flex-col items-center text-center mb-3 ${bookBleed ? 'px-4 pt-3 md:p-0' : ''}`}>
             {/* Progress: spinner + text + bar */}
             {(pageState === 'starting' || pageState === 'generating') && (
               <div className="w-full flex items-center gap-3 mb-2">

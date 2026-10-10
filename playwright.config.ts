@@ -107,7 +107,7 @@ export default defineConfig({
     // Trial waiting page on an iPhone WebKit with the API mocked (no auth, no backend).
     {
       name: 'trial-viewer-webkit',
-      testMatch: /(trial-viewer-no-white-page|trial-waiting-slide-frame).spec.ts/,
+      testMatch: /(trial-viewer-no-white-page|trial-waiting-slide-frame|trial-avatar-frames|trial-book-fullwidth-arrows).spec.ts/,
     },
 
     // Repair-tile visibility (no auth dep — injects admin JWT directly).

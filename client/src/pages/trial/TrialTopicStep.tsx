@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import TrialHeroAvatar from './TrialHeroAvatar';
 import { ArrowLeft, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
 import type { StoryInput } from '../TrialWizard';
 import {
@@ -123,11 +124,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, h
   const avatarBanner = characterName ? (
     <div className="flex flex-col items-center text-center mb-8">
       {heroAvatar ? (
-        <img
-          src={heroAvatar}
-          alt={characterName}
-          className="w-40 h-auto max-h-56 rounded-xl object-contain shadow-lg mb-4"
-        />
+        <TrialHeroAvatar src={heroAvatar} alt={characterName} className="mb-4" />
       ) : (
         <div className="w-32 h-32 rounded-xl bg-indigo-100 flex items-center justify-center mb-4">
           <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
