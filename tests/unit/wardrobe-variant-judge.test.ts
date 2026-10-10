@@ -16,7 +16,7 @@
  *   3  costumed sheets get variants: derivation, projection, both resolvers;
  *   4  a page with no off sheet is recorded (off_sheet_missing).
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,33 +35,88 @@ const fnText = (name: string) => {
   return SRC.slice(s, SRC.indexOf('\n}\n', s));
 };
 
-describe('1 — the variant is judged by the pass-2 style judge plus a garment-gone task', () => {
+describe('1 — the variant is judged by the ONE sheet judge plus a garment-gone task per removed garment and a kept check per kept garment', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
+  const judgeLib = cjs('../../server/lib/avatarSheetJudge.js');
+  const realFetch = globalThis.fetch;
+  afterEach(() => { globalThis.fetch = realFetch; vi.restoreAllMocks(); });
 
-  it('redressSheetVariant calls evaluateVariantSheet (style judge pass 2 + per-garment checks) with the base Pass-1 sheet and the removed garments, never the row judges', () => {
+  const cell = (n: number) => ({ cell: n, headgear: 'none', hairVisible: 'full', hairColour: 'brown', hairStyle: 'down', head: 'present', top: 'blue', extras: 'none', heldObject: 'none' });
+  const parsedWith = (over: any = {}) => judgeLib.parseAvatarSheetVerdict({
+    cells: [1, 2, 3, 4, 5, 6, 7, 8].map(cell),
+    ...Object.fromEntries(judgeLib.DEFECT_TYPES.map((t: string) => [t, { verdict: 'ok', cells: [] }])), ...over, evidence: 'x',
+  });
+  // Every single-garment check (gone / kept) answers from `visible`; the sheet judge is stubbed.
+  const setup = (parsed: any, visible: boolean) => {
+    process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'test-key';
+    vi.spyOn(judgeLib, 'judgeAvatarSheet').mockResolvedValue({ parsed, raw: {}, prompt: 'P' });
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true, status: 200,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ visible, cells: '5-8', reason: 'seen' }) }] }, finishReason: 'STOP' }], usageMetadata: {} }),
+      text: async () => '',
+    })) as any;
+  };
+  const kept = [{ type: 'blouse', colour: 'white', details: '' }];
+
+  it('a clean sheet, the removed garment gone and the kept garment present: valid', async () => {
+    setup(parsedWith(), false);
+    // the removed garment (jacket) is not visible; the kept garment (white blouse) is
+    globalThis.fetch = vi.fn(async (_u: any, init: any) => {
+      const text = JSON.parse(init.body).contents[0].parts.map((p: any) => p.text || '').join(' ');
+      const visible = !/jacket/.test(text);
+      return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ visible, cells: '5-8', reason: 'seen' }) }] }, finishReason: 'STOP' }], usageMetadata: {} }), text: async () => '' };
+    }) as any;
+    const { verdict } = await SHEET.evaluateVariantSheet('data:image/jpeg;base64,AAAA', { removedGarments: ['jacket'], keptGarments: kept });
+    expect(verdict.valid).toBe(true);
+    expect(verdict.sheetFlags).toEqual([]);
+    expect(verdict.garmentChecks).toHaveLength(1);
+    expect(verdict.keptChecks).toHaveLength(1);
+  });
+
+  it('a flag of the sheet judge fails the variant, with the type in the reasons', async () => {
+    setup(parsedWith({ bald: { verdict: 'bald_cell', cells: [5] } }), false);
+    const { verdict } = await SHEET.evaluateVariantSheet('data:image/jpeg;base64,AAAA', { removedGarments: [], keptCheckSkipped: 'outfit version' });
+    expect(verdict.valid).toBe(false);
+    expect(verdict.sheetFlags).toEqual([{ type: 'bald', word: 'bald_cell', cells: [5] }]);
+    expect(verdict.failureReasons.join(' ')).toMatch(/sheet: bald\/bald_cell in cell\(s\) 5/);
+  });
+
+  it('a garment still visible fails the variant (removedScore 1)', async () => {
+    setup(parsedWith(), true);
+    const { verdict } = await SHEET.evaluateVariantSheet('data:image/jpeg;base64,AAAA', { removedGarments: ['jacket'], keptCheckSkipped: 'outfit version' });
+    expect(verdict.valid).toBe(false);
+    expect(verdict.removedScore).toBe(1);
+    expect(verdict.failureReasons.join(' ')).toMatch(/removed: jacket is still visible/);
+  });
+
+  it('a kept garment missing fails the variant (keptScore 1)', async () => {
+    setup(parsedWith(), false);
+    const { verdict } = await SHEET.evaluateVariantSheet('data:image/jpeg;base64,AAAA', { removedGarments: [], keptGarments: kept });
+    expect(verdict.valid).toBe(false);
+    expect(verdict.keptScore).toBe(1);
+  });
+
+  it('no kept list and no reason for skipping the kept check is refused before any call', async () => {
+    setup(parsedWith(), false);
+    await expect(SHEET.evaluateVariantSheet('data:image/jpeg;base64,AAAA', { removedGarments: ['jacket'] })).rejects.toThrow(/no keptGarments and no keptCheckSkipped/);
+    expect(judgeLib.judgeAvatarSheet).not.toHaveBeenCalled();
+  });
+
+  it('a judge that cannot answer THROWS: the attempt is rejected, a variant is never shipped unchecked', async () => {
+    process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'test-key';
+    vi.spyOn(judgeLib, 'judgeAvatarSheet').mockRejectedValue(new Error('gemini 503'));
+    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"visible":false}' }] } }], usageMetadata: {} }), text: async () => '' })) as any;
+    await expect(SHEET.evaluateVariantSheet('data:image/jpeg;base64,AAAA', { removedGarments: [], keptCheckSkipped: 'x' })).rejects.toThrow(/gemini 503/);
+  });
+
+  it('redressSheetVariant calls evaluateVariantSheet with the removed garments and never the style judge or the row judges', () => {
     const body = fnText('redressSheetVariant');
-    expect(body).toMatch(/evaluateVariantSheet\(result\.imageData, \{\s*facePhoto, realisticSheet, artStyle/);
+    expect(body).toMatch(/evaluateVariantSheet\(result\.imageData, \{/);
     expect(body).toMatch(/removedGarments: items/);
-    expect(body).not.toMatch(/evaluateSheetSplit/);
+    expect(body).not.toMatch(/evaluateSheetSplit|evaluateAvatarSheet|realisticSheet/);
   });
 
-  it('no Pass-1 sheet or face photo to judge against = no variant, before any paid edit', async () => {
-    const prev = process.env.GEMINI_API_KEY;
-    process.env.GEMINI_API_KEY = prev || 'test-key';
-    try {
-      const out = await SHEET.redressSheetVariant('data:image/jpeg;base64,AAAA', {
-        characterName: 'A', authoredWardrobe: 'jacket off; shirt outermost', removedItems: ['jacket'],
-        facePhoto: 'data:image/jpeg;base64,BBBB', realisticSheet: null,
-      });
-      expect(out).toBeNull();
-    } finally {
-      if (prev === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = prev;
-    }
-  });
-
-  it('the style judge carries no garment-off task; each removed garment is its own one-question check', () => {
-    const t = String(PROMPT_TEMPLATES.sheet2x4StyleEval);
-    expect(t).not.toMatch(/TASK 10|removedScore|GARMENTS_REMOVED/);
+  it('each removed garment is its own one-question check', () => {
     expect(SHEET.garmentsRemovedTask).toBeUndefined();
     const c = String(PROMPT_TEMPLATES.sheetGarmentGoneCheck);
     expect(c).toContain('is {GARMENT} visible');

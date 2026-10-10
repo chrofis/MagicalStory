@@ -58,13 +58,6 @@ describe('extractor prompts never offer a parting side', () => {
 });
 
 describe('judge prompts say the side is not checked', () => {
-  it('row judges (heads, bodies, cells)', () => {
-    for (const k of ['sheetRowHeadsEval', 'sheetRowBodiesEval', 'sheetRowCellsEval']) {
-      const t = String(PROMPT_TEMPLATES[k]);
-      expect(t).toMatch(/never judged/);
-      expect(t).not.toMatch(/parting seen on which side/);
-    }
-  });
   it('page image evaluation', () => {
     expect(prompt('image-evaluation.txt')).toMatch(/which side a parting falls on is never checked/);
   });

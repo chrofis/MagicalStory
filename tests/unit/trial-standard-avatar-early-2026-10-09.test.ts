@@ -58,6 +58,7 @@ afterEach(() => {
   database.getPool = origGetPool;
   trialRouter.inFlightTitlePagePromises.clear();
   trialRouter.inFlightStandardAvatarPromises.clear();
+  trialRouter.standardSheetDraws.clear();
   trialRouter.inFlightTitleSheetsOnRow.clear();
   trialRouter.inFlightStandardSheetsOnRow.clear();
   vi.restoreAllMocks();
@@ -83,7 +84,7 @@ describe('1. the standard sheet starts at the form', () => {
   it('the client sends no topic with it, and the picture it gets back is the hero avatar', () => {
     const call = step.slice(step.indexOf('/api/trial/prepare-standard-avatar'), step.indexOf('/api/trial/prepare-standard-avatar') + 400);
     expect(call).toContain("body: '{}'");
-    expect(step).toContain('showHero(result.avatarImage, true)');
+    expect(step).toContain('showHero(result.avatarImage);');
   });
 
   it('the server styles ONLY the standard sheet, with no topic, and stamps the age/gender it was drawn for', async () => {
@@ -102,13 +103,13 @@ describe('1. the standard sheet starts at the form', () => {
     expect(args.requirements).toEqual([{ pageNumber: 'pre-cover', clothingCategory: 'standard', characterNames: ['Kid'] }]);
     expect(args.fields).toEqual({ preGeneratedStandardFor: STAMP });
     expect(STAMP).toBe('gender:male'); // gender only: an age band or tier difference keeps the sheet
-    expect(args.styleOptions.skipQualityEval).toBe(true); // the job's own options for this sheet
+    expect(args.styleOptions).toEqual({ seasonOutfit: expect.anything() }); // one path, no mode flags
     expect(JSON.stringify(args)).not.toMatch(/costumed:/);
     expect(res.body).toEqual({ avatarImage: cell('FRONT') });
     expect(trialRouter.inFlightStandardAvatarPromises.has('u1')).toBe(false); // released
   });
 
-  it('while it runs, create-story can hand its promise to the job; a duplicate call is refused', async () => {
+  it('while it runs, create-story can hand its promise to the job; a duplicate call JOINS the running sheet instead of drawing another', async () => {
     const state = { char: row() };
     database.getPool = () => fakePool(state);
     let release!: () => void;
@@ -123,10 +124,11 @@ describe('1. the standard sheet starts at the form', () => {
     await new Promise(r => setTimeout(r, 10));
     expect(trialRouter.inFlightStandardAvatarPromises.has('u1')).toBe(true);
     const dup = fakeRes();
-    await finalHandler('/prepare-standard-avatar')({ sessionUser: { userId: 'u1' }, body: {}, headers: {} }, dup);
-    expect(dup.statusCode).toBe(409);
+    const dupCall = finalHandler('/prepare-standard-avatar')({ sessionUser: { userId: 'u1' }, body: {}, headers: {} }, dup);
     release();
-    await first;
+    await Promise.all([first, dupCall]);
+    expect(dup.statusCode).toBe(200);
+    expect(dup.body).toEqual({ avatarImage: cell('X') });
     expect(trialRouter.inFlightStandardAvatarPromises.has('u1')).toBe(false);
   });
 
@@ -153,7 +155,7 @@ describe('1. the standard sheet starts at the form', () => {
 });
 
 describe('2. prepare-title and the job reuse it', () => {
-  it('prepare-title styles only the costumed sheet (never a standard one), with the costume and the parallel rows', async () => {
+  it('prepare-title styles only the costumed sheet (never a standard one), with the costume, as one Grok call', async () => {
     database.getPool = () => fakePool({ char: row({ preGeneratedStyledAvatars: { Kid: { standard: 'https://r2/std.jpg' } }, preGeneratedStandardFor: STAMP }) });
     const sent = writeCutSlides({}, brandCutList([cell('A'), cell('B')]), ['https://r2/a.jpg', 'https://r2/b.jpg']);
     const style = vi.spyOn(trialSheets, 'styleAndPersistTrialSheets').mockResolvedValue({ slides: sent });
@@ -163,7 +165,7 @@ describe('2. prepare-title and the job reuse it', () => {
     const args = style.mock.calls[0][0];
     expect(args.requirements).toHaveLength(1);
     expect(args.requirements[0].clothingCategory).toMatch(/^costumed:/);
-    expect(args.styleOptions.fastPass1).toBe(true);
+    expect(args.styleOptions).toEqual({ seasonOutfit: expect.anything() });
     expect(args.fields).toHaveProperty('preGeneratedCostumeType');
     expect(res.body.avatarSlides).toEqual(['https://r2/a.jpg', 'https://r2/b.jpg']); // slides of both sheets, built by the persist step
   });
@@ -214,12 +216,12 @@ describe('2. prepare-title and the job reuse it', () => {
 
     it('styling an already seeded standard sheet runs no second sheet generation (the cache hit)', async () => {
       const styled = require('../../server/lib/styledAvatars');
-      const sheet = require('../../server/lib/character2x4Sheet');
-      const gen = vi.spyOn(sheet, 'generateCharacter2x4Sheet').mockRejectedValue(new Error('a second standard sheet must not be styled'));
+      const sheet = require('../../server/lib/oneCallSheet');
+      const gen = vi.spyOn(sheet, 'generateJudgedOneCallSheet').mockRejectedValue(new Error('a second standard sheet must not be styled'));
       await styled.runInCacheScope('trial-early-reuse', async () => {
         styled.setStyledAvatar('Kid', 'standard', 'watercolor', 'data:image/jpeg;base64,AAAA');
         const kid = { name: 'Kid', age: '8', gender: 'male', photos: { face: 'data:image/jpeg;base64,AAAA' }, avatars: {} };
-        await styled.prepareStyledAvatars([kid], 'watercolor', [reqs[1]], { Kid: { standard: { used: true, signature: 'none' }, costumed: { used: false } } }, null, null, { skipQualityEval: true });
+        await styled.prepareStyledAvatars([kid], 'watercolor', [reqs[1]], { Kid: { standard: { used: true, signature: 'none' }, costumed: { used: false } } }, null, null, {});
         styled.clearStyledAvatarCache();
       });
       expect(gen).not.toHaveBeenCalled();

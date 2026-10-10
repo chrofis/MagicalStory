@@ -20,8 +20,13 @@
 import { describe, it, expect } from 'vitest';
 
 const { seasonOutfitGuidance, SEASONS } = require('../../server/lib/season');
-const { buildBodyRowPrompt, buildFootwearRule, buildSeasonOutfitBlock } =
+const { buildFootwearRule, buildSeasonOutfitBlock } =
   require('../../server/lib/character2x4Sheet')._internal;
+const { buildOneCallSheetPrompt } = require('../../server/lib/character2x4Sheet');
+// Old row-builder call shape, now the one-call prompt: (costume text, character, costume-owned outfit?, costume name, season outfit).
+const buildBodyRowPrompt = (desc: string, character: any, redress = false, name: string | null = null, season: any = null) =>
+  buildOneCallSheetPrompt(character || {}, { costumeDescription: desc, costumeName: name, seasonOutfit: season, styleLine: 'watercolour', kind: redress ? 'costume' : 'standard' });
+
 
 const forSeason = (season: string) => seasonOutfitGuidance({ season });
 
@@ -81,7 +86,7 @@ describe('the sheet prompt carries the season as an OUTFIT rule only', () => {
       .not.toContain(winter.outfit);
   });
 
-  it('reaches the body-row builder when passed', () => {
+  it('reaches the sheet prompt when passed', () => {
     expect(buildBodyRowPrompt('standard outfit', null, false, null, winter)).toContain(winter.outfit);
   });
 
@@ -107,7 +112,7 @@ describe('season and the footwear rule are one rule, not two', () => {
     expect(buildFootwearRule(true, forSeason('winter').footwear)).toEqual(buildFootwearRule(true));
   });
 
-  it('the body-row prompt states footwear exactly once', () => {
+  it('the sheet prompt states footwear exactly once', () => {
     const p = buildBodyRowPrompt('standard outfit', null, false, null, forSeason('winter'));
     expect(p.match(/Footwear is part of the/g)).toHaveLength(1);
   });

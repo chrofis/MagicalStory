@@ -5,8 +5,9 @@
  * costume). Both are made before the story job needs them, by two background endpoints in
  * routes/trial.js, and persisted on the character row (`preGeneratedStyledAvatars`):
  *
- *   - POST /api/trial/prepare-standard-avatar starts the moment the form is filled (photo, age and
- *     gender are all it needs) and styles the STANDARD sheet.
+ *   - POST /api/trial/prepare-standard-body starts the STANDARD sheet the moment the photo is analysed, from the photo's own
+ *     age/gender estimates; POST /api/trial/prepare-standard-avatar (the form is filled) takes that sheet when the declared
+ *     gender still fits it, else draws its own. Each sheet is ONE Grok call, judged, one redo (oneCallSheet.js).
  *   - POST /api/trial/prepare-title starts when the story ideas are shown (the topic picks the costume)
  *     and styles the COSTUMED sheet.
  *
@@ -25,22 +26,22 @@ const { writeCutSlides } = require('./clientAvatarImages');
 const TRIAL_ART_STYLE = 'watercolor';
 
 /**
- * What the standard sheet (and the body row drawn ahead of it) was drawn FOR: the gender, and nothing else. The body row is
- * drawn at the photo from the photo's own estimates before the visitor has typed anything; the owner's rule (2026-10-09:
+ * What the standard sheet was drawn FOR: the gender, and nothing else. The sheet is drawn at the photo
+ * from the photo's own estimates before the visitor has typed anything; the owner's rule (2026-10-09:
  * "don't throw the images for trials, just keep them") is that a trial keeps what was drawn when the declared age lands in
  * another band or phantom tier, so the age is NOT part of the stamp. A gender change redraws: the figure, hair and clothes
  * are cut differently. A sheet whose stamp differs from the declared gender is stale and is not reused
- * (docs/decisions.md 2026-10-09 "Trial keeps the drawn body row"; it replaces the band/tier clause of the body-row entry).
+ * (docs/decisions.md 2026-10-09 "Trial keeps the drawn body row", now the whole one-call sheet: 2026-10-10 "avatar sheets are ONE Grok 2 call").
  */
 function standardSheetStamp(character) {
   return `gender:${character?.gender || ''}`;
 }
 
-/** Declared ages up to this keep the drawn body row whatever the gender (owner 2026-10-09: "gender redraws if age is more than 2"). */
+/** Declared ages up to this keep the drawn sheet whatever the gender (owner 2026-10-09: "gender redraws if age is more than 2"). */
 const GENDER_KEEP_MAX_AGE = 2;
 
 /**
- * THE rule for reusing something drawn under `drawnStamp` (the body row, the standard sheet): it is kept when the stamp equals
+ * THE rule for reusing something drawn under `drawnStamp` (the standard sheet): it is kept when the stamp equals
  * the declared one, or when the declared age is 2 or under (a baby's gender barely shows in the figure). Otherwise a gender
  * change redraws. Used by prepare-standard-avatar, the PATCH measurement log and usablePreparedAvatars.
  */
@@ -189,23 +190,6 @@ async function persistPreparedSheets({ userId, characterId, exported, fields = {
 }
 
 /**
- * The first slides of a trial: the cells of the standard sheet's body row, written the moment that row lands (long before
- * the sheet is finished). Only when the row holds no slides yet (a costumed sheet may have landed first); the finished
- * sheet's slides replace them in persistPreparedSheets. Returns the slides the row holds afterwards, or null when it kept
- * the ones it had.
- */
-async function persistBodyRowSlides({ userId, characterId, slides }, deps = defaultDeps()) {
-  const storedSlides = await deps.storeSlides(characterId, userId, slides);
-  let attestedSlides = null;
-  await deps.modifyRow(characterId, userId, (fresh) => {
-    const c = fresh.characters?.[0];
-    if (!c || (Array.isArray(c.preGeneratedAvatarSlides) && c.preGeneratedAvatarSlides.length > 0)) return false;
-    attestedSlides = writeCutSlides(c, slides, storedSlides);
-  });
-  return attestedSlides;
-}
-
-/**
  * Style `requirements` for one trial character inside the trial's cache scope, then persist what was made.
  * The single implementation behind both prepare endpoints.
  *
@@ -215,7 +199,7 @@ async function persistBodyRowSlides({ userId, characterId, slides }, deps = defa
  * @param {object} p.character    the character object handed to the styling pipeline
  * @param {Array}  p.requirements prepareStyledAvatars page requirements
  * @param {object} p.clothingRequirements
- * @param {object} p.styleOptions prepareStyledAvatars options (skipQualityEval, seasonOutfit, fastPass1)
+ * @param {object} p.styleOptions prepareStyledAvatars options (seasonOutfit)
  * @param {object} [p.fields]     extra character-row fields written with the sheets (preGeneratedStandardFor, preGeneratedCostumeType)
  * @param {Function} [p.onSheetsMerged] called when the sheets are on the row (before the waiting-page slides are cut)
  * @returns {Promise<{ slides: string[] }>}
@@ -250,6 +234,5 @@ module.exports = {
   onlyRequestedSheets,
   sheetSignature,
   persistPreparedSheets,
-  persistBodyRowSlides,
   styleAndPersistTrialSheets,
 };

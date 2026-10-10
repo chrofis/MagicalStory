@@ -61,7 +61,7 @@ interface StyledAvatarGenerationEntry {
     attempts: Array<{
       attempt: number; stage: string; score?: number | null; valid?: boolean; accepted?: boolean; reason?: string | null;
       gate?: {
-        style: { score: number | null; valid: boolean | null; reasons: string[] };
+        sheetFlags: Array<{ type: string; word: string; cells: number[] }>;
         garmentChecks: Array<{ garment: string; question: string | null; visible: boolean; cells: string; reason: string }>;
         keptChecks?: Array<{ garment: string; question: string | null; visible: boolean; cells: string; reason: string }>;
         keptCheckSkipped?: string | null; keptScore?: number | null;
@@ -4162,7 +4162,7 @@ export function StoryDisplay({
                               <div className="font-bold text-gray-700">#{a.attempt} {a.stage}{a.score != null ? ` - ${a.score}/10` : ''} {a.accepted ? 'accepted' : 'rejected'}</div>
                               {a.gate ? (
                                 <div className="mt-1 space-y-1 text-[10px] text-gray-700">
-                                  <div>Style: {a.gate.style.score ?? '?'}/10 {a.gate.style.valid ? 'valid' : 'invalid'}{a.gate.style.reasons.length > 0 && ` - ${a.gate.style.reasons.join('; ')}`}</div>
+                                  <div>Sheet judge: {a.gate.sheetFlags.length === 0 ? 'clean' : a.gate.sheetFlags.map(d => `${d.type}:${d.word}${d.cells.length ? ` [${d.cells.join(', ')}]` : ''}`).join('; ')}</div>
                                   {a.gate.garmentChecks.map((c, i) => (
                                     <details key={i}>
                                       <summary className="cursor-pointer"><span className={c.visible ? 'text-red-700 font-bold' : 'text-green-700'}>{c.garment}: {c.visible ? 'STILL VISIBLE' : 'gone'}</span>{c.cells ? ` (${c.cells})` : ''} - {c.reason}</summary>

@@ -154,35 +154,6 @@ const STAGE_TEMPLATE_KEYS = {
 // GET /templates resolves every option to its text, and the UI picks the one
 // matching the param the user typed in the params JSON.
 const STAGE_TEMPLATE_VARIANTS = {
-  // The avatar sheet has FOUR judges, each with its own template, and the
-  // override replaces exactly the one params.evalPrompt names (runAvatarEvalStage).
-  // Until 2026-09-23 this prefilled sheet-2x4-evaluation.txt, a whole-sheet judge
-  // production never ran, and one override replaced both row judges at once.
-  avatar_eval: {
-    param: 'evalPrompt',
-    options: {
-      heads: 'sheetRowHeadsEval',
-      bodies: 'sheetRowBodiesEval',
-      identity: 'sheetRowIdentityEval',
-      style: 'sheet2x4StyleEval',
-    },
-  },
-  // avatar_style's prompt is BUILT in JS, not loaded from a template: the
-  // prefill is the exact string production sends for params.artStyle — with the
-  // style anchor attached when that style has one, as on attempt 1 (a Lab
-  // override keeps the anchor). It used to prefill styled-costumed-avatar.txt,
-  // which production never loads.
-  avatar_style: {
-    param: 'artStyle',
-    buildOptions: () => {
-      const { buildStyleTransferPrompt } = require('../../lib/character2x4Sheet');
-      const { loadStyleAnchor } = require('../../lib/styleAnalysis');
-      const { ART_STYLES } = require('../../lib/storyHelpers');
-      return Object.fromEntries(Object.keys(ART_STYLES)
-        .filter(id => id !== 'realistic') // pass 2 never runs on a realistic story
-        .map(id => [id, buildStyleTransferPrompt(id, { hasAnchor: !!loadStyleAnchor(id) })]));
-    },
-  },
   // runAuditReplayStage switches the audit prompt on params.level.
   audit_replay: {
     param: 'level',
@@ -977,31 +948,8 @@ async function executeRedo(experimentId, exp, entry, resultIndex, override, extr
   try {
     let redo;
     {
-      if (entry.character && (exp.stage === 'avatars' || exp.stage === 'avatar_style')) {
-        // Avatar style pass — always transfer from the character's NEWEST
-        // realistic anchor (a pass-1 redo supersedes the one recorded here).
-        const anchors = await dbQuery(
-          `SELECT e.value AS entry FROM testlab_experiments x, jsonb_array_elements(x.results) e
-           WHERE x.stage IN ('avatars', 'avatar_realistic')
-             AND (e.value->>'ok')::boolean
-             AND e.value->>'storyId' = $1
-             AND LOWER(e.value->>'character') = LOWER($2)
-           ORDER BY x.id DESC, (e.value->>'versionIndex')::int DESC`,
-          [entry.storyId, entry.character]
-        );
-        const latest = anchors.map(a => a.entry).find(e => e.pass === 1 || e.realisticVersionIndex != null);
-        const realisticVersionIndex = latest
-          ? (latest.pass === 1 ? latest.versionIndex : latest.realisticVersionIndex)
-          : entry.realisticVersionIndex;
-        redo = await runStageOnTarget('avatar_style', { storyId: entry.storyId, character: entry.character }, {
-          experimentId,
-          promptOverride: override,
-          params: { artStyle: entry.artStyle, realisticVersionIndex },
-        });
-      } else if (entry.character && exp.stage === 'avatar_realistic') {
-        redo = await runStageOnTarget('avatar_realistic', { storyId: entry.storyId, character: entry.character }, { experimentId });
-      } else if (entry.character) {
-        // Other character-target stages (avatar_eval, future ones). Per-entry
+      if (entry.character) {
+        // Character-target stages (avatar_sheet_variant, avatar_redress). Per-entry
         // fields (evaluated sheet version, styled flag) win over experiment
         // params so an API-created per-target run redoes the SAME unit.
         redo = await runStageOnTarget(exp.stage, { storyId: entry.storyId, character: entry.character }, {

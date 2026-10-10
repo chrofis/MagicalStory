@@ -59,6 +59,10 @@ layout - Is the sheet a clean 2 x 4 grid of one person?
   lettering: a caption, label, word or number is written on the paper (print on a garment does not count).
   not_illustrated: the cells are photographs or cut-outs rather than painted illustrations.
 
+tail - Does a figure whose lower body is a tail or fin stand on it? Look only at the full-body cells 5-8, and only at a figure whose legs are replaced by a tail, a fin or another single fused lower form (a mermaid, a fish, a serpent); a figure with two legs and feet, however long its skirt or robe, is ok.
+  ok: no full-body cell shows such a figure, or in every such cell the tail curves out along the ground and ends in a visible tail tip or fin.
+  standing_on_tail: in at least one such cell the figure stands upright on the tail like a column, or the lower body is an upright skirt or column of scales with no tail tip or fin drawn at its end.
+
 identity - Is it the right person?
   ok: it could be the same person{AND_PHOTO}.
   different_person: clearly a different person than the photo (a different face, or a different gender).
@@ -82,6 +86,7 @@ Write each cell object on ONE line, with no line breaks inside it. Return EXACTL
   "costume":  {"verdict": "<word>", "cells": [<cell numbers>]},
   "rowMatch": {"verdict": "<word>", "cells": [<cell numbers>]},
   "held":     {"verdict": "<word>", "cells": [<cell numbers>]},
+  "tail":     {"verdict": "<word>", "cells": [<cell numbers>]},
   "layout":   {"verdict": "<word>", "cells": [<cell numbers>]},
   "identity": {"verdict": "<word>", "cells": []},
   "age":      {"verdict": "<word>", "cells": []},

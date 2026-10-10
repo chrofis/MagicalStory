@@ -302,16 +302,10 @@ const CASES: Case[] = [
     blind: () => trialWriterPrompt({ ...inputData, storyDetails: 'A quiet afternoon.' }, 4),
   },
   {
-    name: 'buildBodyRowPrompt (2×4 sheet, body row) — the garment',
+    name: 'buildOneCallSheetPrompt (2×4 sheet) — the garment',
     probe: GARMENT,
-    build: () => sheet.buildBodyRowPrompt(GARMENT, CHARACTERS[0], false, COSTUME_NAME, null),
-    blind: () => sheet.buildBodyRowPrompt('a plain grey smock', CHARACTERS[0], false, COSTUME_NAME, null),
-  },
-  {
-    name: 'buildHeadRowPrompt (2×4 sheet, head row) — the garment',
-    probe: GARMENT,
-    build: () => sheet.buildHeadRowPrompt(CHARACTERS[0], GARMENT),
-    blind: () => sheet.buildHeadRowPrompt(CHARACTERS[0], ''),
+    build: () => sheet.buildOneCallSheetPrompt(CHARACTERS[0], { costumeDescription: GARMENT, costumeName: COSTUME_NAME, styleLine: 'watercolour', kind: 'costume' }),
+    blind: () => sheet.buildOneCallSheetPrompt(CHARACTERS[0], { costumeDescription: 'a plain grey smock', costumeName: COSTUME_NAME, styleLine: 'watercolour', kind: 'costume' }),
   },
   {
     // THE LANDMARK BLOCK reaches all three judges from ONE builder
@@ -334,14 +328,6 @@ const CASES: Case[] = [
     blind: () => buildSemanticPrompt(PROMPT_TEMPLATES.imageSemantic, {
       storyText: PAGE_TEXT, sceneHint: BRIEF_PROSE, imagePrompt: BRIEF_PROSE,
     }),
-  },
-  {
-    name: 'buildStyleTransferPrompt (2×4 sheet, pass 2) — the commissioned style',
-    // A distinctive clause of the resolved ART_STYLES descriptor — the style
-    // KEY must be resolved into its medium, not passed through as an id.
-    probe: 'pigment pooling and granulating',
-    build: () => sheet.buildStyleTransferPrompt('watercolor', { hasAnchor: true }),
-    blind: () => sheet.buildStyleTransferPrompt('pixar', { hasAnchor: true }),
   },
 ];
 
@@ -387,91 +373,6 @@ const STUB_SHEET_VERDICT = JSON.stringify({
   crop: { cropScore: 9, reason: 'upper chest' }, perCell: { cell1: 9, cell2: 9, cell3: 9, cell4: 9 },
   identityScore: 9, layoutScore: 9, styleScore: 9, cleanScore: 9, bodyFaceScore: 9, ageScore: 9, soloScore: 9, backgroundScore: 9,
 });
-describe('evaluateSheetRow hands the judge the real outfit, not the token', () => {
-  const realFetch = globalThis.fetch;
-  afterEach(() => { globalThis.fetch = realFetch; vi.restoreAllMocks(); });
-
-  const stubJudge = () => {
-    globalThis.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        candidates: [{ content: { parts: [{ text: STUB_SHEET_VERDICT }] } }],
-        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
-      }),
-      text: async () => '',
-    })) as any;
-  };
-
-  // A 1x1 JPEG is enough — nothing decodes it on this path.
-  const ROW = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/9oACAEBAAA/AKpgA//Z';
-
-  beforeAll(async () => { await loadPromptTemplates(); });
-
-  it.each(['heads', 'bodies'])('%s row: the garment text reaches the judge', async (which) => {
-    stubJudge();
-    const { promptUsed } = await sheet.evaluateSheetRow(ROW, which, {
-      costumeDescription: GARMENT,
-      costumeName: COSTUME_NAME,
-    });
-    expect(promptUsed).toContain(GARMENT);
-    expect(unfilled(promptUsed)).toEqual([]);
-  });
-
-  it.each(['heads', 'bodies'])('%s row: with no costume, the garment is genuinely absent', async (which) => {
-    stubJudge();
-    const { promptUsed } = await sheet.evaluateSheetRow(ROW, which, {});
-    expect(promptUsed).not.toContain(GARMENT);
-    expect(unfilled(promptUsed)).toEqual([]);
-  });
-
-  // Two sheet judges fill BARE-WORD tokens (`CHARACTER_AGE`) with a plain
-  // `.replace(/WORD/g, …)` instead of a braced placeholder, so neither
-  // fillTemplate's warn-then-strip nor the boundary guard's `{TOKEN}` regex can
-  // see an unfilled one — the literal word would ship to the judge. Pinned
-  // here by VALUE: the declared age arrives, and the token name does not.
-  it('the identity judge is told the declared age, not the token name', async () => {
-    stubJudge();
-    const { promptUsed } = await sheet.evaluateIdentity(ROW, { declaredAge: 8 });
-    expect(promptUsed).toContain('8 years old');
-    expect(promptUsed).not.toContain('CHARACTER_AGE');
-    expect(unfilled(promptUsed)).toEqual([]);
-  });
-
-  it('…and says "unknown" rather than leaving the token when no age is declared', async () => {
-    stubJudge();
-    const { promptUsed } = await sheet.evaluateIdentity(ROW, {});
-    expect(promptUsed).not.toContain('CHARACTER_AGE');
-    expect(promptUsed).not.toContain('8 years old');
-  });
-
-  // A9: the bodies judge scores PROPORTIONS — the one axis the declared age
-  // decides — but only the identity and pass-2 style judges were handed
-  // CHARACTER_AGE, so the critic could only confirm the drawing looked like
-  // itself while the generator was anchored on the declared age.
-  it('the bodies judge is told the declared age', async () => {
-    stubJudge();
-    const { promptUsed } = await sheet.evaluateSheetRow(ROW, 'bodies', { declaredAge: 3 });
-    expect(promptUsed).toContain('CHARACTER_AGE: 3 years old');
-    expect(unfilled(promptUsed)).toEqual([]);
-  });
-
-  it('…and "unknown" when no age is declared, never a bare placeholder', async () => {
-    stubJudge();
-    const { promptUsed } = await sheet.evaluateSheetRow(ROW, 'bodies', {});
-    expect(promptUsed).toContain('CHARACTER_AGE: unknown');
-    expect(promptUsed).not.toContain('years old');
-    expect(unfilled(promptUsed)).toEqual([]);
-  });
-
-  it('the heads row does not get the age line — it does not score proportions', async () => {
-    stubJudge();
-    const { promptUsed } = await sheet.evaluateSheetRow(ROW, 'heads', { declaredAge: 3 });
-    expect(promptUsed).not.toContain('CHARACTER_AGE');
-    expect(unfilled(promptUsed)).toEqual([]);
-  });
-});
-
 // ---------------------------------------------------------------------------
 // The Art Director's size-ratio requirement (backlog #77).
 //

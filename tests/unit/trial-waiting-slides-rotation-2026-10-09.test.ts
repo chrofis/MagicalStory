@@ -50,7 +50,7 @@ describe('trial waiting-screen avatar rotation (owner iPhone 2026-10-09: the mai
 });
 
 describe('server: every slide carries its figure label', () => {
-  it('buildAvatarSlides labels cells variant-pose-kind and slidesOfBodyRowCells uses the standard body labels', async () => {
+  it('buildAvatarSlides labels cells variant-pose-kind', async () => {
     const { figuresOf } = require('../../server/lib/clientAvatarImages');
     const png = await sharp({ create: { width: 256, height: 512, channels: 3, background: '#fff' } }).png().toBuffer();
     vi.spyOn(sceneComposite, 'cropAvatarCell').mockResolvedValue({ body: png, face: png });
@@ -59,8 +59,6 @@ describe('server: every slide carries its figure label', () => {
     const slides = await avatarSlides.buildAvatarSlides({ standard: uri, costumed: { default: uri } });
     expect(figuresOf(slides)?.slice(0, 4)).toEqual(['costumed-default-front-head', 'costumed-default-front-body', 'standard-front-head', 'standard-front-body']);
     vi.restoreAllMocks();
-    const early = avatarSlides.slidesOfBodyRowCells(await Promise.all([0, 1, 2, 3].map(async () => `data:image/jpeg;base64,${(await sharp({ create: { width: 64, height: 128, channels: 3, background: '#fff' } }).jpeg().toBuffer()).toString('base64')}`)));
-    expect(figuresOf(early)).toEqual(['standard-front-body', 'standard-threeQuarter-body', 'standard-profile-body']);
   });
 });
 

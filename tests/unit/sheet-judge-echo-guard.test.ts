@@ -77,38 +77,6 @@ describe('isEchoedJudgeVerdict — one guard for all four sheet judges', () => {
   });
 });
 
-describe('the row and identity judges re-ask once, then fail loudly', () => {
-  const realFetch = globalThis.fetch;
-  afterEach(() => { globalThis.fetch = realFetch; vi.restoreAllMocks(); });
-  beforeAll(async () => { await loadPromptTemplates(); });
-
-  const ROW = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/9oACAEBAAA/AKpgA//Z';
-  const reply = (obj: any) => ({
-    ok: true, status: 200,
-    json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(obj) }] }, finishReason: 'STOP' }], usageMetadata: {} }),
-    text: async () => '',
-  });
-  const judged = { ...STORED_HEADS, angles: { score: 2, reason: 'cell1: front; cell2: three-quarter; cell3: profile; cell4: profile, no eye' }, cleanRender: { cleanScore: 10, reason: 'no marks' }, coverage: { coverageScore: 9, reason: 'red crew-neck shirt in all cells' }, solo: { soloScore: 10, reason: 'one head per cell' }, finalScore: 2, valid: false };
-
-  it('an echo followed by a real verdict returns the real verdict after two calls', async () => {
-    const f = vi.fn().mockResolvedValueOnce(reply(STORED_HEADS)).mockResolvedValueOnce(reply(judged));
-    globalThis.fetch = f as any;
-    const { report } = await sheet.evaluateSheetRow(ROW, 'heads', { costumeDescription: 'a red shirt' });
-    expect(f).toHaveBeenCalledTimes(2);
-    expect(report.angles.score).toBe(2);
-  });
-
-  it('two echoes throw — the caller records the row as unjudged, never as a 9', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(reply(STORED_HEADS)) as any;
-    await expect(sheet.evaluateSheetRow(ROW, 'heads', { costumeDescription: 'a red shirt' })).rejects.toThrow(/echoed its prompt twice/);
-  });
-
-  it('the identity judge has the same guard', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(reply({ perCell: { cell1: 9, cell2: 9, cell3: 9, cell4: 9 }, identityScore: 9, reason: 'All 4 heads match the reference person in face structure, hair, skin tone, and age' })) as any;
-    await expect(sheet.evaluateIdentity(ROW, { declaredAge: 3 })).rejects.toThrow(/echoed its prompt twice/);
-  });
-});
-
 // Every sheet judge's final is computed in code from its sub-scores
 // (2026-09-23), so the stub carries each judge's axes, not a bare finalScore.
 const STUB_SHEET_VERDICT = JSON.stringify({
@@ -133,32 +101,8 @@ describe('generator↔critic: the cell-4/8 pose is one definition', () => {
     return sent;
   };
 
-  it('both live generator rows carry it', () => {
-    const c = { name: 'A', age: 5, physical: {} };
-    expect(sheet.buildBodyRowPrompt('a red shirt', c, false, null, null)).toContain(REAR_TURN_POSE);
-    expect(sheet.buildHeadRowPrompt(c, 'a red shirt')).toContain(REAR_TURN_POSE);
+  it('the sheet generator carries it', () => {
+    expect(sheet.buildOneCallSheetPrompt({ name: 'A', age: 5, physical: {} }, { costumeDescription: 'a red shirt', styleLine: 'watercolour', kind: 'standard' })).toContain(REAR_TURN_POSE);
   });
 
-  it('every judge is sent it, and none calls cell 4/8 a plain back view', async () => {
-    const sent = capture();
-    await sheet.evaluateSheetRow(ROW, 'heads', { costumeDescription: 'a red shirt' });
-    await sheet.evaluateSheetRow(ROW, 'bodies', { costumeDescription: 'a red shirt', declaredAge: 5 });
-    await sheet.evaluateIdentity(ROW, { sourcePhoto: ROW, declaredAge: 5 });
-    await sheet.evaluateStyledSheetWithGemini(ROW, ROW, ROW, 'watercolor', 'k', null, 5);
-    expect(sent).toHaveLength(4);
-    for (const p of sent) {
-      expect(p).toContain(REAR_TURN_POSE);
-      expect(p).not.toMatch(/profile, back\b/);
-      expect(p).not.toMatch(/needs no face/);
-    }
-  });
-
-  it('no judge template shows a filled-in score to copy', async () => {
-    const sent = capture();
-    await sheet.evaluateSheetRow(ROW, 'heads', {});
-    await sheet.evaluateSheetRow(ROW, 'bodies', {});
-    await sheet.evaluateIdentity(ROW, { sourcePhoto: ROW });
-    await sheet.evaluateStyledSheetWithGemini(ROW, ROW, ROW, 'watercolor', 'k', null, 5);
-    for (const p of sent) expect(p).not.toMatch(/"(?:score|\w+Score|cell\d)":\s*\d/);
-  });
 });

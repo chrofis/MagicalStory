@@ -540,7 +540,7 @@ function SetsTab() {
   const [sets, setSets] = useState<TestLabSet[]>([]);
   const [expanded, setExpanded] = useState<Record<number, TestLabSetMember[]>>({});
   const [newName, setNewName] = useState('');
-  const [newStage, setNewStage] = useState('avatar_eval');
+  const [newStage, setNewStage] = useState('avatar_sheet_variant');
   // Run-time overrides applied to whichever set you run — the iteration loop:
   // same pinned cases, new prompt / params, so only the variable under test moves.
   const [runPrompt, setRunPrompt] = useState('');
@@ -688,9 +688,6 @@ function ExperimentsTab() {
   const [blurFace, setBlurFace] = useState(true);
   const [refCharacter, setRefCharacter] = useState(''); // '' = stage default | 0.5 | 1 | full (whole page) // '' = whiteout insert (default) | fullscene | blended | cutout
   const [freshDetection, setFreshDetection] = useState(false);
-  const [avatarPass, setAvatarPass] = useState('1');        // avatar_eval: 1=realistic anchor, 2=styled sheet
-  const [avatarEvalModel, setAvatarEvalModel] = useState('gemini-2.5-flash'); // avatar_eval: which model scores the sheet
-  const [avatarSplitRows, setAvatarSplitRows] = useState(true); // avatar_eval: crop the sheet at the gutter, judge heads/bodies separately
   const [paramsJson, setParamsJson] = useState('');
   const [storyIdInput, setStoryIdInput] = useState('');
   const [coverType, setCoverType] = useState('frontCover');
@@ -931,7 +928,6 @@ function ExperimentsTab() {
         ];
       }
       if (stage === 'qwen_insert' && freshDetection) params.freshDetection = true;
-      if (stage === 'avatar_eval') { params.pass = Number(avatarPass); params.model = avatarEvalModel; params.splitRows = avatarSplitRows; }
       if (stage === 'cover') params.coverType = coverType;
       if (isTextRefine) {
         if (refineModel) params.model = refineModel;
@@ -1029,10 +1025,6 @@ function ExperimentsTab() {
     const pCrop = p.crop as { x?: number; y?: number; w?: number; h?: number } | undefined;
     setCropPad(pCrop && pCrop.w === 1 && pCrop.h === 1 ? 'full' : (p.cropPad != null ? String(p.cropPad) : ''));
     setFreshDetection(!!p.freshDetection);
-
-    setAvatarPass(String(p.pass ?? '1'));
-    if (p.model) setAvatarEvalModel(String(p.model));
-    setAvatarSplitRows(p.splitRows !== false);
 
     // A stored outline_review row (stage retired 2026-09-13) has no widgets left
     // to restore into; its writerModel/aspect/mode/rounds/models surface in the
@@ -1157,39 +1149,6 @@ function ExperimentsTab() {
               <input type="checkbox" checked={freshDetection} onChange={e => setFreshDetection(e.target.checked)} />
               Re-detect character (ignore stored box)
             </label>
-          )}
-          {stage === 'avatar_eval' && (
-            <>
-              <label className="text-sm flex items-center gap-1.5">
-                Sheet
-                <select className="border rounded-lg px-3 py-2 text-sm" value={avatarPass} onChange={e => setAvatarPass(e.target.value)}>
-                  <option value="1">Pass 1 — realistic anchor</option>
-                  <option value="2">Pass 2 — styled sheet</option>
-                </select>
-              </label>
-              <label className="text-sm flex items-center gap-1.5">
-                Eval model
-                <select className="border rounded-lg px-3 py-2 text-sm" value={avatarEvalModel} onChange={e => setAvatarEvalModel(e.target.value)}>
-                  <optgroup label="Gemini (Google)">
-                    <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-                    <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-                    <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-                  </optgroup>
-                  <optgroup label="Grok (xAI)">
-                    <option value="grok-4.3">grok-4.3</option>
-                  </optgroup>
-                  <optgroup label="Qwen-VL (OpenRouter)">
-                    <option value="qwen3-vl">qwen3-vl-32b (spatial leader)</option>
-                    <option value="qwen3-vl-235b">qwen3-vl-235b</option>
-                    <option value="qwen-vl">qwen2.5-vl-72b</option>
-                  </optgroup>
-                </select>
-              </label>
-              <label className="text-sm flex items-center gap-1.5">
-                <input type="checkbox" checked={avatarSplitRows} onChange={e => setAvatarSplitRows(e.target.checked)} />
-                Split rows (judge heads &amp; bodies separately)
-              </label>
-            </>
           )}
           {stage === 'garment_hue' && (
             <label className="text-sm flex items-center gap-1.5 font-medium text-indigo-700">
@@ -2881,7 +2840,6 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                       // the set is that two versions of one page are two cases.
                       if (stage === 'eval_variance' && result.versionIndex != null) target.versionIndex = result.versionIndex;
                       const params: Record<string, unknown> = {};
-                      if (stage === 'avatar_eval') { if ((result as { pass?: number }).pass != null) params.pass = (result as { pass?: number }).pass; params.splitRows = true; }
                       if (stage === 'char_repair') { params.characterName = result.character || result.characterName; if (result.backend) params.backend = result.backend; if (result.repairMode) params.repairMode = result.repairMode; }
                       try {
                         const set = await testlabService.createSet(name.trim(), stage);
@@ -2893,7 +2851,7 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                       } catch (e) { alert(`Pin failed: ${e instanceof Error ? e.message : e}`); }
                     }}><Plus size={14} /> Pin to set</Button>
                   )}
-                  {(stage === 'entity' || stage === 'style_check' || stage === 'avatar_eval' || stage === 'repair_verify' || stage === 'beats_replan') && result.report != null && (
+                  {(stage === 'entity' || stage === 'style_check' || stage === 'repair_verify' || stage === 'beats_replan') && result.report != null && (
                     <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64">{JSON.stringify(result.report, null, 2)}</pre>
                   )}
                   {stage === 'judge_fixture' && <JudgeFixtureSummary result={result} />}

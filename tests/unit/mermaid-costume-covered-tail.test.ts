@@ -4,7 +4,7 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const { PROMPT_TEMPLATES, loadPromptTemplates } = require('../../server/services/prompts.js');
 const { TRIAL_COSTUMES } = require('../../server/config/trialCostumes.js');
-const { buildBodyRowPrompt } = require('../../server/lib/character2x4Sheet.js');
+const { buildOneCallSheetPrompt } = require('../../server/lib/character2x4Sheet.js');
 const { WARDROBE_RULES } = require('../../server/lib/promptBuilders.js');
 
 // Staging showcase job_1791222889407_ypl33vk8u: a 5-year-old's mermaid costume was
@@ -39,8 +39,9 @@ describe('a child mermaid costume is a covering top plus one tail, no feet — o
   });
 
   it('sheet prompt: a leg-replacing costume has no legs, feet or footwear', () => {
-    const p = buildBodyRowPrompt('a long-sleeve blue swim shirt and one mermaid tail replacing the legs', { name: 'Emma', age: 5 }, false, 'mermaid');
-    expect(p).toMatch(/replaces the legs[^.]*NO legs, NO feet and NO footwear/);
+    const p = buildOneCallSheetPrompt({ name: 'Emma', age: 5 }, { costumeDescription: 'a long-sleeve blue swim shirt and one mermaid tail replacing the legs', costumeName: 'mermaid', styleLine: 'watercolour', kind: 'costume' });
+    expect(p).toMatch(/replaces the legs[^.]*no legs, no feet and no footwear/);
+    expect(p).toMatch(/never balanced upright on the fin/);
   });
 
   it('page prompts: both scene-brief templates draw the tail/fin instead of bottom and feet', () => {

@@ -26,7 +26,7 @@
  */
 'use strict';
 
-const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
+const { generateJudgedOneCallSheet } = require('./oneCallSheet');
 const { persistStyledAvatar } = require('../services/database');
 const { costumeSubKey, pickCostumed } = require('../utils/costumeKey');
 const { stripDataUriPrefix } = require('./r2');
@@ -312,19 +312,14 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
         const costumeDesc = inputData.clothingRequirements?.[name]?.costumed?.description
           || inputData.clothingRequirements?.[name]?.description
           || (costumeKey || 'standard outfit');
-        const gen = await generateCharacter2x4Sheet(character, {
-          clothingCategory: clothing,
+        const gen = await generateJudgedOneCallSheet(character, {
+          kind: costumeKey ? 'costume' : 'standard',
           costumeDescription: costumeDesc,
+          costumeName: costumeKey || null,
           artStyle: artStyleKey,
           usageTracker: addUsage ? (provider, usage, fn, modelId) => addUsage(provider, usage, fn, modelId) : undefined,
         });
         sheetUri = gen.imageData;
-        // Sibling of the styledAvatars.js path: this lazy-gen entry point also
-        // has to say so when every styled attempt failed the style judge and
-        // the best of them shipped anyway.
-        if (gen.styleJudgeRejected) {
-          log.warn(`⚠️ [CAST] ${name}/${artStyleKey} style judge rejected every attempt — best styled attempt cached at ${gen.finalScore}/10 (${(gen.styleJudgeReasons || []).join('; ') || 'no reason given'})`);
-        }
         // Cache on the in-memory character at the canonical styled-avatar field.
         character.avatars = character.avatars || {};
         character.avatars.styledAvatars = character.avatars.styledAvatars || {};

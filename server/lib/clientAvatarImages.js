@@ -3,7 +3,7 @@
  * wizard, slides, spinner, any page. Always cut first, and show only single images, one figure per image).
  *
  * Avatars are drawn as ROWS (1x4) and SHEETS (2x4). A client may only ever receive a single CELL cut from one:
- *   - the cutters in avatarSlides.js (slidesFromSheet, bodyRowCells, frontBodyCell) are the only code that produces cells;
+ *   - the cutters in avatarSlides.js (slidesFromSheet, frontBodyCell) are the only code that produces cells;
  *     each one checks the cut is a quarter of its source's width and registers it here;
  *   - the slides persisted on the character row are written through writeCutSlides, which accepts only a list the cutters
  *     produced and stamps the row with a digest of exactly what it stored;

@@ -246,8 +246,8 @@ interface TrialCharacterStepProps {
   onChange: (data: CharacterData) => void;
   onNext: () => void;
   /**
-   * Receives the hero's picture: first the FRONT cell of the standard body row (drawn at the photo), later the front cell of the
-   * finished sheet. Always one cut figure, never a row or a sheet (server/lib/clientAvatarImages.js). null clears it (new photo).
+   * Receives the hero's picture: the FRONT body cell of the standard sheet (drawn at the photo; replaced if the declared gender made the form-time call draw it again).
+   * Always one cut figure, never a row or a sheet (server/lib/clientAvatarImages.js). null clears it (new photo).
    */
   onHeroAvatar?: (avatarImage: string | null) => void;
   /** The hero's picture so far, shown above the form. */
@@ -378,7 +378,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
     const data = characterDataRef.current;
     if (!data.photos.face) return null;
     // The account is created the moment the photo is analysed, usually before anything is typed (provisional): the standard
-    // avatar's body row starts then (docs/decisions.md 2026-10-09). Only what is valid is sent; the rest follows by PATCH.
+    // avatar sheet starts then (docs/decisions.md 2026-10-09). Only what is valid is sent; the rest follows by PATCH.
     const sentData = { ...data, name: data.name?.trim() ? data.name : '', age: isValidTrialAge(String(data.age || '')) ? data.age : '' };
     const formComplete = !!(sentData.name && sentData.gender && sentData.age);
     accountPhotoRef.current = data.photos.face;
@@ -503,24 +503,21 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
     }
   };
 
-  // The hero's picture. Two things reach it, both ONE cut figure from the server: the FRONT cell of the standard body row
-  // (drawn at the photo, a few seconds after the account exists) and later the front cell of the finished, styled sheet.
-  // The first one fires the funnel step; a late body-row answer never replaces the styled picture.
+  // The hero's picture: ONE cut figure from the server, the FRONT body cell of the standard sheet. The sheet is drawn at the photo
+  // (prepare-standard-body, from the photo's estimates) and taken by the form-time call (prepare-standard-avatar) unless the declared
+  // gender changed, in which case it is drawn again and the new picture replaces the first. The first one fires the funnel step.
   const heroShownRef = useRef(false);
-  const styledHeroRef = useRef(false);
-  const showHero = (image: string, styled: boolean) => {
-    if (!styled && styledHeroRef.current) return;
-    if (styled) styledHeroRef.current = true;
+  const showHero = (image: string) => {
     if (!heroShownRef.current) { heroShownRef.current = true; trackTrialStep('avatar_ready'); }
     onHeroAvatar?.(image);
   };
 
-  // The standard avatar's FULL-BODY row starts the moment the account exists, from the photo's own age and gender estimates
-  // when the form is still empty. One call per photo; a failure only means the sheet draws its own body row later.
-  const bodyRowStartedRef = useRef(false);
-  const startBodyRow = async (token: string) => {
-    if (bodyRowStartedRef.current) return;
-    bodyRowStartedRef.current = true;
+  // The standard avatar sheet starts the moment the account exists, from the photo's own age and gender estimates
+  // when the form is still empty. One call per photo; a failure only means the form-time call draws the sheet.
+  const photoSheetStartedRef = useRef(false);
+  const startPhotoSheet = async (token: string) => {
+    if (photoSheetStartedRef.current) return;
+    photoSheetStartedRef.current = true;
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/prepare-standard-body`, {
         method: 'POST',
@@ -528,18 +525,18 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
         body: '{}',
       });
       const result = await response.json();
-      if (response.ok && result.avatarImage) showHero(result.avatarImage, false);
+      if (response.ok && result.avatarImage) showHero(result.avatarImage);
     } catch {
-      // Non-blocking: the sheet draws its own body row.
+      // Non-blocking: the form-time call draws the sheet.
     }
   };
   useEffect(() => {
-    // A restored session's account holds an older photo: its body row starts after update-photo (the photo effect below).
-    if (!hasPhoto || bodyRowStartedRef.current || !accountPhotoRef.current) return;
+    // A restored session's account holds an older photo: its sheet starts after update-photo (the photo effect below).
+    if (!hasPhoto || photoSheetStartedRef.current || !accountPhotoRef.current) return;
     (async () => {
       const account = await accountCreationPromiseRef.current;
       const token = account?.sessionToken || sessionToken;
-      if (token) startBodyRow(token);
+      if (token) startPhotoSheet(token);
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPhoto, sessionToken]);
@@ -571,17 +568,16 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
         return;
       }
       heroShownRef.current = false;
-      styledHeroRef.current = false;
       standardAvatarStartedRef.current = false;
-      bodyRowStartedRef.current = false;
+      photoSheetStartedRef.current = false;
       onHeroAvatar?.(null);
-      startBodyRow(token);
+      startPhotoSheet(token);
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [faceNow]);
 
   // The standard avatar sheet (the hero's picture, and the sheet the story reuses): it needs only the photo, the DECLARED age
-  // and the gender (its body row is already drawn, above), so it starts as soon as the form is complete and has been quiet for
+  // and the gender (its drawing has usually started at the photo, above), so it starts as soon as the form is complete and has been quiet for
   // a moment, not when the topic is picked. It runs in the background; nothing here waits for it. One call per account (the server styles one
   // sheet per trial); a failure only means the story job styles the sheet itself. docs/decisions.md 2026-10-09.
   const standardAvatarStartedRef = useRef(false);
@@ -598,7 +594,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
         body: '{}',
       });
       const result = await response.json();
-      if (response.ok && result.avatarImage) showHero(result.avatarImage, true);
+      if (response.ok && result.avatarImage) showHero(result.avatarImage);
     } catch {
       // Non-blocking: the story job styles the standard sheet itself.
     }
@@ -1174,7 +1170,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
             {t.back}
           </button>
 
-          {/* The hero's picture: one figure, shown the moment the body row's first cell is drawn (same frame as the topic step). */}
+          {/* The hero's picture: one figure, shown the moment the sheet's front cell is cut (same frame as the topic step). */}
           {heroAvatar && (
             <div className="flex justify-center">
               <TrialHeroAvatar src={heroAvatar} alt={characterData.name || 'Character'} />

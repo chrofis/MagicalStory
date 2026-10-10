@@ -2895,35 +2895,9 @@ async function loadCharacterContext(storyId, characterName) {
   return { storyId, character, costume };
 }
 
-/** Pass 1: realistic anchor sheet (generated once per character, reused). */
-async function runAvatarRealisticStage(target, { experimentId, params = {} }) {
-  const { loadPromptTemplates } = require('../services/prompts');
-  await loadPromptTemplates();
-  const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
-  const { character, costume } = await loadCharacterContext(target.storyId, target.character);
-  // params.costumeDescription: A/B a modified outfit description (e.g.
-  // carried-accessory removal experiments) against the stored wardrobe.
-  const costumeDescription = params.costumeDescription || costume.description || 'standard outfit';
-  const t0 = Date.now();
-  const result = await generateCharacter2x4Sheet(character, {
-    clothingCategory: costume.category,
-    costumeDescription,
-    artStyle: 'realistic',
-  });
-  if (!result?.imageData) throw new Error('no realistic sheet returned');
-  const versionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, result.imageData, experimentId,
-    result.finalScore != null ? Math.round(result.finalScore) : null);
-  return {
-    character: character.name, imageType: 'tl_avatar', versionIndex,
-    pass: 1, artStyle: 'realistic', clothingCategory: costume.category,
-    costumeDescription: costumeDescription.slice(0, 300),
-    finalScore: result.finalScore ?? null, elapsedMs: Date.now() - t0,
-  };
-}
-
 // The Grok tiers a sheet variant may name (params.grokModel). Ids come from GROK_MODELS, the one definition.
 const SHEET_VARIANT_MODELS = { standard: 'STANDARD', 'grok-imagine-image-2.0': 'IMAGE_2', '2.0': 'IMAGE_2', pro: 'PRO' };
-const SHEET_VARIANTS = ['current', 'oneCall', 'styledBodyRow', 'costumeFromStandard'];
+const SHEET_VARIANTS = ['oneCall', 'costumeFromStandard'];
 
 
 /** Lab only: a stored watercolour sheet of the character by bucket ('standard' | 'costumed') as a data URI, or null. */
@@ -2936,20 +2910,16 @@ async function loadStoredStyledSheet(character, artStyle, bucket) {
 }
 
 /**
- * Avatar sheet variants (owner, 2026-10-10: "avatar creation takes too long - one expensive call instead of four cheaper ones?").
- * Runs the REAL sheet code of character2x4Sheet.js on a stored character, the way the trial runs it, with the options threaded through:
- *   params.variant  'current' (body row -> head row -> pass 2; fastPass1), 'oneCall' (photo -> styled 2x4 in one call),
- *                   'styledBodyRow' (photo -> styled body row, then the head row against it; no photoreal pass, no pass 2),
- *                   'costumeFromStandard' (ONE redress edit of the character's stored STANDARD sheet in params.artStyle: the costume sheet
- *                   without a photo pass; the real redressSheetVariant, unscored),
- *   params.ageLine  true = 'oneCall' adds the explicit head-to-height line (ageProportionsLine)
- *   params.grokModel  Grok tier: standard | grok-imagine-image-2.0 | pro (every Grok call of the sheet)
- *   params.passTwoAttempts  total pass-2 attempts ('current' only)   params.anchor false = no style anchor ('current' only)
- *   params.skipReview  true = no Gemini row/sheet judges (default false, as the trial runs a costumed sheet)
+ * Avatar sheet variants (owner, 2026-10-10). Runs the REAL sheet code on a stored character, the way the trial and the full story run it:
+ *   params.variant  'oneCall' (default): THE sheet of production, oneCallSheet.generateJudgedOneCallSheet: ONE Grok call photo -> styled 2x4,
+ *                   the one sheet judge, one redo on a flag. 'costumeFromStandard': ONE redress edit of the character's stored STANDARD sheet
+ *                   in params.artStyle (the real redressSheetVariant, unscored): a rejected costume-sheet option, kept as a Lab comparison.
+ *   params.references  'face' | 'face+body' (default MODEL_DEFAULTS.avatarSheetReferences)
+ *   params.grokModel  Grok tier: standard | grok-imagine-image-2.0 (default MODEL_DEFAULTS.avatarSheetModel) | pro
  *   params.costume  'standard' | 'trial' (the character's own stored costume type) | a trial costume key (pirate, knight, ...)
  *   params.artStyle default watercolor (the trial's)
  * target: {storyId, character} - the character is read from the story owner's stored character row, photos as the trial uses them.
- * Result: the sheet (tl_avatar test version), per-step wall time, Grok calls, cost, and whether sheetCut.js cuts it into 8 figures.
+ * Result: the sheet (tl_avatar test version), per-step wall time, Grok calls, cost, the sheet check record, and whether sheetCut.js cuts it into 8 figures.
  */
 async function runAvatarSheetVariantStage(target, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
@@ -2957,9 +2927,9 @@ async function runAvatarSheetVariantStage(target, { experimentId, params = {} })
   const sheet = require('./character2x4Sheet');
   const { GROK_MODELS } = require('./grok');
   const { priceUsage } = require('../config/models');
-  const variant = params.variant || 'current';
+  const variant = params.variant || 'oneCall';
   if (!SHEET_VARIANTS.includes(variant)) throw new Error(`avatar_sheet_variant: unknown variant "${variant}" (${SHEET_VARIANTS.join(' | ')})`);
-  const modelKey = params.grokModel || 'standard';
+  const modelKey = params.grokModel || 'grok-imagine-image-2.0';
   if (!SHEET_VARIANT_MODELS[modelKey]) throw new Error(`avatar_sheet_variant: unknown grokModel "${modelKey}" (${Object.keys(SHEET_VARIANT_MODELS).join(' | ')})`);
   const grokModel = GROK_MODELS[SHEET_VARIANT_MODELS[modelKey]];
   const artStyle = params.artStyle || 'watercolor';
@@ -2985,15 +2955,17 @@ async function runAvatarSheetVariantStage(target, { experimentId, params = {} })
     timeline.push({ fn, provider, modelId: modelId || null, cost: Number(cost) || 0, atMs: Date.now() - t0 });
   };
 
-  let imageData, realisticImageData = null, finalScore = null, styleJudgeRejected = false, prompt = null;
+  let imageData, prompt = null, sheetCheck = null;
   const stored = { standard: null, costumed: null };
   if (variant === 'costumeFromStandard') {
     stored.standard = await loadStoredStyledSheet(character, artStyle, 'standard');
     if (!stored.standard) throw new Error(`avatar_sheet_variant: ${character.name} has no stored ${artStyle} standard sheet`);
   }
   if (variant === 'oneCall') {
-    const r = await sheet.generateOneCallSheet(character, { artStyle, costumeDescription, costumeName, seasonOutfit, usageTracker, grokModel, ageLine: params.ageLine === true });
-    imageData = r.imageData; prompt = r.prompt;
+    const r = await require('./oneCallSheet').generateJudgedOneCallSheet(character, { artStyle, kind: costumeParam === 'standard' ? 'standard' : 'costume', costumeDescription, costumeName, seasonOutfit, usageTracker }, {
+      generate: (c, o) => sheet.generateOneCallSheet(c, { ...o, grokModel, ...(params.references ? { references: params.references } : {}) }),
+    });
+    imageData = r.imageData; prompt = r.prompt; sheetCheck = r.sheetCheck;
   } else if (variant === 'costumeFromStandard') {
     if (costumeParam === 'standard') throw new Error('avatar_sheet_variant: costumeFromStandard needs params.costume (a trial costume key)');
     // The real redress path (one provider edit of an approved sheet), unscored (skipQualityEval): the trial would ship the first roll.
@@ -3001,18 +2973,6 @@ async function runAvatarSheetVariantStage(target, { experimentId, params = {} })
     const r = await sheet.redressSheetVariant(stored.standard, { characterName: character.name, characterAge: character.age ?? null, usageTracker, skipQualityEval: true, authoredWardrobe });
     if (!r?.imageData) throw new Error('avatar_sheet_variant: the redress edit returned no image');
     imageData = r.imageData; prompt = r.prompt;
-  } else {
-    const r = await sheet.generateCharacter2x4Sheet(character, {
-      clothingCategory, costumeDescription, costumeName, artStyle, usageTracker, seasonOutfit,
-      skipQualityEval: params.skipReview === true,
-      fastPass1: params.fastPass1 !== false,
-      grokModel,
-      ...(params.passTwoAttempts != null ? { passTwoAttempts: Number(params.passTwoAttempts) } : {}),
-      styleAnchor: params.anchor !== false,
-      styledPass1: variant === 'styledBodyRow',
-    });
-    imageData = r.imageData; realisticImageData = r.realisticImageData || null; finalScore = r.finalScore ?? null;
-    styleJudgeRejected = !!r.styleJudgeRejected; prompt = r.prompt;
   }
   const totalMs = Date.now() - t0;
   if (!imageData) throw new Error('avatar_sheet_variant: no sheet returned');
@@ -3029,56 +2989,14 @@ async function runAvatarSheetVariantStage(target, { experimentId, params = {} })
     cut = { ok: pieces.length === 8, error: null, figures: pieces.length };
   } catch (err) { cut = { ok: false, error: err.message, figures: 0 }; }
 
-  const versionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, imageData, experimentId, finalScore != null ? Math.round(finalScore) : null);
-  const realisticVersionIndex = realisticImageData
-    ? await saveTestVersion(target.storyId, 'tl_avatar', null, realisticImageData, experimentId) : null;
+  const versionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, imageData, experimentId, null);
   return {
-    character: character.name, declaredAge: character.age ?? null, imageType: 'tl_avatar', versionIndex, realisticVersionIndex,
+    character: character.name, declaredAge: character.age ?? null, imageType: 'tl_avatar', versionIndex,
     variant, model: grokModel, costume: costumeParam, artStyle,
-    options: { passTwoAttempts: params.passTwoAttempts ?? null, anchor: params.anchor !== false, skipReview: params.skipReview === true, fastPass1: params.fastPass1 !== false },
-    totalMs, steps, grokCalls, costUsd, cut, finalScore, styleJudgeRejected,
+    options: { references: params.references || null },
+    totalMs, steps, grokCalls, costUsd, cut, sheetCheck,
     headFractionNorm: sheet.headFractionNorm(character.age),
     promptUsed: prompt ? String(prompt).slice(0, 12000) : undefined,
-  };
-}
-
-/** Pass 2: style transfer of an existing realistic sheet (never re-runs Pass 1). */
-async function runAvatarStyleStage(target, { experimentId, promptOverride, params = {} }) {
-  const { loadPromptTemplates } = require('../services/prompts');
-  await loadPromptTemplates();
-  const { runStyleTransferPass, resolveFacePhoto } = require('./character2x4Sheet');
-  const artStyle = params.artStyle || target.artStyle;
-  const realisticVersionIndex = params.realisticVersionIndex ?? target.realisticVersionIndex;
-  if (!artStyle) throw new Error('avatar_style requires artStyle');
-  if (realisticVersionIndex === undefined || realisticVersionIndex === null) {
-    throw new Error('avatar_style requires realisticVersionIndex (run avatar_realistic first)');
-  }
-  const { character } = await loadCharacterContext(target.storyId, target.character);
-  const sheet = await loadTestImage(target.storyId, 'tl_avatar', null, realisticVersionIndex);
-  if (!sheet?.imageData) throw new Error(`realistic sheet v${realisticVersionIndex} not found`);
-  const facePhoto = await resolveFacePhoto(character);
-
-  const t0 = Date.now();
-  const result = await runStyleTransferPass({
-    pass1ImageData: sheet.imageData,
-    facePhoto,
-    artStyle,
-    characterName: character.name,
-    characterAge: character.age ?? null,
-    hair: require('./character2x4Sheet')._internal.hairRequest(character),
-    promptOverride: promptOverride || null,
-  });
-  if (!result?.imageData) throw new Error('style transfer returned no image');
-  const versionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, result.imageData, experimentId,
-    result.finalScore != null ? Math.round(result.finalScore) : null);
-  return {
-    character: character.name, imageType: 'tl_avatar', versionIndex,
-    pass: 2, artStyle, realisticVersionIndex,
-    finalScore: result.finalScore ?? null,
-    // Production ships this sheet only when shippable (identity and solo
-    // passed); the Lab keeps it either way so a rejected output can be seen.
-    shippable: result.shippable, styleJudgeValid: result.valid,
-    elapsedMs: Date.now() - t0,
   };
 }
 
@@ -7175,174 +7093,6 @@ async function resolveAvatarSlotBytes(slot) {
 }
 
 /**
- * Avatar sheet eval. Two source modes:
- *   • STORED production sheet (what the story actually shipped): pass params.pass
- *     — 1 = realistic anchor (styledAvatarGeneration[].inputs.standardAvatar),
- *       2 = styled sheet (styledAvatarGeneration[].output). Disambiguate with
- *       params.entryIndex when a character has several entries; default = latest.
- *   • LAB test version: pass params.versionIndex (a tl_avatar), as before.
- * params.model A/Bs the eval model (any Gemini id; default gemini-2.5-flash);
- * promptOverride A/Bs ONE judge's prompt text — params.evalPrompt names which
- * (heads | bodies | identity on pass 1, style on pass 2), the same key the
- * Lab's "Load current template" reads. Production runs four different judge
- * templates; one override replacing two of them (the pre-2026-09-23 wiring)
- * measured nothing production does. Both are eval-only — no image is
- * generated, so this never spends generation credits.
- */
-async function runAvatarEvalStage(target, { experimentId, promptOverride, params = {} }) {
-  const { loadPromptTemplates } = require('../services/prompts');
-  await loadPromptTemplates();
-  const { _internal, resolveFacePhoto } = require('./character2x4Sheet');
-  const { character, costume } = await loadCharacterContext(target.storyId, target.character);
-  const model = params.model || 'gemini-2.5-flash';
-  // Production judges against the character's declared age; so does the Lab
-  // unless an experiment sets one.
-  const declaredAge = params.declaredAge ?? character.age ?? null;
-  if (promptOverride && !params.evalPrompt) {
-    throw new Error('avatar_eval promptOverride needs params.evalPrompt (heads | bodies | identity | style) — it replaces that one judge');
-  }
-  const promptOverrides = promptOverride ? { [params.evalPrompt]: promptOverride } : {};
-  const t0 = Date.now();
-
-  const versionIndex = params.versionIndex ?? target.versionIndex;
-  if (versionIndex != null) {
-    // Lab test-version path (a sheet generated by avatar_realistic/avatar_style).
-    const sheet = await loadTestImage(target.storyId, 'tl_avatar', null, versionIndex);
-    if (!sheet?.imageData) throw new Error(`tl_avatar v${versionIndex} not found`);
-    const facePhoto = await resolveFacePhoto(character);
-    // Same single-source evaluator production calls — never a lab-only judge.
-    let evalResult;
-    if (params.styled) {
-      const realisticVersionIndex = params.realisticVersionIndex;
-      if (realisticVersionIndex == null) throw new Error('styled avatar_eval requires realisticVersionIndex');
-      const anchor = await loadTestImage(target.storyId, 'tl_avatar', null, realisticVersionIndex);
-      if (!anchor?.imageData) throw new Error(`realistic anchor v${realisticVersionIndex} not found`);
-      ({ verdict: evalResult } = await _internal.evaluateAvatarSheet(sheet.imageData, {
-        pass: 2, facePhoto, realisticSheet: anchor.imageData,
-        artStyle: params.artStyle || target.artStyle || 'pixar',
-        declaredAge, hair: _internal.hairRequest(character), model, promptOverrides,
-      }));
-    } else {
-      const { split } = await _internal.evaluateAvatarSheet(sheet.imageData, {
-        pass: 1, facePhoto,
-        costumeDescription: costume.description || 'standard outfit',
-        declaredAge, glasses: require('./avatarOverrides').declaredGlasses(character), hair: _internal.hairRequest(character), model, promptOverrides,
-      });
-      evalResult = { split: true, splitY: split.splitY, model, heads: split.heads, bodies: split.bodies, identity: split.identity, finalScore: split.verdict.finalScore, valid: split.verdict.valid };
-    }
-    return { character: character.name, source: 'testVersion', versionIndex, styled: !!params.styled, model, elapsedMs: Date.now() - t0, report: evalResult };
-  }
-
-  // Stored production sheet path — pick the sheet by pass from the story's
-  // avatar-generation audit. pass/entryIndex may be set PER TARGET (sheet-set
-  // runs mix pass-1 and pass-2 members) or globally on params.
-  const pass = Number(target.pass ?? params.pass);
-  if (pass !== 1 && pass !== 2) {
-    throw new Error('avatar_eval needs pass (1=realistic anchor, 2=styled sheet) on the target or params, or params.versionIndex (a lab tl_avatar)');
-  }
-  const entryIndexParam = target.entryIndex ?? params.entryIndex;
-  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
-  const entries = storyData.styledAvatarGeneration || [];
-  const wanted = (target.character || '').toLowerCase();
-  const matches = entries
-    .map((e, i) => ({ e, i }))
-    // A variant entry is the off-garment gate's verdict: it holds no sheet to evaluate.
-    .filter(({ e }) => !e.variant && (e.characterName || '').toLowerCase() === wanted);
-  if (!matches.length) {
-    const names = [...new Set(entries.map(e => e.characterName).filter(Boolean))];
-    throw new Error(`No styledAvatarGeneration entry for "${target.character}" (have: ${names.join(', ') || 'none'})`);
-  }
-  const chosen = entryIndexParam != null
-    ? matches.find(m => m.i === Number(entryIndexParam))
-    : matches[matches.length - 1];
-  if (!chosen) throw new Error(`entryIndex ${params.entryIndex} not found for "${target.character}"`);
-  const entry = chosen.e;
-  const artStyle = params.artStyle || entry.artStyle || 'watercolor';
-  const facePhoto = (await resolveAvatarSlotBytes(entry.inputs?.facePhoto)) || (await resolveFacePhoto(character));
-  // The evaluators score the 2×4 SHEETS, not the 2×2 standard-avatar body ref.
-  // pass 1 = the realistic 2×4 anchor (passes.pass1.imageData / realisticImageData);
-  // pass 2 = the styled 2×4 sheet (passes.pass2.imageData, falling back to output).
-  const realistic = (await resolveAvatarSlotBytes(entry.passes?.pass1?.imageData))
-    || (await resolveAvatarSlotBytes(entry.realisticImageData));
-
-  // Resolve which sheet is scored (and shown) for this pass.
-  let slot, sheetForDisplay;
-  let realisticVersionIndex; // pass-2 also shows the realistic anchor as baseline
-  if (pass === 1) {
-    if (!realistic) throw new Error('pass-1 realistic 2×4 sheet (passes.pass1.imageData) not stored on this entry');
-    slot = 'passes.pass1.imageData';
-    sheetForDisplay = realistic;
-  } else {
-    const styled = (await resolveAvatarSlotBytes(entry.passes?.pass2?.imageData))
-      || (await resolveAvatarSlotBytes(entry.output));
-    if (!styled) throw new Error('pass-2 styled 2×4 sheet (passes.pass2.imageData / output) not stored on this entry');
-    if (!realistic) throw new Error('pass-2 eval needs the realistic anchor (passes.pass1.imageData) — not stored on this entry');
-    slot = 'passes.pass2.imageData';
-    sheetForDisplay = styled;
-    // Save the realistic anchor too so the pass-2 card shows both side by side.
-    realisticVersionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, realistic, experimentId);
-  }
-
-  // The lab calls the SINGLE-SOURCE evaluator (evaluateAvatarSheet) — the exact
-  // function production calls — so a lab verdict IS the production verdict. There
-  // is no lab-only eval path: pass keys the behaviour (1 → split head/body/
-  // identity; 2 → holistic styled), identical to generateCharacter2x4Sheet /
-  // runStyleTransferPass. Divergence is only ever a recorded promptOverride/model.
-  let evalResult;
-  let splitSteps;
-  let splitPromptUsed;
-  let splitPrompts;
-  if (pass === 1) {
-    const standardAvatar = await resolveAvatarSlotBytes(entry.inputs?.standardAvatar);
-    const { split } = await _internal.evaluateAvatarSheet(sheetForDisplay, {
-      pass: 1, facePhoto, standardAvatar,
-      costumeDescription: costume.description || 'standard outfit',
-      declaredAge, glasses: require('./avatarOverrides').declaredGlasses(character), hair: _internal.hairRequest(character), model, promptOverrides,
-    });
-    const { heads, bodies, identity } = split;
-    splitPromptUsed = split.promptUsed;
-    splitPrompts = split.prompts;
-    evalResult = { split: true, splitY: split.splitY, model, heads, bodies, identity, finalScore: split.verdict.finalScore, valid: split.verdict.valid };
-    // Save the anchors AND the two crops as steps so the lab shows exactly what
-    // the judge saw: face photo + avatar faces (identity anchors) + the two rows.
-    const [vTop, vBottom, vPhoto, vAvatar] = await Promise.all([
-      saveTestVersion(target.storyId, 'tl_step', null, split.topHeads, experimentId, heads?.finalScore ?? null),
-      saveTestVersion(target.storyId, 'tl_step', null, split.bottomBody, experimentId, bodies?.finalScore ?? null),
-      facePhoto ? saveTestVersion(target.storyId, 'tl_step', null, facePhoto, experimentId) : Promise.resolve(null),
-      split.avatarFaces ? saveTestVersion(target.storyId, 'tl_step', null, split.avatarFaces, experimentId) : Promise.resolve(null),
-    ]);
-    splitSteps = [
-      ...(vPhoto != null ? [{ label: 'Anchor · face photo', imageType: 'tl_step', versionIndex: vPhoto }] : []),
-      ...(vAvatar != null ? [{ label: 'Anchor · avatar faces (top of 2×2)', imageType: 'tl_step', versionIndex: vAvatar }] : []),
-      { label: `Top row · heads (final ${heads?.finalScore ?? '?'})`, imageType: 'tl_step', versionIndex: vTop },
-      { label: `Bottom row · bodies (final ${bodies?.finalScore ?? '?'})`, imageType: 'tl_step', versionIndex: vBottom },
-    ];
-  } else {
-    ({ verdict: evalResult } = await _internal.evaluateAvatarSheet(sheetForDisplay, {
-      // No costumeDescription: pass 2 is a style transfer and its judge does
-      // not score the outfit (that axis lives on pass 1).
-      pass: 2, facePhoto, realisticSheet: realistic, artStyle,
-      declaredAge, hair: _internal.hairRequest(character), model, promptOverrides,
-    }));
-  }
-
-  // Persist the scored sheet as a test version so the lab renders it next to the
-  // eval report (ResultCard shows any result with imageType + versionIndex).
-  const scoreForBadge = evalResult?.finalScore != null ? Math.round(evalResult.finalScore) : null;
-  const evalVersionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, sheetForDisplay, experimentId, scoreForBadge);
-  return {
-    character: character.name, source: 'storedSheet', pass, styled: pass === 2, model, artStyle,
-    imageType: 'tl_avatar', versionIndex: evalVersionIndex,
-    ...(realisticVersionIndex != null ? { realisticVersionIndex } : {}),
-    ...(splitSteps ? { steps: splitSteps } : {}),
-    ...(splitPromptUsed ? { promptUsed: splitPromptUsed } : {}),
-    ...(splitPrompts ? { prompts: splitPrompts } : {}),
-    sheetSource: { array: 'styledAvatarGeneration', entryIndex: chosen.i, slot },
-    elapsedMs: Date.now() - t0, report: evalResult,
-  };
-}
-
-/**
  * EMPTY-SCENE ADHERENCE — measures what the empty-scene stage actually buys us.
  *
  * Per page, three questions (owner, 2026-08-11):
@@ -10720,62 +10470,6 @@ function castPageSummary({ listed = [], stats = {}, actions = [], aliases = {} }
  * members. params {judge, expect, imageUrl?} come from the set member.
  */
 /**
- * judge_fixture `sheet_style`: one 2×4 sheet through production's pass-2 style
- * judge (evaluateAvatarSheet) with the base entry's own face photo, Pass-1 sheet
- * and art style — under the arm params.arm names (sheetJudgeArms.js; default
- * `current` = production exactly). params.input: {entryIndex, removedGarments?,
- * baseImageUrl?} — a sheet with garments taken off is a wardrobe-state variant,
- * judged by evaluateVariantSheet, and under arm D against its approved styled base.
- */
-async function runSheetStyleFixture(target, params, sheet) {
-  if (!target.character) throw new Error('judge_fixture sheet_style: target.character required');
-  const input = params.input || {};
-  const removedGarments = Array.isArray(input.removedGarments) ? input.removedGarments : [];
-  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
-  await loadPromptTemplates();
-  const armRun = require('./sheetJudgeArms').resolveArm(params.arm || 'current', PROMPT_TEMPLATES.sheet2x4StyleEval, { variant: removedGarments.length > 0 });
-  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
-  const entry = (storyData.styledAvatarGeneration || [])[Number(input.entryIndex)];
-  if (!entry) throw new Error(`sheet_style: no styledAvatarGeneration[${input.entryIndex}] on ${target.storyId}`);
-  if (String(entry.characterName || '').toLowerCase() !== String(target.character).toLowerCase()) {
-    throw new Error(`sheet_style: styledAvatarGeneration[${input.entryIndex}] is ${entry.characterName}, not ${target.character}`);
-  }
-  const facePhoto = await resolveAvatarSlotBytes(entry.inputs?.facePhoto);
-  if (!facePhoto) throw new Error('sheet_style: the entry stores no face photo');
-  const referenceUrl = armRun.reference === 'styledBase' ? input.baseImageUrl : entry.passes?.pass1?.imageData;
-  const reference = armRun.reference === 'styledBase'
-    ? (input.baseImageUrl ? await resolveAvatarSlotBytes(input.baseImageUrl) : null)
-    : await resolveAvatarSlotBytes(entry.passes?.pass1?.imageData);
-  if (!reference) throw new Error(`sheet_style: arm ${armRun.arm} needs its reference (${armRun.reference === 'styledBase' ? 'input.baseImageUrl' : 'passes.pass1.imageData'}) — not available`);
-  const { character } = await loadCharacterContext(target.storyId, target.character);
-  const usage = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 };
-  const usageTracker = (_provider, u) => {
-    usage.input_tokens += u?.input_tokens || 0;
-    usage.output_tokens += u?.output_tokens || 0;
-    usage.thinking_tokens += u?.thinking_tokens || 0;
-    usage.calls++;
-  };
-  // A variant (a garment taken off) is production's gate: the style judge plus one
-  // garment-gone check per removed garment. A sheet with nothing off is the style judge alone.
-  const SHEET = require('./character2x4Sheet');
-  const judge = removedGarments.length ? SHEET.evaluateVariantSheet : SHEET._internal.evaluateAvatarSheet;
-  const { verdict, promptUsed } = await judge(sheet, {
-    pass: 2, facePhoto, realisticSheet: reference,
-    artStyle: entry.artStyle || storyData.artStyle || 'watercolor',
-    declaredAge: character.age ?? null, removedGarments, usageTracker,
-    // The kept check is its own Lab judge (sheet_kept); this fixture measures the style judge + garment-gone.
-    keptCheckSkipped: 'Lab sheet_style fixture: the kept check is measured by sheet_kept',
-    promptOverrides: armRun.template ? { style: armRun.template } : {},
-    imageLabels: armRun.imageLabels,
-  });
-  return {
-    arm: armRun.arm, armApplied: armRun.applied, reference: armRun.reference,
-    referenceUrl: typeof referenceUrl === 'string' && /^https?:\/\//.test(referenceUrl) ? referenceUrl : null,
-    removedGarments, imageLabels: armRun.imageLabels, verdict, usage, promptUsed,
-  };
-}
-
-/**
  * judge_fixture `sheet_kept`: one off-garment sheet through production's
  * kept-garment check (character2x4Sheet.checkKeptGarment), one call per garment
  * in params.input.keptGarments, in parallel. No face photo or reference sheet:
@@ -10878,9 +10572,6 @@ async function runJudgeFixtureStage(target, { experimentId, params = {} }) {
       break;
     case 'arc_panel':
       raw = await runArcPanelReplayStage({ storyId: target.storyId }, { params: {} });
-      break;
-    case 'sheet_style':
-      raw = await runSheetStyleFixture(target, params, await loadFixtureImage());
       break;
     case 'sheet_kept':
       raw = await runSheetKeptFixture(target, params, await loadFixtureImage());
@@ -11003,10 +10694,7 @@ async function runAvatarRedressStage(target, { experimentId, params = {} }) {
 
 // Avatar stages take {storyId, character} targets, not page targets.
 const AVATAR_STAGES = {
-  avatar_realistic: runAvatarRealisticStage,
-  avatar_style: runAvatarStyleStage,
   avatar_sheet_variant: runAvatarSheetVariantStage,
-  avatar_eval: runAvatarEvalStage,
   avatar_redress: runAvatarRedressStage,
 };
 

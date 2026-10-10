@@ -3,13 +3,14 @@
 /**
  * ONE defect judge for a finished 2 x 4 character reference sheet (prompts/avatar-sheet-defect-judge.txt).
  *
- * Built for the one-call trial sheet (docs/decisions.md 2026-10-10 "avatar sheet judge"): the owner wants an eval
+ * THE check of every avatar sheet (standard and costume, trial and full story; oneCallSheet.js runs it, redoes once on a flag and records
+ * it): docs/decisions.md 2026-10-10 "avatar sheets are ONE Grok 2 call". Built with (2026-10-10 "avatar sheet judge"): the owner wants an eval
  * that catches hats that grow or vanish, hair that changes, bald or headless cells and inconsistent costumes.
  * It answers a typed verdict per defect type (closed enums, never prose); the free-text "evidence" field is for
  * humans reading the audit and is never parsed. Classification lives in the PROMPT; code only (a) validates the
  * enums, (b) compares per-cell ENUM answers across cells, and (c) maps verdict words to a defect list.
  *
- * NOT WIRED into the pipeline. The measurement is scripts/analysis/eval-avatar-sheet-judge.js.
+ * The measurement of its types is scripts/analysis/eval-avatar-sheet-judge.js.
  */
 
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
@@ -22,6 +23,7 @@ const VERDICTS = {
   costume: ['ok', 'pieces_differ', 'colours_differ', 'emblem_differs'],
   rowMatch: ['ok', 'head_row_differs'],
   held: ['ok', 'object_in_hand'],
+  tail: ['ok', 'standing_on_tail'],
   layout: ['ok', 'not_a_grid', 'extra_figures', 'lettering', 'not_illustrated'],
   identity: ['ok', 'different_person', 'not_assessable'],
   age: ['ok', 'much_younger', 'much_older', 'not_assessable'],
@@ -153,15 +155,15 @@ async function judgeAvatarSheet({ sheet, photo = null, kind, model, usageTracker
   return { parsed: parseAvatarSheetVerdict(raw), raw, prompt };
 }
 
-// The trial's standard sheet runs ONE judge pass for the defect types this judge reads reliably (docs/decisions.md 2026-10-10
-// "Trial standard sheet: whole-sheet judge, one redo"): a bald or headless cell, a held object, a broken layout (not a grid,
-// a second person, lettering, a photograph). Hat, hair, costume and head-row questions stay off: measured precision 5-28%
+// What a sheet is redone for (docs/decisions.md 2026-10-10 "Trial standard sheet: whole-sheet judge, one redo" and "avatar sheets are ONE
+// Grok 2 call"): a bald or headless cell, a held object, a broken layout (not a grid, a second person, lettering, a photograph) and a
+// tail costume drawn standing without a fin. Hat, hair, costume and head-row questions stay off: measured precision 5-28%
 // (decisions 2026-10-10 "Avatar sheet defect judge"), a redo on every second clean sheet. Signal per type as tuned there.
-const TRIAL_REDO_SIGNALS = { bald: 'verdict', held: 'cells', layout: 'verdict' };
+const SHEET_CHECK_SIGNALS = { bald: 'verdict', held: 'cells', layout: 'verdict', tail: 'verdict' };
 
 /** The redo-worthy defects of a parsed verdict: [{ type, word, cells }]; `cells` are the numbers the judge named. */
-function trialSheetDefects(parsed) {
-  const found = defectsOf(parsed, TRIAL_REDO_SIGNALS).filter(t => t in TRIAL_REDO_SIGNALS);
+function sheetDefects(parsed) {
+  const found = defectsOf(parsed, SHEET_CHECK_SIGNALS).filter(t => t in SHEET_CHECK_SIGNALS);
   return found.map(type => {
     const v = parsed.verdicts[type];
     // held is decided from the per-cell enum answers, so its cells come from there
@@ -177,4 +179,4 @@ function betterSheet(a, b) {
   return (tb < ta || (tb === ta && cb < ca)) ? b : a;
 }
 
-module.exports = { TRIAL_REDO_SIGNALS, trialSheetDefects, betterSheet, VERDICTS, DEFECT_TYPES, CELL_ENUMS, buildAvatarSheetJudgePrompt, parseAvatarSheetVerdict, cellSignals, defectsOf, judgeAvatarSheet };
+module.exports = { SHEET_CHECK_SIGNALS, sheetDefects, betterSheet, VERDICTS, DEFECT_TYPES, CELL_ENUMS, buildAvatarSheetJudgePrompt, parseAvatarSheetVerdict, cellSignals, defectsOf, judgeAvatarSheet };

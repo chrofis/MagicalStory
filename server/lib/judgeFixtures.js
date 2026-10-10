@@ -29,12 +29,8 @@ const SEVERITY_ORDER = ['MINOR', 'MODERATE', 'MAJOR', 'CRITICAL', 'CATASTROPHIC'
 
 /** The judges a fixture can name. The stage dispatches on the same list. */
 const JUDGES = Object.freeze([
-  'semantic', 'quality', 'lettering', 'plate_qc', 'entity', 'book_audit', 'arc_panel', 'sheet_style', 'sheet_kept',
+  'semantic', 'quality', 'lettering', 'plate_qc', 'entity', 'book_audit', 'arc_panel', 'sheet_kept',
 ]);
-
-/** The 2×4 sheet style judge's axes (character2x4Sheet STYLE_AXES) and its ship line. */
-const SHEET_STYLE_AXES = Object.freeze(['layout', 'identity', 'style', 'clean', 'bodyFace', 'age', 'solo', 'background', 'garment', 'removed']);
-const SHEET_VALID_MIN = 6;
 
 function severityRank(sev) {
   if (sev == null) return null;
@@ -102,15 +98,6 @@ function normalizeFindings(judge, result) {
         }
       }
       return out;
-    }
-    case 'sheet_style': {
-      // A sheet is rejected when any axis scores under the ship line; each such
-      // axis is one finding, typed by the axis, carrying the judge's own reason.
-      const v = r.verdict || {};
-      return SHEET_STYLE_AXES
-        .map(axis => ({ axis, score: v[`${axis}Score`] ?? v[axis]?.score }))
-        .filter(a => typeof a.score === 'number' && a.score < SHEET_VALID_MIN)
-        .map(a => ({ type: a.axis, severity: null, text: String(v[a.axis]?.reason ?? ''), character: null, pages: [], fields: { score: a.score } }));
     }
     case 'sheet_kept':
       // One finding per kept garment the check could not see in body cells 5-8.
@@ -249,16 +236,6 @@ function validateFixtures(fixtures) {
       problems.push(`${at}: input.imageUrl (the judged image, by R2 URL) required for ${f?.judge}`);
     }
     if (f?.judge === 'entity' && !f?.target?.character) problems.push(`${at}: target.character required for entity`);
-    if (f?.judge === 'sheet_style') {
-      if (!f?.target?.character) problems.push(`${at}: target.character required for sheet_style`);
-      if (!/^https:\/\//.test(String(f?.input?.imageUrl || ''))) problems.push(`${at}: input.imageUrl (the judged sheet, by R2 URL) required for sheet_style`);
-      if (!Number.isInteger(f?.input?.entryIndex)) problems.push(`${at}: input.entryIndex (the styledAvatarGeneration entry of the base sheet) required for sheet_style`);
-      if (f?.input?.removedGarments != null && !Array.isArray(f.input.removedGarments)) problems.push(`${at}: input.removedGarments must be a list`);
-      if (Array.isArray(f?.input?.removedGarments) && f.input.removedGarments.length && !/^https:\/\//.test(String(f?.input?.baseImageUrl || ''))) {
-        problems.push(`${at}: a sheet with garments taken off needs input.baseImageUrl (its approved styled base, for arm D)`);
-      }
-      if (f?.expect?.minSeverity != null) problems.push(`${at}: sheet_style findings carry no severity — drop minSeverity`);
-    }
     if (f?.judge === 'sheet_kept') {
       if (!/^https:\/\//.test(String(f?.input?.imageUrl || ''))) problems.push(`${at}: input.imageUrl (the judged off sheet, by R2 URL) required for sheet_kept`);
       const kept = f?.input?.keptGarments;
@@ -315,11 +292,6 @@ function estimateCostUsd(judge, result) {
     }
     case 'plate_qc':
       return { usd: priceFlash(4000, 300), basis: 'flat estimate (validateEmptyScene returns no usage)' };
-    case 'sheet_style': {
-      const u = r.usage || {};
-      if (!Number(u.input_tokens)) return { usd: priceFlash(3600, 1000), basis: 'flat estimate (no usage returned)' };
-      return { usd: priceFlash(u.input_tokens, (Number(u.output_tokens) || 0) + (Number(u.thinking_tokens) || 0)), basis: 'measured (input + output + thinking, every call incl. a re-ask)' };
-    }
     case 'sheet_kept': {
       const u = r.usage || {};
       if (!Number(u.input_tokens)) return { usd: priceFlash(500, 150) * Math.max(1, asArray(r.checks).length), basis: 'flat estimate per garment (no usage returned)' };
@@ -345,7 +317,6 @@ const setNameFor = (judge) => `Judge fixtures · ${judge}`;
 module.exports = {
   SEVERITY_ORDER,
   JUDGES,
-  SHEET_STYLE_AXES,
   severityRank,
   normalizeFindings,
   findingMatches,

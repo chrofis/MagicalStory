@@ -124,26 +124,6 @@ describe('figure mask / silhouette (imageCompositing) and rembg', () => {
   });
 });
 
-describe('2×4 sheet helpers (character2x4Sheet)', () => {
-  const { _internal } = require('../../server/lib/character2x4Sheet.js');
-  it('detectBodyRowHeads returns the explicit null (Gemini fallback, stamped by applyPoseHeadGate) AND reports', async () => {
-    globalThis.fetch = reply(503, { success: false, error: 'yolo loading' }) as any;
-    await expect(_internal.detectBodyRowHeads('data:image/jpeg;base64,AA')).resolves.toBeNull();
-    expect(recorded.map(r => r.kind)).toContain('analyzer_pose_heads_failed');
-    const bodies = _internal.applyPoseHeadGate({ fullBody: { headScore: 9, feetScore: 10 } }, null);
-    expect(bodies.fullBody.headSource).toBe('gemini-fallback');
-  });
-  it('detectSheetRowDivider marks the variance fallback as such AND reports', async () => {
-    const sharp = require('sharp');
-    const buf = await sharp({ create: { width: 40, height: 40, channels: 3, background: { r: 200, g: 200, b: 200 } } }).png().toBuffer();
-    globalThis.fetch = down as any;
-    const r = await _internal.detectSheetRowDivider('data:image/png;base64,' + buf.toString('base64'), buf, 40, 40);
-    expect(r.source).toBe('variance-fallback');
-    expect(typeof r.mid).toBe('number');
-    expect(recorded.map(r => r.kind)).toContain('analyzer_split_reference_sheet_failed');
-  });
-});
-
 describe('callers report through reportAnalyzerFailure (source pins)', () => {
   it('bbox detection marks a Gemini fallback caused by the analyzer', () => {
     const s = src('server/lib/bboxDetection.js');

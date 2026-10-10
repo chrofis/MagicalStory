@@ -9,49 +9,38 @@ import fs from 'fs';
 import path from 'path';
 
 const sheet = require('../../server/lib/character2x4Sheet.js');
-const { buildBodyRowPrompt, buildHeadRowPrompt, buildStyleTransferPrompt } = sheet;
+const { buildOneCallSheetPrompt } = sheet;
 const ROOT = path.join(__dirname, '../..');
 const EMPTY = /Empty hands: nothing is held or carried in any cell, and no bag or backpack is worn/;
 const kid = { name: 'A', age: 8, gender: 'male' };
+const P = (o: any = {}) => buildOneCallSheetPrompt(kid, { costumeDescription: 'standard outfit', styleLine: 'watercolour', kind: 'standard', ...o });
 
-describe('empty hands reaches every sheet prompt', () => {
-  it('body row: standard, costumed (redress) and seasonal', () => {
-    for (const [desc, redress, name] of [['standard outfit', false, null], ['red bodysuit', true, 'superhero']] as const) {
-      const p = buildBodyRowPrompt(desc, kid, redress, name, null);
-      expect(p).toMatch(EMPTY);
-    }
-    expect(buildBodyRowPrompt('standard outfit', kid, false, null, { label: 'Autumn', outfit: 'a jumper', footwear: 'boots' })).toMatch(EMPTY);
+describe('empty hands reaches the sheet prompt', () => {
+  it('standard, costume and seasonal sheets, with and without a body reference', () => {
+    expect(P()).toMatch(EMPTY);
+    expect(P({ kind: 'costume', costumeDescription: 'red bodysuit', costumeName: 'superhero' })).toMatch(EMPTY);
+    expect(P({ seasonOutfit: { label: 'Autumn', outfit: 'a jumper', footwear: 'boots' } })).toMatch(EMPTY);
+    expect(P({ hasReference: true })).toMatch(EMPTY);
   });
-  it('body row: the standard prompt names Image 2 as clothing only and drops hoop, toy and backpack', () => {
-    const p = buildBodyRowPrompt('standard outfit', kid, false, null, null);
-    expect(p).toMatch(/take its CLOTHING ONLY/);
+  it('the standard sheet names the body reference as clothing and build only, and drops hoop, toy and backpack', () => {
+    const p = P({ hasReference: true });
+    expect(p).toMatch(/take its CLOTHING and build only/);
     expect(p).toMatch(/hoop/);
     expect(p).toMatch(/backpack/);
   });
-  it('head row and style transfer', () => {
-    expect(buildHeadRowPrompt(kid, 'standard outfit', false)).toMatch(EMPTY);
-    expect(buildHeadRowPrompt(kid, 'red bodysuit', true)).toMatch(EMPTY);
-    expect(buildStyleTransferPrompt('watercolor')).toMatch(EMPTY);
+  it('a costume sheet takes the body reference build only and ignores its clothes', () => {
+    expect(P({ kind: 'costume', hasReference: true })).toMatch(/take its build only\. IGNORE its clothing/);
   });
   it('the full-story avatar template keeps its no-carried-items rule', () => {
     expect(fs.readFileSync(path.join(ROOT, 'prompts/avatar-main-prompt.txt'), 'utf8')).toMatch(/No carried items/);
   });
   it('a costume-named item stays allowed', () => {
-    expect(buildBodyRowPrompt('tweed jacket, brass magnifying glass', kid, true, 'detective', null)).toMatch(/only an item the costume text names stays/);
+    expect(P({ kind: 'costume', costumeDescription: 'tweed jacket, brass magnifying glass', costumeName: 'detective' })).toMatch(/only an item the costume text names stays/);
   });
 });
 
 describe('head and body wear the same clothes', () => {
-  it('standard and costumed head rows both bind the neckline, emblem and print to Image 3', () => {
-    for (const redress of [false, true]) {
-      const p = buildHeadRowPrompt(kid, 'standard outfit', redress);
-      expect(p).toMatch(/clothing at the neck and shoulders is EXACTLY what Image 3 wears/);
-      expect(p).toMatch(/no other garment drawn/);
-    }
-  });
-  it('the head row is always drawn with the body row as Image 3', () => {
-    const src = fs.readFileSync(path.join(ROOT, 'server/lib/character2x4Sheet.js'), 'utf8');
-    expect(src).toContain('const headRefs = [headPhantom, facePhoto, bodyRow];');
-    expect(src).not.toMatch(/parallelRows/);
+  it('one call draws both rows: the top row wears the neckline the body below wears', () => {
+    expect(P()).toMatch(/the neckline in the top row is the one the body below wears/);
   });
 });

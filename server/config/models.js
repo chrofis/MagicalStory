@@ -1083,21 +1083,14 @@ const MODEL_DEFAULTS = {
   coverAspect: IMAGE_ASPECTS.A4,
   avatarAspect: IMAGE_ASPECTS.AVATAR,
 
-  // ─── Avatar 2×4 sheet: per-pass backend ──────────────────────────────
-  // Round 1 (realistic identity anchor) stays on Grok — it preserves hair
-  // length + outfit better than Gemini (which drifts identity). Round 2
-  // (art/style transfer) is now ALSO Grok. Re-tested 2026-08-06 (Test Lab
-  // exps #336/#341/#344): gemini-2.5-flash-image barely stylises — it returns a
-  // near-photographic sheet regardless of prompt strength (prompt A/B #339
-  // moved it almost nothing) — while Grok produces strong, correct watercolour /
-  // pixar / anime AND handled an adult face (Hans) with no content-moderation
-  // refusals. This reverses the 2026-07-19 verdict (that A/B was gemini-3-pro).
-  // Grok's occasional child-avatar moderation false-reject is covered by the
-  // 3-attempt retry in runStyleTransferPass. Revert via AVATAR_STYLE_BACKEND.
+  // ─── Wardrobe-variant edit backend ───────────────────────────────────
+  // Only redressSheetVariant (a garment-off edit of an approved sheet) uses these since 2026-10-10; new sheets are the one Grok 2.0
+  // call (avatarSheetModel below). Grok is the default: Gemini returns `IMAGE_OTHER` (a SAFETY refusal, no image) on a share of
+  // realistic-face inputs (docs/decisions.md 2026-08-09 A/B). Revert via AVATAR_STYLE_BACKEND.
   avatarStyleTransferBackend: process.env.AVATAR_STYLE_BACKEND || 'grok', // 'gemini' | 'grok'
   avatarStyleTransferModel: process.env.AVATAR_STYLE_MODEL || 'gemini-2.5-flash-image', // only used when backend='gemini'
 
-  // Vision judge for the 2×4 sheet split eval (evaluateSheetSplit). gemini-2.5-flash:
+  // Vision judge of the 2×4 sheet (avatarSheetJudge, the garment checks, the hair read). gemini-2.5-flash:
   // qwen3-vl is ~6× cheaper but WON'T apply the strict "whole head" rule — it
   // counts a top-cropped chin as head=yes, so it misses headless/partial-head
   // body crops (verified: Lukas chin-only crop → qwen head=yes, gemini head=no,
@@ -1105,19 +1098,22 @@ const MODEL_DEFAULTS = {
   // correctness wins. Set SHEET_EVAL_MODEL=qwen3-vl to trade it back for cost.
   // Must be a TEXT_MODELS key.
   sheetEvalModel: process.env.SHEET_EVAL_MODEL || 'gemini-2.5-flash',
+  // THE avatar sheet (standard and every costume): ONE call on Grok 2.0, photo -> styled 2x4, with the age-proportions line
+  // (docs/decisions.md 2026-10-10 "avatar sheets are ONE Grok 2 call"; Lab 1760-1765: 17/18 acceptable, median 16 s, USD 0.04).
+  // grok-imagine-image-2.0 = GROK_MODELS.IMAGE_2 (grok.js; not imported here to keep this file free of provider modules).
+  // Grok image calls take no effort/reasoning knob; the judge model above is the only other model of a sheet.
+  avatarSheetModel: 'grok-imagine-image-2.0',
+  // Which references the one call gets: 'face' (the face photo) or 'face+body' (also the body cut-out). 'face+body' won the A/B
+  // against 'face' and 'face+2x2 avatar' (docs/decisions.md 2026-10-10: proportions, and the standard sheet's clothes).
+  avatarSheetReferences: 'face+body',
   // The independent second look at every CRITICAL/MAJOR absence claim before it
   // may take a repair slot (absenceCheck.secondLookAbsenceClaims, 2026-09-23).
   // Sees the image and the claims only. Must be a Gemini model id.
   absenceSecondLookModel: 'gemini-2.5-flash',
-  // The BODY-row head check is NOT done by Gemini at all: any VLM hallucinates a
-  // head on a headless torso because head+body co-occur in training (POPE-
-  // adversarial object hallucination — verified deterministically, even
-  // gemini-2.5-pro is only a partial mitigation and costs ~2.4¢/call). Head
-  // presence on the body row is owned by local YOLO pose (Python /pose-heads,
-  // detectBodyRowHeads in character2x4Sheet.js — $0, deterministic; validated on
-  // set #2 / exp #419: headed 0.86–1.00, headless 0.00–0.10, no overlap). The
-  // bodies row eval therefore runs on the cheap sheetEvalModel (flash) for
-  // feet/angles/outfit/proportions/background, and pose gates the head axis.
+  // 2026-10-10: the local YOLO pose head check of the body row (detectBodyRowHeads) was deleted with the two-row chain. Head presence on a
+  // sheet is now the sheet judge's bald/headless question (a VLM question; its recall is the 2026-10-10 measurement in docs/decisions.md
+  // "Avatar sheet defect judge"; a VLM can hallucinate a head on a headless torso: the 50-run record and Grok 2.0's 0 headless in 30 sheets
+  // are the evidence that this is enough).
 
   // ─── Composite Cover mode ────────────────────────────────────────────
   // When true, cover pages (frontCover, initialPage, backCover) skip the

@@ -878,11 +878,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // prepare call if it is still in flight; only a sheet nobody prepared is styled here. The two never wait for
       // each other: awaiting prepare-title before styling anything held every page and cover image behind
       // "Waiting for early avatar styling" (Tobias +53 s).
-      // Trial skips the sheet reviews (owner 2026-08-15): skipQualityEval
-      // reaches generateComposited2x4 as skipReview — 1 try per row, no
-      // bodies/heads/identity/style eval. Measured on job_1786818831439:
-      // 4 Gemini evals plus a body-row retry the trial cannot act on
-      // anyway (no repair stage).
+      // Every sheet is ONE Grok 2 call, checked by ONE judge with one redo (server/lib/oneCallSheet.js, docs/decisions.md 2026-10-10
+      // "avatar sheets are ONE Grok 2 call"), in the trial as in a full story.
       streamingAvatarStylingPromise = runTrialEarlyStyling({
         requirements: trialAvatarRequirements,
         titleAvatarsReady,
@@ -894,7 +891,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // drawn for another age/gender than the row now says is left out, loudly (usablePreparedAvatars).
         jobStartAvatars: require('./server/lib/trialSheets').usablePreparedAvatars((inputData.characters || [])[0]),
         seed: seedPreGeneratedAvatars,
-        style: (reqs) => prepareStyledAvatars(inputData.characters || [], artStyle, reqs, trialClothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: true, seasonOutfit: trialSeasonOutfit(inputData) }),
+        style: (reqs) => prepareStyledAvatars(inputData.characters || [], artStyle, reqs, trialClothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { seasonOutfit: trialSeasonOutfit(inputData) }),
         onDone: () => {
           earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
           log.info(`✅ [TRIAL] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
@@ -2110,7 +2107,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             try {
               const basicRequirements = avatarRequirementsFor(inputData.characters || [], requirements);
 
-              await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, requirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode, seasonOutfit: trialSeasonOutfit(inputData), finalPass: false }); // the coverage top-up below is the final pass
+              await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, requirements, addUsage, modelOverrides.storyAvatarModel || null, { seasonOutfit: trialSeasonOutfit(inputData), finalPass: false }); // the coverage top-up below is the final pass
               earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
               log.debug(`✅ [STREAM] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
             } catch (error) {
@@ -3438,7 +3435,7 @@ ${trialWriter.pagesPrompt}`;
               characterNames: [char.name]
             }));
           });
-          await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode, seasonOutfit: trialSeasonOutfit(inputData), finalPass: false }); // the coverage top-up below is the final pass
+          await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { seasonOutfit: trialSeasonOutfit(inputData), finalPass: false }); // the coverage top-up below is the final pass
           log.debug(`✅ [UNIFIED] Pre-cover styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
         } catch (error) {
           log.warn(`⚠️ [UNIFIED] Pre-cover styled avatar prep failed: ${error.message}`);
@@ -3518,7 +3515,7 @@ ${trialWriter.pagesPrompt}`;
         ? `coverage top-up (${getStyledAvatarCacheStats().size} already cached)`
         : 'early styling did not run';
       log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled-avatar reqs for ${artStyle} (${mode})`);
-      await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode, seasonOutfit: trialSeasonOutfit(inputData) });
+      await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { seasonOutfit: trialSeasonOutfit(inputData) });
     }
 
     // Start cover generation NOW that avatars are ready (covers need avatars as reference photos)

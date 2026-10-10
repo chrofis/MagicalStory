@@ -25,7 +25,12 @@ import fs from 'fs';
 import path from 'path';
 
 const sheet = require('../../server/lib/character2x4Sheet');
-const { buildBodyRowPrompt, buildFootwearRule } = sheet._internal;
+const { buildFootwearRule } = sheet._internal;
+const { buildOneCallSheetPrompt } = require('../../server/lib/character2x4Sheet');
+// Old row-builder call shape, now the one-call prompt: (costume text, character, costume-owned outfit?, costume name, season outfit).
+const buildBodyRowPrompt = (desc: string, character: any, redress = false, name: string | null = null, season: any = null) =>
+  buildOneCallSheetPrompt(character || {}, { costumeDescription: desc, costumeName: name, seasonOutfit: season, styleLine: 'watercolour', kind: redress ? 'costume' : 'standard' });
+
 
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), 'utf8');
 
@@ -35,7 +40,7 @@ const requiresFootwear = (t: string) => /Footwear is part of the (outfit|costume
 const keepsNoFeetException = (t: string) => /tail, fin, or single fused form with no feet at all/.test(t);
 
 describe('reference-sheet prompts require footwear', () => {
-  it('the body-row prompt (split path) requires it and keeps the no-feet exception', () => {
+  it('the sheet prompt requires it and keeps the no-feet exception', () => {
     const p = buildBodyRowPrompt('standard outfit', { name: 'A', physical: {} }, false, null);
     expect(requiresFootwear(p)).toBe(true);
     expect(keepsNoFeetException(p)).toBe(true);
@@ -59,7 +64,7 @@ describe('reference-sheet prompts require footwear', () => {
     expect(keepsNoFeetException(t)).toBe(true);
   });
 
-  it('the rule is stated once in code and shared by both JS builders', () => {
+  it('the rule is stated once in code and shared by the sheet prompt', () => {
     const plain = buildFootwearRule(false);
     const redress = buildFootwearRule(true);
     expect(plain).not.toEqual(redress);

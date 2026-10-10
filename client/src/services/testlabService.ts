@@ -255,7 +255,7 @@ export interface ExperimentResult {
   baselinePrompt?: string | null;
   promptUsedA?: string | null;
   promptUsedB?: string | null;
-  // Multi-call stages (avatar_eval split) expose each call's prompt separately.
+  // Multi-call stages expose each call's prompt separately.
   prompts?: { label: string; text: string }[];
   versions?: unknown[];
   winner?: unknown;
@@ -622,10 +622,7 @@ export const TESTLAB_STAGES = [
   // dropdown could never select them — unreachable except by hand-posting.
   { id: 'garment_colour_fix', label: 'Garment colour fix (DINO+SAM mask → L*a*b* match)', producesImage: true, overridable: false },
   { id: 'style_repair', label: 'Style repair (story-wide)', producesImage: true, overridable: false, storyLevel: true },
-  { id: 'avatar_realistic', label: 'Avatar pass 1 (realistic anchor)', producesImage: true, overridable: false, characterLevel: true },
-  { id: 'avatar_style', label: 'Avatar pass 2 (style transfer)', producesImage: true, overridable: true, characterLevel: true },
-  { id: 'avatar_sheet_variant', label: 'Avatar sheet variants (one call / model / pass-2 options)', producesImage: true, overridable: false, characterLevel: true },
-  { id: 'avatar_eval', label: 'Avatar sheet eval', producesImage: false, overridable: true, characterLevel: true },
+  { id: 'avatar_sheet_variant', label: 'Avatar sheet (one call + judge + redo; params.references / grokModel / costume)', producesImage: true, overridable: false, characterLevel: true },
   // A garment-off (wardrobe-state) sheet made from the story's approved base the
   // way production makes it, unjudged — the input the sheet_style fixtures judge.
   { id: 'avatar_redress', label: 'Avatar garment-off variant (production redress, no judge)', producesImage: true, overridable: false, characterLevel: true },

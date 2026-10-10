@@ -264,7 +264,7 @@ export default function TrialWizard() {
   const [selectedIdeaIndex, setSelectedIdeaIndex] = useState<number | null>(null);
 
   // The hero's picture, shown on the character step, the topic step and the waiting page: ONE cut figure, first the front cell
-  // of the standard body row (drawn at the photo), later the front cell of the finished sheet. There is no separate preview
+  // of the standard sheet (drawn at the photo, taken by the form-time call). There is no separate preview
   // portrait (docs/decisions.md 2026-10-09).
   const [heroAvatar, setHeroAvatar] = useState<string | null>(null);
 
