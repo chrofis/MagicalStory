@@ -354,10 +354,18 @@ def test_warm_actually_spawns_the_worker():
     # the warm hold blocks the reap that fires while warming, and nothing used to
     # look again afterwards.
     client.post('/session/end', json={'id': 'tab-1'})
+    # Since 2026-10-10 the reap waits SESSION_END_GRACE_S after a session ends, so a
+    # presence leave/arrive bounce keeps the warm worker (analyzer_reap_policy.py).
+    time.sleep(1)
+    check('kept through the grace period right after the session closed', bool(pa._workers),
+          f'_workers={list(pa._workers)}')
+    # Grace elapsed: the deferred check reclaims it.
+    pa._last_session_end_ts = time.time() - 60
+    pa._maybe_reap_workers()
     deadline = time.time() + 5
     while time.time() < deadline and pa._workers:
         time.sleep(0.1)
-    check('reaped once the session closed', not pa._workers,
+    check('reaped once the grace period after the session closed has passed', not pa._workers,
           f'_workers={list(pa._workers)}')
 
 
