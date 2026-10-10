@@ -2088,8 +2088,9 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     composed = await generateComposited2x4(character, {
       costumeDescription, costumeName, redress, usageTracker, skipReview: skipQualityEval, seasonOutfit,
       // fastPass1 = the trial prewarm: one try per row, so the row judges only record; they run beside the next render and pass 2 (see generateComposited2x4).
-      precomputedBody, grokModel,
+      grokModel,
       ...(styledPass1 ? { styleLine: resolveStyleLineForSheet(artStyle) } : {}),
+      precomputedBody,
       ...(fastPass1 ? { rowTries: 1, deferJudges: true } : {}),
     });
   } catch (err) {
