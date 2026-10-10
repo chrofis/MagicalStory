@@ -1,0 +1,509 @@
+{
+ "runId": "2026-10-10_avatar-cell-judge-v1",
+ "sheets": 115,
+ "failed": [
+  {
+   "id": "63f21ca1-Fiona25-cos",
+   "error": "avatarCellJudge: cell 7 layers [\"headband_scarf\",\"necklace\",\"sash\",\"wristbands\",\"boots\"] must be a list of vest|cape|hood_down|collar|backpack|overalls_straps|necklace|belt|pouch|sash|wristbands|sword|boots"
+  }
+ ],
+ "chosen": {
+  "hat": "presence",
+  "hair": "colour1",
+  "bald": "buzzBesideShort",
+  "costume": "stablePieceHeads",
+  "rowMatch": "piecesOnly",
+  "held": "any",
+  "layout": "mediumAndPeople"
+ },
+ "tables": {
+  "chosen": {
+   "all": {
+    "hat": {
+     "tp": 8,
+     "fp": 5,
+     "fn": 4,
+     "tn": 98,
+     "positives": 12,
+     "recall": 0.6666666666666666,
+     "precision": 0.6153846153846154
+    },
+    "hair": {
+     "tp": 0,
+     "fp": 11,
+     "fn": 3,
+     "tn": 101,
+     "positives": 3,
+     "recall": 0,
+     "precision": 0
+    },
+    "bald": {
+     "tp": 3,
+     "fp": 0,
+     "fn": 0,
+     "tn": 112,
+     "positives": 3,
+     "recall": 1,
+     "precision": 1
+    },
+    "costume": {
+     "tp": 0,
+     "fp": 12,
+     "fn": 6,
+     "tn": 97,
+     "positives": 6,
+     "recall": 0,
+     "precision": 0
+    },
+    "rowMatch": {
+     "tp": 9,
+     "fp": 34,
+     "fn": 1,
+     "tn": 71,
+     "positives": 10,
+     "recall": 0.9,
+     "precision": 0.20930232558139536
+    },
+    "held": {
+     "tp": 1,
+     "fp": 0,
+     "fn": 0,
+     "tn": 114,
+     "positives": 1,
+     "recall": 1,
+     "precision": 1
+    },
+    "layout": {
+     "tp": 6,
+     "fp": 11,
+     "fn": 1,
+     "tn": 97,
+     "positives": 7,
+     "recall": 0.8571428571428571,
+     "precision": 0.35294117647058826
+    },
+    "ANY": {
+     "tp": 32,
+     "fp": 33,
+     "fn": 3,
+     "tn": 47,
+     "positives": 35,
+     "recall": 0.9142857142857143,
+     "precision": 0.49230769230769234,
+     "cleanPassRate": 0.5875
+    }
+   },
+   "tune": {
+    "hat": {
+     "tp": 3,
+     "fp": 2,
+     "fn": 2,
+     "tn": 41,
+     "positives": 5,
+     "recall": 0.6,
+     "precision": 0.6
+    },
+    "hair": {
+     "tp": 0,
+     "fp": 6,
+     "fn": 0,
+     "tn": 42,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "bald": {
+     "tp": 3,
+     "fp": 0,
+     "fn": 0,
+     "tn": 45,
+     "positives": 3,
+     "recall": 1,
+     "precision": 1
+    },
+    "costume": {
+     "tp": 0,
+     "fp": 4,
+     "fn": 1,
+     "tn": 43,
+     "positives": 1,
+     "recall": 0,
+     "precision": 0
+    },
+    "rowMatch": {
+     "tp": 6,
+     "fp": 11,
+     "fn": 0,
+     "tn": 31,
+     "positives": 6,
+     "recall": 1,
+     "precision": 0.35294117647058826
+    },
+    "held": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "tn": 48,
+     "positives": 0,
+     "recall": null,
+     "precision": null
+    },
+    "layout": {
+     "tp": 2,
+     "fp": 4,
+     "fn": 0,
+     "tn": 42,
+     "positives": 2,
+     "recall": 1,
+     "precision": 0.3333333333333333
+    },
+    "ANY": {
+     "tp": 14,
+     "fp": 12,
+     "fn": 1,
+     "tn": 21,
+     "positives": 15,
+     "recall": 0.9333333333333333,
+     "precision": 0.5384615384615384,
+     "cleanPassRate": 0.6363636363636364
+    }
+   },
+   "test": {
+    "hat": {
+     "tp": 5,
+     "fp": 3,
+     "fn": 2,
+     "tn": 57,
+     "positives": 7,
+     "recall": 0.7142857142857143,
+     "precision": 0.625
+    },
+    "hair": {
+     "tp": 0,
+     "fp": 5,
+     "fn": 3,
+     "tn": 59,
+     "positives": 3,
+     "recall": 0,
+     "precision": 0
+    },
+    "bald": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "tn": 67,
+     "positives": 0,
+     "recall": null,
+     "precision": null
+    },
+    "costume": {
+     "tp": 0,
+     "fp": 8,
+     "fn": 5,
+     "tn": 54,
+     "positives": 5,
+     "recall": 0,
+     "precision": 0
+    },
+    "rowMatch": {
+     "tp": 3,
+     "fp": 23,
+     "fn": 1,
+     "tn": 40,
+     "positives": 4,
+     "recall": 0.75,
+     "precision": 0.11538461538461539
+    },
+    "held": {
+     "tp": 1,
+     "fp": 0,
+     "fn": 0,
+     "tn": 66,
+     "positives": 1,
+     "recall": 1,
+     "precision": 1
+    },
+    "layout": {
+     "tp": 4,
+     "fp": 7,
+     "fn": 1,
+     "tn": 55,
+     "positives": 5,
+     "recall": 0.8,
+     "precision": 0.36363636363636365
+    },
+    "ANY": {
+     "tp": 18,
+     "fp": 21,
+     "fn": 2,
+     "tn": 26,
+     "positives": 20,
+     "recall": 0.9,
+     "precision": 0.46153846153846156,
+     "cleanPassRate": 0.5531914893617021
+    }
+   }
+  }
+ },
+ "allDeciders": {
+  "hat.presence": {
+   "tp": 8,
+   "fp": 5,
+   "fn": 4,
+   "recall": 0.6666666666666666,
+   "precision": 0.6153846153846154
+  },
+  "hat.presenceOrKind": {
+   "tp": 8,
+   "fp": 7,
+   "fn": 4,
+   "recall": 0.6666666666666666,
+   "precision": 0.5333333333333333
+  },
+  "hair.colour": {
+   "tp": 3,
+   "fp": 54,
+   "fn": 0,
+   "recall": 1,
+   "precision": 0.05263157894736842
+  },
+  "hair.colour0": {
+   "tp": 3,
+   "fp": 54,
+   "fn": 0,
+   "recall": 1,
+   "precision": 0.05263157894736842
+  },
+  "hair.colour1": {
+   "tp": 0,
+   "fp": 11,
+   "fn": 3,
+   "recall": 0,
+   "precision": 0
+  },
+  "hair.colourOrWorn1": {
+   "tp": 1,
+   "fp": 31,
+   "fn": 2,
+   "recall": 0.3333333333333333,
+   "precision": 0.03125
+  },
+  "hair.colour1OrLength": {
+   "tp": 0,
+   "fp": 11,
+   "fn": 3,
+   "recall": 0,
+   "precision": 0
+  },
+  "bald.baldOrMissing": {
+   "tp": 1,
+   "fp": 0,
+   "fn": 2,
+   "recall": 0.3333333333333333,
+   "precision": 1
+  },
+  "bald.buzzBesideShort": {
+   "tp": 3,
+   "fp": 0,
+   "fn": 0,
+   "recall": 1,
+   "precision": 1
+  },
+  "bald.baldBuzzMissing": {
+   "tp": 1,
+   "fp": 0,
+   "fn": 2,
+   "recall": 0.3333333333333333,
+   "precision": 1
+  },
+  "costume.colourInRow": {
+   "tp": 1,
+   "fp": 36,
+   "fn": 5,
+   "recall": 0.16666666666666666,
+   "precision": 0.02702702702702703
+  },
+  "costume.stablePieceBodies": {
+   "tp": 0,
+   "fp": 6,
+   "fn": 6,
+   "recall": 0,
+   "precision": 0
+  },
+  "costume.stablePieceHeads": {
+   "tp": 0,
+   "fp": 12,
+   "fn": 6,
+   "recall": 0,
+   "precision": 0
+  },
+  "costume.colourOrStable": {
+   "tp": 1,
+   "fp": 46,
+   "fn": 5,
+   "recall": 0.16666666666666666,
+   "precision": 0.02127659574468085
+  },
+  "costume.colourOrStableBodies": {
+   "tp": 1,
+   "fp": 38,
+   "fn": 5,
+   "recall": 0.16666666666666666,
+   "precision": 0.02564102564102564
+  },
+  "rowMatch.colourAndPieces": {
+   "tp": 10,
+   "fp": 69,
+   "fn": 0,
+   "recall": 1,
+   "precision": 0.12658227848101267
+  },
+  "rowMatch.anyCell": {
+   "tp": 10,
+   "fp": 69,
+   "fn": 0,
+   "recall": 1,
+   "precision": 0.12658227848101267
+  },
+  "rowMatch.twoCells": {
+   "tp": 9,
+   "fp": 46,
+   "fn": 1,
+   "recall": 0.9,
+   "precision": 0.16363636363636364
+  },
+  "rowMatch.piecesOnly": {
+   "tp": 9,
+   "fp": 34,
+   "fn": 1,
+   "recall": 0.9,
+   "precision": 0.20930232558139536
+  },
+  "rowMatch.colourOrKindFront": {
+   "tp": 7,
+   "fp": 31,
+   "fn": 3,
+   "recall": 0.7,
+   "precision": 0.18421052631578946
+  },
+  "held.any": {
+   "tp": 1,
+   "fp": 0,
+   "fn": 0,
+   "recall": 1,
+   "precision": 1
+  },
+  "held.twoCells": {
+   "tp": 1,
+   "fp": 0,
+   "fn": 0,
+   "recall": 1,
+   "precision": 1
+  },
+  "layout.any": {
+   "tp": 7,
+   "fp": 15,
+   "fn": 0,
+   "recall": 1,
+   "precision": 0.3181818181818182
+  },
+  "layout.mediumAndPeople": {
+   "tp": 6,
+   "fp": 11,
+   "fn": 1,
+   "recall": 0.8571428571428571,
+   "precision": 0.35294117647058826
+  },
+  "layout.mediumOnly": {
+   "tp": 5,
+   "fp": 9,
+   "fn": 2,
+   "recall": 0.7142857142857143,
+   "precision": 0.35714285714285715
+  }
+ },
+ "latencyMs": {
+  "p50": 1204,
+  "p90": 1536,
+  "mean": 1292
+ },
+ "costPerSheetUsd": 0.0034889429824561387,
+ "totalCostUsd": 0.3977394999999998,
+ "misses": [
+  {
+   "id": "exp1736-17914968-v1",
+   "type": "costume",
+   "fold": "test"
+  },
+  {
+   "id": "exp1738-17915545-v0",
+   "type": "hair",
+   "fold": "test"
+  },
+  {
+   "id": "exp1739-17916378-v3",
+   "type": "hair",
+   "fold": "test"
+  },
+  {
+   "id": "exp1741-17914901-v6",
+   "type": "hat",
+   "fold": "tune"
+  },
+  {
+   "id": "exp1741-17914901-v7",
+   "type": "hat",
+   "fold": "tune"
+  },
+  {
+   "id": "exp1742-17914968-v6",
+   "type": "hat",
+   "fold": "test"
+  },
+  {
+   "id": "exp1744-17914502-v0",
+   "type": "hair",
+   "fold": "test"
+  },
+  {
+   "id": "base-Omar3-standard",
+   "type": "costume",
+   "fold": "test"
+  },
+  {
+   "id": "base-Omar3-standard",
+   "type": "rowMatch",
+   "fold": "test"
+  },
+  {
+   "id": "17667708-Levin5-std",
+   "type": "layout",
+   "fold": "test"
+  },
+  {
+   "id": "680c30fd-Daniel38-std",
+   "type": "hat",
+   "fold": "test"
+  },
+  {
+   "id": "f1c14f8c-Noah4-std",
+   "type": "costume",
+   "fold": "test"
+  },
+  {
+   "id": "728e8f21-Tobias1-cos",
+   "type": "costume",
+   "fold": "tune"
+  },
+  {
+   "id": "880b53c1-Lukas8-cos",
+   "type": "costume",
+   "fold": "test"
+  },
+  {
+   "id": "10e1d43c-Lukas8-cos",
+   "type": "costume",
+   "fold": "test"
+  }
+ ]
+}

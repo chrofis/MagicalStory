@@ -237,7 +237,9 @@
       ],
       "critics": [
         "prompts/avatar-sheet-defect-judge.txt",
-        "server/lib/avatarSheetJudge.js"
+        "server/lib/avatarSheetJudge.js",
+        "prompts/avatar-cell-judge.txt",
+        "server/lib/avatarCellJudge.js"
       ],
       "severity": "block"
     },
