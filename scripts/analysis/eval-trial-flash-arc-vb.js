@@ -18,7 +18,9 @@ const phase = arg('phase') || 'prompts';
 const CAP = Number(arg('cap') || 2.5);
 const BASE = path.join(ROOT, 'evals/runs/2026-10-09_trial-writer-effort');
 const V2 = path.join(ROOT, 'evals/runs/2026-10-10_trial-split-writer-v2');
-const OUT = path.join(ROOT, 'evals/runs/2026-10-10_trial-flash-arc-vb');
+// --v=2 (owner 2026-10-10 "Run it"): mandatory cast & objects line from the characters' special details + Flash reasoning effort low
+const V2ON = arg('v') === '2';
+const OUT = path.join(ROOT, V2ON ? 'evals/runs/2026-10-10_trial-flash-arc-vb-v2' : 'evals/runs/2026-10-10_trial-flash-arc-vb');
 const VBF = path.join(ROOT, 'evals/runs/2026-10-10_trial-vb-first');
 const OLD_IDS = ['job_1791579344291_rk2bno6av', 'job_1791496820206_qwcnrq30r', 'job_1791391658361_4eylyr1w4', 'job_1791554548909_kl0phznw2', 'job_1791551298726_19tfcxccl'];
 const NEW_IDS = ['job_1791450452362_pv0l5hf49', 'job_1791450270543_n1iu8ipsu', 'job_1790769860433_2bhhj0pyi', 'job_1790680992018_nd95o89r7', 'job_1791500208126_at0wow7xa'];
@@ -107,7 +109,19 @@ function parseSimple(text) {
   fs.mkdirSync(path.join(ROOT, 'prompts/experiments'), { recursive: true });
   fs.writeFileSync(path.join(ROOT, 'prompts/experiments/story-trial-flasharc-a.txt'), tplA);
   fs.writeFileSync(path.join(ROOT, 'prompts/experiments/story-trial-flasharc-b.txt'), tplB);
-  const build = (tpl, input) => { PROMPT_TEMPLATES.storyTrial = tpl; try { return buildTrialStoryPrompt(input, input.pages); } finally { PROMPT_TEMPLATES.storyTrial = orig; } };
+  /** v2: the same character fields the trial prompt renders (traits.specialDetails, array traits, customTraits), as one binding line before the Story Idea */
+  const mandatoryLine = input => {
+    const items = [];
+    for (const c of input.characters || []) {
+      const t = c.traits; const bits = [];
+      if (t && !Array.isArray(t) && t.specialDetails) bits.push(t.specialDetails);
+      if (Array.isArray(t)) bits.push(...t);
+      if (c.customTraits && !bits.includes(c.customTraits)) bits.push(c.customTraits);
+      if (bits.length) items.push(c.name + ': ' + bits.join('; '));
+    }
+    return items.length ? '- **MANDATORY CAST & OBJECTS** (from the characters special details; binding): ' + items.join(' | ') + '. Every named figure, pet, toy and object here, and the object or creature of every activity named, appears in the arc AND in the Visual Bible with a role in the story, on the scenes where it matters (a toy, pet or object gets its own entry; an activity becomes something the character does or uses in the story). The maximums below yield to this.\n' : '';
+  };
+  const build = (tpl, input) => { PROMPT_TEMPLATES.storyTrial = tpl; try { let t = buildTrialStoryPrompt(input, input.pages); if (V2ON) { const m = mandatoryLine(input); if (m) { if (!t.includes('- **Story Idea**:')) throw new Error('story idea line not found'); t = t.replace('- **Story Idea**:', () => m + '- **Story Idea**:'); } } return t; } finally { PROMPT_TEMPLATES.storyTrial = orig; } };
   const loadInput = id => JSON.parse(fs.readFileSync(path.join(inputDir(id), 'inputData.json'), 'utf8'));
   const mediumFile = id => {
     if (!OLD_IDS.includes(id)) return path.join(V2, id, 'output-medium.txt');
@@ -224,7 +238,7 @@ function arcRespect(arc, hints, vb) {
     await Promise.all(ids.map(async id => { try {
       const input = loadInput(id); const dir = path.join(OUT, id); fs.mkdirSync(dir, { recursive: true });
       const mainName = (input.characters.find(c => c.role === 'main') || input.characters[0]).name;
-      const a = await timedCall(build(tplA, input), 'gemini-3.7-flash', 'medium');
+      const a = await timedCall(build(tplA, input), 'gemini-3.7-flash', V2ON ? 'low' : 'medium');
       fs.writeFileSync(path.join(dir, 'output-A.txt'), a.r.text); book({ part: 1, id, call: 'A', cost: a.cost });
       const promptB = build(tplB, input).replace('@@VB@@', () => a.r.text.trim());
       fs.writeFileSync(path.join(dir, 'prompt-B.txt'), promptB);

@@ -1,0 +1,729 @@
+{
+ "job_1790680992018_nd95o89r7": {
+  "id": "job_1790680992018_nd95o89r7",
+  "aVbMs": 12261,
+  "aTitleMs": 7114,
+  "aTotalMs": 14978,
+  "aOut": 1733,
+  "aIn": 8441,
+  "aCost": 0.0128295,
+  "bFirstMs": 1123,
+  "bPage1Ms": 7272,
+  "bPagesMs": {
+   "1": 7272,
+   "2": 12972,
+   "3": 19070,
+   "4": 24806,
+   "5": 30141,
+   "6": 35290
+  },
+  "bTotalMs": 35290,
+  "bOut": 5432,
+  "bIn": 15157,
+  "bCost": 0.084634,
+  "page1ImageStartS": 22.25,
+  "totalS": 50.268,
+  "costUsd": 0.09746350000000001,
+  "stops": [
+   "stop",
+   "end_turn"
+  ],
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 0,
+    "ani": 1,
+    "art": 1,
+    "loc": 2,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+   "coverEventWithSentinel": true
+  },
+  "respect": {
+   "vbIds": 4,
+   "foreign": [],
+   "outside": [],
+   "unused": [],
+   "unlistedFigs": [],
+   "unlistedObjs": [],
+   "noLocId": []
+  },
+  "arcRespect": {
+   "arcPages": 6,
+   "withItems": 21,
+   "inHint": 21,
+   "inVb": 15,
+   "missing": [],
+   "notInVb": [
+    "p1:Neva",
+    "p2:Neva",
+    "p3:Neva",
+    "p4:Neva",
+    "p5:Neva",
+    "p6:Neva"
+   ]
+  },
+  "arcLines": 6
+ },
+ "job_1790769860433_2bhhj0pyi": {
+  "id": "job_1790769860433_2bhhj0pyi",
+  "aVbMs": 10795,
+  "aTitleMs": 5853,
+  "aTotalMs": 13305,
+  "aOut": 1771,
+  "aIn": 8788,
+  "aCost": 0.01323225,
+  "bFirstMs": 546,
+  "bPage1Ms": 7900,
+  "bPagesMs": {
+   "1": 7900,
+   "2": 13967,
+   "3": 19571,
+   "4": 25706,
+   "5": 31629,
+   "6": 37001
+  },
+  "bTotalMs": 37001,
+  "bOut": 5659,
+  "bIn": 15708,
+  "bCost": 0.088006,
+  "page1ImageStartS": 21.205,
+  "totalS": 50.306,
+  "costUsd": 0.10123825,
+  "stops": [
+   "stop",
+   "end_turn"
+  ],
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 1,
+    "ani": 0,
+    "art": 2,
+    "loc": 1,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+   "coverEventWithSentinel": true
+  },
+  "respect": {
+   "vbIds": 4,
+   "foreign": [],
+   "outside": [],
+   "unused": [],
+   "unlistedFigs": [
+    "p1:Luna",
+    "p2:Luna",
+    "p3:Luna",
+    "p4:Luna",
+    "p5:Luna",
+    "p6:Luna"
+   ],
+   "unlistedObjs": [],
+   "noLocId": []
+  },
+  "arcRespect": {
+   "arcPages": 6,
+   "withItems": 23,
+   "inHint": 23,
+   "inVb": 17,
+   "missing": [],
+   "notInVb": [
+    "p1:Luna",
+    "p2:Luna",
+    "p3:Luna",
+    "p4:Luna",
+    "p5:Luna",
+    "p6:Luna"
+   ]
+  },
+  "arcLines": 6
+ },
+ "job_1791391658361_4eylyr1w4": {
+  "id": "job_1791391658361_4eylyr1w4",
+  "aVbMs": 10415,
+  "aTitleMs": 5402,
+  "aTotalMs": 13077,
+  "aOut": 1727,
+  "aIn": 8105,
+  "aCost": 0.012555,
+  "bFirstMs": 9726,
+  "bPage1Ms": 15897,
+  "bPagesMs": {
+   "1": 15897,
+   "2": 21535,
+   "3": 26502,
+   "4": 31925,
+   "5": 37033,
+   "6": 42815
+  },
+  "bTotalMs": 42815,
+  "bOut": 6367,
+  "bIn": 14380,
+  "bCost": 0.09243000000000001,
+  "page1ImageStartS": 28.974,
+  "totalS": 55.892,
+  "costUsd": 0.10498500000000001,
+  "stops": [
+   "stop",
+   "end_turn"
+  ],
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 1,
+    "ani": 1,
+    "art": 1,
+    "loc": 1,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+   "coverEventWithSentinel": true
+  },
+  "respect": {
+   "vbIds": 4,
+   "foreign": [],
+   "outside": [],
+   "unused": [],
+   "unlistedFigs": [],
+   "unlistedObjs": [],
+   "noLocId": []
+  },
+  "arcRespect": {
+   "arcPages": 6,
+   "withItems": 26,
+   "inHint": 26,
+   "inVb": 20,
+   "missing": [],
+   "notInVb": [
+    "p1:Jules",
+    "p2:Jules",
+    "p3:Jules",
+    "p4:Jules",
+    "p5:Jules",
+    "p6:Jules"
+   ]
+  },
+  "arcLines": 6
+ },
+ "job_1791450270543_n1iu8ipsu": {
+  "id": "job_1791450270543_n1iu8ipsu",
+  "aVbMs": 8570,
+  "aTitleMs": 4571,
+  "aTotalMs": 10827,
+  "aOut": 1556,
+  "aIn": 9199,
+  "aCost": 0.01273425,
+  "bFirstMs": 774,
+  "bPage1Ms": 5318,
+  "bPagesMs": {
+   "1": 5318,
+   "2": 9607,
+   "3": 13365,
+   "4": 16983,
+   "5": 20885,
+   "6": 24455
+  },
+  "bTotalMs": 24455,
+  "bOut": 4194,
+  "bIn": 16067,
+  "bCost": 0.074074,
+  "page1ImageStartS": 16.145,
+  "totalS": 35.282,
+  "costUsd": 0.08680825,
+  "stops": [
+   "stop",
+   "end_turn"
+  ],
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 0,
+    "ani": 1,
+    "art": 1,
+    "loc": 1,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+   "coverEventWithSentinel": true
+  },
+  "respect": {
+   "vbIds": 3,
+   "foreign": [],
+   "outside": [],
+   "unused": [],
+   "unlistedFigs": [],
+   "unlistedObjs": [],
+   "noLocId": []
+  },
+  "arcRespect": {
+   "arcPages": 6,
+   "withItems": 13,
+   "inHint": 13,
+   "inVb": 7,
+   "missing": [],
+   "notInVb": [
+    "p1:Omar",
+    "p2:Omar",
+    "p3:Omar",
+    "p4:Omar",
+    "p5:Omar",
+    "p6:Omar"
+   ]
+  },
+  "arcLines": 6
+ },
+ "job_1791450452362_pv0l5hf49": {
+  "id": "job_1791450452362_pv0l5hf49",
+  "aVbMs": 8764,
+  "aTitleMs": 5036,
+  "aTotalMs": 10972,
+  "aOut": 1278,
+  "aIn": 8991,
+  "aCost": 0.01153575,
+  "bFirstMs": 1073,
+  "bPage1Ms": 6774,
+  "bPagesMs": {
+   "1": 6774,
+   "2": 12308,
+   "3": 17340,
+   "4": 22408,
+   "5": 26675,
+   "6": 31340
+  },
+  "bTotalMs": 31340,
+  "bOut": 4758,
+  "bIn": 15143,
+  "bCost": 0.07786599999999999,
+  "page1ImageStartS": 17.746,
+  "totalS": 42.312,
+  "costUsd": 0.08940174999999999,
+  "stops": [
+   "stop",
+   "end_turn"
+  ],
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 0,
+    "ani": 1,
+    "art": 0,
+    "loc": 1,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+   "coverEventWithSentinel": true
+  },
+  "respect": {
+   "vbIds": 2,
+   "foreign": [
+    "p3:ART_STONES",
+    "p4:ART_STONES"
+   ],
+   "outside": [],
+   "unused": [],
+   "unlistedFigs": [],
+   "unlistedObjs": [],
+   "noLocId": []
+  },
+  "arcRespect": {
+   "arcPages": 6,
+   "withItems": 11,
+   "inHint": 11,
+   "inVb": 5,
+   "missing": [],
+   "notInVb": [
+    "p1:Ethan",
+    "p2:Ethan",
+    "p3:Ethan",
+    "p4:Ethan",
+    "p5:Ethan",
+    "p6:Ethan"
+   ]
+  },
+  "arcLines": 6
+ },
+ "job_1791496820206_qwcnrq30r": {
+  "id": "job_1791496820206_qwcnrq30r",
+  "aVbMs": 9470,
+  "aTitleMs": 4774,
+  "aTotalMs": 11659,
+  "aOut": 1534,
+  "aIn": 9515,
+  "aCost": 0.01288875,
+  "bFirstMs": 873,
+  "bPage1Ms": 4972,
+  "bPagesMs": {
+   "1": 4972,
+   "2": 8770,
+   "3": 12101,
+   "4": 15897,
+   "5": 19407,
+   "6": 22869
+  },
+  "bTotalMs": 22869,
+  "bOut": 3874,
+  "bIn": 16776,
+  "bCost": 0.072292,
+  "page1ImageStartS": 16.631,
+  "totalS": 34.528,
+  "costUsd": 0.08518075,
+  "stops": [
+   "stop",
+   "end_turn"
+  ],
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 0,
+    "ani": 0,
+    "art": 1,
+    "loc": 2,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+   "coverEventWithSentinel": true
+  },
+  "respect": {
+   "vbIds": 3,
+   "foreign": [],
+   "outside": [],
+   "unused": [],
+   "unlistedFigs": [],
+   "unlistedObjs": [],
+   "noLocId": []
+  },
+  "arcRespect": {
+   "arcPages": 6,
+   "withItems": 12,
+   "inHint": 12,
+   "inVb": 6,
+   "missing": [],
+   "notInVb": [
+    "p1:Noah",
+    "p2:Noah",
+    "p3:Noah",
+    "p4:Noah",
+    "p5:Noah",
+    "p6:Noah"
+   ]
+  },
+  "arcLines": 6
+ },
+ "job_1791500208126_at0wow7xa": {
+  "id": "job_1791500208126_at0wow7xa",
+  "aVbMs": 11036,
+  "aTitleMs": 5952,
+  "aTotalMs": 13579,
+  "aOut": 1548,
+  "aIn": 8715,
+  "aCost": 0.01234125,
+  "bFirstMs": 1266,
+  "bPage1Ms": 5949,
+  "bPagesMs": {
+   "1": 5949,
+   "2": 11381,
+   "3": 15816,
+   "4": 21447,
+   "5": 26848,
+   "6": 31083
+  },
+  "bTotalMs": 31083,
+  "bOut": 4746,
+  "bIn": 15288,
+  "bCost": 0.078036,
+  "page1ImageStartS": 19.528,
+  "totalS": 44.662,
+  "costUsd": 0.09037724999999999,
+  "stops": [
+   "stop",
+   "end_turn"
+  ],
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 1,
+    "ani": 0,
+    "art": 1,
+    "loc": 1,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+   "coverEventWithSentinel": true
+  },
+  "respect": {
+   "vbIds": 3,
+   "foreign": [
+    "p6:ART002"
+   ],
+   "outside": [],
+   "unused": [],
+   "unlistedFigs": [],
+   "unlistedObjs": [],
+   "noLocId": [
+    "p1",
+    "p6"
+   ]
+  },
+  "arcRespect": {
+   "arcPages": 6,
+   "withItems": 12,
+   "inHint": 12,
+   "inVb": 6,
+   "missing": [],
+   "notInVb": [
+    "p1:Lily",
+    "p2:Lily",
+    "p3:Lily",
+    "p4:Lily",
+    "p5:Lily",
+    "p6:Lily"
+   ]
+  },
+  "arcLines": 6
+ },
+ "job_1791551298726_19tfcxccl": {
+  "id": "job_1791551298726_19tfcxccl",
+  "aVbMs": 15763,
+  "aTitleMs": 8371,
+  "aTotalMs": 18190,
+  "aOut": 2333,
+  "aIn": 8897,
+  "aCost": 0.0126675,
+  "bFirstMs": 597,
+  "bPage1Ms": 6790,
+  "bPagesMs": {
+   "1": 6790,
+   "2": 13382,
+   "3": 19413,
+   "4": 25158,
+   "5": 30868,
+   "6": 36932
+  },
+  "bTotalMs": 36932,
+  "bOut": 6063,
+  "bIn": 16903,
+  "bCost": 0.094436,
+  "page1ImageStartS": 24.98,
+  "totalS": 55.122,
+  "costUsd": 0.1071035,
+  "stops": [
+   "stop",
+   "end_turn"
+  ],
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 1,
+    "ani": 1,
+    "art": 2,
+    "loc": 2,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+   "coverEventWithSentinel": true
+  },
+  "respect": {
+   "vbIds": 6,
+   "foreign": [],
+   "outside": [],
+   "unused": [],
+   "unlistedFigs": [],
+   "unlistedObjs": [],
+   "noLocId": []
+  },
+  "arcRespect": {
+   "arcPages": 6,
+   "withItems": 20,
+   "inHint": 20,
+   "inVb": 14,
+   "missing": [],
+   "notInVb": [
+    "p1:Rohan",
+    "p2:Rohan",
+    "p3:Rohan",
+    "p4:Rohan",
+    "p5:Rohan",
+    "p6:Rohan"
+   ]
+  },
+  "arcLines": 6
+ },
+ "job_1791554548909_kl0phznw2": {
+  "id": "job_1791554548909_kl0phznw2",
+  "aVbMs": 11851,
+  "aTitleMs": 4630,
+  "aTotalMs": 14502,
+  "aOut": 1991,
+  "aIn": 9269,
+  "aCost": 0.014418,
+  "bFirstMs": 1174,
+  "bPage1Ms": 7256,
+  "bPagesMs": {
+   "1": 7256,
+   "2": 12890,
+   "3": 18293,
+   "4": 23692,
+   "5": 28362,
+   "6": 33438
+  },
+  "bTotalMs": 33438,
+  "bOut": 5418,
+  "bIn": 16855,
+  "bCost": 0.08789,
+  "page1ImageStartS": 21.758,
+  "totalS": 47.94,
+  "costUsd": 0.102308,
+  "stops": [
+   "stop",
+   "end_turn"
+  ],
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 1,
+    "ani": 1,
+    "art": 2,
+    "loc": 2,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+   "coverEventWithSentinel": true
+  },
+  "respect": {
+   "vbIds": 6,
+   "foreign": [],
+   "outside": [],
+   "unused": [],
+   "unlistedFigs": [],
+   "unlistedObjs": [],
+   "noLocId": []
+  },
+  "arcRespect": {
+   "arcPages": 6,
+   "withItems": 19,
+   "inHint": 19,
+   "inVb": 13,
+   "missing": [],
+   "notInVb": [
+    "p1:Emma",
+    "p2:Emma",
+    "p3:Emma",
+    "p4:Emma",
+    "p5:Emma",
+    "p6:Emma"
+   ]
+  },
+  "arcLines": 6
+ },
+ "job_1791579344291_rk2bno6av": {
+  "id": "job_1791579344291_rk2bno6av",
+  "aVbMs": 13544,
+  "aTitleMs": 6058,
+  "aTotalMs": 16158,
+  "aOut": 2176,
+  "aIn": 9550,
+  "aCost": 0.0153225,
+  "bFirstMs": 597,
+  "bPage1Ms": 7528,
+  "bPagesMs": {
+   "1": 7528,
+   "2": 13594,
+   "3": 18738,
+   "4": 24274,
+   "5": 30262,
+   "6": 36284
+  },
+  "bTotalMs": 36283,
+  "bOut": 5808,
+  "bIn": 17611,
+  "bCost": 0.093302,
+  "page1ImageStartS": 23.686,
+  "totalS": 52.441,
+  "costUsd": 0.1086245,
+  "stops": [
+   "stop",
+   "end_turn"
+  ],
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 1,
+    "ani": 1,
+    "art": 2,
+    "loc": 1,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+   "coverEventWithSentinel": true
+  },
+  "respect": {
+   "vbIds": 5,
+   "foreign": [],
+   "outside": [],
+   "unused": [],
+   "unlistedFigs": [],
+   "unlistedObjs": [],
+   "noLocId": []
+  },
+  "arcRespect": {
+   "arcPages": 6,
+   "withItems": 21,
+   "inHint": 20,
+   "inVb": 15,
+   "missing": [
+    "p5:Stofftier Eli"
+   ],
+   "notInVb": [
+    "p1:Lukas",
+    "p2:Lukas",
+    "p3:Lukas",
+    "p4:Lukas",
+    "p5:Lukas",
+    "p6:Lukas"
+   ]
+  },
+  "arcLines": 6
+ }
+}

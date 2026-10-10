@@ -1,0 +1,25 @@
+{
+ "note": "One reader (the agent), arm hidden by blind-key-run.json; unblinded afterwards. Flash reasoning effort low; mandatory cast line from special details.",
+ "verdicts": {
+  "job_1791579344291_rk2bno6av": "medium better: test has Eli but passive (clipped to belt), slip \"Der Beutel war fast voll, doch zwoelf fehlten noch\" after eleven",
+  "job_1791496820206_qwcnrq30r": "tie: test invents a wizard handing over the letter but spells M.U.T. and the second try works",
+  "job_1791391658361_4eylyr1w4": "test better: medium says Natel in an Iowa park; test slip: Je vous montre to Papa",
+  "job_1791554548909_kl0phznw2": "test better: sword taken at the church as the idea says; test slip: Ein Elster",
+  "job_1791551298726_19tfcxccl": "medium slightly better: test invents Mesmer Beat, buttons abgetrennt, keys that rip fingers",
+  "job_1791450452362_pv0l5hf49": "test better: medium I am doing a running, goose follows to the top",
+  "job_1791450270543_n1iu8ipsu": "tie: medium invents Mama, test drops nothing",
+  "job_1790769860433_2bhhj0pyi": "tie: test uses the special detail (mother-sorceress) and a sphere instead of the tablet, medium solid and faithful",
+  "job_1790680992018_nd95o89r7": "test better: crafted painted feather, one brave climb; medium changes clothes while the unicorn lies hurt and loses the feather twice",
+  "job_1791500208126_at0wow7xa": "test better: medium invents flute, Burr, no walk home"
+ },
+ "tally": {
+  "test_better": 5,
+  "tie": 3,
+  "medium_better": 2
+ },
+ "special_details": {
+  "Lukas": "Eli in arc 6/6 pages, bible entry, story",
+  "Luna": "plays mother: mother-sorceress in arc and story",
+  "Neva": "crafts and paints: yes (painted paper feather); loves horses, rides: no"
+ }
+}
