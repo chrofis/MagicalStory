@@ -68465,3 +68465,11 @@ Considered: 2.0 for the existing two-call path (slower and twice the price for n
 Revisit if: a judged oneCall 2.0 run on >=20 sheets keeps >=90% acceptable.
 Spend: USD ~1.33 (1756-1759 0.84, 1760-1761 0.48, measurement 0.005). Experiments 1756-1761.
 Touched files: scripts/analysis/run-costume-sheet-lab.js (extra-params argument), evals/results/results.jsonl.
+
+## 2026-10-10 - Grok 2.0 oneCall avatar sheet: 6 more sheets (cape, tail, knight, standard x3), combined 18: 17/18 acceptable
+Context: owner "max 6 more tries, then decide" after Lab 1760-1761 (see the entry above; same method, nothing wired).
+Measured (Lab 1762-1765, USD 0.24): superhero cape (Rohan 8) clean and acceptable; knight (Levin 5) clean, bareheaded because the knight definition says no helmet, so a helmet or hood costume is still untested (the ninja definition also says no hood); mermaid (Lily 7) NOT acceptable, the tail is drawn as a long scale skirt on an upright figure with no fin; STANDARD sheets Emma 4, Ayan 8, Sarah 36 (adult woman) all clean with right hair and glasses. 6/6 cut; head ratio within 15% of the norm 4/6 (Emma 4 over by 43%, Lily 7 over by 29%; vision read, noise ~15%).
+**Combined 18 oneCall 2.0 sheets (age line, no judges): 18/18 cut into 8 figures, 17/18 acceptable viewed, median 16.1 s, p90 27.1 s, max 29.9 s, 1 call and USD 0.04 each (USD 0.72); head ratio within 15% of the norm 11/14 measured.** Defects: mermaid tail as upright skirt 1/18; head-row hat larger than the body-row hat on the hat sheets (minor). Zero bald cells, zero extra people, zero missing hats, zero photographic sheets.
+Decision: unchanged, no wiring; the measured risk of one-call is now one tail costume plus unscored likeness. Reversing the SETTLED one-call line still needs the owner's sign-off, a judged run, and a superseding entry. Revisit if: oneCall 2.0 is run behind the existing judges on >=20 sheets.
+Spend: this follow-up USD 0.243; task total about USD 1.57 (earlier cap 1.50 was set before the owner's two additions).
+Touched files: scripts/analysis/run-costume-sheet-lab.js ('Name:storyId' targets), evals/results/results.jsonl.

@@ -13,7 +13,9 @@ const all = [
   ['Lukas', 'job_1791490151653_r9mypyn0c'], ['Daniel', 'job_1791551239260_a0dpn715x'], ['Sarah', 'job_1787469664089_9e27p42el7l'], ['Hans', 'job_1791551239260_a0dpn715x'],
 ];
 const want = only ? only.split(',') : all.map(a => a[0]);
-const targets = all.filter(a => want.includes(a[0])).map(([n, s]) => ({ storyId: s, character: n.replace(/\d$/, '') }));
+// 'Name:storyId' in the list names a character outside the built-in ten
+const targets = want.map(w => w.includes(':') ? { storyId: w.split(':')[1], character: w.split(':')[0] } : null).filter(Boolean)
+  .concat(all.filter(a => want.includes(a[0])).map(([n, s]) => ({ storyId: s, character: n.replace(/\d$/, '') })));
 (async () => {
   const body = { stage: 'avatar_sheet_variant', label, params: { variant, costume, skipReview: true, ...(ageLine === '1' ? { ageLine: true } : {}), ...(extraJson ? JSON.parse(extraJson) : {}) }, targets };
   const r = await fetch(`${BASE}/api/admin/testlab/experiments`, { method: 'POST', headers: H, body: JSON.stringify(body) });
