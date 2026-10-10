@@ -1,0 +1,263 @@
+[
+  {
+    "id": "job_1791579344291_rk2bno6av",
+    "flagged": [
+      "CAST_LOST",
+      "OBJ_STATE"
+    ],
+    "usedRerun": true,
+    "a1VbMs": 8827,
+    "a1TotalMs": 34672,
+    "checkMs": 438,
+    "a2VbMs": 36782,
+    "a2TotalMs": 65954,
+    "bTotalMs": 15728,
+    "vbReadySpeculativeS": 8.827,
+    "vbReadyAfterCheckS": 71.892,
+    "totalS": 116.792,
+    "rerunAddedS": 66.392,
+    "costA1": 0.09509999999999999,
+    "costA2": 0.13175599999999998,
+    "costB": 0.05062,
+    "costJev": 0.000094206,
+    "costUsd": 0.27757020599999993,
+    "stops": [
+      "end_turn",
+      "end_turn",
+      "end_turn"
+    ]
+  },
+  {
+    "id": "job_1791496820206_qwcnrq30r",
+    "flagged": [],
+    "usedRerun": false,
+    "a1VbMs": 8720,
+    "a1TotalMs": 32620,
+    "checkMs": 486,
+    "a2VbMs": null,
+    "a2TotalMs": null,
+    "bTotalMs": 8274,
+    "vbReadySpeculativeS": 8.72,
+    "vbReadyAfterCheckS": 33.106,
+    "totalS": 41.38,
+    "rerunAddedS": 0,
+    "costA1": 0.09151200000000001,
+    "costA2": 0,
+    "costB": 0.038256,
+    "costJev": 0.000044562,
+    "costUsd": 0.129812562,
+    "stops": [
+      "end_turn",
+      null,
+      "end_turn"
+    ]
+  },
+  {
+    "id": "job_1791391658361_4eylyr1w4",
+    "flagged": [],
+    "usedRerun": false,
+    "a1VbMs": 7098,
+    "a1TotalMs": 30031,
+    "checkMs": 279,
+    "a2VbMs": null,
+    "a2TotalMs": null,
+    "bTotalMs": 14687,
+    "vbReadySpeculativeS": 7.098,
+    "vbReadyAfterCheckS": 30.31,
+    "totalS": 44.997,
+    "rerunAddedS": 0,
+    "costA1": 0.08436199999999999,
+    "costA2": 0,
+    "costB": 0.040501999999999996,
+    "costJev": 0.000035994,
+    "costUsd": 0.12489999399999999,
+    "stops": [
+      "end_turn",
+      null,
+      "end_turn"
+    ]
+  },
+  {
+    "id": "job_1791554548909_kl0phznw2",
+    "flagged": [
+      "OBJ_STATE"
+    ],
+    "usedRerun": true,
+    "a1VbMs": 8890,
+    "a1TotalMs": 35360,
+    "checkMs": 319,
+    "a2VbMs": 9427,
+    "a2TotalMs": 37693,
+    "bTotalMs": 16293,
+    "vbReadySpeculativeS": 8.89,
+    "vbReadyAfterCheckS": 45.106,
+    "totalS": 89.665,
+    "rerunAddedS": 38.012,
+    "costA1": 0.10012399999999999,
+    "costA2": 0.10048599999999999,
+    "costB": 0.048769999999999994,
+    "costJev": 0.00008635199999999999,
+    "costUsd": 0.24946635199999997,
+    "stops": [
+      "end_turn",
+      "end_turn",
+      "end_turn"
+    ]
+  },
+  {
+    "id": "job_1791551298726_19tfcxccl",
+    "flagged": [
+      "OBJ_STATE"
+    ],
+    "usedRerun": true,
+    "a1VbMs": 9401,
+    "a1TotalMs": 31317,
+    "checkMs": 296,
+    "a2VbMs": 10367,
+    "a2TotalMs": 36438,
+    "bTotalMs": 15832,
+    "vbReadySpeculativeS": 9.401,
+    "vbReadyAfterCheckS": 41.98,
+    "totalS": 83.883,
+    "rerunAddedS": 36.734,
+    "costA1": 0.088006,
+    "costA2": 0.10005800000000001,
+    "costB": 0.048202,
+    "costJev": 0.000085176,
+    "costUsd": 0.236351176,
+    "stops": [
+      "end_turn",
+      "end_turn",
+      "end_turn"
+    ]
+  },
+  {
+    "id": "job_1791450452362_pv0l5hf49",
+    "flagged": [],
+    "usedRerun": false,
+    "a1VbMs": 6804,
+    "a1TotalMs": 28572,
+    "checkMs": 306,
+    "a2VbMs": null,
+    "a2TotalMs": null,
+    "bTotalMs": 11273,
+    "vbReadySpeculativeS": 6.804,
+    "vbReadyAfterCheckS": 28.878,
+    "totalS": 40.151,
+    "rerunAddedS": 0,
+    "costA1": 0.084058,
+    "costA2": 0,
+    "costB": 0.036708000000000005,
+    "costJev": 0.000039648,
+    "costUsd": 0.120805648,
+    "stops": [
+      "end_turn",
+      null,
+      "end_turn"
+    ]
+  },
+  {
+    "id": "job_1791450270543_n1iu8ipsu",
+    "flagged": [],
+    "usedRerun": false,
+    "a1VbMs": 8033,
+    "a1TotalMs": 28810,
+    "checkMs": 312,
+    "a2VbMs": null,
+    "a2TotalMs": null,
+    "bTotalMs": 6348,
+    "vbReadySpeculativeS": 8.033,
+    "vbReadyAfterCheckS": 29.122,
+    "totalS": 35.47,
+    "rerunAddedS": 0,
+    "costA1": 0.089682,
+    "costA2": 0,
+    "costB": 0.034215999999999996,
+    "costJev": 0.000035196,
+    "costUsd": 0.123933196,
+    "stops": [
+      "end_turn",
+      null,
+      "end_turn"
+    ]
+  },
+  {
+    "id": "job_1790769860433_2bhhj0pyi",
+    "flagged": [],
+    "usedRerun": false,
+    "a1VbMs": 7866,
+    "a1TotalMs": 33426,
+    "checkMs": 264,
+    "a2VbMs": null,
+    "a2TotalMs": null,
+    "bTotalMs": 16547,
+    "vbReadySpeculativeS": 7.866,
+    "vbReadyAfterCheckS": 33.69,
+    "totalS": 50.237,
+    "rerunAddedS": 0,
+    "costA1": 0.09049399999999999,
+    "costA2": 0,
+    "costB": 0.045146,
+    "costJev": 0.000047334,
+    "costUsd": 0.135687334,
+    "stops": [
+      "end_turn",
+      null,
+      "end_turn"
+    ]
+  },
+  {
+    "id": "job_1790680992018_nd95o89r7",
+    "flagged": [
+      "OBJ_STATE"
+    ],
+    "usedRerun": true,
+    "a1VbMs": 8583,
+    "a1TotalMs": 32954,
+    "checkMs": 310,
+    "a2VbMs": 7616,
+    "a2TotalMs": 33239,
+    "bTotalMs": 18149,
+    "vbReadySpeculativeS": 8.583,
+    "vbReadyAfterCheckS": 40.88,
+    "totalS": 84.652,
+    "rerunAddedS": 33.549,
+    "costA1": 0.088948,
+    "costA2": 0.08893999999999999,
+    "costB": 0.045814,
+    "costJev": 0.000087486,
+    "costUsd": 0.22378948599999998,
+    "stops": [
+      "end_turn",
+      "end_turn",
+      "end_turn"
+    ]
+  },
+  {
+    "id": "job_1791500208126_at0wow7xa",
+    "flagged": [
+      "NOT_FOLLOW"
+    ],
+    "usedRerun": true,
+    "a1VbMs": 9528,
+    "a1TotalMs": 37520,
+    "checkMs": 268,
+    "a2VbMs": 42581,
+    "a2TotalMs": 70808,
+    "bTotalMs": 11874,
+    "vbReadySpeculativeS": 9.528,
+    "vbReadyAfterCheckS": 80.369,
+    "totalS": 120.47,
+    "rerunAddedS": 71.076,
+    "costA1": 0.09787199999999999,
+    "costA2": 0.136304,
+    "costB": 0.040508,
+    "costJev": 0.000089082,
+    "costUsd": 0.274773082,
+    "stops": [
+      "end_turn",
+      "end_turn",
+      "end_turn"
+    ]
+  }
+]

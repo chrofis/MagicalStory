@@ -15,6 +15,8 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - Page 1 starts with action, not weather or waking up
 - {WHO_DOES_WHAT}
 - A figure's first scene brings them in, by arriving or by a name someone present says, before they speak or act
+- Every figure the idea or the Visual Bible introduces (person, creature, toy) keeps a role: it appears in the scenes it matters to, and no PLAN line leaves it out or forgets it without a reason.
+- A change to an object stays in every later PLAN line (torn, lost, broken, eaten, spilled) unless a scene changes it back. Check each PLAN line against the earlier ones.
 - {PICTURE_COUNT}
 - {CLOSING_MOMENT}
 - Show character personality through actions
