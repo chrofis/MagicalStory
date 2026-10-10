@@ -161,10 +161,18 @@ describe('the trial prewarm is the one caller that asks for it', () => {
     // prepare-title hands it to the one styling helper (styleAndPersistTrialSheets -> prepareStyledAvatars); the standard
     // sheet endpoint does not set it: its head row has no costume text, so it must agree with the body row on the garment
     expect(trial).toContain('styleOptions: { seasonOutfit: seasonOutfitGuidance({ storyCategory }), fastPass1: true }');
-    for (const f of ['server/lib/storyAvatars.js', 'storyJobPipeline.js', 'server/lib/testlab.js']) {
+    for (const f of ['server/lib/storyAvatars.js', 'storyJobPipeline.js']) {
       const t = fs.readFileSync(path.join(ROOT, f), 'utf8');
       expect(t).not.toMatch(/fastPass1/);
     }
+    // The Test Lab may replay the trial's mode in exactly one stage, avatar_sheet_variant (params.fastPass1, default on): it
+    // measures the trial's own sheet. Every other Lab stage stays off it (docs/decisions.md 2026-10-10 "avatar sheet variants").
+    const lab = fs.readFileSync(path.join(ROOT, 'server/lib/testlab.js'), 'utf8');
+    const start = lab.indexOf('// The Grok tiers a sheet variant may name');
+    const end = lab.indexOf('/** Pass 2: style transfer of an existing realistic sheet');
+    expect(start).toBeGreaterThan(0);
+    expect(end).toBeGreaterThan(start);
+    expect(lab.slice(0, start) + lab.slice(end)).not.toMatch(/fastPass1/);
   });
 });
 

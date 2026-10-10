@@ -2921,6 +2921,101 @@ async function runAvatarRealisticStage(target, { experimentId, params = {} }) {
   };
 }
 
+// The Grok tiers a sheet variant may name (params.model). Ids come from GROK_MODELS, the one definition.
+const SHEET_VARIANT_MODELS = { standard: 'STANDARD', 'grok-imagine-image-2.0': 'IMAGE_2', '2.0': 'IMAGE_2', pro: 'PRO' };
+const SHEET_VARIANTS = ['current', 'oneCall', 'styledBodyRow'];
+
+/**
+ * Avatar sheet variants (owner, 2026-10-10: "avatar creation takes too long - one expensive call instead of four cheaper ones?").
+ * Runs the REAL sheet code of character2x4Sheet.js on a stored character, the way the trial runs it, with the options threaded through:
+ *   params.variant  'current' (body row -> head row -> pass 2; fastPass1), 'oneCall' (photo -> styled 2x4 in one call),
+ *                   'styledBodyRow' (photo -> styled body row, then the head row against it; no photoreal pass, no pass 2)
+ *   params.model    Grok tier: standard | grok-imagine-image-2.0 | pro (every Grok call of the sheet)
+ *   params.passTwoAttempts  total pass-2 attempts ('current' only)   params.anchor false = no style anchor ('current' only)
+ *   params.skipReview  true = no Gemini row/sheet judges (default false, as the trial runs a costumed sheet)
+ *   params.costume  'standard' | 'trial' (the character's own stored costume type) | a trial costume key (pirate, knight, ...)
+ *   params.artStyle default watercolor (the trial's)
+ * target: {storyId, character} - the character is read from the story owner's stored character row, photos as the trial uses them.
+ * Result: the sheet (tl_avatar test version), per-step wall time, Grok calls, cost, and whether sheetCut.js cuts it into 8 figures.
+ */
+async function runAvatarSheetVariantStage(target, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const sheet = require('./character2x4Sheet');
+  const { GROK_MODELS } = require('./grok');
+  const { priceUsage } = require('../config/models');
+  const variant = params.variant || 'current';
+  if (!SHEET_VARIANTS.includes(variant)) throw new Error(`avatar_sheet_variant: unknown variant "${variant}" (${SHEET_VARIANTS.join(' | ')})`);
+  const modelKey = params.model || 'standard';
+  if (!SHEET_VARIANT_MODELS[modelKey]) throw new Error(`avatar_sheet_variant: unknown model "${modelKey}" (${Object.keys(SHEET_VARIANT_MODELS).join(' | ')})`);
+  const grokModel = GROK_MODELS[SHEET_VARIANT_MODELS[modelKey]];
+  const artStyle = params.artStyle || 'watercolor';
+  const { character } = await loadCharacterContext(target.storyId, target.character);
+
+  const costumeParam = params.costume || 'standard';
+  let costumeDescription = 'standard outfit', costumeName = null, seasonOutfit = null, clothingCategory = 'standard';
+  if (costumeParam === 'standard') {
+    seasonOutfit = require('./season').seasonOutfitGuidance({ storyCategory: 'adventure' });
+  } else {
+    const key = costumeParam === 'trial' ? character.preGeneratedCostumeType : costumeParam;
+    const costume = require('../config/trialCostumes').getTrialCostume(key, 'adventure', character.gender || 'male');
+    if (!costume) throw new Error(`avatar_sheet_variant: no trial costume "${key}" for ${character.name}`);
+    costumeDescription = costume.description; costumeName = costume.costumeType; clothingCategory = `costumed:${costume.costumeType}`;
+  }
+
+  // Per-step wall time: every paid call reports through the usage tracker when it returns, so the gap between two reports is the step.
+  const t0 = Date.now();
+  const timeline = [];
+  const usageTracker = (provider, usage, fn, modelId) => {
+    let cost = 0;
+    try { cost = usage?.cost ?? priceUsage(modelId || '', usage || {}); } catch { /* unpriced: counted as 0, flagged below */ }
+    timeline.push({ fn, provider, modelId: modelId || null, cost: Number(cost) || 0, atMs: Date.now() - t0 });
+  };
+
+  let imageData, realisticImageData = null, finalScore = null, styleJudgeRejected = false, prompt = null;
+  if (variant === 'oneCall') {
+    const r = await sheet.generateOneCallSheet(character, { artStyle, costumeDescription, costumeName, seasonOutfit, usageTracker, grokModel });
+    imageData = r.imageData; prompt = r.prompt;
+  } else {
+    const r = await sheet.generateCharacter2x4Sheet(character, {
+      clothingCategory, costumeDescription, costumeName, artStyle, usageTracker, seasonOutfit,
+      skipQualityEval: params.skipReview === true,
+      fastPass1: params.fastPass1 !== false,
+      grokModel,
+      ...(params.passTwoAttempts != null ? { passTwoAttempts: Number(params.passTwoAttempts) } : {}),
+      styleAnchor: params.anchor !== false,
+      styledPass1: variant === 'styledBodyRow',
+    });
+    imageData = r.imageData; realisticImageData = r.realisticImageData || null; finalScore = r.finalScore ?? null;
+    styleJudgeRejected = !!r.styleJudgeRejected; prompt = r.prompt;
+  }
+  const totalMs = Date.now() - t0;
+  if (!imageData) throw new Error('avatar_sheet_variant: no sheet returned');
+
+  let prev = 0;
+  const steps = timeline.map(e => { const ms = e.atMs - prev; prev = e.atMs; return { step: e.fn, modelId: e.modelId, ms, cost: Number(e.cost.toFixed(4)) }; });
+  const grokCalls = timeline.filter(e => e.provider === 'grok').length;
+  const costUsd = Number(timeline.reduce((a, e) => a + e.cost, 0).toFixed(4));
+
+  // Can the production cutter turn the sheet into its 8 figures (head row over body row)?
+  let cut = { ok: false, error: null, figures: 0 };
+  try {
+    const pieces = await require('./sheetCut').cutSheet(Buffer.from(require('./r2').stripDataUriPrefix(imageData), 'base64'));
+    cut = { ok: pieces.length === 8, error: null, figures: pieces.length };
+  } catch (err) { cut = { ok: false, error: err.message, figures: 0 }; }
+
+  const versionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, imageData, experimentId, finalScore != null ? Math.round(finalScore) : null);
+  const realisticVersionIndex = realisticImageData
+    ? await saveTestVersion(target.storyId, 'tl_avatar', null, realisticImageData, experimentId) : null;
+  return {
+    character: character.name, declaredAge: character.age ?? null, imageType: 'tl_avatar', versionIndex, realisticVersionIndex,
+    variant, model: grokModel, costume: costumeParam, artStyle,
+    options: { passTwoAttempts: params.passTwoAttempts ?? null, anchor: params.anchor !== false, skipReview: params.skipReview === true, fastPass1: params.fastPass1 !== false },
+    totalMs, steps, grokCalls, costUsd, cut, finalScore, styleJudgeRejected,
+    promptUsed: prompt ? String(prompt).slice(0, 12000) : undefined,
+  };
+}
+
 /** Pass 2: style transfer of an existing realistic sheet (never re-runs Pass 1). */
 async function runAvatarStyleStage(target, { experimentId, promptOverride, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
@@ -10884,6 +10979,7 @@ async function runAvatarRedressStage(target, { experimentId, params = {} }) {
 const AVATAR_STAGES = {
   avatar_realistic: runAvatarRealisticStage,
   avatar_style: runAvatarStyleStage,
+  avatar_sheet_variant: runAvatarSheetVariantStage,
   avatar_eval: runAvatarEvalStage,
   avatar_redress: runAvatarRedressStage,
 };

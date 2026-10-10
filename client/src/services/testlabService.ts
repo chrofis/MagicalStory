@@ -624,6 +624,7 @@ export const TESTLAB_STAGES = [
   { id: 'style_repair', label: 'Style repair (story-wide)', producesImage: true, overridable: false, storyLevel: true },
   { id: 'avatar_realistic', label: 'Avatar pass 1 (realistic anchor)', producesImage: true, overridable: false, characterLevel: true },
   { id: 'avatar_style', label: 'Avatar pass 2 (style transfer)', producesImage: true, overridable: true, characterLevel: true },
+  { id: 'avatar_sheet_variant', label: 'Avatar sheet variants (one call / model / pass-2 options)', producesImage: true, overridable: false, characterLevel: true },
   { id: 'avatar_eval', label: 'Avatar sheet eval', producesImage: false, overridable: true, characterLevel: true },
   // A garment-off (wardrobe-state) sheet made from the story's approved base the
   // way production makes it, unjudged — the input the sheet_style fixtures judge.

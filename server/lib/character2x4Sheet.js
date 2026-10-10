@@ -86,7 +86,8 @@ async function aspectPresetFor(imageData) {
   } catch { return '16:9'; }
 }
 
-async function styleTransferGenerate(prompt, pass1ImageData, backendOverride = null, styleAnchor = null) {
+// grokModel: the Grok tier for this call (default Standard). Only the Test Lab avatar_sheet_variant stage passes another.
+async function styleTransferGenerate(prompt, pass1ImageData, backendOverride = null, styleAnchor = null, grokModel = GROK_MODELS.STANDARD) {
   const backend = backendOverride || MODEL_DEFAULTS.avatarStyleTransferBackend;
   const aspectRatio = await aspectPresetFor(pass1ImageData); // aspect follows the sheet, not the anchor
   // Image 1 = the sheet to repaint; Image 2 (when present) = the style anchor
@@ -99,7 +100,7 @@ async function styleTransferGenerate(prompt, pass1ImageData, backendOverride = n
   // skipOutputCrop: the sheet is a panel GRID that gets split into cells. A
   // drift crop trims whole rows/columns off the edges — i.e. it eats panels.
   // stackRowsInto2x4 / the splitter already tolerate a drifted aspect.
-  const r = await editWithGrok(prompt, refs, { aspectRatio, model: GROK_MODELS.STANDARD, skipOutputCrop: true });
+  const r = await editWithGrok(prompt, refs, { aspectRatio, model: grokModel, skipOutputCrop: true });
   return { ...r, provider: 'grok' };
 }
 
@@ -370,7 +371,9 @@ function buildSeasonOutfitBlock(seasonOutfit = null, redress = false) {
 
 // Body-row prompt (call 1): one row of 4 full bodies, tall cells. Keeps the
 // outer layer in the profile (validated wording). Generic — no story specifics.
-function buildBodyRowPrompt(costumeDescription, character = null, redress = false, costumeName = null, seasonOutfit = null) {
+// styleLine (Test Lab avatar_sheet_variant 'styledBodyRow' only): draw the row in the story's art style instead of the realistic
+// identity-anchor look. Null = the production prompt, byte for byte.
+function buildBodyRowPrompt(costumeDescription, character = null, redress = false, costumeName = null, seasonOutfit = null, styleLine = null) {
   const hairBlock = buildHairBlock(character);
   const bodyRef = redress
     ? `Image 2 shows the character's body shape, build, and identity ONLY — IGNORE the clothing in Image 2, it is the wrong outfit. Image 3 is the character's face.`
@@ -397,7 +400,9 @@ The figure reads as a ${costumeName} at a glance. Each garment is worn the way t
 ${bodyRef}
 
 ${outfitRule}${readsAs}${buildSeasonOutfitBlock(seasonOutfit, redress)}${hairBlock}${buildGlassesBlock(character)}
-Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, natural proportions${ageFromPhoto}. No cartoon, no anime, no watercolour. This sheet is an identity anchor.
+${styleLine
+    ? `Render every cell in this art style: ${styleLine}. The face, hair colour and skin tone stay recognisably the person in Image 3; natural proportions${ageFromPhoto}. ${SHEET_GROUND_RULE} This sheet is an identity anchor.`
+    : `Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, natural proportions${ageFromPhoto}. No cartoon, no anime, no watercolour. This sheet is an identity anchor.`}
 
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background, same cell layout as Image 1.
 Each cell shows the SAME PERSON as Image 3 rendered as a COMPLETE FULL BODY from the very top of the head to the figure's lowest point, wearing the costume. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 is a REAR TURN: ${REAR_TURN_POSE}. Cell 4 is never a profile and never a flat back view with no face showing — Image 1's cell 4 is a plain reference silhouette only, ignore its exact head angle. Normally that lowest point is both feet with shoes, and the whole figure — head, hair, face, torso, legs, feet — sits inside its cell. When the costume replaces the legs (a tail, a fin, a single fused lower body), the figure has NO legs, NO feet and NO footwear: it ends at the tip of that form, which is then the lowest point. ${TAIL_POSE_RULE} Image 1's standing silhouette applies to the head and torso only. Never crop the head and never crop the lowest point; if the figure does not fit, scale it down until the whole figure is inside the cell, with white margin above and below. ${proportionsRule}
@@ -412,7 +417,7 @@ The outfit is identical in all four cells, layers included. ${buildUnnamedTrimRu
 // Image 3 = the body row from call 1 (match its rendered face/hair).
 // The head row is ALWAYS drawn against the body row (Image 3): head and body wear the same clothes (docs/decisions.md 2026-10-10,
 // which replaced the 2026-10-08 parallel rows).
-function buildHeadRowPrompt(character = null, costumeDescription = '', redress = false) {
+function buildHeadRowPrompt(character = null, costumeDescription = '', redress = false, styleLine = null) {
   const hairBlock = buildHairBlock(character);
   // The costume text reaches this call at all only since the dungaree fault
   // (2026-09-14): the row was generated from the body IMAGE alone, so a part
@@ -426,7 +431,7 @@ Image 3 is the character's full-body reference sheet — match the SAME face, ha
 ${buildGarmentRule()} ${SHEET_HEAD_SAME_CLOTHES_RULE} ${SHEET_EMPTY_HANDS_RULE} ${buildUnnamedTrimRule(redress)}${hairBlock}${buildGlassesBlock(character)}
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background. Each cell is framed like a passport photo of the SAME PERSON: head, neck and the top of the shoulders wearing the costume, cut off at the upper chest, with plain white above the hair and filling the rest of the cell; no bare skin below the neck. No waist, hands or lower body in any cell. Never crop the top of the head. Cell 1 front, cell 2 three-quarter, cell 3 profile.
 Cell 4 is a REAR TURN, distinct from cell 3's profile: ${REAR_TURN_POSE}. Cell 4 is never a second profile and never a flat back of the head with no face showing — Image 1's cell 4 is a plain placeholder silhouette, ignore its exact head angle entirely.
-Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3.${declaredAgeBlock(character)} No arrows or symbols. ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
+${styleLine ? `Art style: ${styleLine}, the same as Image 3; ${SHEET_GROUND_RULE}` : 'Photographic / lifelike;'} identity from Image 2; hair, skin tone, and costume consistent with Image 3.${declaredAgeBlock(character)} No arrows or symbols. ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
 }
 
 // Pure: the pixels of headroom to add on top of the head row so the sheet stack lands exactly on an aspect preset the
@@ -606,7 +611,7 @@ async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usage
 // generateComposited2x4 as `precomputedBody` (docs/decisions.md 2026-10-09, trial body row at the photo).
 // deferReview (one try only, see generateComposited2x4): the judge runs in the background and its promise rides on the result, so the
 // caller can start the next render while it works. The attempt entry is filled in when the judge answers.
-async function runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model, usageTracker, attemptHistory, addUsage, deferReview = false }) {
+async function runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model, usageTracker, attemptHistory, addUsage, deferReview = false, grokModel = GROK_MODELS.STANDARD }) {
   // ── Stage 1: body row (up to rowTries tries, keep least-bad) ──
   let bestBody = null;
   let bodyGenError = null;
@@ -624,7 +629,7 @@ async function runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skip
     // after the loop, carrying the last provider error.
     let res;
     try {
-      res = await editWithGrok(bodyPrompt, bodyRefs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
+      res = await editWithGrok(bodyPrompt, bodyRefs, { aspectRatio: '16:9', model: grokModel, skipOutputCrop: true });
     } catch (err) {
       bodyGenError = err?.message || String(err);
       attemptHistory.push({ stage: 'body', try: t, error: `gen-error: ${bodyGenError}` });
@@ -672,7 +677,7 @@ async function runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skip
 // deferJudges (honoured only with one try per row and reviews on, the trial prewarm): with one try nothing can act on a row verdict, so
 // the judges only record. The body judge then runs while the head row renders, the head and identity judges while the caller styles the
 // sheet, and the verdict arrives as `verdictPromise` (never rejects) instead of `verdict`. docs/decisions.md 2026-10-10.
-async function generateComposited2x4(character, { costumeDescription, costumeName = null, redress = false, usageTracker = null, skipReview = false, seasonOutfit = null, rowTries = PASS1_ROW_TRIES, precomputedBody = null, deferJudges = false } = {}) {
+async function generateComposited2x4(character, { costumeDescription, costumeName = null, redress = false, usageTracker = null, skipReview = false, seasonOutfit = null, rowTries = PASS1_ROW_TRIES, precomputedBody = null, deferJudges = false, grokModel = GROK_MODELS.STANDARD, styleLine = null } = {}) {
   const facePhoto = await resolveFacePhoto(character);
   if (!facePhoto) throw new Error(`No face photo for ${character?.name || 'character'}.`);
   const standardAvatar = await resolveStandardAvatar(character);
@@ -681,15 +686,15 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   const headPhantom = await phantomRow(loadPhantomVariant(character?.age, 'axes'), 'top');
   const model = MODEL_DEFAULTS.sheetEvalModel;
   const bodyRefs = standardAvatar ? [bodyPhantom, standardAvatar, facePhoto] : [bodyPhantom, facePhoto];
-  const bodyPrompt = buildBodyRowPrompt(costumeDescription, character, redress, costumeName, seasonOutfit);
-  const headPrompt = buildHeadRowPrompt(character, costumeDescription, redress);
+  const bodyPrompt = buildBodyRowPrompt(costumeDescription, character, redress, costumeName, seasonOutfit, styleLine);
+  const headPrompt = buildHeadRowPrompt(character, costumeDescription, redress, styleLine);
   const attemptHistory = [];
   const defer = deferJudges && rowTries === 1 && !skipReview;
   let usage = { input_tokens: 0, output_tokens: 0 };
   const addUsage = (u, fn, id) => { if (u) { usage.input_tokens += u.input_tokens || 0; usage.output_tokens += u.output_tokens || 0; if (usageTracker) usageTracker('grok', u, fn, id); } };
 
   if (precomputedBody?.attemptHistory) attemptHistory.push(...precomputedBody.attemptHistory);
-  const runBodyRow = async () => precomputedBody || runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model, usageTracker, attemptHistory, addUsage, deferReview: defer });
+  const runBodyRow = async () => precomputedBody || runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model, usageTracker, attemptHistory, addUsage, deferReview: defer, grokModel });
 
   const runHeadRow = async (bodyRow) => {
     // ── Stage 2: head row (up to rowTries tries, keep least-bad) ──
@@ -707,7 +712,7 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
       // A thrown backend call consumes ONE try — see the body row above.
       let res;
       try {
-        res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '20:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
+        res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '20:9', model: grokModel, skipOutputCrop: true });
       } catch (err) {
         headGenError = err?.message || String(err);
         attemptHistory.push({ stage: 'head', try: t, error: `gen-error: ${headGenError}` });
@@ -788,7 +793,7 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   // Not deferred: the verdict is part of the result, as ever. Deferred: the caller awaits verdictPromise when it needs the verdict.
   const settled = defer ? null : await verdictPromise;
   return {
-    imageData, ...(settled || {}), verdictPromise, usage, modelId: GROK_MODELS.STANDARD,
+    imageData, ...(settled || {}), verdictPromise, usage, modelId: grokModel,
     refs: { phantom: headPhantom, bodyPhantom, standardAvatar, facePhoto },
     prompt: `— BODY ROW —
 ${bodyPrompt}
@@ -797,6 +802,50 @@ ${bodyPrompt}
 ${headPrompt}`,
     bodyRow: bestBody.row, headRow: bestHead.row, attemptHistory,
   };
+}
+
+// ── Test Lab only: the whole styled 2×4 sheet from the photo in ONE call (avatar_sheet_variant 'oneCall') ──────────────────────
+// Built from the same rule constants and prompt blocks the two row prompts use. NOT wired into any production path: the 2026-08-08
+// split into two row calls exists because one combined call gave a headless bottom row ~70% of the time (docs/decisions.md); the
+// Lab stage measures whether a stronger Grok tier changes that. Layout guide = the axes phantom's head row over the plain
+// phantom's body row, the two guides the production rows are drawn against.
+function buildOneCallSheetPrompt(character, { costumeDescription, costumeName = null, seasonOutfit = null, styleLine }) {
+  const named = costumeName ? ` — a ${costumeName}` : '';
+  const declaredAge = declaredAgeBlock(character);
+  const ageFromPhoto = declaredAge ? '' : " matching the person's apparent age in Image 2";
+  const proportionsRule = declaredAge ? declaredAge.trimStart() : "Body proportions match the person's apparent age (an adult is roughly 7 to 8 heads tall).";
+  return `Image 1 is a layout guide ONLY: a 2×4 grid (two rows of four cells) showing the camera angle and facing direction of each cell. Ignore its silhouettes, bodies and faces. The output contains no arrows.
+Image 2 is the character's face photo — the identity; match this exact face.
+
+Output ONE image: a 2×4 grid, thin dividers between the cells, pure white background, the same layout as Image 1. Every cell shows the SAME PERSON as Image 2, alone, in the same art style, wearing the same costume.
+TOP ROW (4 cells): head, neck and the top of the shoulders, cut off at the upper chest, with plain white above the hair; never crop the top of the head. BOTTOM ROW (4 cells): the COMPLETE FULL BODY from the very top of the head to the figure's lowest point (normally both feet with shoes), the whole figure inside its cell; if it does not fit, scale it down with white margin above and below. ${proportionsRule}
+In both rows: cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 a REAR TURN: ${REAR_TURN_POSE}. Cell 4 is never a second profile and never a flat back view with no face showing.
+
+Costume${named}: ${costumeDescription}${buildSeasonOutfitBlock(seasonOutfit, false)}${buildHairBlock(character)}${buildGlassesBlock(character)}
+Art style: ${styleLine}${ageFromPhoto ? `. Natural proportions${ageFromPhoto}` : ''}. The face, hair colour and skin tone stay recognisably the person in Image 2.
+${buildFootwearRule(false, seasonOutfit?.footwear)}
+${buildGarmentRule()}
+${SHEET_EMPTY_HANDS_RULE}
+The outfit is identical in all eight cells, layers included, and the neckline in the top row is the one the body below wears. ${buildUnnamedTrimRule(false)} ${SHEET_GROUND_RULE} ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
+}
+
+async function generateOneCallSheet(character, { artStyle, costumeDescription = 'standard outfit', costumeName = null, seasonOutfit = null, usageTracker = null, grokModel = GROK_MODELS.STANDARD } = {}) {
+  if (!artStyle || artStyle === 'realistic') throw new Error('generateOneCallSheet: a non-realistic art style is required');
+  const facePhoto = await resolveFacePhoto(character);
+  if (!facePhoto) throw new Error(`No face photo for ${character?.name || 'character'}.`);
+  const head = Buffer.from(r2.stripDataUriPrefix(await phantomRow(loadPhantomVariant(character?.age, 'axes'), 'top')), 'base64');
+  const body = Buffer.from(r2.stripDataUriPrefix(await phantomRow(loadPhantomVariant(character?.age, 'plain'), 'bottom')), 'base64');
+  const W = (await sharp(body).metadata()).width;
+  const headFit = await sharp(head).resize({ width: W }).png().toBuffer();
+  const hH = (await sharp(headFit).metadata()).height;
+  const bH = (await sharp(body).metadata()).height;
+  const guide = await sharp({ create: { width: W, height: hH + bH, channels: 3, background: '#ffffff' } })
+    .composite([{ input: headFit, top: 0, left: 0 }, { input: body, top: hH, left: 0 }]).png().toBuffer();
+  const prompt = buildOneCallSheetPrompt(character, { costumeDescription, costumeName, seasonOutfit, styleLine: resolveStyleLineForSheet(artStyle) });
+  const res = await editWithGrok(prompt, [`data:image/png;base64,${guide.toString('base64')}`, facePhoto], { aspectRatio: '1:1', model: grokModel, skipOutputCrop: true });
+  if (!res?.imageData) throw new Error(`generateOneCallSheet: no image for ${character?.name}`);
+  if (usageTracker && res.usage) usageTracker('grok', res.usage, 'character_2x4_one_call', res.modelId);
+  return { imageData: res.imageData, usage: res.usage, modelId: res.modelId || grokModel, prompt };
 }
 
 /**
@@ -2007,7 +2056,18 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     fastPass1 = false,
     // A body row drawn ahead of the sheet by generateBodyRow (the trial draws it at the photo); stage 1 is skipped.
     precomputedBody = null,
+    // Test Lab avatar_sheet_variant knobs (server/lib/testlab.js). Every default is the production value, so production calls
+    // are unchanged; nothing but the Lab passes them (tests/unit/avatar-sheet-variant-options.test.ts pins the defaults).
+    //   grokModel        the Grok tier of every call of the sheet (pass 1 rows and pass 2); undefined = Standard, resolved by the callee
+    //   passTwoAttempts  total pass-2 attempts; undefined = 1 + MAX_SHEET_RETRIES, resolved by runStyleTransferPass
+    //   styleAnchor      attach the per-style anchor image to pass 2 (default true)
+    //   styledPass1      draw the rows straight in the art style and skip pass 2 (no photoreal pass at all)
+    grokModel,
+    passTwoAttempts,
+    styleAnchor = true,
+    styledPass1 = false,
   } = opts;
+  if (styledPass1 && (!artStyle || artStyle === 'realistic')) throw new Error('styledPass1 needs a non-realistic art style');
 
   const facePhoto = await resolveFacePhoto(character);
   if (!facePhoto) {
@@ -2028,7 +2088,8 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     composed = await generateComposited2x4(character, {
       costumeDescription, costumeName, redress, usageTracker, skipReview: skipQualityEval, seasonOutfit,
       // fastPass1 = the trial prewarm: one try per row, so the row judges only record; they run beside the next render and pass 2 (see generateComposited2x4).
-      precomputedBody,
+      precomputedBody, grokModel,
+      ...(styledPass1 ? { styleLine: resolveStyleLineForSheet(artStyle) } : {}),
       ...(fastPass1 ? { rowTries: 1, deferJudges: true } : {}),
     });
   } catch (err) {
@@ -2051,7 +2112,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   // (job_1786909179342: pass2 recorded as null, no character_2x4_style_transfer
   // in api_usage). Pass 2 always runs for a non-realistic style; the flag is
   // forwarded so the pass itself takes 1 attempt and skips its own reviews.
-  const wantStyleTransfer = artStyle && artStyle !== 'realistic';
+  const wantStyleTransfer = artStyle && artStyle !== 'realistic' && !styledPass1;
   // NO REALISTIC FALLBACK (owner, 2026-09-24). In a non-realistic story the
   // realistic Pass-1 sheet is never shipped as the character's avatar: that
   // child then looks unlike every other figure in the book. Three outcomes:
@@ -2075,6 +2136,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
       hair: hairRequest(character),
       usageTracker,
       skipQualityEval,
+      grokModel, maxAttempts: passTwoAttempts, useAnchor: styleAnchor,
     });
     if (!pass2.shippable) {
       const reasons = (pass2.finalVerdict?.failureReasons || []).join('; ') || 'no reason given';
@@ -2149,10 +2211,10 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
  * style match. Returns the same shape as Pass 1's
  * collected fields so the dev panel can render both passes uniformly.
  */
-async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, characterAge = null, hair = null, usageTracker, promptOverride = null, backendOverride = null, skipQualityEval = false }) {
+async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, characterAge = null, hair = null, usageTracker, promptOverride = null, backendOverride = null, skipQualityEval = false, grokModel, maxAttempts = 1 + MAX_SHEET_RETRIES, useAnchor = true }) {
   // Optional per-style anchor image (Image 2). The prompt references it only
   // when present; styleTransferGenerate passes it as the 2nd reference.
-  const styleAnchor = loadStyleAnchor(artStyle);
+  const styleAnchor = useAnchor ? loadStyleAnchor(artStyle) : null;
   // promptOverride: Test Lab A/B — full replacement for the style-transfer
   // prompt (buildStyleTransferPrompt output), this call only.
   // TWO prompts, because the retry drops the anchor (see the loop below) and the
@@ -2160,7 +2222,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   const promptWithAnchor = promptOverride || buildStyleTransferPrompt(artStyle, { hasAnchor: !!styleAnchor });
   const promptNoAnchor = promptOverride || buildStyleTransferPrompt(artStyle, { hasAnchor: false });
   if (styleAnchor) log.info(`[CHARACTER 2×4] ${characterName} Pass 2 using style anchor (style-anchor-${artStyle})`);
-  const totalAttempts = 1 + MAX_SHEET_RETRIES;
+  const totalAttempts = maxAttempts;
   // ONE extra, fed-back attempt when the best sheet so far hard-fails an axis
   // (SHEET_HARD_FAIL_MAX). The loop limit is raised once, at the last ordinary
   // attempt, and never again.
@@ -2238,7 +2300,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     // same refusal). See docs/decisions.md "Styled-avatar MUST guarantee".
     let result;
     try {
-      result = await styleTransferGenerate(prompt, pass1ImageData, backendOverride, anchorForAttempt);
+      result = await styleTransferGenerate(prompt, pass1ImageData, backendOverride, anchorForAttempt, grokModel);
     } catch (err) {
       log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt}/${attemptLimit} (${MODEL_DEFAULTS.avatarStyleTransferBackend}) threw: ${err.message}${attempt < attemptLimit ? ' — retrying' : ''}`);
       attempts.push({ attempt, stage: 'gen-error', score: 0, reason: err.message, usedAnchor: !!anchorForAttempt });
@@ -2618,6 +2680,8 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
 module.exports = {
   generateCharacter2x4Sheet,
   generateBodyRow,
+  generateOneCallSheet,
+  buildOneCallSheetPrompt,
   styleBodyRow,
   phantomTierForAge,
   redressSheetVariant,
