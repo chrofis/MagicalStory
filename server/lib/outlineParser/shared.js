@@ -61,7 +61,7 @@ function parseCharacterClothingBlock(content) {
   const characters = [];
 
   // JSON scene hint format (the page metadata block in
-  // prompts/scene-expansion-all.txt and prompts/story-trial.txt):
+  // prompts/scene-expansion-all.txt and prompts/story-trial-arc.txt / story-trial-pages.txt):
   //   "characters": [
   //     { "name": "Lukas", "position": "left", "clothing": "costumed:roman" },
   //     { "name": "Sophie", "clothing": "costumed:roman", "depth": "background", "perspective": "back view" }
@@ -416,7 +416,7 @@ function extractScenePagesFromText(response) {
  * Extract draft-section pages from a full unified-story response.
  * Pure function — returns a fresh Map each call. Callers should cache.
  *
- * Trial stories (`prompts/story-trial.txt`) intentionally don't emit a draft
+ * Trial stories (`prompts/story-trial-arc.txt / story-trial-pages.txt`) intentionally don't emit a draft
  * section — they're single-pass for speed. Callers parsing a trial response
  * pass `{ isTrial: true }` to suppress the "marker missing" warning, which
  * is otherwise correct but spurious.

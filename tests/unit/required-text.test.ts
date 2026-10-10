@@ -18,6 +18,7 @@
  */
 import { describe, it, beforeAll, expect } from 'vitest';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const rt = require('../../server/lib/requiredText');
 const PB = require('../../server/lib/promptBuilders');
 const { loadPromptTemplates, buildEvaluationPrompt, PROMPT_TEMPLATES, fillTemplate } = require('../../server/services/prompts');
@@ -206,7 +207,7 @@ describe('the authoring rule reaches every site that authors or judges a declara
   });
 
   it('arrives in the BUILT trial writer prompt (the sibling VB authoring site)', () => {
-    const built = PB.buildTrialStoryPrompt(STORY, 4);
+    const built = trialWriterPrompt(STORY, 4);
     expect(built).toContain(rt.REQUIRED_TEXT_AUTHORING_RULE);
     expect(built).not.toContain('{REQUIRED_TEXT_AUTHORING}');
   });

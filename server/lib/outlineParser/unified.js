@@ -3,7 +3,7 @@
  *
  * Parses the unified SECTION format. story-unified.txt was its only author
  * until 2026-09-15 (deleted); the live authors are
- * `prompts/scene-expansion-all.txt` (full path) and `prompts/story-trial.txt`
+ * `prompts/scene-expansion-all.txt` (full path) and `prompts/story-trial-arc.txt / story-trial-pages.txt`
  * (trial). The model emits
  * a DRAFT, an ANALYSIS, and a STORY PAGES patch block; this parser merges
  * them per-section into a final per-page array.

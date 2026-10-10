@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'module';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const require = createRequire(import.meta.url);
 const PB = require('../../server/lib/promptBuilders.js');
 const { loadPromptTemplates } = require('../../server/services/prompts.js');
@@ -36,7 +37,7 @@ beforeAll(async () => {
   await loadPromptTemplates();
   built = {
     beats: String(PB.buildStoryTextFromBeatsPrompt(input(), beats, [], 'ARC', { arcHints: '' })),
-    trial: String(PB.buildTrialStoryPrompt(input({ trialMode: true }), 5)),
+    trial: String(trialWriterPrompt(input({ trialMode: true }), 5)),
     refine: String(PB.buildTextRefinePrompt(input(), pages, 'FAULT[COUNT]: p2 — counts both', 'ARC')),
     audit: String(PB.buildTextAuditPrompt(input(), pages, 'ARC')),
   };

@@ -40,7 +40,7 @@ describe('vbIdGuard allow-list: writers whose output spec carries the id keys', 
 
   it('the trial writer template really carries schema ids (why it is allow-listed)', async () => {
     const fs = await import('node:fs');
-    const t = fs.readFileSync('prompts/story-trial.txt', 'utf8');
+    const t = fs.readFileSync('prompts/story-trial-arc.txt', 'utf8');
     expect(/CHR001/.test(t) && /LOC001/.test(t)).toBe(true);
   });
 

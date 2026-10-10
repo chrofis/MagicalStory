@@ -142,8 +142,9 @@ describe('the trial path makes no arc-panel call', () => {
   it('the trial writer path in storyJobPipeline never reaches the panel', () => {
     const src = fs.readFileSync(path.join(root, 'storyJobPipeline.js'), 'utf8');
     expect(src).not.toMatch(/arc_panel|buildArcPanelPrompt|arcPanelModels/);
-    const trialPrompt = fs.readFileSync(path.join(root, 'prompts/story-trial.txt'), 'utf8');
-    expect(trialPrompt).not.toMatch(/panel/i);
+    for (const f of ['prompts/story-trial-arc.txt', 'prompts/story-trial-pages.txt']) {
+      expect(fs.readFileSync(path.join(root, f), 'utf8'), f).not.toMatch(/panel/i);
+    }
   });
 });
 

@@ -15,7 +15,7 @@ const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 // were deleted as unreachable (docs/decisions.md).
 const VB_AUTHORING_TEMPLATES = [
   'prompts/visual-bible.txt',
-  'prompts/story-trial.txt',
+  'prompts/story-trial-arc.txt',
 ];
 
 describe('shared Visual-Bible authoring rules reach every authoring site', () => {

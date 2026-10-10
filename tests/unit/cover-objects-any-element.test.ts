@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'node:module';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 // COVERS AND THEIR ELEMENTS (owner, 2026-09-23 / 2026-09-24).
 //   - A FULL-STORY cover is a page: the Art Director briefs it from its cover
 //     beat (coverBeats.js), and the beat carries the element budget — any VB
@@ -121,7 +122,7 @@ describe('the cover element cap is the page element budget, in both paths', () =
   beforeAll(async () => { await loadPromptTemplates(); });
   const input = { language: 'en', characters: [{ id: 1, name: 'Ada', isMainCharacter: true }], mainCharacters: [1], pages: 4 };
   it('the trial writer is filled with VB_ELEMENT_BUDGET; every full-story cover beat carries it', () => {
-    const trial = String(PB.buildTrialStoryPrompt(input, 4));
+    const trial = String(trialWriterPrompt(input, 4));
     expect(trial).not.toContain('{COVER_ELEMENT_CAP}');
     expect(trial).toContain(`up to ${VB_ELEMENT_BUDGET} Visual Bible animals`);
     const { buildCoverBeats } = require_('../../server/lib/coverBeats');

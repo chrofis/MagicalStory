@@ -310,7 +310,7 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
     // prod ART002 "brass nutcracker" was described as "a heavy hand tool…"
     // and rendered as a bolt cutter. Both VB authoring sites carry it.
     expect(t).toMatch(/first noun is the noun its `label` ends in/);
-    expect(templates['storyTrial']).toMatch(/first noun the noun its `label` ends in/);
+    expect(templates['storyTrialArc']).toMatch(/first noun the noun its `label` ends in/);
     expect(t).toMatch(/separates it from the everyday object its bare geometry would otherwise describe/);
     expect(t).toMatch(/Geometry serves recognition; it is never the whole description/);
   });
@@ -331,7 +331,7 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   // reaches the page. All three templates now carry the same split.
   it.each([
     ['visualBible'],
-    ['storyTrial'],
+    ['storyTrialArc'],
   ])("%s excludes the WORLD light from the state test, keeps the object own light in", (key) => {
     expect(templates[key]).toBeTruthy();
     expect(templates[key]).toMatch(/world lights it is not a state/i);
@@ -377,7 +377,7 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   // Every emitter of a VB character entry has to carry the sex+age rule, or a
   // story routed down the other pipeline ships the same defect. The live
   // template emitters, plus the phantom-patch prompt built in JS.
-  it.each(['storyTrial'])(
+  it.each(['storyTrialArc'])(
     '%s states sex and apparent age in the character scaffold',
     (key) => {
       expect(templates[key], `template ${key} not loaded`).toBeTruthy();
@@ -431,7 +431,7 @@ describe('the authored `label` — one English name per element', () => {
   it('is authored by both bible-emitting templates', async () => {
     await cjs('../../server/services/prompts.js').loadPromptTemplates();
     const templates = cjs('../../server/services/prompts.js').PROMPT_TEMPLATES;
-    for (const key of ['storyTrial', 'visualBible']) {
+    for (const key of ['storyTrialArc', 'visualBible']) {
       expect(templates[key], key).toBeTruthy();
       // The schema slot, or (all-pages Art Director, 2026-09-23) one rule its
       // four schema slots point at.

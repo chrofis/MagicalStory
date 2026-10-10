@@ -9,14 +9,14 @@ const { buildTextFromJson, stripEntityIds } = require('../../server/lib/sceneMet
 const { TRIAL_COSTUMES } = require('../../server/config/trialCostumes');
 
 describe('trial writer prompt', () => {
-  const tpl = read('prompts/story-trial.txt');
+  const tpl = read('prompts/story-trial-pages.txt');
   it('every foreground character gets an interactions row, so EXACT POSES is never empty', () => {
     expect(tpl).toContain('`interactions` is never empty on a page that has one');
     expect(tpl).toContain('`priority: "low"` row');
   });
   it('a creature has no written face', () => {
     expect(tpl).toContain("the look of a creature's eyes, gaze, mouth or beak");
-    expect(pb.buildTrialStoryPrompt).toBeTypeOf('function');
+    expect(pb.buildTrialPagesPrompt).toBeTypeOf('function');
   });
   it('page openings are capped by count, one constant for both writers', () => {
     expect(pb.PAGE_OPENING_VARIETY_RULE).toContain('at most one page in three begins with a character');

@@ -321,7 +321,7 @@ class OutlineParser {
     // Try unified-outline format FIRST (---COVER SCENE HINTS--- with
     // **Title Page** / **Initial Page** / **Back Cover** markers). This is
     // the section format the live authoring templates emit
-    // (`prompts/scene-expansion-all.txt`, `prompts/story-trial.txt`). Must run before
+    // (`prompts/scene-expansion-all.txt`, `prompts/story-trial-arc.txt / story-trial-pages.txt`). Must run before
     // _extractStoryModeCoverScenes because the latter's inline regex
     // (\*{0,2}Title Page\*{0,2}[:\s]+ ...) over-eagerly matches `**Title Page`
     // and captures `(Front Cover)**` as the prose.

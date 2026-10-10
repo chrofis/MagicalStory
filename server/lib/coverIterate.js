@@ -212,7 +212,7 @@ const foldForTitleMatch = (s) => String(s || '')
 /**
  * WARN-ONLY (owner, 2026-09-23): a Visual Bible entity the TITLE names belongs
  * in the front cover's objects — the writer templates expect a title-named
- * creature there (story-trial.txt COVER SCENE, scene-expansion-all.txt cover
+ * creature there (story-trial-arc.txt / story-trial-pages.txt COVER SCENE, scene-expansion-all.txt cover
  * rules). When the writer left it out, this logs it and changes NOTHING:
  * the name match decides whether to warn, never what the cover shows.
  *

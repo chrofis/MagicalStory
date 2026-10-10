@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const {
   buildSceneBriefsAllPrompt,
   buildSceneExpansionPrompt,
@@ -73,7 +74,7 @@ describe('rules the deleted unified writers were the last to carry', () => {
       [{ pageNumber: 1, text: 'A page.' }],
     );
     one = B.buildSceneExpansionPrompt(1, 'A page.', [{ name: 'Mara', age: 7 }], 'de');
-    trial = B.buildTrialStoryPrompt({ characters: [{ name: 'Mara', age: 7 }], language: 'de' }, 5);
+    trial = trialWriterPrompt({ characters: [{ name: 'Mara', age: 7 }], language: 'de' }, 5);
   });
 
   it('depth is distance, never a size', () => {

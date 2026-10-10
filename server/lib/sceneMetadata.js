@@ -2080,7 +2080,7 @@ function groupPagesByVantage(pageDataArray, visualBible) {
  *
  * Trial renders its backdrop plates during outline streaming, from
  * `visualBible.backgrounds[]` — long before any page has scene metadata. The
- * writer declares those entries (story-trial.txt: exactly 3 on a 6-page story,
+ * writer declares those entries (story-trial-arc.txt / story-trial-pages.txt: exactly 3 on a 6-page story,
  * each a different place or a different part / angle of one place), so the
  * entry IS the plate. It used to be grouped by LOCATION (one plate per LOC, the
  * 2026-09-13 cost cut), which collapsed every story set at one landmark to a

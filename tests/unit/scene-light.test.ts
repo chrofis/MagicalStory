@@ -22,6 +22,7 @@ const { buildEmptySceneQcPrompt } = require_('../../server/lib/evalPipeline');
 const { shrinkPromptForModel } = require_('../../server/lib/images');
 const { REVIEWABLE } = require_('../../server/lib/sceneBriefCheck');
 import { checkPage } from '../helpers/cast-index';
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const { buildPlateDeriveInstruction } = require_('../../server/lib/shotVocabulary');
 const { selectGeometryFacts } = require_('../../server/lib/sceneGeometry');
 
@@ -117,7 +118,7 @@ describe('one rule for every brief author', () => {
     const beats = [{ pageNumber: 1, planLine: 'wide — Mira — she lifts the lantern — it glows' }];
     const built = [
       String(PB.buildSceneBriefsAllPrompt(inputData, beats, { jevBackup: true })),
-      String(PB.buildTrialStoryPrompt(inputData, 4)),
+      String(trialWriterPrompt(inputData, 4)),
     ];
     for (const text of built) {
       expect(text).toContain(L.SCENE_LIGHT_FIELD_RULE);

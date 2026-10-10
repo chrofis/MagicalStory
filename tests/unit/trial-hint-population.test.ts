@@ -7,7 +7,7 @@ const { extractSceneMetadata, POPULATION_LEVELS } = require('../../server/lib/sc
 const { loadPromptTemplates } = require('../../server/services/prompts.js');
 
 // Replay (rung 1, free): a trial-shaped scene hint — the JSON block
-// prompts/story-trial.txt asks for, as storyJobPipeline's trial page passes it
+// prompts/story-trial-pages.txt asks for, as storyJobPipeline's trial page passes it
 // to extractSceneMetadata and buildImagePrompt — with and without the
 // `population` field the trial writer declares since 2026-10-07. Before that
 // field every trial page read as cast_only, so the image prompt said

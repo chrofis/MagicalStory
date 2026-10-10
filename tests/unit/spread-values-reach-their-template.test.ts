@@ -23,13 +23,13 @@
  */
 import { describe, it, beforeAll, expect } from 'vitest';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const {
   buildStoryContextFields,
   buildAgeModeSection,
   buildArcCreatePrompt,
   buildArcRetellPrompt,
-  buildTrialStoryPrompt,
-} = require('../../server/lib/promptBuilders');
+  } = require('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = require('../../server/services/prompts');
 
 // A real windowed topic from TOPIC_AGE_WINDOWS: dealing-bully is ages 5-12, so
@@ -92,7 +92,7 @@ describe('values spread into a prompt actually reach it', () => {
 
     // The two unified variants were the subjects here until 2026-09-15, when
     // both templates and buildUnifiedStoryPrompt were deleted as unreachable.
-    const prompt = lf(buildTrialStoryPrompt({ ...base, trialMode: true }, 12));
+    const prompt = lf(trialWriterPrompt({ ...base, trialMode: true }, 12));
     expect(prompt).toContain(bandLine);
     expect(prompt).toContain(nudge);
 
@@ -105,7 +105,7 @@ describe('values spread into a prompt actually reach it', () => {
   it('no prompt in the family ships an unfilled placeholder', () => {
     expect(unfilled(buildArcCreatePrompt(base, 12))).toEqual([]);
     expect(unfilled(buildArcRetellPrompt(base, 12, COMMITTED_ARC, 'Panelist A: x'))).toEqual([]);
-    expect(unfilled(buildTrialStoryPrompt({ ...base, trialMode: true }, 12))).toEqual([]);
+    expect(unfilled(trialWriterPrompt({ ...base, trialMode: true }, 12))).toEqual([]);
   });
 
   it('an in-window topic still reaches the writer with the band and no nudge', () => {
@@ -121,7 +121,7 @@ describe('values spread into a prompt actually reach it', () => {
     // Not every band carries the same opening sentence, so pin the band this
     // age actually resolves to: its own first line must reach the prompt.
     const firstLine = ageMode.split('\n')[0];
-    expect(lf(buildTrialStoryPrompt({ ...inWindow, trialMode: true }, 12))).toContain(firstLine);
+    expect(lf(trialWriterPrompt({ ...inWindow, trialMode: true }, 12))).toContain(firstLine);
   });
 
   it('an older reader gets the journey band, and it reaches the prompt whole', () => {
@@ -136,7 +136,7 @@ describe('values spread into a prompt actually reach it', () => {
     const ageMode = String(buildAgeModeSection(older) || '').trim();
     expect(ageMode).toContain("# HERO'S JOURNEY (age 9)");
     expect(ageMode).not.toMatch(/\{[A-Z][A-Z0-9_]*\}/);
-    expect(lf(buildTrialStoryPrompt({ ...older, trialMode: true }, 12))).toContain(ageMode.split('\n')[0]);
-    expect(unfilled(buildTrialStoryPrompt({ ...older, trialMode: true }, 12))).toEqual([]);
+    expect(lf(trialWriterPrompt({ ...older, trialMode: true }, 12))).toContain(ageMode.split('\n')[0]);
+    expect(unfilled(trialWriterPrompt({ ...older, trialMode: true }, 12))).toEqual([]);
   });
 });

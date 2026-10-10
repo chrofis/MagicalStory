@@ -20,6 +20,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'node:module';
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const nodeRequire = createRequire(import.meta.url);
 
 const landmarkPhotos: any = nodeRequire('../../server/lib/landmarkPhotos.js');
@@ -149,7 +150,7 @@ describe('one citation rule reaches every author', () => {
     vantages: landmark().vantages.map((v: any) => ({ ...v, emptyScenePrompt: 'a plate', shot: 'wide' })) }] };
 
   it('the trial writer lists the numbered photos and gets the rule', () => {
-    const p = PB.buildTrialStoryPrompt({
+    const p = trialWriterPrompt({
       characters: [{ name: 'Mia', age: 6, isMainCharacter: true }], mainCharacters: [], language: 'en',
       storyDetails: 'A day out.', userLocation: { city: 'A Town' },
       availableLandmarks: [{ name: 'A Terrace Square', photoVariants: landmark().photoVariants }],

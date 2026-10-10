@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'module';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const require = createRequire(import.meta.url);
 const {
   RISK_FRAMING_RULE,
   buildTellingRulesSection,
-  buildTrialStoryPrompt,
-} = require('../../server/lib/promptBuilders.js');
+  } = require('../../server/lib/promptBuilders.js');
 const { loadPromptTemplates } = require('../../server/services/prompts.js');
 
 // The risk-FRAMING rule is one constant with four consumers: {TELLING_RULES}
@@ -35,7 +35,7 @@ describe('risk-framing rule reaches every stage that writes story prose', () => 
   });
 
   it('reaches the trial writer, which runs no review stage', () => {
-    expect(buildTrialStoryPrompt(input({ trialMode: true }), 5)).toContain(RISK_FRAMING_RULE);
+    expect(trialWriterPrompt(input({ trialMode: true }), 5)).toContain(RISK_FRAMING_RULE);
   });
 
   // The two unified variants were pinned here until 2026-09-15, when both
@@ -49,7 +49,7 @@ describe('risk-framing rule reaches every stage that writes story prose', () => 
 
   it('leaves no unfilled placeholder in any writer prompt', () => {
     const built = [
-      buildTrialStoryPrompt(input({ trialMode: true }), 5),
+      trialWriterPrompt(input({ trialMode: true }), 5),
     ];
     for (const prompt of built) expect(prompt).not.toContain('{RISK_FRAMING}');
   });

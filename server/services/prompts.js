@@ -393,7 +393,10 @@ async function loadPromptTemplates() {
     // Deterministic validation finds the faults, this prompt asks the author
     // to fix exactly those ids, and code repairs whatever survives.
     ['vbLabelRepair', 'vb-label-repair.txt'],
-    ['storyTrial', 'story-trial.txt'],
+    // The trial writer is TWO calls (decisions.md 2026-10-10 "Flash arc+bible v4"): a planner writes ARC + TITLE +
+    // VISUAL BIBLE + COVER, the pages writer writes the page texts and scene hints bound to them.
+    ['storyTrialArc', 'story-trial-arc.txt'],
+    ['storyTrialPages', 'story-trial-pages.txt'],
     ['trialIdea', 'trial-idea.txt'],
     // Plot-shape rules per age band of the OLDEST MAIN character. One of these
     // is injected as {AGE_MODE} into the idea, trial, arc and beats prompts.

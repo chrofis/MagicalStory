@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createRequire } from 'module';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const require = createRequire(import.meta.url);
 const {
   reconcilePageClothingWithRequirements,
 } = require('../../server/lib/clothingCategories.js');
 const { loadPromptTemplates } = require('../../server/services/prompts.js');
-const { buildTrialStoryPrompt } = require('../../server/lib/promptBuilders.js');
 
 // ── Real fixture: prod job_1788698812047_q5b1vuds7 (trial, theme mothers-day) ──
 // clothingRequirements said the costumed slot was unused; pageClothing said
@@ -99,7 +99,7 @@ describe('buildTrialStoryPrompt costume instructions', () => {
 
   it('says nothing about costumes when the theme has no configured costume', async () => {
     await loadPromptTemplates();
-    const prompt = buildTrialStoryPrompt({ ...base, storyTheme: 'mothers-day' }, 6);
+    const prompt = trialWriterPrompt({ ...base, storyTheme: 'mothers-day' }, 6);
     expect(prompt).not.toMatch(/\{[A-Z_]+\}/);
     expect(prompt).toContain('"clothing": "standard"');
     expect(prompt).not.toContain('"clothing": "[standard | costumed]"');
@@ -110,7 +110,7 @@ describe('buildTrialStoryPrompt costume instructions', () => {
 
   it('keeps the costume instructions when a costume IS configured', async () => {
     await loadPromptTemplates();
-    const prompt = buildTrialStoryPrompt({ ...base, storyTheme: 'pirate' }, 6);
+    const prompt = trialWriterPrompt({ ...base, storyTheme: 'pirate' }, 6);
     expect(prompt).not.toMatch(/\{[A-Z_]+\}/);
     expect(prompt).toContain('"clothing": "[standard | costumed]"');
     expect(prompt).toContain('"clothing": "costumed"');

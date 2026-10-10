@@ -4,6 +4,7 @@
  * extras drawn in the cast's colours.
  */
 import { describe, it, expect } from 'vitest';
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const PB = require('../../server/lib/promptBuilders');
 
 const page = (population: string, n = 1) => ({
@@ -27,7 +28,7 @@ describe('POPULATION_FIELD_RULE (trial writer and Jev-outage backup)', () => {
   it('tells the author to dress unnamed people apart from the cast', async () => {
     const { loadPromptTemplates } = require('../../server/services/prompts');
     await loadPromptTemplates();
-    const t = PB.buildTrialStoryPrompt({ characters: [{ id: 'c1', name: 'Mia', age: 7, gender: 'girl' }], mainCharacters: ['c1'], language: 'de-ch', storyCategory: 'adventure', storyTheme: 'pirate', storyDetails: 'x', artStyle: 'watercolor' }, 6);
+    const t = trialWriterPrompt({ characters: [{ id: 'c1', name: 'Mia', age: 7, gender: 'girl' }], mainCharacters: ['c1'], language: 'de-ch', storyCategory: 'adventure', storyTheme: 'pirate', storyDetails: 'x', artStyle: 'watercolor' }, 6);
     expect(t).toContain('a colour no cast member wears');
   });
 });

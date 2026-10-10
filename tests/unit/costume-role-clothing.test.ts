@@ -21,7 +21,7 @@ const read = (f: string) => fs.readFileSync(path.join(PROMPTS, f), 'utf-8');
 // story-unified*.txt were members until 2026-09-15 (deleted as unreachable).
 const WARDROBE_SITES = ['story-bible-from-beats.txt'];
 // The four templates that author a Visual Bible entry.
-const VB_SITES = ['visual-bible.txt', 'story-trial.txt'];
+const VB_SITES = ['visual-bible.txt', 'story-trial-arc.txt'];
 
 const beats = [{ page: 1, beat: 'the child boards the ship' }, { page: 2, beat: 'the captain loses her cap' }];
 const inputData = {

@@ -33,7 +33,7 @@ beforeAll(async () => { await loadPromptTemplates(); });
 const LANDMARK = { name: 'Cathedral square', photoData: 'data:image/jpeg;base64,RAWPHOTO', photoType: 'exterior' };
 const PLATE = 'data:image/jpeg;base64,PAGEPLATE';
 const VB = { locations: [{ id: 'LOC001', name: 'Cathedral square', isRealLandmark: true, pages: [1, 2] }] };
-// Real trial cover-scene shape (prompts/story-trial.txt COVER SCENE).
+// Real trial cover-scene shape (prompts/story-trial-pages.txt COVER SCENE).
 const COVER_SCENE = {
   imageSummary: 'Mia stands proudly in the middle of the square.',
   setting: {

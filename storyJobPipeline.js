@@ -78,7 +78,6 @@ const {
   extractPageClothing,
   buildSceneExpansionPrompt,
   buildOutlineReviewPrompt,
-  buildTrialStoryPrompt,
   buildAvailableAvatarsForPrompt,
   getLandmarkPhotosForScene,
   ensureLandmarkPhotoBytes,
@@ -691,10 +690,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (inputData.trialMode) {
       await require('./server/lib/jevSelection').selectStoryLandmarks(inputData, { jevReport: trialJev, gl: genLog, mode: 'trial', probe: true });
     }
-    const unifiedPrompt = inputData.trialMode
-      ? buildTrialStoryPrompt(inputData, sceneCount)
-      : null;
-    if (unifiedPrompt) log.debug(`📖 [TRIAL] Prompt length: ${unifiedPrompt.length} chars, requesting ${sceneCount} pages`);
+    // The trial writer's two prompts (planner + pages writer), recorded once the calls ran.
+    let unifiedPrompt = null;
 
     // Art style for avatar generation
     const artStyle = inputData.artStyle || 'pixar';
@@ -2845,17 +2842,28 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       await runBeatsWriterWithLandmarkGuideline();
     } else {
       // Trial only (resolvePipelineMode returns 'unified' for trialMode alone).
-      if (!unifiedPrompt) throw new Error('No writer prompt: a non-trial job reached the single-call branch');
-      const unifiedResult = await callTextModelStreaming(unifiedPrompt, null, (chunk, fullText) => {
-        progressiveParser.processChunk(chunk, fullText);
-        unifiedHeartbeat();  // throttled — fires at most every 30s
-      // The trial writer has its own effort (MODEL_DEFAULTS.trialStoryEffort): the
-      // trial's product requirement is speed, and at the model default (`high`)
-      // most of its output is thinking (decisions.md 2026-10-07).
-      }, modelOverrides.outlineModel, { usageLabel: 'unified_story', effort: MODEL_DEFAULTS.trialStoryEffort });
-      unifiedResponse = unifiedResult.text;
-      unifiedModelId = unifiedResult.modelId;
-      unifiedUsage = unifiedResult.usage || { input_tokens: 0, output_tokens: 0 };
+      if (!inputData.trialMode) throw new Error('No writer: a non-trial job reached the trial writer branch');
+      // Two calls (server/lib/trialWriter.js, decisions.md 2026-10-10 "Flash arc+bible v4"): the planner's
+      // title, Visual Bible and cover reach the parser the moment it is done (plates, reference sheets and
+      // the cover start then), while the pages writer streams the pages. Efforts: MODEL_DEFAULTS.trialArcEffort
+      // and trialStoryEffort (the trial's product requirement is speed, decisions.md 2026-10-07).
+      const trialWriter = await require('./server/lib/trialWriter').runTrialWriter({
+        inputData,
+        sceneCount,
+        pagesModel: modelOverrides.outlineModel,
+        onArcText: (arcText, mergedSoFar) => progressiveParser.processChunk('', mergedSoFar),
+        onPagesChunk: (chunk, mergedText) => progressiveParser.processChunk(chunk, mergedText),
+        heartbeat: unifiedHeartbeat,  // throttled — fires at most every 30s
+      });
+      unifiedPrompt = `${trialWriter.arcPrompt}
+
+=== PAGES WRITER PROMPT ===
+
+${trialWriter.pagesPrompt}`;
+      log.debug(`📖 [TRIAL] Prompts: planner ${trialWriter.arcPrompt.length} chars, pages writer ${trialWriter.pagesPrompt.length} chars, requesting ${sceneCount} pages`);
+      unifiedResponse = trialWriter.text;
+      unifiedModelId = trialWriter.modelId;
+      unifiedUsage = trialWriter.usage || { input_tokens: 0, output_tokens: 0 };
     }
     } finally {
       clearInterval(textPhaseHeartbeat);

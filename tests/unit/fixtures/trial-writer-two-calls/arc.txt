@@ -1,0 +1,144 @@
+---STORY ARC---
+PAGE 1: Dans le parc boisé de Montpreveyres paré de feuilles d'automne, Serena, vêtue de son déguisement de sirène, chante et danse joyeusement tout en ramassant de beaux coquillages pour fabriquer une couronne royale. | WITH: Serena; sea shell crown | STATE: none
+PAGE 2: Guidée par son amour des animaux, Serena aperçoit Barnabé le crabe près d'une petite arche de rochers menant à une caverne ombragée, où scintille la toute dernière coquille dorée nécessaire pour terminer la couronne. | WITH: Serena; Barnabé; sea shell crown | STATE: none
+PAGE 3: Serena fait un pas vers l'intérieur pour saisir le trésor, mais une ombre dense et soudaine assombrit l'entrée, déclenchant sa vive peur du noir; elle recule d'un coup, le souffle coupé, n'osant pas franchir le seuil. | WITH: Serena; Barnabé; sea shell crown | STATE: none
+PAGE 4: Réalisant que le noir bloque l'accès à la dernière nacre, Serena tremble mais refuse d'abandonner: Barnabé avoue timidement avoir peur lui aussi, alors Serena serre sa coquille préférée contre sa poitrine et respire un grand coup pour se calmer. | WITH: Serena; Barnabé; sea shell crown; spiral sea shell | STATE: spiral sea shell is clutched to chest
+PAGE 5: Toujours un peu tremblante mais guidée par sa détermination et son chant fredonné, Serena avance pas à pas dans le passage sombre jusqu'à atteindre la lueur dorée où repose la coquille manquante. | WITH: Serena; Barnabé; sea shell crown; spiral sea shell | STATE: none
+PAGE 6: Émergeant de la pénombre vers la douce lumière d'automne du parc, Serena pose triomphalement la dernière nacre sur sa couronne, encore légèrement émue mais fière d'avoir surmonté sa peur toute seule. | WITH: Serena; Barnabé; sea shell crown; spiral sea shell | STATE: sea shell crown is completed with the final shell
+
+---TITLE---
+TITLE: Serena et la couronne du passage sombre
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Barnabé",
+      "properName": "Barnabé",
+      "pages": [2, 3, 4, 5, 6],
+      "scaleClass": "palm-sized",
+      "species": "crabe côtier",
+      "coloring": "warm coral-orange shell with cream-coloured underbelly and small yellow dots on claws",
+      "anatomy": "two large front pincers, six small walking legs, two rounded black bead eyes on short stalks, one closed rounded mouth",
+      "features": "smooth rounded carapax, tiny cream stripes on claws, closed rounded mouth"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "sea shell crown",
+      "name": "sea shell crown",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "melon-sized",
+      "type": "headwear",
+      "description": "circlet frame woven from dry reeds and mounted with shiny autumn-tinted sea shells, missing one central shell at the peak",
+      "states": [
+        {
+          "name": "incomplete",
+          "delta": "missing the prominent golden shell at its top center",
+          "pages": [1, 2, 3, 4, 5]
+        },
+        {
+          "name": "completed",
+          "delta": "fitted with a glowing golden shell set at its front peak",
+          "pages": [6]
+        }
+      ]
+    },
+    {
+      "id": "ART002",
+      "label": "spiral sea shell",
+      "name": "spiral sea shell",
+      "pages": [4, 5, 6],
+      "scaleClass": "palm-sized",
+      "type": "talisman",
+      "description": "spiral sea shell with smooth mother-of-pearl ridges, pale pink and pearl-white with a soft polished sheen"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Parc communal de Montpreveyres",
+      "pages": [1, 2, 6],
+      "scaleClass": "landmark",
+      "setting": "outdoor public park surrounded by autumn woodland",
+      "colors": "golden yellow, amber, russet leaves, green mossy grass, pale stone",
+      "features": "tall beech trees with falling autumn foliage, soft grassy clearings, rustic wooden park benches, small stone outcrop",
+      "signatureElement": "ancient moss-covered boulder flanked by golden beech trees",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    },
+    {
+      "id": "LOC002",
+      "name": "Grotte des rochers",
+      "pages": [3, 4, 5],
+      "scaleClass": "house-height",
+      "setting": "natural rock passage and shallow cave",
+      "colors": "slate grey, shadowy violet, damp earth brown, warm amber glow in distance",
+      "features": "curving stone walls, rough cavern archway, low ceiling, natural sunlight aperture at the far end",
+      "signatureElement": "narrow rocky natural arch that frames darkness with a distant amber glow",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "description": "A sunny autumn clearing in a park bordered by beech trees shedding golden and copper leaves. Soft grassy ground dotted with colourful fallen foliage and mossy stones. Gentle morning light filtering through tree canopies. Wide shot. Wide open foreground."
+    },
+    {
+      "pages": [3, 4],
+      "description": "The entrance threshold of a dark rocky cave under mossy stone overhangs. Shadowy interior cast in deep cool tones contrasted with bright autumn foliage outside the frame. Rocky gravel floor in foreground with deep shadows stretching inwards."
+    },
+    {
+      "pages": [5, 6],
+      "description": "Inside a dim rock tunnel opening out toward a sunlit exit where golden autumn light spills onto a rocky pedestal. Wet stone textures on walls, gentle golden reflections on the cavern ground. Wide camera angle with an open walkway in the center."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Serena et la couronne du passage sombre",
+  "scene": {
+    "imageSummary": "Serena, dressed in her costume of a long-sleeve scale-pattern swim shirt in sea green, one mermaid tail replacing the legs, white shell necklace, and pink coral tiara, smiles courageously in a sunlit autumn park while holding her shell crown. Golden leaves drift gently around the ancient mossy boulder.",
+    "setting": {
+      "location": "Parc communal de Montpreveyres [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "A peaceful clearing in an autumn park in Montpreveyres with beech trees shedding amber leaves and a prominent mossy boulder.",
+      "lighting": "Warm morning sunlight filtering through golden foliage from above",
+      "camera": "wide",
+      "depthLayers": "Fallen golden leaves in foreground, Serena standing proud in midground, mossy boulder and tall autumn trees in background"
+    },
+    "timeOfDay": "morning",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Serena",
+        "position": "center",
+        "action": "Serena stands happily presenting her sea shell crown with both hands",
+        "expression": "happy",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {
+        "id": "LOC001",
+        "name": "Parc communal de Montpreveyres",
+        "position": "background"
+      },
+      {
+        "id": "ART001",
+        "name": "sea shell crown",
+        "position": "held in Serena's hands"
+      }
+    ]
+  }
+}
+```

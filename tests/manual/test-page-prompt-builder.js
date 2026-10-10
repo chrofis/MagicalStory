@@ -198,7 +198,7 @@ check(/Flocke/.test(vbSection), 'animal keeps its given name in fallback section
   const fs = require('fs');
   // story-unified*.txt were the subjects here until 2026-09-15 (deleted as
   // unreachable); the live bible-authoring writer is the trial template.
-  for (const tpl of ['prompts/story-trial.txt']) {
+  for (const tpl of ['prompts/story-trial-arc.txt', 'prompts/story-trial-pages.txt']) {
     const text = fs.readFileSync(tpl, 'utf8');
     check(/ENGLISH `name` and `description` for artifacts, locations, vehicles, and clothing/.test(text),
       `${tpl} mandates English VB name/description fields`);

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'module';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const require = createRequire(import.meta.url);
 const pb = require('../../server/lib/promptBuilders.js');
 const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../../server/services/prompts.js');
@@ -95,7 +96,7 @@ describe('age-band views — one file, three readers', () => {
   });
 
   it('the writer prompt itself still carries the band whole', () => {
-    const w = pb.buildTrialStoryPrompt({
+    const w = trialWriterPrompt({
       trialMode: true, language: 'de', storyTheme: 'realistic', storyDetails: 'x', characters: chars(3),
     }, 5);
     expect(w).not.toMatch(/\[\[/);

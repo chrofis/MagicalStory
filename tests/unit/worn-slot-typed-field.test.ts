@@ -124,8 +124,8 @@ describe('source 2 - a declared row on an element the writer never linked', () =
 });
 
 describe('the authoring prompts carry the slot rule from one constant', () => {
-  it('visual-bible.txt and story-trial.txt both take {WORN_SLOT}, filled from WORN_SLOT_FIELD_RULE', () => {
-    for (const f of ['visual-bible', 'story-trial']) {
+  it('visual-bible.txt and story-trial-arc.txt both take {WORN_SLOT}, filled from WORN_SLOT_FIELD_RULE', () => {
+    for (const f of ['visual-bible', 'story-trial-arc']) {
       expect(readFileSync(join(__dirname, `../../prompts/${f}.txt`), 'utf8'), f).toContain('{WORN_SLOT}');
     }
     for (const s of WORN_SLOTS) expect(W.WORN_SLOT_FIELD_RULE).toContain('`' + s + '`');

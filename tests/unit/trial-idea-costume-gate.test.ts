@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'module';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const require = createRequire(import.meta.url);
 const {
   TRIAL_COSTUMES,
@@ -8,7 +9,7 @@ const {
   resolveTrialCostumeLookup,
   getTrialCostumeForStory,
 } = require('../../server/config/trialCostumes.js');
-const { buildTrialIdeaCostumeInstructions, buildTrialStoryPrompt } = require('../../server/lib/promptBuilders.js');
+const { buildTrialIdeaCostumeInstructions } = require('../../server/lib/promptBuilders.js');
 const { PROMPT_TEMPLATES, fillTemplate, loadPromptTemplates } = require('../../server/services/prompts.js');
 
 // Evidence: prod job_1788698812047_q5b1vuds7 — a trial on theme "mothers-day"
@@ -117,14 +118,14 @@ describe('buildTrialStoryPrompt resolves the costume the same way', () => {
   });
 
   it('keeps the costume branch on a life-challenge trial, where the theme carries the costume', () => {
-    const prompt = buildTrialStoryPrompt(inputs({
+    const prompt = trialWriterPrompt(inputs({
       storyCategory: 'life-challenge', storyTopic: 'understanding-rules', storyTheme: 'cowboy',
     }));
     expect(prompt).toContain('[standard | costumed]');
   });
 
   it('drops it on an adventure theme with no costume entry', () => {
-    const prompt = buildTrialStoryPrompt(inputs({
+    const prompt = trialWriterPrompt(inputs({
       storyCategory: 'adventure', storyTopic: '', storyTheme: 'mothers-day',
     }));
     expect(prompt).not.toContain('[standard | costumed]');

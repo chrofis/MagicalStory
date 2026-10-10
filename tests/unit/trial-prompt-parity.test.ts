@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'module';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const require = createRequire(import.meta.url);
-const { buildTrialStoryPrompt, buildImagePrompt } = require('../../server/lib/promptBuilders.js');
+const { buildImagePrompt } = require('../../server/lib/promptBuilders.js');
 const { extractSceneMetadata } = require('../../server/lib/sceneMetadata.js');
 const { loadPromptTemplates } = require('../../server/services/prompts.js');
 
@@ -25,7 +26,7 @@ let prompts: Record<number, string>;
 beforeAll(async () => {
   await loadPromptTemplates();
   prompts = { 3: '', 6: '', 9: '' };
-  for (const age of [3, 6, 9]) prompts[age] = buildTrialStoryPrompt(trialInput(age), 5);
+  for (const age of [3, 6, 9]) prompts[age] = trialWriterPrompt(trialInput(age), 5);
 });
 
 describe('trial story prompt — the template is actually used', () => {
@@ -85,7 +86,7 @@ describe('creature tone is banded by the main character age', () => {
   });
 
   it('omits the section entirely when no age is known', () => {
-    const noAge = buildTrialStoryPrompt({ ...trialInput(6), characters: [{ name: 'Mia', isMain: true }] }, 5);
+    const noAge = trialWriterPrompt({ ...trialInput(6), characters: [{ name: 'Mia', isMain: true }] }, 5);
     expect(noAge).not.toMatch(/drawn cute|kind eyes and a soft face|powerful, wild or formidable/);
   });
 });

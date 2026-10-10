@@ -1,0 +1,38 @@
+{
+ "note": "One reader (the agent), arm hidden by blind-key-run.json (shuffled per input), read before unblinding. 13 stored inputs, each v4 (Flash planner with repair rules + Sonnet pages writer, v2 call B unchanged) vs the stored single Sonnet-medium call. Slips quoted from the texts.",
+ "blind_verdicts": {
+  "job_1789944735873_vmbd0or30": "tie",
+  "job_1790680992018_nd95o89r7": "v4",
+  "job_1790769860433_2bhhj0pyi": "medium",
+  "job_1791391658361_4eylyr1w4": "v4",
+  "job_1791450270543_n1iu8ipsu": "tie",
+  "job_1791450452362_pv0l5hf49": "v4",
+  "job_1791490151653_r9mypyn0c": "medium",
+  "job_1791496820206_qwcnrq30r": "tie",
+  "job_1791497394846_v01s6ndpn": "medium",
+  "job_1791500208126_at0wow7xa": "v4",
+  "job_1791551298726_19tfcxccl": "tie",
+  "job_1791554548909_kl0phznw2": "v4",
+  "job_1791579344291_rk2bno6av": "medium"
+ },
+ "per_input": {
+  "job_1789944735873_vmbd0or30": "tie. v4: crab Barnabe invented and addressed with vous, animals trait and fear of the dark both used; medium: hermit crab Bouli invented, present tense throughout",
+  "job_1790680992018_nd95o89r7": "v4 better. v4: the golden feather she crafted and painted herself (special detail used), a failed climb then a second; medium: Neva changes into a festival dress while the unicorn lies wounded",
+  "job_1790769860433_2bhhj0pyi": "medium better. medium keeps the crystal bridge, the squirrel and the empty phone battery; v4 invents an enchanted slate and a doll, a wooden stick appears from nowhere, the crystal bridge becomes a wooden walkway (but v4 uses the plays-mother detail)",
+  "job_1791391658361_4eylyr1w4": "v4 better. medium: Papa regardait son Natel in Bayliss Park, Council Bluffs (Iowa); v4 clean, the goose hisses when he runs and that pays off",
+  "job_1791450270543_n1iu8ipsu": "tie. medium invents Mama on a bench; v4 none, but ends flat",
+  "job_1791450452362_pv0l5hf49": "v4 better. medium: \"I'm doing a running\" and twenty wall stones; v4: ten pebbles, counted 1-10 consistently",
+  "job_1791490151653_r9mypyn0c": "medium better. v4: raven keeps the map, mimicry never pays off, Eli sits in a pouch",
+  "job_1791496820206_qwcnrq30r": "tie. both spell the word letter by letter",
+  "job_1791497394846_v01s6ndpn": "medium better. v4 invents the boy Noah; medium invents Jonas but plays the wall-walking setup out on the roof",
+  "job_1791500208126_at0wow7xa": "v4 better. medium invents a flute and a gnome Burr; v4: grandmother rhyme pays off",
+  "job_1791551298726_19tfcxccl": "tie. v4: \"Dort liess sie den Schluesselbund fallen\" unmotivated, a grandfather line appears; medium invents Herr Hofer, Erntedank, Grossmutter",
+  "job_1791554548909_kl0phznw2": "v4 better. v4 steals the sword at the church as the idea says; medium moves the theft to the street",
+  "job_1791579344291_rk2bno6av": "medium better. medium: Eli the plush elephant rescues the twelfth figure with his trunk, counts 11 then 12; v4: Eli only watches, the leader figure is found in a squirrel hole, counts also consistent"
+ },
+ "tally": {
+  "v4_better": 5,
+  "tie": 4,
+  "medium_better": 4
+ }
+}

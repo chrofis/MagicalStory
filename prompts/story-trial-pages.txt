@@ -1,7 +1,7 @@
 # Trial Story Generation
 {LANGUAGE_INSTRUCTION}
 
-You write children's stories. Create a {PAGES}-scene story. The title, the Visual Bible and the cover scene are FIXED (below) and are already being drawn. Write ONLY the story pages and their scene hints.
+You write children's stories. Create a {PAGES}-scene story. A planner has already written the story's ARC, TITLE, Visual Bible and cover scene (below). They are FIXED, and the Visual Bible is already being drawn. You write ONLY the story pages and their scene hints: the prose of every page, in the story language.
 SHORT story — {PAGES} scenes. Keep it focused:
 - One clear conflict, one resolution. No subplots. The conflict is an outside event with something at stake — something that happens in the world, never a feeling on its own.
 - Introduce quickly (scene 1), build tension ({TENSION_SCENES}), resolve ({RESOLVE_SCENES}).
@@ -38,7 +38,7 @@ SHORT story — {PAGES} scenes. Keep it focused:
 
 - **Scenes**: {PAGES}
 - **Characters** (appearance is illustration context for the scene hints, never for the story text): {CHARACTERS}
-- **Story Idea**: {STORY_DETAILS}
+{MANDATORY_CAST}- **Story Idea**: {STORY_DETAILS}
 
 {CATEGORY_GUIDELINES}
 
@@ -120,15 +120,15 @@ Every field of a scene hint is written in English, whatever the story language: 
 - Content, not rendering. {NO_LENS}
 - True relative size. {TRUE_RELATIVE_SIZE}
 
-# THE VISUAL BIBLE (binding)
+# THE PLAN (binding)
 
-@@VB@@
+{ARC_PLAN}
 
-The Visual Bible above is final. Every secondary character, animal, artifact and location in your scene hints cites an id from it, on the pages it lists. You add no recurring character, animal, object, location or background to it; a figure the story needs on one page only follows the one-page rule above (no entry). Every location in a scene hint is a location of the Visual Bible, and each scene's setting is the background that lists its page. Use every element of it in the story, and when a beat seems to need something it lacks, tell the beat with what it has. The story is built on the title and the idea.
+The plan above is final. The ARC is the story: write page n from arc line n, so that everything it says happens on that page, happens on that page and for the reason it gives, and nothing a later line says has happened yet. You may not drop a beat, reorder beats or merge two pages. Every figure, animal and object on a line's WITH list is in that page's scene hint and in its text where the beat needs it; every STATE change is told on its page, and an object keeps the state and place the arc gave it until a later line changes it. Every secondary character, animal, artifact and location in your scene hints cites an id from the Visual Bible, on the pages it lists. You add no recurring character, animal, object, location or background; a figure the story needs on one page only follows the one-page rule above (no entry). Each scene's setting is the background that lists its page. The planner wrote English planning notes: take no wording, number word or name of a thing from them for the prose; the prose is yours, in the story language and the reading level, and the arc's facts are the only thing you carry over. The title is fixed; write no title.
 
 # OUTPUT FORMAT
 
-Output only the story pages, in this exact form, for ALL {PAGES} pages. No title, no Visual Bible, no cover scene.
+Output only the story pages, in this exact form, for ALL {PAGES} pages. No arc, no title, no Visual Bible, no cover scene.
 
 ---STORY PAGES---
 

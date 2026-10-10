@@ -233,7 +233,6 @@ const {
   buildSceneDescriptionPrompt,
   buildImagePrompt,
   buildOutlineReviewPrompt,
-  buildTrialStoryPrompt,
   buildPreviousScenesContext,
   buildAvailableAvatarsForPrompt,
   getLandmarkPhotosForScene,

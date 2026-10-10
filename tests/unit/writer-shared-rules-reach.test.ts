@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'module';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const require = createRequire(import.meta.url);
 const {
+  buildTrialArcPrompt,
+  buildTrialPagesPrompt,
   PAGE_OPENING_VARIETY_RULE,
   AD_COMPOSITION_RULE,
   buildStoryTextFromBeatsPrompt,
-  buildTrialStoryPrompt,
-} = require('../../server/lib/promptBuilders.js');
+  } = require('../../server/lib/promptBuilders.js');
 const { loadPromptTemplates } = require('../../server/services/prompts.js');
 
 // Two writer rules that used to be prose copied between templates are now one
@@ -41,13 +43,16 @@ const beats = [
 const unfilled = (s: string) => [...new Set(String(s).match(/\{[A-Z][A-Z0-9_]*\}/g) || [])];
 
 let built: Record<string, string>;
+// The trial writer is two prompts; a shared rule is stated at most once in each.
+let trialParts: string[];
 
 beforeAll(async () => {
   await loadPromptTemplates();
   built = {
     beats: buildStoryTextFromBeatsPrompt(input(), beats, [], 'ARC', { arcHints: '' }),
-    trial: buildTrialStoryPrompt(input({ trialMode: true }), 5),
+    trial: trialWriterPrompt(input({ trialMode: true }), 5),
   };
+  trialParts = [buildTrialArcPrompt(input({ trialMode: true }), 5), buildTrialPagesPrompt(input({ trialMode: true }), 5, '')];
 });
 
 describe('page-opening variety rule reaches every stage that writes page prose', () => {
@@ -124,10 +129,10 @@ describe('shared prose rules reach both writers as one constant each', () => {
 
   it('each shared rule is stated once per prompt, never duplicated', () => {
     for (const [, value] of shared) {
-      for (const writer of ['beats', 'trial']) {
-        const hits = built[writer].split(value).length - 1;
-        expect(hits, `${value.slice(0, 30)} in ${writer}`).toBe(1);
-      }
+      expect(built.beats.split(value).length - 1, `${value.slice(0, 30)} in beats`).toBe(1);
+      const perPrompt = trialParts.map(p => p.split(value).length - 1);
+      expect(Math.max(...perPrompt), `${value.slice(0, 30)} in a trial prompt`).toBeLessThanOrEqual(1);
+      expect(perPrompt.reduce((a, b) => a + b, 0), `${value.slice(0, 30)} in the trial writer`).toBeGreaterThanOrEqual(1);
     }
   });
 
@@ -146,7 +151,7 @@ describe('shared prose rules reach both writers as one constant each', () => {
   });
 
   it('the trial scene arithmetic follows the page count (6 pages since 2026-10)', () => {
-    const six = buildTrialStoryPrompt(input({ trialMode: true, storyTheme: 'pirate' }), 6);
+    const six = trialWriterPrompt(input({ trialMode: true, storyTheme: 'pirate' }), 6);
     expect(unfilled(six)).toEqual([]);
     expect(six).toContain('build tension (2-4), resolve (5-6)');
     expect(six).toContain('Keep it MINIMAL for a 6-scene story');

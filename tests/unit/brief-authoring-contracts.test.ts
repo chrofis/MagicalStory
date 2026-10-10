@@ -34,6 +34,7 @@
  */
 import { describe, it, beforeAll, expect } from 'vitest';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const PB = require('../../server/lib/promptBuilders');
 const { collectPlanLineCast, planStagedSegment } = require('../../server/lib/iterateBeat');
 const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../../server/services/prompts');
@@ -189,7 +190,7 @@ describe('the brief-authoring contracts reach every site that writes a brief', (
   });
 
   it('the two Visual-Bible authoring sites carry the entry-page contract', () => {
-    const trial = String(PB.buildTrialStoryPrompt(inputData));
+    const trial = String(trialWriterPrompt(inputData));
     const bible = String(PB.buildVisualBibleCallPrompt(inputData, BEATS, {}));
     for (const [site, prompt] of [['AD Visual Bible call', bible], ['trial writer', trial]] as const) {
       expect(prompt.includes(PB.ELEMENT_ENTRY_PAGE_RULE), `${site} lost the entry-page contract`).toBe(true);

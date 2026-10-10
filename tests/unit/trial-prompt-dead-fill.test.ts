@@ -1,11 +1,11 @@
 /**
  * The trial writer's fill hands `fillTemplate` only keys its template reads.
  *
- * `buildTrialStoryPrompt` used to pass `LANGUAGE_NOTE` although
- * `prompts/story-trial.txt` carries no `{LANGUAGE_NOTE}` — a dead fill: the
+ * `buildTrialStoryPrompt` (now the arc and pages builders) used to pass `LANGUAGE_NOTE` although
+ * `prompts/story-trial-*.txt` carry no `{LANGUAGE_NOTE}` — a dead fill: the
  * value was computed and dropped on every trial, and a reader of the builder
  * believed the note reached the writer (BACKLOG 2026-09-19, undeclared-keys
- * list, `storyTrial` entry). `fillTemplate` substitutes every key it is
+ * list, `storyTrial` entry, since replaced by storyTrialArc/Pages). `fillTemplate` substitutes every key it is
  * given, so a probe template made of the one placeholder shows whether the
  * builder still passes it: the note's text means it does, an empty string
  * means it does not.
@@ -25,20 +25,23 @@ const inputData: any = {
   artStyle: 'watercolor',
 };
 
-describe('buildTrialStoryPrompt — no dead fill keys', () => {
-  let realTrial: string;
+describe('the trial writer prompt builders — no dead fill keys', () => {
+  const keys = ['storyTrialArc', 'storyTrialPages'] as const;
+  const real: Record<string, string> = {};
   beforeAll(async () => {
     await loadPromptTemplates();
-    realTrial = PROMPT_TEMPLATES.storyTrial;
+    for (const k of keys) real[k] = PROMPT_TEMPLATES[k];
   });
-  afterAll(() => { PROMPT_TEMPLATES.storyTrial = realTrial; });
+  afterAll(() => { for (const k of keys) PROMPT_TEMPLATES[k] = real[k]; });
 
-  it('the template reads no {LANGUAGE_NOTE}', () => {
-    expect(realTrial).not.toContain('{LANGUAGE_NOTE}');
+  it.each(keys)('the %s template reads no {LANGUAGE_NOTE}', (k) => {
+    expect(real[k]).not.toContain('{LANGUAGE_NOTE}');
   });
 
-  it('the builder passes no LANGUAGE_NOTE', () => {
-    PROMPT_TEMPLATES.storyTrial = '{LANGUAGE_NOTE}';
-    expect(PB.buildTrialStoryPrompt(inputData, 4)).toBe('');
+  it('the builders pass no LANGUAGE_NOTE', () => {
+    PROMPT_TEMPLATES.storyTrialArc = '{LANGUAGE_NOTE}';
+    expect(PB.buildTrialArcPrompt(inputData, 4)).toBe('');
+    PROMPT_TEMPLATES.storyTrialPages = '{LANGUAGE_NOTE}';
+    expect(PB.buildTrialPagesPrompt(inputData, 4, 'arc')).toBe('');
   });
 });

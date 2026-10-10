@@ -48,7 +48,7 @@ const BANDS = ['fingertip-sized', 'palm-sized', 'hand-sized', 'melon-sized', 'fo
 // The two pre-beats unified writers were members until 2026-09-15, when they
 // were deleted as unreachable (docs/decisions.md).
 const ARTIFACT_AUTHORING_TEMPLATES = [
-  'story-trial.txt',
+  'story-trial-arc.txt',
   'visual-bible.txt'
 ];
 

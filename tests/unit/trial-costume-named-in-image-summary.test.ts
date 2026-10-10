@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 // Staging trial job_1791560888615_uaivmr21o (ninja): the clothing check logged
 // "the scene prose does not dress Serafin" on every page and the cover, because
 // the trial writer was never told to name the costume in `imageSummary`, the
@@ -10,7 +11,7 @@ const PB = require('../../server/lib/promptBuilders');
 async function build(theme: string) {
   const { loadPromptTemplates } = require('../../server/services/prompts');
   await loadPromptTemplates();
-  return PB.buildTrialStoryPrompt({ characters: [{ id: 'c1', name: 'Mia', age: 7, gender: 'girl' }], mainCharacters: ['c1'], language: 'de-ch', storyCategory: 'adventure', storyTheme: theme, storyDetails: 'x', artStyle: 'watercolor' }, 6);
+  return trialWriterPrompt({ characters: [{ id: 'c1', name: 'Mia', age: 7, gender: 'girl' }], mainCharacters: ['c1'], language: 'de-ch', storyCategory: 'adventure', storyTheme: theme, storyDetails: 'x', artStyle: 'watercolor' }, 6);
 }
 
 describe('trial writer names the costume in imageSummary', () => {

@@ -26,6 +26,7 @@
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 // @ts-ignore - CommonJS
 const VB = require('../../server/lib/visualBible');
 // @ts-ignore - CommonJS
@@ -546,7 +547,7 @@ describe('the authoring templates offer exactly the code enum', () => {
   const fs = require('fs');
   const path = require('path');
   const ROOT = path.resolve(__dirname, '../..');
-  const SITES = ['prompts/visual-bible.txt', 'prompts/story-trial.txt'];
+  const SITES = ['prompts/visual-bible.txt', 'prompts/story-trial-arc.txt'];
 
   const trialInput = {
     language: 'en',
@@ -582,7 +583,7 @@ describe('the authoring templates offer exactly the code enum', () => {
     await loadPromptTemplates();
     built = {
       all: String(PB.buildVisualBibleCallPrompt(allInput, BEATS, {})),
-      trial: String(PB.buildTrialStoryPrompt(trialInput, 5)),
+      trial: String(trialWriterPrompt(trialInput, 5)),
     };
   });
 

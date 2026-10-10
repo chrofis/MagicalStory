@@ -32,7 +32,7 @@ const pageRender = require_('../../server/lib/pageRenderCall.js');
 const { extractSceneMetadata } = require_('../../server/lib/sceneMetadata.js');
 const { VB_SLOT_MAX_ELEMENTS } = require_('../../server/lib/grok.js');
 
-// A trial writer's scene hint: the JSON shape prompts/story-trial.txt declares
+// A trial writer's scene hint: the JSON shape prompts/story-trial-pages.txt declares
 // (no Art Director brief — `objects[]` is the hint's own list, no `aboard`).
 const trialHint = (objects: any[]) => JSON.stringify({
   scene: {

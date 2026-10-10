@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 /**
  * Jev wired into the text chain (owner, 2026-09-27: "slop + logic/arc
  * rewrites"). What this pins:
@@ -200,7 +201,7 @@ describe('the built writer prompts carry the slop rules (real builders)', () => 
   it('beats writer, trial writer and the text repair', () => {
     const built = {
       beats: PB.buildStoryTextFromBeatsPrompt(story, [{ pageNumber: 1, planLine: 'wide — Mara — Mara pulls the rope — the sail is up' }], [], 'An arc.'),
-      trial: PB.buildTrialStoryPrompt(story, 4),
+      trial: trialWriterPrompt(story, 4),
       refine: PB.buildTextRefinePrompt(story, [{ pageNumber: 1, text: 'Mara zog am Seil.' }], 'FAULT[SLOP]: p1 — [SLOP_BODY_CLICHE] x', '1. An arc.'),
     };
     for (const [name, p] of Object.entries(built)) {

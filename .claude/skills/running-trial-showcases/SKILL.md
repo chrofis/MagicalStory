@@ -54,4 +54,4 @@ To add an entry: append to the JSON with the next `index`, keep the face file pr
 
 - Full-story runs: the `running-validation-stories` skill (ladder from stored evidence → page rerun → 4-page smoke → showcase).
 - Trial → claim → account E2E assertion test: `npm run test:trial` (`tests/trial-to-full.spec.ts`) — that one is pass/fail, not a showcase.
-- Trial pipeline gates: `server/routes/trial.js` (`buildTrialInputData`), `prompts/story-trial.txt`, decisions.md 2026-08-15.
+- Trial pipeline gates: `server/routes/trial.js` (`buildTrialInputData`), `prompts/story-trial-arc.txt` + `prompts/story-trial-pages.txt` (two calls, `server/lib/trialWriter.js`), decisions.md 2026-08-15.

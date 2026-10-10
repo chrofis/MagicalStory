@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const B = require('../../server/lib/promptBuilders');
 const { getLanguageInstruction } = require('../../server/lib/languages');
 
@@ -141,7 +142,7 @@ describe('a reversed decision is a rule on both sides', () => {
   const beats = () => B.buildStoryTextFromBeatsPrompt(
     story(7), [{ pageNumber: 1, planLine: 'wide \u2014 Mara \u2014 Mara pulls the rope \u2014 the sail is up' }], [], 'An arc.',
   );
-  const trial = () => B.buildTrialStoryPrompt({
+  const trial = () => trialWriterPrompt({
     trialMode: true, language: 'de', storyTheme: 'realistic',
     storyDetails: 'a kite caught in a tree',
     characters: [{ name: 'Mia', age: 6, gender: 'female', isMain: true }],

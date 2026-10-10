@@ -188,7 +188,7 @@ async function selectChallengeDraw({ inputData, excludeIds = [], jevReport, gl =
 
 // ───────────────────────── LANDMARKS in the story ─────────────────────────
 
-/** How many landmarks the trial story is given (promptBuilders.buildTrialStoryPrompt reads the first 3). */
+/** How many landmarks the trial story is given (promptBuilders.trialFillValues reads the first 3). */
 const TRIAL_STORY_LANDMARKS = 3;
 /** The Jev window those are drawn from, story and idea alike. */
 const LANDMARK_TOP = 5;

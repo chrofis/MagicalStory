@@ -136,9 +136,9 @@ const STAGE_TEMPLATE_KEYS = {
   consolidate: 'feedbackConsolidator',
   vb_element_cell: 'referenceSheet',
   // The two trial-variety stages: the idea generator's own template, and the
-  // trial's one-call story template.
+  // trial writer's planner template (the pages writer follows it).
   trial_idea_variety: 'trialIdea',
-  trial_challenge_draw: 'storyTrial',
+  trial_challenge_draw: 'storyTrialArc',
   // Story bible replay re-authors the VB from the locked beats.
   story_bible_replay: 'storyBibleFromBeats',
   // Story text replay re-writes the page text from the locked beats.

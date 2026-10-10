@@ -84,7 +84,7 @@
 <p><strong>How Claude learns about variants:</strong></p>
 <ul>
   <li><strong>Full mode</strong> (the beats chain): scene expansion runs after <code>loadLandmarkPhotoDescriptions</code> has put the per-slot descriptions on the visual bible, and writes <code>landmarkView</code> on each page citing a real landmark.</li>
-  <li><strong>Trial mode</strong> (story-trial.txt): the <code>{LANDMARKS}</code> section lists what each photo shows (a <code>PHOTOS</code> block per landmark, built by <code>buildTrialStoryPrompt</code>), and each scene hint at a real landmark carries a <code>landmarkView</code>.</li>
+  <li><strong>Trial mode</strong> (story-trial-arc.txt / story-trial-pages.txt): the <code>{LANDMARKS}</code> section lists what each photo shows (a <code>PHOTOS</code> block per landmark, built by <code>buildTrialArcPrompt/buildTrialPagesPrompt</code>), and each scene hint at a real landmark carries a <code>landmarkView</code>.</li>
 </ul>
 
 <p><strong>Avoiding example bias:</strong> the trial prompt deliberately does NOT show a specific landmark as the <code>landmarkQuery</code> example — previous versions used "Holzbrücke Baden" and Claude pattern-matched it on every Baden story even when other landmarks scored higher. See <code>docs/decisions.md</code> → "Trial landmark photo variants — surface per-angle descriptions to Claude".</p>

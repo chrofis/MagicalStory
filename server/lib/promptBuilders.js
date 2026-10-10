@@ -4766,7 +4766,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // Forward the scene hint's `background` field explicitly. It carries the
   // atmosphere AND any story-essential unnamed figures (antagonists, guards —
   // the scene hint's `background` field, emitted today only by
-  // prompts/story-trial.txt; on the full path the Art Director writes such
+  // prompts/story-trial-arc.txt / story-trial-pages.txt; on the full path the Art Director writes such
   // figures into the SETTING prose instead). The prose is supposed to weave it
   // in but can drop the figures, and the evaluator scores against the hint —
   // generator and evaluator must receive the same contract.
@@ -9411,7 +9411,7 @@ function rangeLabel({ lo, hi }) {
  * 2026-08-19 round RAISED. See docs/decisions.md 2026-09-14.
  *
  * One constant, four consumers: {TELLING_RULES} (arc-create / arc-retell) and
- * the {RISK_FRAMING} placeholder in story-trial.txt — the template the shared
+ * the {RISK_FRAMING} placeholder in story-trial-arc.txt / story-trial-pages.txt — the template the shared
  * block never reaches (story-unified.txt and story-unified-imagefirst.txt were
  * the other two consumers until they were deleted 2026-09-15). Byte-identical everywhere by construction, not by discipline.
  */
@@ -10383,7 +10383,7 @@ const PERIL_CEILING_RULE = "Nothing in the story or its pictures is dangerous en
 
 /**
  * The prose rules both story writers share, ONE constant each, filled as a
- * placeholder into story-text-from-beats.txt and story-trial.txt (registry set
+ * placeholder into story-text-from-beats.txt and story-trial-arc.txt / story-trial-pages.txt (registry set
  * `story-prose-writers`). They were prose in the beats template only; the trial
  * writer, which runs no refine and no audit (the trial's time budget — see
  * docs/decisions.md 2026-10-07), had none of them, so a trial story could carry
@@ -10575,7 +10575,7 @@ function styleRulebook(language) {
  * but the page's who column leaves him out of frame. Stated as the KIND of
  * word (a number, all, both, every), never a language's words, so it holds in
  * every story language. One constant for the writers (story-text-from-beats.txt,
- * story-trial.txt — both read who is in frame from the page's own plan line or
+ * story-trial-arc.txt / story-trial-pages.txt — both read who is in frame from the page's own plan line or
  * scene), the rewriter (text-refine.txt) and the arc-informed audit's COUNT
  * question (story-text-audit.txt), which reads the same plan lines.
  */
@@ -10620,11 +10620,11 @@ const MECHANISM_FIX_RULE = 'A fault about how something physically works (how a 
 
 /**
  * The Art Director composition rules for a writer that authors its own scene
- * hints without an Art Director stage: the trial writer (story-trial.txt is
+ * hints without an Art Director stage: the trial writer (story-trial-arc.txt / story-trial-pages.txt is
  * the only template that declares {AD_COMPOSITION} since the two unified
  * writers were deleted 2026-09-15). The six bullets were reworded for a scene
  * hint from scene-expansion(-all).txt rules 5, 5c, 11f, the close-up rule and
- * the immersion/footing rules (2026-09-13) and lived only in story-trial.txt
+ * the immersion/footing rules (2026-09-13) and lived only in story-trial-arc.txt / story-trial-pages.txt
  * as prose. Since 2026-10-07 the "one instant" and "no partial immersion"
  * bullets are the Art Director's own constants (ONE_INSTANT_RULE,
  * shotVocabulary.FOOTING_RULE) behind the same labels, not paraphrases of
@@ -12827,11 +12827,12 @@ function buildSceneTranslationPrompt(scenes, lang) {
 }
 
 /**
- * Build a lightweight story prompt for trial stories.
- * Much simpler than the full unified prompt — no critical analysis, no character arcs,
- * no plot structure planning. Just generates the story directly.
+ * The placeholder values both trial writer templates (story-trial-arc.txt,
+ * story-trial-pages.txt) are filled from. Each template reads the subset it
+ * carries; fillTemplate ignores the rest. One computation, so the two calls
+ * cannot disagree about the costume, the landmarks or the rules.
  */
-function buildTrialStoryPrompt(inputData, sceneCount = null) {
+function trialFillValues(inputData, sceneCount = null) {
   const pageCount = sceneCount || inputData.pages || 5;
   const language = inputData.language || 'en';
 
@@ -12843,7 +12844,7 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
     // (trial.js stamps them on character.physical). Without surfacing them here
     // the scene hints carry zero visual anchors ("the main character stands at
     // the gate") and Grok has to guess or fall back on the photo ref. These
-    // descriptors are ILLUSTRATION context only — story-trial.txt forbids them
+    // descriptors are ILLUSTRATION context only — story-trial-arc.txt / story-trial-pages.txt forbids them
     // in the reader-facing page text (owner: the parent doesn't need to be told
     // the hair colour of their own child).
     const p = char.physical || {};
@@ -12871,7 +12872,7 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
     return parts.join(', ');
   }).join('\n');
 
-  if (PROMPT_TEMPLATES.storyTrial) {
+  {
     // Look up costume from config
     // Same resolver as the story job and the avatar prewarm. This used to read
     // `storyTopic || storyTheme`, which on a life-challenge trial looks the
@@ -12972,7 +12973,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       ? buildLifeSkillGuidelines(inputData.storyTopic, inputData.storyTheme, getTeachingGuide('life-challenge', inputData.storyTopic), inputData)
       : '';
 
-    return fillTemplate(PROMPT_TEMPLATES.storyTrial, {
+    return {
       LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
       PAGES: pageCount,
       LANGUAGE: getLanguageNameEnglish(language),
@@ -13073,10 +13074,55 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       WORN_SLOT: WORN_SLOT_FIELD_RULE,
       CREATURE_FEATURES: CREATURE_FEATURES_RULE,
       TRUE_RELATIVE_SIZE: TRUE_RELATIVE_SIZE_RULE,
-    });
+    };
   }
+}
 
-  throw new Error('buildTrialStoryPrompt: story-trial template not loaded');
+/**
+ * The MANDATORY CAST & OBJECTS line of the trial ARC prompt: every named figure,
+ * pet, toy and object of the characters' special details, so the planner puts it
+ * into the arc and the Visual Bible (the plush elephant in a character's details
+ * was dropped from the story by every planner without it; decisions.md
+ * 2026-10-10 Flash arc v2). Same character fields the CHARACTERS block renders.
+ * Empty when no character has any.
+ */
+function buildTrialMandatoryCast(inputData) {
+  const items = [];
+  for (const c of inputData.characters || []) {
+    const t = c.traits; const bits = [];
+    if (t && !Array.isArray(t) && t.specialDetails) bits.push(t.specialDetails);
+    if (Array.isArray(t)) bits.push(...t);
+    if (c.customTraits && !bits.includes(c.customTraits)) bits.push(c.customTraits);
+    if (bits.length) items.push(c.name + ': ' + bits.join('; '));
+  }
+  if (!items.length) return '';
+  return '- **MANDATORY CAST & OBJECTS** (from the characters special details; binding): ' + items.join(' | ') +
+    '. Every named figure, pet, toy and object here, and the object or creature of every activity named, appears in the arc AND in the Visual Bible with a role in the story, on the scenes where it matters (a toy, pet or object gets its own entry; an activity becomes something the character does or uses in the story). The maximums below yield to this.' + '\n';
+}
+
+/**
+ * Trial writer call A (planner): ARC + TITLE + VISUAL BIBLE + COVER SCENE.
+ * The Visual Bible and the cover are drawn while call B still writes the pages.
+ */
+function buildTrialArcPrompt(inputData, sceneCount = null) {
+  if (!PROMPT_TEMPLATES.storyTrialArc) throw new Error('buildTrialArcPrompt: story-trial-arc template not loaded');
+  return fillTemplate(PROMPT_TEMPLATES.storyTrialArc, {
+    ...trialFillValues(inputData, sceneCount),
+    MANDATORY_CAST: buildTrialMandatoryCast(inputData),
+  });
+}
+
+/**
+ * Trial writer call B (pages): page texts + scene hints, bound to call A's arc
+ * and Visual Bible (arcText = call A's whole output).
+ */
+function buildTrialPagesPrompt(inputData, sceneCount = null, arcText = '') {
+  if (!PROMPT_TEMPLATES.storyTrialPages) throw new Error('buildTrialPagesPrompt: story-trial-pages template not loaded');
+  return fillTemplate(PROMPT_TEMPLATES.storyTrialPages, {
+    ...trialFillValues(inputData, sceneCount),
+    ARC_PLAN: String(arcText || '').trim(),
+    MANDATORY_CAST: buildTrialMandatoryCast(inputData),
+  });
 }
 
 // ============================================================================
@@ -13969,7 +14015,9 @@ module.exports = {
   buildStoryTextFromBeatsPrompt,
   buildTitleRule,
   buildStoryBibleFromBeatsPrompt,
-  buildTrialStoryPrompt,
+  buildTrialArcPrompt,
+  buildTrialPagesPrompt,
+  buildTrialMandatoryCast,
   buildSceneTranslationPrompt,
   buildAvailableLandmarksSection,
   buildTrialIdeaCostumeInstructions,

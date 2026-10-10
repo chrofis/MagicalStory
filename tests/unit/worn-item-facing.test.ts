@@ -15,6 +15,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'node:module';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const cjs = createRequire(import.meta.url);
 const W = cjs('../../server/lib/wornItems.js');
 const PB = cjs('../../server/lib/promptBuilders.js');
@@ -91,7 +92,7 @@ describe('1 — the back look is authored at both Visual Bible sites, from one c
   };
   it('the Art Director bible call and the trial writer both carry GARMENT_BACK_RULE', () => {
     const bibleCall = String(PB.buildVisualBibleCallPrompt(inputData, [{ pageNumber: 1, planLine: 'wide — Kiaan — Kiaan walks away' }], {}));
-    const trial = String(PB.buildTrialStoryPrompt(inputData));
+    const trial = String(trialWriterPrompt(inputData));
     for (const [site, p] of [['bible call', bibleCall], ['trial', trial]]) {
       expect(p.includes(W.GARMENT_BACK_RULE), site).toBe(true);
       expect(p, site).not.toContain('{GARMENT_BACK}');

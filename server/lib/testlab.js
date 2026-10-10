@@ -9321,7 +9321,7 @@ async function runVbElementCellStage(target, { experimentId, promptOverride = nu
 // ─── Trial variety stages ───────────────────────────────────────────────────
 // Two showcase runs of ONE rotation entry came back as near-identical chestnut
 // stories. That had a harness cause (the showcase never called the idea
-// endpoint, so storyDetails was empty and buildTrialStoryPrompt fell back to the
+// endpoint, so storyDetails was empty and the trial writer prompt fell back to the
 // literal 'A fun adventure'), fixed elsewhere. It left two variety questions
 // nobody had measured, and these are the two stages that measure them.
 
@@ -9692,14 +9692,15 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
  * buildChallengeIdeasSection() draws 25 age-banded challenges from
  * prompts/challenge-catalogue.txt and injects them as prompt text (no model
  * call, no cost). It reaches arc-create.txt through the beats pipeline, which
- * draws once and persists the draw as `challengeDraw`. buildTrialStoryPrompt
- * never receives it — the trial writes its whole story in ONE call from
- * story-trial.txt.
+ * draws once and persists the draw as `challengeDraw`. The trial writer
+ * (server/lib/trialWriter.js: planner story-trial-arc.txt, then pages writer
+ * story-trial-pages.txt) never receives it.
  *
  * This stage writes a trial-shaped story twice from the same inputs, once with
- * the draw appended and once without, so the owner can read both. The injection
- * is LAB-ONLY: it appends the section to the prompt this stage built. Nothing is
- * wired into buildTrialStoryPrompt, so a real trial is unaffected.
+ * the draw appended and once without, so the owner can read both. Each arm runs
+ * the production trial writer (both calls); the draw is appended to the
+ * PLANNER's prompt, where the plot is made. The injection is LAB-ONLY: nothing
+ * is wired into buildTrialArcPrompt, so a real trial is unaffected.
  *
  * Two things the result states outright:
  *  - BAND SHAPE. `challengeCatalogueBands` returns nothing for the three simple
@@ -9752,8 +9753,8 @@ function labForcedChallengeDraw(inputData, count, bands) {
 async function runTrialChallengeDrawStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildTrialStoryPrompt, buildChallengeIdeasSection, resolveAgeBand, buildAgeModeSection } = require('./promptBuilders');
-  const { callTextModelStreaming } = require('./textModels');
+  const { buildChallengeIdeasSection, resolveAgeBand, buildAgeModeSection } = require('./promptBuilders');
+  const { runTrialWriter } = require('./trialWriter');
   const { TEXT_MODELS, MODEL_DEFAULTS, priceUsage } = require('../config/models');
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
@@ -9798,32 +9799,30 @@ async function runTrialChallengeDrawStage(target, { params = {}, promptOverride 
     throw new Error(`no challenges drawn: band "${band}" draws none (SIMPLE_BANDS) — pass params.forceBands=3 (or 6/9) to draw anyway, or run withDraw=false`);
   }
 
-  const orig = PROMPT_TEMPLATES.storyTrial;
-  if (promptOverride) PROMPT_TEMPLATES.storyTrial = promptOverride;
-  let basePrompt;
-  try {
-    basePrompt = buildTrialStoryPrompt(inputData, pageCount);
-  } finally {
-    PROMPT_TEMPLATES.storyTrial = orig;
-  }
-  if (!basePrompt) throw new Error('story-trial template unavailable');
-
   const usage = [];
-  const costOf = r => priceUsage(r.modelId || '', r.usage || {});
-  const runArm = async (label, prompt) => {
+  const costOf = (modelId, u) => priceUsage(modelId || '', u || {});
+  const runArm = async (label, arcSuffix) => {
     const t = Date.now();
-    const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_trial_challenge_draw' });
-    if (!String(res.text || '').trim() || res.usage?.output_tokens === 0) {
-      throw new Error(`writer ${model} returned an empty response on the "${label}" arm — provider failure, not a result`);
+    // The override replaces the planner template (the stage's prefill key is storyTrialArc).
+    const orig = PROMPT_TEMPLATES.storyTrialArc;
+    if (promptOverride) PROMPT_TEMPLATES.storyTrialArc = promptOverride;
+    let res;
+    try {
+      res = await runTrialWriter({ inputData, sceneCount: pageCount, pagesModel: model, arcSuffix });
+    } finally {
+      PROMPT_TEMPLATES.storyTrialArc = orig;
     }
-    usage.push({ cost: costOf(res), modelId: res.modelId, usage: res.usage });
+    const prompt = res.arcPrompt;
+    // Planner and pages writer are different models: priced separately.
+    const cost = costOf(res.arcResult.modelId, res.arcResult.usage) + costOf(res.pagesResult.modelId, res.pagesResult.usage);
+    usage.push({ cost, modelId: res.modelId, usage: res.usage });
     const body = String(res.text || '');
     const pagesSection = body.includes('---STORY PAGES---') ? body.split('---STORY PAGES---').slice(1).join('---STORY PAGES---') : body;
     return {
       arm: label,
       modelId: res.modelId,
       elapsedMs: Date.now() - t,
-      cost: costOf(res),
+      cost,
       usage: res.usage,
       promptChars: prompt.length,
       prompt,
@@ -9836,8 +9835,8 @@ async function runTrialChallengeDrawStage(target, { params = {}, promptOverride 
   const armsOut = [];
   // Sequential: two writer calls of a whole story, and a failure on the second
   // must still leave the first readable.
-  if (wantWithout) armsOut.push(await runArm('without-draw', basePrompt));
-  if (wantWith) armsOut.push(await runArm('with-draw', `${basePrompt}\n\n${drawSection}`));
+  if (wantWithout) armsOut.push(await runArm('without-draw', ''));
+  if (wantWith) armsOut.push(await runArm('with-draw', `\n\n${drawSection}`));
 
   return {
     storyId: target.storyId,

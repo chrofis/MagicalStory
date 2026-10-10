@@ -9706,6 +9706,21 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-writer-two-calls-flash-planner",
+      "commits": [],
+      "addedAt": "2026-10-10",
+      "claim": "The trial writer is two calls (Flash planner for arc, title, Visual Bible and cover; Sonnet pages writer). On a real trial the plates, reference sheets and cover start about 13 s after the click on Create (not about 100 s), the first page image starts about 22 s in, the whole text is done in about 50 s (single call: about 130 s), and the story reads as a sound story: every setup pays off, counts add up, no invented names.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Owner's next iPhone trial: time from tapping Create to the first image appearing (bible/plates, expect well under 40 s), total time to the finished story, and a read of the story: the plush toy or pet named in the character details takes part, nothing introduced is left hanging, no new named figures. Logs show '[TRIAL] Prompts: planner N chars, pages writer M chars'."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

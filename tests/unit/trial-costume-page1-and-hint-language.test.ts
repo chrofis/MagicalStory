@@ -1,6 +1,7 @@
 // Trial writer: when the costume starts (page 1 in role vs a shown change of clothes) and
 // the language of scene hints (docs/decisions.md 2026-10-09 "trial costume page 1").
 import { describe, it, expect, beforeAll } from 'vitest';
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const pb = require('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = require('../../server/services/prompts');
 
@@ -15,8 +16,8 @@ describe('trial writer costume rule', () => {
   let plain = '';
   beforeAll(async () => {
     await loadPromptTemplates();
-    costumed = pb.buildTrialStoryPrompt(input());
-    plain = pb.buildTrialStoryPrompt(input({ storyTheme: 'nothing-configured' }));
+    costumed = trialWriterPrompt(input());
+    plain = trialWriterPrompt(input({ storyTheme: 'nothing-configured' }));
   });
 
   it('a story that opens in role is costumed from page 1; the old "except the very first" rule is gone', () => {
@@ -42,7 +43,7 @@ describe('trial writer costume rule', () => {
 describe('trial scene hints are written in English', () => {
   it('every trial prompt carries the English-hint rule (the full path\'s "all output in English")', async () => {
     await loadPromptTemplates();
-    for (const p of [pb.buildTrialStoryPrompt(input()), pb.buildTrialStoryPrompt(input({ language: 'fr' }))]) {
+    for (const p of [trialWriterPrompt(input()), trialWriterPrompt(input({ language: 'fr' }))]) {
       expect(p).toContain('Every field of a scene hint is written in English, whatever the story language');
     }
   });

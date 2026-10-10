@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, afterEach, beforeAll } from 'vitest';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 // @ts-ignore — CommonJS libs
 const PB = require('../../server/lib/promptBuilders.js');
 // @ts-ignore
@@ -49,9 +50,13 @@ describe('B4 a missing template throws', () => {
     drop('imageGeneration');
     expect(() => PB.buildImagePrompt('A scene.', { characters: chars, artStyle: 'watercolor', ageFrom: 3, ageTo: 8 }, chars)).toThrow(/image-generation template not loaded/);
   });
-  it('buildTrialStoryPrompt', () => {
-    drop('storyTrial');
-    expect(() => PB.buildTrialStoryPrompt({ characters: chars, language: 'en', storyDetails: 'x' }, 4)).toThrow(/story-trial template not loaded/);
+  it('buildTrialArcPrompt', () => {
+    drop('storyTrialArc');
+    expect(() => PB.buildTrialArcPrompt({ characters: chars, language: 'en', storyDetails: 'x' }, 4)).toThrow(/story-trial-arc template not loaded/);
+  });
+  it('buildTrialPagesPrompt', () => {
+    drop('storyTrialPages');
+    expect(() => PB.buildTrialPagesPrompt({ characters: chars, language: 'en', storyDetails: 'x' }, 4, 'arc')).toThrow(/story-trial-pages template not loaded/);
   });
 });
 

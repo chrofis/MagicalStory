@@ -54,7 +54,7 @@ class ProgressiveUnifiedParser {
     this._patchedPageNumbers = null;  // Set<number> | null (null = unknown / fallback)
 
     // Section markers in order (must match the section format the live authoring
-    // templates emit: prompts/scene-expansion-all.txt, prompts/story-trial.txt)
+    // templates emit: prompts/scene-expansion-all.txt, prompts/story-trial-arc.txt / story-trial-pages.txt)
     this.sectionMarkers = [
       '---TITLE---',
       '---CLOTHING REQUIREMENTS---',

@@ -1,0 +1,55 @@
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Serena chante à tue-tête et tourne sur elle-même entre les hêtres du parc de Montpreveyres. Les feuilles dorées volent autour de sa queue de sirène. Elle ramasse un coquillage nacré, puis un autre, et les fourre dans son cornet. Ils serviront à sa couronne de reine des mers.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serena, wearing a long-sleeve scale-pattern swim shirt in sea green, one mermaid tail replacing the legs, a white shell necklace and a pink coral tiara, twirls with her arms out in a sunlit autumn park while picking up shells. Golden leaves swirl around her and the reed shell crown rests nearby.","setting":{"location":"Parc communal de Montpreveyres [LOC001]","indoorOutdoor":"outdoor","description":"Sunny clearing with beech trees shedding golden and copper leaves, mossy grass and stones.","lighting":"Soft morning sunlight filtering from above through the canopy","camera":"wide","depthLayers":"Fallen leaves in the foreground, Serena dancing in the midground, beech trees in the background"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Serena","position":"center","action":"twirls mid-dance while holding a shell in one hand, singing","expression":"joyful","clothing":"costumed","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"sea shell crown","position":"on the grass beside Serena"}],"interactions":[{"character":"Serena","object":"sea shell crown","where":"carries the sea shell crown in the crook of one arm","priority":"essential"}],"background":"autumn trees","population":"cast_only"}}
+```
+
+--- Page 2 ---
+TEXT:
+Près d'un gros rocher moussu, quelque chose bouge dans les feuilles. C'est un petit crabe orange, et Serena s'accroupit tout de suite. «Bonjour! Je m'appelle Serena. Et vous?» «Barnabé», répond le crabe. Derrière lui, une petite arche de pierre s'ouvre sur une grotte. Tout au fond, une coquille dorée scintille.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serena, in her sea-green scale-pattern swim shirt with mermaid tail, white shell necklace and pink coral tiara, crouches in front of Barnabé the small orange crab beside a stone arch. Far inside the arch a golden shell glints.","setting":{"location":"Parc communal de Montpreveyres [LOC001]","indoorOutdoor":"outdoor","description":"Autumn clearing with a mossy boulder and a small rock arch leading to a shaded cave.","lighting":"Gentle morning light from above, amber glint deep in the arch","camera":"medium","depthLayers":"Barnabé on leaves in the foreground, Serena in the midground, rock arch in the background"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Serena","position":"left","action":"crouches toward the crab, holding the crown","expression":"curious","clothing":"costumed","depth":"midground","perspective":"side"},{"id":"ANI001","name":"Barnabé","position":"right","action":"raises one pincer in greeting","expression":"friendly","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"sea shell crown","position":"held in Serena's hands"}],"interactions":[{"character":"Serena","object":"sea shell crown","where":"holds the sea shell crown on her lap","priority":"essential"},{"character":"Barnabé","object":"Serena","where":"greets Serena with a raised pincer","priority":"normal"}],"background":"rock arch and beech trees","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+Serena glisse un pas sous l'arche pour attraper la coquille dorée. Alors l'entrée devient toute sombre. Serena retient son souffle et recule d'un bond. Ses mains serrent la couronne. Le noir est trop grand, et elle n'ose plus passer le seuil.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serena, in her sea-green scale-pattern swim shirt with mermaid tail, white shell necklace and pink coral tiara, shrinks back from the dark cave entrance, clutching the crown. Barnabé the crab stands beside her at the threshold.","setting":{"location":"Grotte des rochers [LOC002]","indoorOutdoor":"outdoor","description":"Rocky cave entrance under mossy overhangs, deep shadow inside, a faint amber glow far away.","lighting":"Cool shadow inside, dim daylight at the entrance","camera":"medium","depthLayers":"Gravel floor in the foreground, Serena and Barnabé at the threshold, dark passage in the background"},"timeOfDay":"morning","weather":"none","characters":[{"id":null,"name":"Serena","position":"left","action":"steps back with both arms hugging the crown to her chest","expression":"frightened","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"ANI001","name":"Barnabé","position":"right","action":"stands on the gravel looking toward the dark","expression":"worried","clothing":"standard","depth":"foreground","perspective":"side"}],"objects":[{"id":"ART001","name":"sea shell crown","position":"held against Serena's chest"}],"interactions":[{"character":"Serena","object":"sea shell crown","where":"clutches the sea shell crown against her chest","priority":"essential"},{"character":"Barnabé","object":"Serena","where":"stands beside Serena","priority":"low"}],"background":"dark cave passage","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+Serena tremble, mais elle ne veut pas partir sans la dernière coquille. Barnabé frotte ses pinces l'une contre l'autre. «J'ai peur du noir moi aussi», dit-il tout bas. Serena sort sa coquille spirale préférée et la serre contre elle. Elle souffle un grand coup, longuement.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serena, in her sea-green scale-pattern swim shirt with mermaid tail, white shell necklace and pink coral tiara, hugs her pale pink spiral shell to her chest and breathes out, while Barnabé the crab beside her rubs his pincers together. The cave mouth is dark behind them.","setting":{"location":"Grotte des rochers [LOC002]","indoorOutdoor":"outdoor","description":"Cave threshold with mossy overhangs and deep shadows stretching inward.","lighting":"Cool shadow, soft daylight on the children's side","camera":"medium","depthLayers":"Gravel in the foreground, Serena and Barnabé at the threshold, dark tunnel in the background"},"timeOfDay":"morning","weather":"none","characters":[{"id":null,"name":"Serena","position":"left","action":"hugs the spiral shell to her chest and exhales, the crown hanging from one arm","expression":"determined","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"ANI001","name":"Barnabé","position":"right","action":"rubs his pincers together","expression":"shy","clothing":"standard","depth":"foreground","perspective":"side"}],"objects":[{"id":"ART002","name":"spiral sea shell","position":"held against Serena's chest"},{"id":"ART001","name":"sea shell crown","position":"hanging from Serena's arm"}],"interactions":[{"character":"Serena","object":"spiral sea shell","where":"clutches the spiral sea shell to her chest","priority":"essential"},{"character":"Barnabé","object":"Serena","where":"looks up at Serena","priority":"low"}],"background":"dark cave passage","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+Serena fredonne une petite chanson et avance dans le passage. Un pas, puis un autre. Ses mains tremblent encore. Barnabé trottine à côté d'elle. Le sol est mouillé, mais plus loin, une lueur dorée grandit. La coquille manquante repose sur une pierre, tout au bout.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serena, in her sea-green scale-pattern swim shirt with mermaid tail, white shell necklace and pink coral tiara, moves forward in the dim tunnel humming, the spiral shell pressed to her chest. Barnabé scuttles beside her toward a golden glow on a rocky pedestal ahead.","setting":{"location":"Grotte des rochers [LOC002]","indoorOutdoor":"outdoor","description":"Dim rock tunnel with wet stone walls opening toward a sunlit exit and a golden glow on a pedestal.","lighting":"Dim light with golden light spilling from the far end","camera":"wide","depthLayers":"Wet stone floor in the foreground, Serena and Barnabé in the midground, golden pedestal in the background"},"timeOfDay":"morning","weather":"none","characters":[{"id":null,"name":"Serena","position":"center","action":"walks forward with careful steps, holding the spiral shell to her chest","expression":"determined","clothing":"costumed","depth":"midground","perspective":"back view"},{"id":"ANI001","name":"Barnabé","position":"right","action":"scuttles beside Serena","expression":"hopeful","clothing":"standard","depth":"midground","perspective":"side"}],"objects":[{"id":"ART002","name":"spiral sea shell","position":"held against Serena's chest"},{"id":"ART001","name":"sea shell crown","position":"hanging from Serena's arm"}],"interactions":[{"character":"Serena","object":"spiral sea shell","where":"holds the spiral sea shell against her chest","priority":"essential"},{"character":"Barnabé","object":"Serena","where":"scuttles alongside Serena","priority":"low"}],"background":"rock tunnel","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+Dehors, la douce lumière d'automne éclaire le parc. Serena s'assied sur une pierre plate avec la coquille dorée. Ses doigts tremblent un peu. Elle la pose au sommet de la couronne. «Barnabé, regardez! Elle est terminée!»
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serena, in her sea-green scale-pattern swim shirt with mermaid tail, white shell necklace and pink coral tiara, sits on a flat stone at the tunnel exit and sets the golden shell on top of her crown. Barnabé the crab watches beside her, the spiral shell resting in her lap.","setting":{"location":"Parc communal de Montpreveyres [LOC001]","indoorOutdoor":"outdoor","description":"Sunlit tunnel exit opening onto the autumn park with golden leaves on the ground.","lighting":"Soft golden autumn light from the park side","camera":"medium","depthLayers":"Leaves in the foreground, Serena and Barnabé in the midground, park trees in the background"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Serena","position":"center","action":"presses the golden shell onto the crown's peak","expression":"proud","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"ANI001","name":"Barnabé","position":"right","action":"watches with raised pincers","expression":"delighted","clothing":"standard","depth":"midground","perspective":"side"}],"objects":[{"id":"ART001","name":"sea shell crown","position":"in Serena's hands, completed with the golden shell"},{"id":"ART002","name":"spiral sea shell","position":"in Serena's lap"}],"interactions":[{"character":"Serena","object":"sea shell crown","where":"presses the golden shell onto the sea shell crown","priority":"essential"},{"character":"Barnabé","object":"sea shell crown","where":"watches the sea shell crown","priority":"low"}],"background":"autumn park","population":"cast_only"}}
+```

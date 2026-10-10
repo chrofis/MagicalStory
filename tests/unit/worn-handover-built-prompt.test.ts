@@ -97,7 +97,7 @@ describe('the wornAs-is-required rule reaches every VB authoring site', () => {
     'prompts/scene-expansion.txt',
     'prompts/story-unified.txt',
     'prompts/story-unified-imagefirst.txt',
-    'prompts/story-trial.txt',
+    'prompts/story-trial-arc.txt',
   ].filter(rel => fs.existsSync(path.join(ROOT, rel)));
 
   it('at least the two Art Director templates and one writer are covered', () => {

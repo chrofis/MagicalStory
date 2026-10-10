@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const PB = require('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = require('../../server/services/prompts');
 
@@ -31,7 +32,7 @@ beforeAll(async () => {
   built.lector = PB.buildTextProofreadPrompt(input, [{ pageNumber: 1, text: 'Mira ging.' }]);
   built.diff = PB.buildTextDiffPrompt(input, [{ pageNumber: 1, before: 'Mira ging.', after: 'Mira lief.', findings: [] }]);
   built.arc = PB.buildArcCreatePrompt(input, 4);
-  built.trial = PB.buildTrialStoryPrompt(input, 6);
+  built.trial = trialWriterPrompt(input, 6);
 });
 
 describe('#18 who does what: the planner, its checker and both writers read one rule', () => {

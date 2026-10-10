@@ -1,0 +1,68 @@
+{
+  "pages": 6,
+  "layout": {
+    "mode": "square-below",
+    "imageAspect": "1:1",
+    "textInImage": false
+  },
+  "artStyle": "watercolor",
+  "language": "fr-ch",
+  "characters": [
+    {
+      "id": 1789944369197,
+      "age": "4",
+      "name": "Serena",
+      "role": "main",
+      "gender": "female",
+      "traits": {
+        "flaws": [],
+        "strengths": [
+          "Drôle",
+          "Joyeux",
+          "Courageux",
+          "Énergique",
+          "Curieux"
+        ],
+        "challenges": [],
+        "specialDetails": "Elle adore la danse et le chant, elle a peur du noir, elle adore les animaux, aime jouer au parc"
+      },
+      "photoUrl": "https://images.magicalstory.ch/characters/77628a13-8e01-43fc-b6e0-706c7786cda8/characters_77628a13-8e01-43fc-b6e0-706c7/inline/characters-0-photos-face.jpg",
+      "physical": {
+        "eyeColor": "blue",
+        "skinTone": "light",
+        "hairColor": "light brown",
+        "apparentAge": "preschooler"
+      },
+      "bodyNoBgUrl": "https://images.magicalstory.ch/characters/77628a13-8e01-43fc-b6e0-706c7786cda8/characters_77628a13-8e01-43fc-b6e0-706c7/inline/characters-0-photos-bodyNoBg.jpg",
+      "bodyPhotoUrl": "https://images.magicalstory.ch/characters/77628a13-8e01-43fc-b6e0-706c7786cda8/characters_77628a13-8e01-43fc-b6e0-706c7/inline/characters-0-photos-body.jpg",
+      "customTraits": "Elle adore la danse et le chant, elle a peur du noir, elle adore les animaux, aime jouer au parc",
+      "isMainCharacter": true,
+      "preGeneratedCostumeType": "mermaid",
+      "preGeneratedAvatarSlides": [
+        "https://images.magicalstory.ch/characters/77628a13-8e01-43fc-b6e0-706c7786cda8/characters_77628a13-8e01-43fc-b6e0-706c7/inline/characters-0-preGeneratedAvatarSlides-0.jpg",
+        "https://images.magicalstory.ch/characters/77628a13-8e01-43fc-b6e0-706c7786cda8/characters_77628a13-8e01-43fc-b6e0-706c7/inline/characters-0-preGeneratedAvatarSlides-1.jpg",
+        "https://images.magicalstory.ch/characters/77628a13-8e01-43fc-b6e0-706c7786cda8/characters_77628a13-8e01-43fc-b6e0-706c7/inline/characters-0-preGeneratedAvatarSlides-2.jpg"
+      ],
+      "preGeneratedStyledAvatars": {
+        "Serena": {
+          "costumed": {
+            "default": "https://images.magicalstory.ch/characters/77628a13-8e01-43fc-b6e0-706c7786cda8/characters_77628a13-8e01-43fc-b6e0-706c7/inline/characters-0-preGeneratedStyledAvatars-Serena-costumed-default.jpg"
+          }
+        }
+      }
+    }
+  ],
+  "storyTheme": "mermaid",
+  "storyTopic": "being-brave",
+  "storyDetails": "Serena veut construire une couronne de coquillages pour sa reine des mers, mais la grotte où elle entre en jouant se referme derrière elle dans le noir. Elle serre sa coquille préférée contre elle, souffle un grand coup, et avance quand même dans l'obscurité jusqu'à la lumière au fond. Encore un peu tremblante, elle pose la dernière coquille sur la couronne.\n",
+  "userLocation": {
+    "city": "Montpreveyres",
+    "region": "Vaud",
+    "country": "Schweiz/Suisse/Svizzera/Svizra",
+    "latitude": 46.581339,
+    "longitude": 6.740799
+  },
+  "languageLevel": "standard",
+  "storyCategory": "life-challenge",
+  "trialMode": true
+}

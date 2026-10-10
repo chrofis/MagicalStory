@@ -134,11 +134,12 @@ describe('the challenge-draw stage answers the band question explicitly', () => 
     expect(challengeStage).toMatch(/challengeDraw,/);
   });
 
-  it('injects the draw only into the prompt it built itself — never into buildTrialStoryPrompt', () => {
-    expect(challengeStage).toMatch(/runArm\('with-draw', `\$\{basePrompt\}\\n\\n\$\{drawSection\}`\)/);
+  it('appends the draw to the planner prompt of its own run only — never inside the trial prompt builders', () => {
+    expect(challengeStage).toMatch(/runArm\('with-draw', `\\n\\n\$\{drawSection\}`\)/);
+    expect(challengeStage).toMatch(/runTrialWriter\(\{[^}]*arcSuffix/);
     const builders = read('server/lib/promptBuilders.js');
     const trialBuilder = builders.slice(
-      builders.indexOf('function buildTrialStoryPrompt'),
+      builders.indexOf('function trialFillValues'),
       builders.indexOf('// LANDMARK PHOTO HELPERS'),
     );
     expect(trialBuilder).not.toContain('buildChallengeIdeasSection');

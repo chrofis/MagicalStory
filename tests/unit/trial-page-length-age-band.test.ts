@@ -6,6 +6,7 @@
  */
 import { describe, it, beforeAll, expect } from 'vitest';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const PB = require('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = require('../../server/services/prompts');
 
@@ -37,22 +38,22 @@ describe('trialPageLength', () => {
 describe('buildTrialStoryPrompt page length and escort', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
   it('a 1-year-old prompt states 25-70 words twice and never 100-140', () => {
-    const p = PB.buildTrialStoryPrompt(kid(1), 6);
+    const p = trialWriterPrompt(kid(1), 6);
     expect(p).not.toContain('100-140');
     expect(p).toContain('[Story text, 25-70 words]');
     expect(p).not.toMatch(/\{PAGE_(LENGTH_RULE|WORDS)\}/);
   });
   it('a 7-year-old prompt is unchanged: 100-140', () => {
-    const p = PB.buildTrialStoryPrompt(kid(7), 6);
+    const p = trialWriterPrompt(kid(7), 6);
     expect(p).toContain('100-140 words per page');
     expect(p).toContain('[Story text, 100-140 words]');
   });
   it.each([1, 2, 3])('age %i carries the escort rule, age 5 does not', (age) => {
-    expect(PB.buildTrialStoryPrompt(kid(age), 6)).toContain('Nobody this young goes anywhere alone');
+    expect(trialWriterPrompt(kid(age), 6)).toContain('Nobody this young goes anywhere alone');
   });
   it('age 5 and 7 do not', () => {
-    expect(PB.buildTrialStoryPrompt(kid(5), 6)).not.toContain('Nobody this young goes anywhere alone');
-    expect(PB.buildTrialStoryPrompt(kid(7), 6)).not.toContain('Nobody this young goes anywhere alone');
+    expect(trialWriterPrompt(kid(5), 6)).not.toContain('Nobody this young goes anywhere alone');
+    expect(trialWriterPrompt(kid(7), 6)).not.toContain('Nobody this young goes anywhere alone');
   });
   it('no band token is left unfilled', () => {
     expect(PB.buildAgeModeSection(kid(1))).not.toMatch(/\{ESCORT_RULE\}/);

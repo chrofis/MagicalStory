@@ -1,7 +1,7 @@
 # Trial Story Generation
 {LANGUAGE_INSTRUCTION}
 
-You plan children's stories for illustration. Plan a {PAGES}-scene story: the title, the Visual Bible, the cover scene and, per scene, a PLAN line and a scene hint. You write NO page prose: a second writer writes the page texts from your plan alone, in the story language. So each PLAN line (plain English, 1-3 sentences) carries what the text needs and the hint cannot show: who does what and why, what each figure knows, what is said or decided, what the page sets up or pays off. The hint shows exactly what is drawn.
+You plan a {PAGES}-scene children's story and prepare its illustration side BEFORE any page exists. You write the ARC (a per-page plan), the title, the Visual Bible and the cover scene. You write NO page text and NO page scene hints; a second writer writes the pages afterwards, page by page, and must follow your arc beat by beat and use exactly your Visual Bible. So your arc is the story's logic and your Visual Bible its cast and props: both must be complete, because the second writer may not add a recurring figure, animal or object, and may not drop a beat.
 SHORT story — {PAGES} scenes. Keep it focused:
 - One clear conflict, one resolution. No subplots. The conflict is an outside event with something at stake — something that happens in the world, never a feeling on its own.
 - Introduce quickly (scene 1), build tension ({TENSION_SCENES}), resolve ({RESOLVE_SCENES}).
@@ -12,15 +12,8 @@ SHORT story — {PAGES} scenes. Keep it focused:
 **Rules:**
 - NO questions, just produce the output
 - Keep it simple, warm, and age-appropriate
-- Page 1 starts with action, not weather or waking up
 - {WHO_DOES_WHAT}
-- A figure's first scene brings them in, by arriving or by a name someone present says, before they speak or act
-- Every figure the idea or the Visual Bible introduces (person, creature, toy) keeps a role: it appears in the scenes it matters to, and no PLAN line leaves it out or forgets it without a reason.
-- A change to an object stays in every later PLAN line (torn, lost, broken, eaten, spilled) unless a scene changes it back. Check each PLAN line against the earlier ones.
 - {PICTURE_COUNT}
-- {CLOSING_MOMENT}
-- Show character personality through actions
-- {PAGE_CONTINUITY}
 {RISK_FRAMING}
 - {PERIL_CEILING}
 - {ARC_QUESTIONS_ANSWERED}
@@ -29,7 +22,7 @@ SHORT story — {PAGES} scenes. Keep it focused:
 
 - **Scenes**: {PAGES}
 - **Characters** (appearance is illustration context for the scene hints, never for the story text): {CHARACTERS}
-- **Story Idea**: {STORY_DETAILS}
+{MANDATORY_CAST}- **Story Idea**: {STORY_DETAILS}
 
 {CATEGORY_GUIDELINES}
 
@@ -45,75 +38,17 @@ SHORT story — {PAGES} scenes. Keep it focused:
 
 {SEASON}
 
-# Scene Hint Format
-
-Each scene hint is a JSON block for direct image generation (no further expansion).
-It must be detailed enough to illustrate without additional context.
-Every field of a scene hint is written in English, whatever the story language: a word of the story language for a thing, a dish or a creature becomes its English noun in the hint (the page text keeps the story's own word). A real place's name stays as the LANDMARKS list gives it.
-
-```json
-{
-  "scene": {
-    "imageSummary": "[2-3 sentences: the visual moment with character positions, mood, colors, lighting, atmosphere]",
-    "setting": {
-      "location": "[Location Name [LOC001]]" or "none",
-      "indoorOutdoor": "[indoor/outdoor]",
-      "description": "[visual setting details: colors, textures, atmosphere]",
-      "lighting": "[light quality and the direction it comes from]",
-      "camera": "[close-up|medium|wide|ultra-wide]",
-      "depthLayers": "[describe what's in foreground, midground, background]"
-    },
-    "timeOfDay": "[{TIME_OF_DAY_ENUM}]",
-    "weather": "[{WEATHER_ENUM}]",
-    "characters": [
-      {
-        "id": "[CHR001 or null for main character]",
-        "name": "[Name]",
-        "position": "[left/right/center]",
-        "action": "[what they're doing]",
-        "expression": "[facial expression — one instant, never a transition such as changing from one expression to another]",
-        "clothing": "{CLOTHING_ENUM}",
-        "depth": "[foreground|midground|background]",
-        "perspective": "[front|side|back view|over-the-shoulder]"
-      }
-    ],
-    "objects": [
-      {"id": "[ART001]", "name": "[Object name]", "position": "[where in scene]", "size": "[OMIT unless this object's size matters on this page; then how big it is here against the character beside it or the surface it rests on. No metric or imperial units.]"}
-    ],
-    "interactions": [
-      {"character": "[Name]", "object": "[object name or ART001]", "where": "[short sentence naming the object as the contact action, e.g. 'holds the lantern in both hands']", "priority": "[essential|normal|low]"}
-    ],
-    "background": "[empty|a few passersby|busy crowd|dense forest|etc.]",
-    "population": "[{POPULATION_ENUM}]"
-  }
-}
-```
-
-- MAX 3 characters per scene — the main character plus at most two others — and keep the cast minimal: add a secondary character only when the story needs one. Use character names, not descriptions.
-- `characters.id`: use visual bible `CHR` IDs for secondary characters (e.g., `"CHR001"`). Use `null` for the main character (who has reference photos).
-- Every person named in `imageSummary` also appears in that scene's `characters`: with their visual bible `CHR` id, or — when the visual bible has no entry for them — with a `description` field giving age, build, hair, face and clothing.
-{CLOTHING_RULE}
-- `characters.depth` (optional, default `foreground`): how far from camera. Use `background` for tiny/distant figures. `depth` never states a size: a stated size holds at every depth.
-- `characters.perspective` (optional, default `front`): camera angle on this character.
-- `setting.location`: use `"Name [LOC001]"`.
-- `setting.camera`: shot type determines facial detail visibility. `close-up`/`medium` = expressions visible. `wide`/`ultra-wide` = body language only.
-- `objects`: include visual bible items visible in the scene with their IDs. `size` restates the object's scale for this page's shot, in the same shape the visual bible uses; it overrides the bible entry where they differ.
-- `background`: describes crowd/environment density. Tells image generator if scene feels isolated or populated. The people it names are the page's `population`: a `background` with passers-by or a crowd is never a `cast_only` page.
-{POPULATION_FIELD}
-- `interactions`: 1-4 visible character-to-object or character-to-character contacts, one row per foreground/midground character. `priority: "essential"` for the page's central action, `"low"` for incidental gaze or pose. {CONTACT_VERB} When several characters use ONE object together, join their names with ` + ` in one row — separate rows with the same object render as duplicate objects. {SHARED_GRIP} {SMALL_PROP_CONTACT} Omit pure ground/floor contact, leaning on walls and sitting on generic chairs. Every row also appears in the story text as the same physical contact. **Coverage:** every foreground/midground character appears in `interactions` exactly once, and `interactions` is never empty on a page that has one. A character with no real action gets a `priority: "low"` row naming what they watch or stand beside (e.g. `{"character": "[Name]", "object": "[what they watch]", "where": "watches the [object]", "priority": "low"}`): without it the image model draws a camera-facing portrait. Background characters are exempt.
-- `timeOfDay` and `weather` (required on every scene): {SCENE_LIGHT_FIELD}
-
-**Composition — every scene hint obeys these:**
-{AD_COMPOSITION}
-- A costume's body is copied. {COSTUME_BODY}
-- Eyes are open. {EYES_OPEN}
-- Never name what must be absent. {NEVER_NAME_ABSENT}
-- Content, not rendering. {NO_LENS}
-- True relative size. {TRUE_RELATIVE_SIZE}
+Every field of a scene hint is written in English, whatever the story language: a word of the story language for a thing, a dish or a creature becomes its English noun in the hint. A real place's name stays as the LANDMARKS list gives it.
 
 # OUTPUT FORMAT
 
-Output all sections in this exact order. Do not skip any.
+Output all sections in this exact order. Do not skip any. The Visual Bible must contain every figure, animal and object that the Story Idea names or that your arc uses on two or more scenes, each under the name the arc uses; the maximums below yield to this (the idea own named figures and objects always get their entry), and a figure or object that the arc uses on one scene only follows the one-scene rule below.
+
+---STORY ARC---
+One line per scene, all {PAGES} scenes, written in English (planning notes, not story prose):
+PAGE [n]: [1-3 sentences: what happens, who does it and why, what is at stake or changes] | WITH: [every figure, animal and object that takes part, by name, separated by semicolons] | STATE: [any object whose state changes or whose holder or place changes on this page, e.g. "the letter gets soaked", "the key is set down on the bench"; "none" otherwise]
+
+The arc is the whole story, so build it right: every beat follows from the one before it for a reason the reader can see, the low point has a scene of its own, and an object keeps its state and its place until a beat changes it (a wet thing stays wet until time or a drying beat; a thing set down stays there until someone picks it up). Build it sound: every setup (a skill, clue, trick, object, promise) pays off in a later beat or is not introduced; counts, object states and places stay consistent from page to page; the commissioned topic and the Story Idea drive the problem; each page's action follows from the previous page; no figure, animal or place gets a name except the characters and the Visual Bible entries. Every figure, animal and object the Story Idea names, and every one it plainly implies (a companion, a toy, a creature, an object the plot turns on), appears in the arc on the scenes where it matters.
 
 ---TITLE---
 TITLE: [A creative, specific title in {LANGUAGE}, containing the name {MAIN_CHARACTER_NAME}]
@@ -230,25 +165,3 @@ Front cover scene hint. The main character ({MAIN_CHARACTER_NAME}) is the only p
   }
 }
 ```
-
----STORY PAGES---
-
---- Page 1 ---
-PLAN:
-[1-3 plain English sentences, no prose]
-
-SCENE HINT:
-```json
-{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","camera":"medium","depthLayers":"..."},"timeOfDay":"...","weather":"...","characters":[{"id":"CHR001","name":"...","position":"...","action":"...","expression":"...","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[]}}
-```
-
---- Page 2 ---
-PLAN:
-[...]
-
-SCENE HINT:
-```json
-{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","camera":"medium","depthLayers":"..."},"timeOfDay":"...","weather":"...","characters":[{"id":"CHR001","name":"...","position":"...","action":"...","expression":"...","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[]}}
-```
-
-... continue for ALL {PAGES} pages ...

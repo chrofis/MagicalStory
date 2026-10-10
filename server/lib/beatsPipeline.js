@@ -188,7 +188,7 @@ function fixingBelowMajor(fixing, prevCritique) {
  */
 function resolvePipelineMode(inputData = {}) {
   // TRIAL IS NEVER BEATS (owner decision 2026-08-15). The trial writes its
-  // whole story in ONE call (buildTrialStoryPrompt / story-trial.txt) because
+  // whole story in TWO calls (a fast planner, then the pages writer: server/lib/trialWriter.js) because
   // the funnel depends on speed: the last real production trial finished in
   // 123s end-to-end for 5 pages. The beats chain is seven sequential LLM calls
   // whose cost is mostly FIXED, not per-page — measured on staging: 326/350/382s
@@ -196,7 +196,7 @@ function resolvePipelineMode(inputData = {}) {
   // Beats for a trial would therefore spend ~3x the entire current trial budget
   // on text alone. Nothing excluded trial from beats before this, so promoting
   // PIPELINE_MODE=beats to production would have silently switched every trial
-  // onto the slow path and made story-trial.txt dead code.
+  // onto the slow path and made story-trial-arc.txt / story-trial-pages.txt dead code.
   if (inputData?.trialMode) return 'unified';
   const raw = inputData?.pipelineMode || require('../config/runtime').runtime('pipelineMode');
   const mode = String(raw).trim().toLowerCase();

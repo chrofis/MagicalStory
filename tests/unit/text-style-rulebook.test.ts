@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const B = require('../../server/lib/promptBuilders');
 
 // Owner, 2026-09-23 (dragon run 6, staging job_1790100385959_1nitlympp, Lab 1422).
@@ -27,7 +28,7 @@ describe('the style rulebook reaches every prose-writing pass', () => {
     await require('../../server/services/prompts').loadPromptTemplates();
     built = {
       writer: B.buildStoryTextFromBeatsPrompt(inputData, [{ pageNumber: 1, planLine: PLAN }], [], 'An arc.'),
-      trialWriter: B.buildTrialStoryPrompt({ trialMode: true, language: 'de', storyTheme: 'realistic', storyDetails: 'a kite caught in a tree', characters: [{ name: 'Mia', age: 6, gender: 'female', isMain: true }] }, 5),
+      trialWriter: trialWriterPrompt({ trialMode: true, language: 'de', storyTheme: 'realistic', storyDetails: 'a kite caught in a tree', characters: [{ name: 'Mia', age: 6, gender: 'female', isMain: true }] }, 5),
       repair: B.buildTextRefinePrompt(inputData, PAGES, 'FAULT[CAUSE]: p1 — something', 'An arc.'),
       diff: B.buildTextDiffPrompt(inputData, [{ pageNumber: 1, before: 'Niemand antwortete ihm oder widersprach ihm.', after: 'Keiner antwortete. Keiner widersprach ihm.' }]),
       lector: B.buildTextProofreadPrompt(inputData, PAGES),
@@ -49,7 +50,7 @@ describe('the style rulebook reaches every prose-writing pass', () => {
 
   it('no template keeps a hand copy of a rulebook rule', () => {
     const dir = path.join(__dirname, '../../prompts');
-    for (const f of ['story-text-from-beats.txt', 'story-trial.txt', 'text-refine.txt', 'story-text-diff.txt', 'story-text-proofread.txt']) {
+    for (const f of ['story-text-from-beats.txt', 'story-trial-pages.txt', 'text-refine.txt', 'story-text-diff.txt', 'story-text-proofread.txt']) {
       const t = fs.readFileSync(path.join(dir, f), 'utf8');
       expect(t, f).not.toMatch(/paired negation/i);
       expect(t, f).not.toMatch(/bare fragment/i);
@@ -173,7 +174,7 @@ describe('the closing moment and the shown callback reach generator and critic a
       arcRetell: B.buildArcRetellPrompt(inputData, 4, 'STORY LOGIC: x\nARC:\n1. Mara pulls the rope.', '1. [MAJOR] a fault'),
       arcPanel: B.buildArcPanelPrompt(inputData, 'ARC:\n1. Mara pulls the rope.'),
       writer: B.buildStoryTextFromBeatsPrompt(inputData, [{ pageNumber: 1, planLine: PLAN }], [], 'An arc.'),
-      trialWriter: B.buildTrialStoryPrompt({ trialMode: true, language: 'de', storyTheme: 'realistic', storyDetails: 'a kite caught in a tree', characters: [{ name: 'Mia', age: 6, gender: 'female', isMain: true }] }, 5),
+      trialWriter: trialWriterPrompt({ trialMode: true, language: 'de', storyTheme: 'realistic', storyDetails: 'a kite caught in a tree', characters: [{ name: 'Mia', age: 6, gender: 'female', isMain: true }] }, 5),
       repair: B.buildTextRefinePrompt(inputData, PAGES, 'FAULT[ENDING]: p1 — something', 'An arc.'),
       audit: B.buildTextAuditPrompt(inputData, PAGES, 'An arc.'),
       blind: B.buildTextAuditBlindPrompt(inputData, PAGES),
@@ -326,7 +327,7 @@ describe('text-v5 owed facts and narration tense', () => {
     expect(B.buildTextDiffPrompt(fr, [{ pageNumber: 1, before: 'A.', after: 'B.' }])).toMatch(/imparfait/);
     // The trial writer is the sibling of the beats writer.
     const trial = { ...fr, storyCategory: 'adventure', storyTheme: 'pirate', trialMode: true, languageLevel: 'standard' };
-    expect(String(B.buildTrialStoryPrompt(trial, 5))).toMatch(/imparfait and the passé composé/);
-    expect(String(B.buildTrialStoryPrompt({ ...trial, language: 'en' }, 5))).toMatch(/simple past/);
+    expect(String(trialWriterPrompt(trial, 5))).toMatch(/imparfait and the passé composé/);
+    expect(String(trialWriterPrompt({ ...trial, language: 'en' }, 5))).toMatch(/simple past/);
   });
 });

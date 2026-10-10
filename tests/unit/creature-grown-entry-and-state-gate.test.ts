@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { createRequire } from 'node:module';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const req = createRequire(import.meta.url);
 const fs = req('fs');
 const path = req('path');
@@ -47,14 +48,14 @@ describe('2 — anatomy: one authored slot, into the entry description', () => {
     expect(RS.elementCellGatePrompt(entry, 'watercolor')).toContain(DRAGON.anatomy);
   });
   describe('both Visual Bible authoring sites fill the same spec', () => {
-    const SITES = ['prompts/visual-bible.txt', 'prompts/story-trial.txt'];
+    const SITES = ['prompts/visual-bible.txt', 'prompts/story-trial-arc.txt'];
     let built: Record<string, string> = {};
     beforeAll(async () => {
       await loadPromptTemplates();
       built = {
         all: String(PB.buildVisualBibleCallPrompt({ title: 'T', language: 'en', characters: [{ id: 'c1', name: 'Mia', age: 3, gender: 'female', isMain: true }], mainCharacters: ['c1'] },
           [{ pageNumber: 1, plan: 'wide — Mia — Mia waves at the creature — x' }], {})),
-        trial: String(PB.buildTrialStoryPrompt({ language: 'en', storyCategory: 'adventure', storyTheme: 'adventure', storyDetails: 'a dragon', trialMode: true,
+        trial: String(trialWriterPrompt({ language: 'en', storyCategory: 'adventure', storyTheme: 'adventure', storyDetails: 'a dragon', trialMode: true,
           characters: [{ name: 'Mia', age: 3, gender: 'female', isMain: true }] }, 5)),
       };
     });

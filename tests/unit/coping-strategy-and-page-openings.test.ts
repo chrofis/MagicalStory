@@ -18,6 +18,7 @@
  */
 import { describe, it, beforeAll, expect } from 'vitest';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const pb = require('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = require('../../server/services/prompts');
 
@@ -89,7 +90,7 @@ describe('page-opening variety rule', () => {
   // pinned in tests/unit/writer-shared-rules-reach.test.ts.
   it('reaches the trial writer', () => {
     const prompt = String(
-      pb.buildTrialStoryPrompt(
+      trialWriterPrompt(
         base(9, { storyCategory: 'adventure', storyTheme: 'pirate', trialMode: true }),
         5
       )

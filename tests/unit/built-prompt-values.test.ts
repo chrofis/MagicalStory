@@ -32,6 +32,7 @@
  */
 import { describe, it, beforeAll, expect, vi, afterEach } from 'vitest';
 
+import { trialWriterPrompt } from './helpers/trialWriterPrompt';
 const PB = require('../../server/lib/promptBuilders');
 const { loadPromptTemplates, PROMPT_TEMPLATES, buildEmptyScenePrompt, buildEvaluationPrompt } = require('../../server/services/prompts');
 const { buildReferenceSheetPrompt } = require('../../server/lib/referenceSheets');
@@ -297,8 +298,8 @@ const CASES: Case[] = [
   {
     name: 'buildTrialStoryPrompt (trial writer)',
     probe: PLACE,
-    build: () => PB.buildTrialStoryPrompt(inputData, 4),
-    blind: () => PB.buildTrialStoryPrompt({ ...inputData, storyDetails: 'A quiet afternoon.' }, 4),
+    build: () => trialWriterPrompt(inputData, 4),
+    blind: () => trialWriterPrompt({ ...inputData, storyDetails: 'A quiet afternoon.' }, 4),
   },
   {
     name: 'buildBodyRowPrompt (2×4 sheet, body row) — the garment',
@@ -649,7 +650,7 @@ describe('the re-plan asks for only the pages it changes', () => {
 //
 // The same object got opposite treatment depending on which template authored
 // the bible: the beats Art Director called its own emission a state, while
-// `story-trial.txt` said a change of light never is.
+// `story-trial-arc.txt` said a change of light never is.
 // A state is drawn as its own reference cell, and a reference cell is the only
 // way a glowing look actually reaches the page — an emission carried only in
 // `description` is on every page or none. Story B
@@ -667,7 +668,7 @@ describe('the light rule agrees across every template that states it', () => {
   const path = require('path');
   const PROMPTS = path.join(__dirname, '../../prompts');
   // story-unified.txt was a member until 2026-09-15 (deleted as unreachable).
-  const FILES = ['visual-bible.txt', 'story-trial.txt'];
+  const FILES = ['visual-bible.txt', 'story-trial-arc.txt'];
 
   const lightLine = (file: string) =>
     fs.readFileSync(path.join(PROMPTS, file), 'utf8')
@@ -808,7 +809,7 @@ describe('both Visual Bible authoring templates forbid a shared proper name', ()
   });
 
   it('the trial writer states it identically', () => {
-    expect(properNameLine('story-trial.txt')).toBe(properNameLine('visual-bible.txt'));
+    expect(properNameLine('story-trial-arc.txt')).toBe(properNameLine('visual-bible.txt'));
   });
 
   it('the rule names the transformation case without naming a story', () => {

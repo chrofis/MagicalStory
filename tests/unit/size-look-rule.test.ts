@@ -70,7 +70,7 @@ describe('SIZE_LOOK_RULE — one rule for plan and prose', () => {
   it('the Visual Bible authors still size every element themselves', () => {
     // Both live authoring sites declare the scaleClass spec; the constant is
     // filled, never hand-typed (vb-scale-class.test.ts pins the fill).
-    for (const rel of ['prompts/visual-bible.txt', 'prompts/story-trial.txt']) {
+    for (const rel of ['prompts/visual-bible.txt', 'prompts/story-trial-arc.txt']) {
       const text = fs.readFileSync(path.join(__dirname, '../../', rel), 'utf8');
       expect(text.includes('{SCALE_CLASS_SPEC}'), rel).toBe(true);
     }
