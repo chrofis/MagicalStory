@@ -1279,7 +1279,7 @@ router.put('/update-photo', verifySessionToken, async (req, res) => {
     // Drawings on the old photo must finish (or fail) before their results are cleared, or they would land after the clear.
     await inFlightStandardAvatarPromises.get(userId);
     await inFlightTitlePagePromises.get(userId);
-    await standardBodyRows.get(userId)?.promise.catch(() => {});
+    await standardBodyRows.get(userId)?.cellsPromise.catch(() => {});
     standardBodyRows.delete(userId);
     await inFlightTraitSaves.get(userId);
 
@@ -2721,7 +2721,7 @@ router.post('/prepare-standard-body', verifySessionToken, async (req, res) => {
   try {
     const existing = standardBodyRows.get(userId);
     if (existing) {
-      const { cell } = await existing.promise;
+      const { cell } = await existing.cellsPromise;
       return res.json({ avatarImage: heroForClient(cell) });
     }
     const problem = await trialAvatarAccountProblem(userId);
@@ -2747,19 +2747,29 @@ router.post('/prepare-standard-body', verifySessionToken, async (req, res) => {
     const { seasonOutfitGuidance } = require('../lib/season');
     const { generateStandardBodyRow } = require('../lib/styledAvatars');
     const { bodyRowCells, slidesOfBodyRowCells } = require('../lib/avatarSlides');
+    const { styleBodyRow } = require('../lib/character2x4Sheet');
     const startedAt = Date.now();
     log.info(`[TRIAL AVATARS] Drawing the standard body row at the photo for user ${userId} (${who.fromEstimate ? 'photo estimate' : 'declared'}: age ${who.age}, gender ${who.gender || 'unset'}, stamp ${stamp})`);
-    const promise = (async () => {
-      const body = await generateStandardBodyRow(drawFor, { seasonOutfit: seasonOutfitGuidance({}) });
-      const cells = await bodyRowCells(body.row);
-      return { row: body.row, review: body.review, attemptHistory: body.attemptHistory, cell: cells[0], cells };
-    })();
-    standardBodyRows.set(userId, { stamp, promise, at: Date.now() });
-    promise.catch((err) => {
-      log.error(`[TRIAL AVATARS] body row for user ${userId} failed: ${err.message} — the sheet draws its own body row`);
-      if (standardBodyRows.get(userId)?.promise === promise) standardBodyRows.delete(userId);
+    const promise = generateStandardBodyRow(drawFor, { seasonOutfit: seasonOutfitGuidance({}) });
+    let drawn = false;
+    // The client only ever gets cells cut (edge-detected) from the row STYLED in the story's art style (docs/decisions.md 2026-10-10).
+    // The photoreal row stays on the server: the sheet reuses it from `promise` the moment it is drawn, without waiting for the
+    // styling, and restyles the whole sheet itself.
+    const cellsPromise = promise.then(async (body) => {
+      drawn = true;
+      const drawnAt = Date.now();
+      const cells = await bodyRowCells(await styleBodyRow(body.row, TRIAL_ART_STYLE));
+      log.info(`[TRIAL AVATARS] Standard body row styled and cut for user ${userId} in ${Math.round((Date.now() - drawnAt) / 1000)}s (${Math.round((drawnAt - startedAt) / 1000)}s to draw it)`);
+      return { cell: cells[0], cells };
     });
-    const done = await promise;
+    standardBodyRows.set(userId, { stamp, promise, cellsPromise, at: Date.now() });
+    const forget = (what) => (err) => {
+      log.error(`[TRIAL AVATARS] body row ${what} for user ${userId} failed: ${err.message}${what === 'drawing' ? ' — the sheet draws its own body row' : ' — no early full-body figure is shown'}`);
+      if (what === 'drawing' && standardBodyRows.get(userId)?.promise === promise) standardBodyRows.delete(userId);
+    };
+    promise.catch(forget('drawing'));
+    cellsPromise.catch((err) => { if (drawn) forget('styling')(err); });
+    const done = await cellsPromise;
     log.info(`[TRIAL AVATARS] Standard body row ready for user ${userId} in ${Math.round((Date.now() - startedAt) / 1000)}s`);
     res.json({ avatarImage: heroForClient(done.cell) });
     // The other cells feed the slides, after the answer (the row's first cell is what the wizard waits for).

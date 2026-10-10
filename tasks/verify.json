@@ -9751,6 +9751,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-early-body-figures-styled-2026-10-10",
+      "title": "Trial: the early full-body figures are watercolour, whole, and arrive within about 15 s of the photoreal ones",
+      "commits": [],
+      "addedAt": "2026-10-10",
+      "status": "pending",
+      "evidence": [],
+      "claim": "The hero full-body figure and the first waiting-page slides (the body-row cells) are watercolour and show the whole figure (head and feet, margin around); the first one appears at most about 15 s after the pass-1 body row is drawn.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "One /try on staging from the iPhone: the hero on the character step and the first three waiting-page slides are painted, whole bodies, no photoreal image at any moment; Railway log shows \"Drawing the standard body row\" then \"Standard body row styled and cut for user ... in Ns\" with N <= 15 and the later \"reusing the body row drawn at the photo\"; no \"body row styling ... failed\"."
+      }
     }
   ],
   "runs": [

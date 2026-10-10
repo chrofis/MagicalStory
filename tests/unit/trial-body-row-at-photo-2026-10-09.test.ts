@@ -10,7 +10,7 @@
  *  3. the first cell reaches the client before the sheet exists; the client never receives a row or a sheet (one hand-off);
  *  4. a changed photo replaces the photo on the same account.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 
@@ -22,14 +22,16 @@ const trialSheets = require('../../server/lib/trialSheets.js');
 const trialAge = require('../../server/lib/trialAge.js');
 const styled = require('../../server/lib/styledAvatars.js');
 const avatarSlides = require('../../server/lib/avatarSlides.js');
+const sceneComposite = require('../../server/lib/sceneComposite.js');
+const sheetLib = require('../../server/lib/character2x4Sheet.js');
 const clientImages = require('../../server/lib/clientAvatarImages.js');
 const { log } = require('../../server/utils/logger');
 const root = path.resolve(__dirname, '../..');
 const read = (p: string) => fs.readFileSync(path.join(root, p), 'utf8');
 
 // A 1x4 full-body row as the generator draws it (16:9) and a 2x4 sheet (about 1:1), both on four equal columns.
-async function bodyRow() {
-  const buf = await sharp({ create: { width: 1280, height: 720, channels: 3, background: '#fff' } })
+async function bodyRow(background = '#fff') {
+  const buf = await sharp({ create: { width: 1280, height: 720, channels: 3, background } })
     .composite([0, 1, 2, 3].map(c => ({ input: { create: { width: 160, height: 600, channels: 3, background: { r: 40 * (c + 1), g: 90, b: 160 } } }, left: c * 320 + 80, top: 60 })))
     .jpeg().toBuffer();
   return `data:image/jpeg;base64,${buf.toString('base64')}`;
@@ -64,7 +66,24 @@ function fakePool(state: { char: any }) {
     },
   };
 }
+// The analyzer is a separate service: its edge-detecting split is stood in for by a split on the given column edges
+// (default: equal quarters). `splitCalls` records what the cutter asked for.
+const splitCalls: any[] = [];
+function fakeAnalyzerSplit(edges = [0, 320, 640, 960, 1280]) {
+  splitCalls.length = 0;
+  return vi.spyOn(sceneComposite, 'splitSheetByEdgeDetection').mockImplementation(async (buf: Buffer, opts: any) => {
+    splitCalls.push({ buf, opts });
+    const { height } = await sharp(buf).metadata();
+    return Promise.all([0, 1, 2, 3].map((i) => sharp(buf).extract({ left: edges[i], top: 0, width: edges[i + 1] - edges[i], height: height! }).png().toBuffer()));
+  });
+}
+// pass 1 draws a white-background row; the styled row has another background, so a cell shows which row it was cut from
+const STYLED_BG = '#eeeedd';
+const photoreal = () => bodyRow('#fff');
+const fakeStyle = () => vi.spyOn(sheetLib, 'styleBodyRow').mockImplementation(async () => bodyRow(STYLED_BG));
+const cellIsStyled = async (uri: string) => { const { data } = await sharp(Buffer.from(uri.split(',')[1], 'base64')).raw().toBuffer({ resolveWithObject: true }); return Math.abs(data[0] - 0xee) < 6; };
 const origGetPool = database.getPool;
+beforeEach(() => { fakeAnalyzerSplit(); });
 afterEach(() => {
   database.getPool = origGetPool;
   trialRouter.inFlightStandardAvatarPromises.clear();
@@ -117,7 +136,8 @@ describe('2. who the row is drawn for, and when it is redrawn', () => {
   it('prepare-standard-body draws from the photo estimate while the form is empty, answers with the FIRST cell only, and starts no sheet', async () => {
     const state = { char: row() };
     database.getPool = () => fakePool(state);
-    const gen = vi.spyOn(styled, 'generateStandardBodyRow').mockResolvedValue({ row: await bodyRow(), review: { valid: true, score: null }, attemptHistory: [], usage: {} });
+    const gen = vi.spyOn(styled, 'generateStandardBodyRow').mockResolvedValue({ row: await photoreal(), review: { valid: true, score: null }, attemptHistory: [], usage: {} });
+    const style = fakeStyle();
     const sheet = vi.spyOn(trialSheets, 'styleAndPersistTrialSheets');
     const persisted = vi.spyOn(trialSheets, 'persistBodyRowSlides').mockResolvedValue(null);
     const res = fakeRes();
@@ -133,10 +153,50 @@ describe('2. who the row is drawn for, and when it is redrawn', () => {
     const meta = await sharp(Buffer.from(res.body.avatarImage.split(',')[1], 'base64')).metadata();
     expect(meta.width).toBe(320);
     expect(meta.height).toBe(720);
+    // the cell is cut from the STYLED row (the trial's art style), never from the photoreal pass-1 row
+    expect(style).toHaveBeenCalledTimes(1);
+    expect(style.mock.calls[0][1]).toBe(trialRouter.TRIAL_ART_STYLE);
+    expect(await cellIsStyled(res.body.avatarImage)).toBe(true);
     // the other cells feed the slides (front, three-quarter, profile)
     await new Promise(r => setTimeout(r, 5));
     expect(persisted).toHaveBeenCalledTimes(1);
     expect(persisted.mock.calls[0][0].slides).toHaveLength(3);
+    for (const slide of persisted.mock.calls[0][0].slides) expect(await cellIsStyled(slide)).toBe(true);
+  });
+
+  it('no photoreal figure reaches the client: when the styling fails there is no hero, the failure is logged, and the sheet still reuses the drawn row', async () => {
+    database.getPool = () => fakePool({ char: row() });
+    const drawn = await photoreal();
+    vi.spyOn(styled, 'generateStandardBodyRow').mockResolvedValue({ row: drawn, review: { valid: true, score: null }, attemptHistory: [], usage: {} });
+    vi.spyOn(sheetLib, 'styleBodyRow').mockRejectedValue(new Error('grok refused'));
+    const persisted = vi.spyOn(trialSheets, 'persistBodyRowSlides').mockResolvedValue(null);
+    const err = vi.spyOn(log, 'error').mockImplementation(() => {});
+    const res = fakeRes();
+    await finalHandler('/prepare-standard-body')({ sessionUser: { userId: 'u1' }, body: {}, headers: {} }, res);
+    expect(res.statusCode).toBe(500);
+    expect(res.body.avatarImage).toBeUndefined();
+    expect(persisted).not.toHaveBeenCalled();
+    expect(err.mock.calls.some(c => /body row styling for user u1 failed: grok refused/.test(String(c[0])))).toBe(true);
+    // the pass-1 row is still on the registry for the sheet
+    expect((await trialRouter.standardBodyRows.get('u1').promise).row).toBe(drawn);
+  });
+
+  it('the sheet does not wait for the styling: the pass-1 row is on the registry the moment it is drawn', async () => {
+    database.getPool = () => fakePool({ char: row() });
+    const drawn = await photoreal();
+    vi.spyOn(styled, 'generateStandardBodyRow').mockResolvedValue({ row: drawn, review: { valid: true, score: null }, attemptHistory: [], usage: {} });
+    let release: (v: string) => void = () => {};
+    vi.spyOn(sheetLib, 'styleBodyRow').mockImplementation(() => new Promise<string>((r) => { release = r; }));
+    vi.spyOn(trialSheets, 'persistBodyRowSlides').mockResolvedValue(null);
+    const res = fakeRes();
+    const call = finalHandler('/prepare-standard-body')({ sessionUser: { userId: 'u1' }, body: {}, headers: {} }, res);
+    await new Promise(r => setTimeout(r, 20));
+    const entry = trialRouter.standardBodyRows.get('u1');
+    expect((await entry.promise).row).toBe(drawn);   // resolved while the styling is still pending
+    expect(res.body).toBeNull();                     // nothing was sent yet
+    release(await bodyRow(STYLED_BG));
+    await call;
+    expect(res.body.avatarImage).toMatch(/^data:image\/jpeg/);
   });
 
   it('with no declared age and no usable estimate it stops loudly instead of guessing', async () => {
@@ -153,7 +213,8 @@ describe('2. who the row is drawn for, and when it is redrawn', () => {
   async function runBothPhases(declared: { age: string; gender: string }) {
     const state = { char: row() };
     database.getPool = () => fakePool(state);
-    vi.spyOn(styled, 'generateStandardBodyRow').mockResolvedValue({ row: await bodyRow(), review: { valid: true, score: null }, attemptHistory: [{ stage: 'body', try: 1 }], usage: {} });
+    vi.spyOn(styled, 'generateStandardBodyRow').mockResolvedValue({ row: await photoreal(), review: { valid: true, score: null }, attemptHistory: [{ stage: 'body', try: 1 }], usage: {} });
+    fakeStyle();
     vi.spyOn(trialSheets, 'persistBodyRowSlides').mockResolvedValue(null);
     await finalHandler('/prepare-standard-body')({ sessionUser: { userId: 'u1' }, body: {}, headers: {} }, fakeRes());
     // the visitor then declares their values (update-character-details)
@@ -173,6 +234,9 @@ describe('2. who the row is drawn for, and when it is redrawn', () => {
     const bodies = style.mock.calls[0][0].styleOptions.precomputedBodies;
     expect(Object.keys(bodies)).toEqual(['Mia:standard']);
     expect(bodies['Mia:standard'].row).toMatch(/^data:image\/jpeg/);
+    // the sheet gets the pass-1 row (it restyles the whole sheet itself), not the styled one
+    const { data } = await sharp(Buffer.from(bodies['Mia:standard'].row.split(',')[1], 'base64')).raw().toBuffer({ resolveWithObject: true });
+    expect(data[0]).toBeGreaterThan(0xf8);
     expect(warn.mock.calls.some(c => /drawn for/.test(String(c[0])))).toBe(false);
   });
 
@@ -193,10 +257,23 @@ describe('2. who the row is drawn for, and when it is redrawn', () => {
 });
 
 describe('3. the client never receives a row or a sheet', () => {
-  it('slides cut from a sheet are single cells, and a body row is cut into four quarter-width cells', async () => {
+  it("a body row is cut by the analyzer's edge detection (1 row x 4 columns), never by fixed quarters", async () => {
+    // columns the analyzer found, uneven like the drift measured on a stored row: [273, 365, 251, 391]
+    const split = fakeAnalyzerSplit([0, 273, 638, 889, 1280]);
     const cells = await avatarSlides.bodyRowCells(await bodyRow());
+    expect(split).toHaveBeenCalledTimes(1);
+    expect(splitCalls[0].opts).toEqual({ cols: 4, rows: 1 });
     expect(cells).toHaveLength(4);
-    for (const c of cells) expect((await sharp(Buffer.from(c.split(',')[1], 'base64')).metadata()).width).toBe(320);
+    const widths = [];
+    for (const c of cells) widths.push((await sharp(Buffer.from(c.split(',')[1], 'base64')).metadata()).width);
+    expect(widths).toEqual([273, 365, 251, 391]);   // the detected columns, not 320 x 4
+    expect(read('server/lib/avatarSlides.js')).not.toMatch(/Math\.floor\(width \/ 4\)/);
+  });
+  it('a split that is not a plausible grid, or an analyzer that cannot answer, gives no cells (no fixed-quarter fallback)', async () => {
+    vi.spyOn(sceneComposite, 'splitSheetByEdgeDetection').mockResolvedValue(null);
+    await expect(avatarSlides.bodyRowCells(await bodyRow())).rejects.toThrow(/not a plausible 4-column grid/);
+    vi.spyOn(sceneComposite, 'splitSheetByEdgeDetection').mockRejectedValue(new Error('analyzer unavailable'));
+    await expect(avatarSlides.bodyRowCells(await bodyRow())).rejects.toThrow(/analyzer unavailable/);
   });
   it('a sheet or a single figure is refused as a body row', async () => {
     await expect(avatarSlides.bodyRowCells(await wholeSheet())).rejects.toThrow(/not a 1x4 body row/);
@@ -308,5 +385,26 @@ describe('5. a rename moves the sheets; a persisted sheet lands under the row\'s
     };
     await trialSheets.persistPreparedSheets({ userId: 'u', characterId: 'c', exported: { Child: { standard: 'std' } } }, deps);
     expect(Object.keys(rowChar.preGeneratedStyledAvatars)).toEqual(['Mia']);
+  });
+});
+
+describe('4. the early full-body row is styled before it is shown (docs/decisions.md 2026-10-10)', () => {
+  it('the row prompt is the sheet prompt worded for a 1x4 row: same rules, same style line', () => {
+    const rowPrompt = sheetLib.buildStyleTransferPrompt('watercolor', { bodyRowOnly: true });
+    const sheetPrompt = sheetLib.buildStyleTransferPrompt('watercolor');
+    expect(sheetPrompt).toContain('a 2×4 character reference sheet (8 cells)');
+    expect(rowPrompt).toContain('a row of four full-body character views (4 cells)');
+    expect(rowPrompt).not.toMatch(/8 cells|2×4/);
+    const rules = (p: string) => p.slice(p.indexOf('Keep the content of Image 1 unchanged'));
+    expect(rules(rowPrompt).replace('in the row', 'on the sheet')).toBe(rules(sheetPrompt));
+  });
+  it('a realistic or missing art style is refused (the row exists to be restyled)', async () => {
+    await expect(sheetLib.styleBodyRow(await bodyRow(), 'realistic')).rejects.toThrow(/non-realistic art style/);
+    await expect(sheetLib.styleBodyRow(await bodyRow(), undefined)).rejects.toThrow(/non-realistic art style/);
+  });
+  it('the route cuts only the styled row: bodyRowCells is never given the pass-1 row', () => {
+    const src = read('server/routes/trial.js');
+    expect(src).toMatch(/bodyRowCells\(await styleBodyRow\(body\.row, TRIAL_ART_STYLE\)\)/);
+    expect(src).not.toMatch(/bodyRowCells\(body\.row\)/);
   });
 });

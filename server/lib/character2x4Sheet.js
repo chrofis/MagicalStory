@@ -798,6 +798,23 @@ async function generateBodyRow(character, { costumeDescription = 'standard outfi
 }
 
 /**
+ * Pass 2 on the FULL-BODY row alone: the same style transfer the sheet gets (styleTransferGenerate, the sheet's prompt worded
+ * for a 1x4 row), one attempt, no judge and no anchor (nothing can act on a verdict in the trial; the anchor is only attached
+ * when a judge can reject a contaminated result, see runStyleTransferPass). The trial shows the row's cells before the sheet
+ * exists, so they must already be in the story's style (owner, 2026-10-10: "some avatars are not watercolour"). The row it is
+ * given stays the sheet's pass-1 body row: the sheet is restyled as a whole, so head and body keep ONE painter's hand.
+ * Throws when the backend returns no image.
+ * @returns {Promise<string>} the styled row (data URI)
+ */
+async function styleBodyRow(rowImageData, artStyle, { usageTracker = null } = {}) {
+  if (!artStyle || artStyle === 'realistic') throw new Error('styleBodyRow: a non-realistic art style is required');
+  const result = await styleTransferGenerate(buildStyleTransferPrompt(artStyle, { bodyRowOnly: true }), rowImageData, null, null);
+  if (!result?.imageData) throw new Error('styleBodyRow: the style transfer returned no image');
+  if (usageTracker && result.usage) usageTracker(result.provider || 'grok', { ...result.usage, cost: result.usage.cost ?? require('../config/models').priceUsage(result.modelId, result.usage) }, 'character_2x4_body_row_style_transfer', result.modelId);
+  return result.imageData;
+}
+
+/**
  * The DECLARED age, as a proportion instruction (2026-09-14).
  *
  * The sheet prompt used to carry the age only as "match the person's apparent
@@ -1094,7 +1111,7 @@ function resolveStyleLineForSheet(artStyle) {
 // Grok's stylisation ceiling, but the tidy prompt holds the style without the
 // realism backfire the over-constrained variant caused. `hasAnchor` adds the
 // "Image 2 is the style reference" line only when styleTransferGenerate passes one.
-function buildStyleTransferPrompt(artStyle, { hasAnchor = false } = {}) {
+function buildStyleTransferPrompt(artStyle, { hasAnchor = false, bodyRowOnly = false } = {}) {
   const styleLine = resolveStyleLineForSheet(artStyle);
   // Image 2's PEOPLE keep bleeding into the sheet (job_1786277779744 2026-08-09;
   // again job_1786484554633 2026-08-12 — the anchor family ghosted across Noah's
@@ -1105,10 +1122,14 @@ function buildStyleTransferPrompt(artStyle, { hasAnchor = false } = {}) {
   const anchorLine = hasAnchor
     ? '\nImage 2 is a swatch of the painting technique, brushwork and paper texture only. Take nothing else from it: no figure, face, garment, garment colour, or composition — every painted element and every garment colour in the output comes from Image 1. Where Image 2 and the style text above disagree, the style text wins.'
     : '';
-  return `Change the art style of Image 1 — a 2×4 character reference sheet (8 cells) — to: ${styleLine}
-Render all 8 cells uniformly in this style — no cell left photographic.
+  // The trial styles the full-body row alone, right after it is drawn (docs/decisions.md 2026-10-10): same rules, a 1×4 row.
+  const what = bodyRowOnly ? 'a row of four full-body character views (4 cells)' : 'a 2×4 character reference sheet (8 cells)';
+  const cells = bodyRowOnly ? 'all 4 cells' : 'all 8 cells';
+  const where = bodyRowOnly ? 'in the row' : 'on the sheet';
+  return `Change the art style of Image 1 — ${what} — to: ${styleLine}
+Render ${cells} uniformly in this style — no cell left photographic.
 
-Keep the content of Image 1 unchanged; only the art style changes. Every cell shows the same single character as Image 1, alone — no other person or figure anywhere on the sheet. Hair colour and skin tone stay as Image 1 shows them, with no colour patch on the face that Image 1 does not have. ${garmentColourRule('Image 1')} ${SHEET_GROUND_RULE} ${SHEET_EMPTY_HANDS_RULE} ${SHEET_NO_LETTERING_RULE}${anchorLine}`;
+Keep the content of Image 1 unchanged; only the art style changes. Every cell shows the same single character as Image 1, alone — no other person or figure anywhere ${where}. Hair colour and skin tone stay as Image 1 shows them, with no colour patch on the face that Image 1 does not have. ${garmentColourRule('Image 1')} ${SHEET_GROUND_RULE} ${SHEET_EMPTY_HANDS_RULE} ${SHEET_NO_LETTERING_RULE}${anchorLine}`;
 }
 
 // Optional per-art-style STYLE ANCHOR asset (server/assets/style-anchor-<style>.jpg|png)
@@ -2572,6 +2593,7 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
 module.exports = {
   generateCharacter2x4Sheet,
   generateBodyRow,
+  styleBodyRow,
   phantomTierForAge,
   redressSheetVariant,
   gateRecordOf,

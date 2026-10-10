@@ -936,10 +936,10 @@ function judgeSheetColumnSplit(widths, opts = {}) {
  * caller falls back to cropSheetCellFixed per-cell, same as it does when the
  * service is unreachable (which throws).
  */
-async function splitSheetByEdgeDetection(sheetBuf) {
+async function splitSheetByEdgeDetection(sheetBuf, { cols = 4, rows = 2 } = {}) {
   const b64 = sheetBuf.toString('base64');
-  // Throws an AnalyzerError when the analyzer cannot answer.
-  const data = await analyzerJson('/split-reference-sheet', { image: `data:image/png;base64,${b64}`, count: 8, cols: 4, rows: 2 });
+  // Throws an AnalyzerError when the analyzer cannot answer. A 1x4 full-body row (rows: 1) is cut by the same call.
+  const data = await analyzerJson('/split-reference-sheet', { image: `data:image/png;base64,${b64}`, count: cols * rows, cols, rows });
   if (!Array.isArray(data.cells)) {
     throw new AnalyzerError('/split-reference-sheet', `bad response: ${JSON.stringify(data).slice(0, 120)}`);
   }
@@ -949,7 +949,7 @@ async function splitSheetByEdgeDetection(sheetBuf) {
   // the crop is what a page actually gets, and it stays checkable if the
   // response shape ever changes. Both rows share the column bounds, so the
   // top row answers for all eight.
-  const COLS = 4;
+  const COLS = cols;
   const topRow = cells.slice(0, COLS);
   if (topRow.length !== COLS || topRow.some(c => !c)) {
     log.warn(`[SCENE COMPOSITE] edge-detection split returned ${topRow.filter(Boolean).length}/${COLS} top-row cells — falling back to the fixed ${COLS}-column grid`);
@@ -4631,6 +4631,7 @@ async function _stratifiedBody(ctx) {
 }
 
 module.exports = {
+  splitSheetByEdgeDetection,
   generateSceneComposite,
   generateStratifiedComposite,
   blendPastedCanvas,
