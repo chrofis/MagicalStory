@@ -324,8 +324,9 @@ function getAvatarCacheKey(characterRef, clothingCategory, artStyle) {
 }
 
 /**
- * The character record the 2×4 sheet generators take, from what the styled-avatar pipeline resolved: the ONE builder
- * for convertAvatarToStyle (row-chain and one-call sheets alike).
+ * The character record the 2×4 sheet generator takes, from what the styled-avatar pipeline resolved: the ONE builder
+ * for convertAvatarToStyle and for generateStandardBodyRow, so a body row drawn ahead of the sheet uses the same
+ * references and the same age/gender/physical the sheet itself would.
  */
 function sheetCharacterFor(characterName, character, originalAvatar, facePhoto) {
   return {
@@ -342,6 +343,20 @@ function sheetCharacterFor(characterName, character, originalAvatar, facePhoto) 
 }
 
 /**
+ * The standard sheet's full-body row, drawn on its own ahead of the sheet (the trial does it at the photo, from the
+ * photo's age/gender estimates). Same references the sheet's own body stage gets (body cut-out, face thumbnail), same
+ * unreviewed single try the trial's standard sheet uses; the sheet reuses it via prepareStyledAvatars `precomputedBodies`.
+ * @returns {Promise<{ row: string, review: object, attemptHistory: object[], usage: object }>}
+ */
+async function generateStandardBodyRow(character, { seasonOutfit = null, usageTracker = null } = {}) {
+  const originalAvatar = await photoAsDataUri(getPrimaryPhoto(character), `${character.name} primary photo`);
+  const facePhoto = await photoAsDataUri(getFacePhoto(character), `${character.name} face photo`);
+  if (!originalAvatar || !facePhoto) throw new Error(`generateStandardBodyRow: ${character.name} has no body cut-out or face photo`);
+  const { generateBodyRow } = require('./character2x4Sheet');
+  return generateBodyRow(sheetCharacterFor(character.name, character, originalAvatar, facePhoto), { seasonOutfit, usageTracker, skipReview: true });
+}
+
+/**
  * Convert a single avatar to target art style
  * @param {string} originalAvatar - Base64 image data URL (clothing/body reference)
  * @param {string} artStyle - Target art style (pixar, watercolor, etc.)
@@ -353,7 +368,7 @@ function sheetCharacterFor(characterName, character, originalAvatar, facePhoto) 
  * @param {Object} character - Character object with physical traits (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL (downsized)
  */
-async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false, seasonOutfit = null, oneCall = false } = {}) {
+async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false, seasonOutfit = null, fastPass1 = false, precomputedBody = null } = {}) {
   const startTime = Date.now();
 
   // CANONICAL PATH (2026-05-14): styled avatars are 2×4 reference sheets
@@ -387,16 +402,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     // partially-overlapping criteria, and an outer retry loop on top of all
     // that. Removed — Pass 1 eval is now the authoritative quality gate.
     log.debug(`🎨 [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} → 2×4 via Grok`);
-    // oneCall = the trial (docs/decisions.md 2026-10-10 "one-call sheets in the trial"): ONE Grok call drawn straight in the art
-    // style, judged as a whole, one redo on a defect. The full-story sheet keeps the row chain below.
-    const result = oneCall ? await require('./oneCallSheet').generateJudgedOneCallSheet(adHocChar, {
-      artStyle,
-      costumeDescription,
-      costumeName,
-      seasonOutfit,
-      kind: clothingCategory.startsWith('costumed') ? 'costume' : 'standard',
-      usageTracker: addUsage,
-    }) : await generateCharacter2x4Sheet(adHocChar, {
+    const result = await generateCharacter2x4Sheet(adHocChar, {
       clothingCategory,
       costumeDescription,
       costumeName,
@@ -404,6 +410,8 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       usageTracker: addUsage,
       redress,
       seasonOutfit,
+      fastPass1,
+      precomputedBody,
       // The end of the chain: every caller above threads skipQualityEval, and
       // it died here — the sheet builder kept running its row reviews for
       // trials no matter what the pipeline asked for (job_1786826686448).
@@ -447,13 +455,9 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     // logged "passed".
     const styleJudgeRejected = result.styleJudgeRejected === true;
     const styleJudgeReasons = (result.styleJudgeReasons || []).join('; ') || 'no reason given';
-    // A one-call (trial) sheet is judged as a whole (oneCallSheet.js): it "passed" when nothing is flagged on the shipped sheet.
-    const sheetJudge = result.sheetJudge || null;
-    const shippedSheetDefects = sheetJudge ? (sheetJudge.shipped === 'second' ? sheetJudge.secondDefects : sheetJudge.firstDefects) || [] : [];
     const passed = (faceMatchScore == null || faceMatchScore >= MIN_FACE_MATCH_SCORE)
                 && (clothingMatchScore == null || clothingMatchScore >= MIN_CLOTHING_MATCH_SCORE)
-                && !styleJudgeRejected
-                && shippedSheetDefects.length === 0;
+                && !styleJudgeRejected;
 
     const logEntry = {
       timestamp: new Date().toISOString(),
@@ -472,8 +476,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       combinedScore: innerFinal,
       // False = no judge ran on this sheet. A consumer must not read its scores
       // as a pass; they are unknown.
-      evaluated: sheetJudge ? sheetJudge.judged : !(evalSkipped || evalFailed),
-      sheetJudge,
+      evaluated: !(evalSkipped || evalFailed),
       evalSkipped,
       // True = the shipped styled sheet failed the style judge on every attempt
       // and shipped as the best of them, with the warning below.
@@ -490,18 +493,13 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
         facePhoto: usedFace ? { sizeKB: getImageSizeKB(usedFace), imageData: usedFace } : null,
       },
       output: { sizeKB: getImageSizeKB(downsizedSheet), imageData: downsizedSheet },
-      ...(passed ? {} : { warning: shippedSheetDefects.length > 0
-        ? `shipped with the whole-sheet judge's defects still flagged: ${shippedSheetDefects.map(d => `${d.type}:${d.verdict}`).join(', ')}`
-        : styleJudgeRejected
+      ...(passed ? {} : { warning: styleJudgeRejected
         ? `style judge rejected every attempt — shipped the best styled attempt at ${innerFinal}/10 (${styleJudgeReasons})`
         : `face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10` }),
     };
     pushStyledAvatarLog(logEntry);
 
-    if (sheetJudge) {
-      const how = sheetJudge.judgeError ? `judge error (${sheetJudge.judgeError}), shipped unchecked` : `${sheetJudge.redone ? `redone, shipped the ${sheetJudge.shipped} sheet` : 'first sheet'}, ${shippedSheetDefects.length === 0 ? 'clean' : `flagged ${shippedSheetDefects.map(d => d.type).join(', ')}`}`;
-      log.info(`${sheetJudge.judgeError || shippedSheetDefects.length ? '⚠️' : '✅'} [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} one-call sheet: ${how} (${Math.round(sheetJudge.totalMs / 1000)}s)`);
-    } else if (evalSkipped) {
+    if (evalSkipped) {
       log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} shipped UNSCORED — quality eval skipped (${evalSkipped}); no axis was judged`);
     } else if (evalFailed) {
       log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} shipped UNSCORED — row eval failed (${evalFailed}); sheet kept but not judged`);
@@ -543,7 +541,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
  * @param {Object} character - Character object with physical traits (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL
  */
-async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false, seasonOutfit = null, oneCall = false } = {}) {
+async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false, seasonOutfit = null, fastPass1 = false, precomputedBody = null } = {}) {
   const cacheKey = getAvatarCacheKey(character || characterName, clothingCategory, artStyle);
 
   // Check cache first. A guarantee-seeded raw reference does NOT count — the
@@ -565,7 +563,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
 
   const conversionPromise = (async () => {
     try {
-      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage, character, imageModelOverride, { skipQualityEval, redress, seasonOutfit, oneCall });
+      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage, character, imageModelOverride, { skipQualityEval, redress, seasonOutfit, fastPass1, precomputedBody });
       styledAvatarCache.set(cacheKey, styledAvatar);
       guaranteeSeededKeys.delete(cacheKey); // real sheet replaces any seeded raw reference
       return styledAvatar;
@@ -624,7 +622,7 @@ function rememberStyledAvatarOnCharacter(character, artStyle, clothingCategory, 
 // outfit (a t-shirt in a winter book). Costumed sheets never take it: the
 // costume is the outfit. Not part of the cache key deliberately — the key is
 // already story-scoped (`getCacheScope()`), and a story has exactly one season.
-async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null, addUsage = null, imageModelOverride = null, { skipQualityEval = false, seasonOutfit = null, finalPass = true, oneCall = false } = {}) {
+async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null, addUsage = null, imageModelOverride = null, { skipQualityEval = false, seasonOutfit = null, finalPass = true, fastPass1 = false, precomputedBodies = {} } = {}) {
   log.debug(`🎨 [STYLED AVATARS] Preparing styled avatars for ${characters.length} characters in ${artStyle} style`);
 
   // For realistic style, skip standard/winter/summer style conversion (photos are already realistic)
@@ -905,7 +903,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 
     if (originalAvatar && typeof originalAvatar === 'string' && originalAvatar.startsWith('data:image')) {
       allPromises.push(
-        getOrCreateStyledAvatar(charName, clothingCategory, artStyle, originalAvatar, facePhoto, costumeDescription, addUsage, char, imageModelOverride, { skipQualityEval, oneCall })
+        getOrCreateStyledAvatar(charName, clothingCategory, artStyle, originalAvatar, facePhoto, costumeDescription, addUsage, char, imageModelOverride, { skipQualityEval, fastPass1 })
           .then(styledAvatar => {
             // Store on character object
             if (!char.avatars) char.avatars = {};
@@ -934,7 +932,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
   // Standard style conversion promises (run simultaneously with costumed)
   for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto, clothingDescription, redress, seasonOutfit: entrySeasonOutfit, character }] of neededAvatars) {
     allPromises.push(
-      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage, character, imageModelOverride, { skipQualityEval, redress, seasonOutfit: entrySeasonOutfit, oneCall })
+      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage, character, imageModelOverride, { skipQualityEval, redress, seasonOutfit: entrySeasonOutfit, fastPass1, precomputedBody: precomputedBodies[`${characterName}:${clothingCategory}`] || null })
         .then(styledAvatar => ({ type: 'standard', cacheKey, characterName, clothingCategory, character, styledAvatar, success: true }))
         .catch(error => {
           log.error(`❌ [STYLED AVATARS] Failed ${cacheKey}: ${error.message}`);
@@ -1016,7 +1014,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
           // generation too, and dropping the option here kept the reviews
           // running for trials even after every prepareStyledAvatars call site
           // passed skipQualityEval (staging job_1786825477481).
-          getOrCreateStyledAvatar(charName, 'standard', artStyle, originalAvatar, facePhoto, null, addUsage, char, imageModelOverride, { skipQualityEval, oneCall })
+          getOrCreateStyledAvatar(charName, 'standard', artStyle, originalAvatar, facePhoto, null, addUsage, char, imageModelOverride, { skipQualityEval, fastPass1 })
             .then(styledAvatar => {
               if (char) {
                 if (!char.avatars) char.avatars = {};
@@ -2216,6 +2214,7 @@ module.exports = {
   variantLogEntry,
   approvedBaseSheetFor,
   convertAvatarToStyle,
+  generateStandardBodyRow,
   sheetCharacterFor,
   resolveAvatarBytes, // avatarHair.js reads the stored standard avatar through the same inline-or-R2 lookup
 

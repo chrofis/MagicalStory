@@ -65,6 +65,29 @@ async function singleCellJpeg(cell, sourceWidth) {
 }
 
 /**
+ * The cells of a 1x4 FULL-BODY row (the body stage of a sheet, drawn before the head row): [front, threeQuarter, profile,
+ * back] as JPEG data URIs. Cut with the figure cutter (sheetCut.js, the one the sheet cells and page references use),
+ * never by fixed quarters: a fixed quarter sliced heads and feet off figures that drift off their column (owner, iPhone
+ * 2026-10-10: "the full body images are cut at head and feet"). A row without four figures throws. An image that is not wide is refused.
+ * docs/decisions.md 2026-10-10 "Trial: the early full-body figures are styled".
+ */
+async function bodyRowCells(source) {
+  const buf = await bytesFromAnyImage(source);
+  if (!buf) throw new Error('body row could not be read');
+  const { width, height } = await sharp(buf).metadata();
+  if (!width || !height || width / height < 1.5) throw new Error(`image ${width}x${height} is not a 1x4 body row`);
+  const parts = await require('./sheetCut').cutSheet(buf, { rows: 1, cols: 4 });
+  const cells = [];
+  for (const part of parts) cells.push(await singleCellJpeg(part, width));
+  return brandCutList(cells);
+}
+
+/** The slides a body row feeds, from its cells (bodyRowCells): front, three-quarter and profile; the back view has no face and is skipped. */
+function slidesOfBodyRowCells(cells) {
+  return brandCutList(cells.slice(0, SLIDE_POSES.length), SLIDE_POSES.map(pose => figureLabel('standard', pose, 'body')));
+}
+
+/**
  * The whole front-facing BODY cell of one sheet as a JPEG data URI: the hero image the wizard shows next to the
  * hero's name (the standard sheet is the only avatar the wizard draws; there is no separate preview portrait).
  */
@@ -121,7 +144,7 @@ async function buildAvatarSlides(styledAvatars, log = defaultLog) {
 
 /**
  * Store cut slides in R2 under a CONTENT key and return their URLs, in order. The generic row offload names an object by its
- * position in the row (`preGeneratedAvatarSlides-3.jpg`), so two slide lists written close together (the
+ * position in the row (`preGeneratedAvatarSlides-3.jpg`), so two slide lists written close together (the body row's, the
  * costumed sheet's, the finished sheet's) overwrote each other's objects: the stored list of user 880b53c1 held the standard
  * front body at two positions and a head at two, while the cutters returned twelve distinct cells (docs/decisions.md
  * 2026-10-09 "Trial slides: content keys"). A content key can only ever hold its own bytes.
@@ -156,4 +179,4 @@ async function persistAvatarSlides({ characterId, userId, styledAvatars }, log =
   return slides.length;
 }
 
-module.exports = { storeSlides, persistAvatarSlides, buildAvatarSlides, slidesFromSheet, frontBodyCell, sheetSourcesOf, sheetEntriesOf, interleaveSheetSlides, SLIDE_POSES };
+module.exports = { storeSlides, persistAvatarSlides, buildAvatarSlides, slidesFromSheet, bodyRowCells, slidesOfBodyRowCells, frontBodyCell, sheetSourcesOf, sheetEntriesOf, interleaveSheetSlides, SLIDE_POSES };

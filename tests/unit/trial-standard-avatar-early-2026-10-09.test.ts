@@ -58,7 +58,6 @@ afterEach(() => {
   database.getPool = origGetPool;
   trialRouter.inFlightTitlePagePromises.clear();
   trialRouter.inFlightStandardAvatarPromises.clear();
-  trialRouter.standardSheetDraws.clear();
   trialRouter.inFlightTitleSheetsOnRow.clear();
   trialRouter.inFlightStandardSheetsOnRow.clear();
   vi.restoreAllMocks();
@@ -84,7 +83,7 @@ describe('1. the standard sheet starts at the form', () => {
   it('the client sends no topic with it, and the picture it gets back is the hero avatar', () => {
     const call = step.slice(step.indexOf('/api/trial/prepare-standard-avatar'), step.indexOf('/api/trial/prepare-standard-avatar') + 400);
     expect(call).toContain("body: '{}'");
-    expect(step).toContain('showHero(result.avatarImage);');
+    expect(step).toContain('showHero(result.avatarImage, true)');
   });
 
   it('the server styles ONLY the standard sheet, with no topic, and stamps the age/gender it was drawn for', async () => {
@@ -104,13 +103,12 @@ describe('1. the standard sheet starts at the form', () => {
     expect(args.fields).toEqual({ preGeneratedStandardFor: STAMP });
     expect(STAMP).toBe('gender:male'); // gender only: an age band or tier difference keeps the sheet
     expect(args.styleOptions.skipQualityEval).toBe(true); // the job's own options for this sheet
-    expect(args.styleOptions.oneCall).toBe(true);        // one Grok call, judged, one redo (oneCallSheet.js)
     expect(JSON.stringify(args)).not.toMatch(/costumed:/);
     expect(res.body).toEqual({ avatarImage: cell('FRONT') });
     expect(trialRouter.inFlightStandardAvatarPromises.has('u1')).toBe(false); // released
   });
 
-  it('while it runs, create-story can hand its promise to the job; a duplicate call JOINS the running sheet instead of drawing another', async () => {
+  it('while it runs, create-story can hand its promise to the job; a duplicate call is refused', async () => {
     const state = { char: row() };
     database.getPool = () => fakePool(state);
     let release!: () => void;
@@ -125,11 +123,10 @@ describe('1. the standard sheet starts at the form', () => {
     await new Promise(r => setTimeout(r, 10));
     expect(trialRouter.inFlightStandardAvatarPromises.has('u1')).toBe(true);
     const dup = fakeRes();
-    const dupCall = finalHandler('/prepare-standard-avatar')({ sessionUser: { userId: 'u1' }, body: {}, headers: {} }, dup);
+    await finalHandler('/prepare-standard-avatar')({ sessionUser: { userId: 'u1' }, body: {}, headers: {} }, dup);
+    expect(dup.statusCode).toBe(409);
     release();
-    await Promise.all([first, dupCall]);
-    expect(dup.statusCode).toBe(200);
-    expect(dup.body).toEqual({ avatarImage: cell('X') });
+    await first;
     expect(trialRouter.inFlightStandardAvatarPromises.has('u1')).toBe(false);
   });
 
@@ -156,7 +153,7 @@ describe('1. the standard sheet starts at the form', () => {
 });
 
 describe('2. prepare-title and the job reuse it', () => {
-  it('prepare-title styles only the costumed sheet (never a standard one), with the costume, as one Grok call', async () => {
+  it('prepare-title styles only the costumed sheet (never a standard one), with the costume and the parallel rows', async () => {
     database.getPool = () => fakePool({ char: row({ preGeneratedStyledAvatars: { Kid: { standard: 'https://r2/std.jpg' } }, preGeneratedStandardFor: STAMP }) });
     const sent = writeCutSlides({}, brandCutList([cell('A'), cell('B')]), ['https://r2/a.jpg', 'https://r2/b.jpg']);
     const style = vi.spyOn(trialSheets, 'styleAndPersistTrialSheets').mockResolvedValue({ slides: sent });
@@ -166,7 +163,7 @@ describe('2. prepare-title and the job reuse it', () => {
     const args = style.mock.calls[0][0];
     expect(args.requirements).toHaveLength(1);
     expect(args.requirements[0].clothingCategory).toMatch(/^costumed:/);
-    expect(args.styleOptions.oneCall).toBe(true);
+    expect(args.styleOptions.fastPass1).toBe(true);
     expect(args.fields).toHaveProperty('preGeneratedCostumeType');
     expect(res.body.avatarSlides).toEqual(['https://r2/a.jpg', 'https://r2/b.jpg']); // slides of both sheets, built by the persist step
   });

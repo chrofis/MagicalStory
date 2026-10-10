@@ -336,13 +336,6 @@
 </tr>
 
 <tr>
-  <td>Generate the TRIAL's styled avatar sheet (standard and costumed, one call, 2026-10-10)</td>
-  <td><code>server/lib/styledAvatars.js</code> → <code>convertAvatarToStyle</code> (<code>oneCall: true</code>) → <code>server/lib/oneCallSheet.js</code> <code>generateJudgedOneCallSheet</code> → <code>generateOneCallSheet</code> (character2x4Sheet.js) → Grok edit; judge: <code>avatarSheetJudge.js</code> <code>judgeAvatarSheet</code> (Gemini 2.5 Flash)</td>
-  <td>Grok edit (Standard tier, 1:1), 2 ref slots: layout guide (axes head row over plain body row of the age-tiered phantom) + face photo; the judge gets the sheet and the photo</td>
-  <td>The whole styled 2×4 in ONE call, drawn straight in the story's art style (no photoreal pass, no pass 2): USD 0.02, 13-31 s. Judged as a whole (USD 0.0033, 4 s); on a defect (hat, hair, bald/headless cell, costume, head row vs body row, held object, layout) ONE redo of the same call with the judge's types and cells fed back, judged again, the better sheet ships; a judge API error is logged and the first sheet ships (fail-open, 2026-09-11 gate precedent). Set by the trial only: prepare-standard-body / prepare-standard-avatar / prepare-title (<code>routes/trial.js</code>) and the job's <code>runTrialEarlyStyling</code> and trial coverage top-ups (<code>storyJobPipeline.js</code>, <code>oneCall: !!inputData.trialMode</code>). The full-story sheet is NOT this path: it keeps the row chain in the next row. Slides and hero are cut with <code>sheetCut.js</code>; a client only gets single cut cells (<code>clientAvatarImages.js</code>). Verdict, redo count and wall time are in the styled-avatar log entry (<code>sheetJudge</code>) and the <code>avatar_sheet_oneCall_*</code> run metrics. docs/decisions.md 2026-10-10 "one-call sheets in the trial".</td>
-</tr>
-
-<tr>
   <td>Generate styled avatar (watercolor, ghibli, …)</td>
   <td><code>server/lib/styledAvatars.js</code> → <code>convertAvatarToStyle</code> → <code>generateCharacter2x4Sheet</code> → Grok edit</td>
   <td>Grok edit, 3 ref slots: phantom + standard avatar + face photo</td>

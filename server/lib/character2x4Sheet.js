@@ -113,6 +113,7 @@ async function styleTransferGenerate(prompt, pass1ImageData, backendOverride = n
 const MAX_SHEET_RETRIES = 1;
 
 // Pass-1 tries per row (body row, head row): the first attempt plus one retry.
+// The trial prewarm passes 1 (decisions 2026-10-08, "Trial avatar sheet").
 const PASS1_ROW_TRIES = 2;
 
 // The cell-4 / cell-8 pose, ONE definition. The live row generators
@@ -606,8 +607,11 @@ async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usage
 }
 
 // Stage 1 of the decoupled sheet: the 1×4 FULL-BODY row (up to rowTries tries, keep least-bad). Its own render, before and
-// independent of the head row.
-async function runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model, usageTracker, attemptHistory, addUsage, grokModel = GROK_MODELS.STANDARD }) {
+// independent of the head row, so a caller can draw it ahead of the rest (generateBodyRow) and hand it back to
+// generateComposited2x4 as `precomputedBody` (docs/decisions.md 2026-10-09, trial body row at the photo).
+// deferReview (one try only, see generateComposited2x4): the judge runs in the background and its promise rides on the result, so the
+// caller can start the next render while it works. The attempt entry is filled in when the judge answers.
+async function runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model, usageTracker, attemptHistory, addUsage, deferReview = false, grokModel = GROK_MODELS.STANDARD }) {
   // ── Stage 1: body row (up to rowTries tries, keep least-bad) ──
   let bestBody = null;
   let bodyGenError = null;
@@ -639,6 +643,7 @@ async function runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skip
     // every axis without a single judge call). score null = unscored; valid stays
     // true so the sheet still ships (the caller asked for no reviews).
     let review = { valid: true, score: null, evaluated: false, bodies: null };
+    let reviewPromise = null;
     const judge = async () => {
       try {
         return await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker, declaredAge: character?.age, glasses: declaredGlasses(character), hair: hairRequest(character) });
@@ -650,11 +655,12 @@ async function runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skip
         return { valid: true, score: 0, bodies: null, evalFailed: err.message };
       }
     };
-    if (!skipReview) review = await judge();
+    if (!skipReview) { if (deferReview) reviewPromise = judge(); else review = await judge(); }
     const entry = { stage: 'body', try: t, score: review.score, valid: review.valid, reasons: review.bodies?.failureReasons || [] };
     attemptHistory.push(entry);
+    if (reviewPromise) reviewPromise.then(r => Object.assign(entry, { score: r.score, valid: r.valid, reasons: r.bodies?.failureReasons || [] }));
     const rank = (v) => (typeof v === 'number' ? v : -1); // unscored ranks below any judged attempt
-    if (!bestBody || rank(review.score) > rank(bestBody.review.score)) bestBody = { row: res.imageData, review };
+    if (!bestBody || rank(review.score) > rank(bestBody.review.score)) bestBody = { row: res.imageData, review, reviewPromise };
     if (review.valid) break;
     log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t} invalid (score=${review.score}) — ${skipReview ? '' : (review.bodies?.failureReasons || []).join('; ')}`);
   }
@@ -665,11 +671,13 @@ async function runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skip
 // Two-call generation → one composited 2×4 sheet, WITH review between the calls.
 // (1) body row, reviewed (pose + bodies eval); up to rowTries tries (default 2), keep least-bad.
 // (2) head row on the ACCEPTED body, reviewed (heads + identity); same tries,
-// keep least-bad. Then composite. Rejected rows are discarded. Returns a verdict
+// keep least-bad. rowTries 1 is the trial prewarm (fastPass1). Then composite. Rejected rows are discarded. Returns a verdict
 // in the evaluateSheetSplit shape so generateCharacter2x4Sheet / styledAvatars
 // consume it unchanged. skipReview → 1 try each, no eval (fast path for tests).
-// The FULL-STORY sheet's pass 1. The trial draws its sheet in one call instead (oneCallSheet.js).
-async function generateComposited2x4(character, { costumeDescription, costumeName = null, redress = false, usageTracker = null, skipReview = false, seasonOutfit = null, rowTries = PASS1_ROW_TRIES, grokModel = GROK_MODELS.STANDARD, styleLine = null } = {}) {
+// deferJudges (honoured only with one try per row and reviews on, the trial prewarm): with one try nothing can act on a row verdict, so
+// the judges only record. The body judge then runs while the head row renders, the head and identity judges while the caller styles the
+// sheet, and the verdict arrives as `verdictPromise` (never rejects) instead of `verdict`. docs/decisions.md 2026-10-10.
+async function generateComposited2x4(character, { costumeDescription, costumeName = null, redress = false, usageTracker = null, skipReview = false, seasonOutfit = null, rowTries = PASS1_ROW_TRIES, precomputedBody = null, deferJudges = false, grokModel = GROK_MODELS.STANDARD, styleLine = null } = {}) {
   const facePhoto = await resolveFacePhoto(character);
   if (!facePhoto) throw new Error(`No face photo for ${character?.name || 'character'}.`);
   const standardAvatar = await resolveStandardAvatar(character);
@@ -681,10 +689,12 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   const bodyPrompt = buildBodyRowPrompt(costumeDescription, character, redress, costumeName, seasonOutfit, styleLine);
   const headPrompt = buildHeadRowPrompt(character, costumeDescription, redress, styleLine);
   const attemptHistory = [];
+  const defer = deferJudges && rowTries === 1 && !skipReview;
   let usage = { input_tokens: 0, output_tokens: 0 };
   const addUsage = (u, fn, id) => { if (u) { usage.input_tokens += u.input_tokens || 0; usage.output_tokens += u.output_tokens || 0; if (usageTracker) usageTracker('grok', u, fn, id); } };
 
-  const runBodyRow = async () => runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model, usageTracker, attemptHistory, addUsage, grokModel });
+  if (precomputedBody?.attemptHistory) attemptHistory.push(...precomputedBody.attemptHistory);
+  const runBodyRow = async () => precomputedBody || runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model, usageTracker, attemptHistory, addUsage, deferReview: defer, grokModel });
 
   const runHeadRow = async (bodyRow) => {
     // ── Stage 2: head row (up to rowTries tries, keep least-bad) ──
@@ -714,6 +724,7 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
       const headCrop = await cropHeadRowToShoulders(res.imageData);
       res = { ...res, imageData: headCrop.imageData };
       let review = { valid: true, score: null, evaluated: false, heads: null, identity: null };
+      let reviewPromise = null;
       const judge = async () => {
         try {
           return await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker, declaredAge: character?.age, costumeDescription, glasses: declaredGlasses(character), hair: hairRequest(character) });
@@ -722,11 +733,12 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
           return { valid: true, score: 0, heads: null, identity: null, evalFailed: err.message };
         }
       };
-      if (!skipReview) review = await judge();
+      if (!skipReview) { if (defer) reviewPromise = judge(); else review = await judge(); }
       const entry = { stage: 'head', try: t, score: review.score, valid: review.valid, reasons: review.heads?.failureReasons || [], crop: headCrop.crop };
       attemptHistory.push(entry);
+      if (reviewPromise) reviewPromise.then(r => Object.assign(entry, { score: r.score, valid: r.valid, reasons: r.heads?.failureReasons || [] }));
       const rank = (v) => (typeof v === 'number' ? v : -1); // unscored ranks below any judged attempt
-      if (!bestHead || rank(review.score) > rank(bestHead.review.score)) bestHead = { row: res.imageData, review };
+      if (!bestHead || rank(review.score) > rank(bestHead.review.score)) bestHead = { row: res.imageData, review, reviewPromise };
       if (review.valid) break;
       log.warn(`[CHARACTER 2×4] ${character?.name} head try ${t} invalid (score=${review.score})`);
     }
@@ -777,9 +789,11 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
     };
     return { verdict, judgePrompts };
   };
-  const settled = settle([bestBody.review, bestHead.review]);
+  const verdictPromise = Promise.all([bestBody.reviewPromise || bestBody.review, bestHead.reviewPromise || bestHead.review]).then(settle);
+  // Not deferred: the verdict is part of the result, as ever. Deferred: the caller awaits verdictPromise when it needs the verdict.
+  const settled = defer ? null : await verdictPromise;
   return {
-    imageData, ...settled, usage, modelId: grokModel,
+    imageData, ...(settled || {}), verdictPromise, usage, modelId: grokModel,
     refs: { phantom: headPhantom, bodyPhantom, standardAvatar, facePhoto },
     prompt: `— BODY ROW —
 ${bodyPrompt}
@@ -790,13 +804,12 @@ ${headPrompt}`,
   };
 }
 
-// ── The whole styled 2×4 sheet from the photo in ONE call (the trial's sheet since docs/decisions.md 2026-10-10 "one-call sheets in the
-// trial"; also the Lab's avatar_sheet_variant 'oneCall') ─────────────────────────────────────────────────────────────────────────────
-// Built from the same rule constants and prompt blocks the two row prompts use (the full-story sheet keeps the row chain: one combined
-// call gave a headless bottom row ~70% of the time on the photoreal path, docs/decisions.md 2026-08-08; drawn straight in watercolour on
-// the Standard tier it was 0 of 13). Layout guide = the axes phantom's head row over the plain phantom's body row, the two guides the
-// production rows are drawn against. `redoFeedback` (avatarSheetJudge.redoFeedback) is the judge's correction block of a redo.
-function buildOneCallSheetPrompt(character, { costumeDescription, costumeName = null, seasonOutfit = null, styleLine, redoFeedback = null }) {
+// ── Test Lab only: the whole styled 2×4 sheet from the photo in ONE call (avatar_sheet_variant 'oneCall') ──────────────────────
+// Built from the same rule constants and prompt blocks the two row prompts use. NOT wired into any production path: the 2026-08-08
+// split into two row calls exists because one combined call gave a headless bottom row ~70% of the time (docs/decisions.md); the
+// Lab stage measures whether a stronger Grok tier changes that. Layout guide = the axes phantom's head row over the plain
+// phantom's body row, the two guides the production rows are drawn against.
+function buildOneCallSheetPrompt(character, { costumeDescription, costumeName = null, seasonOutfit = null, styleLine }) {
   const named = costumeName ? ` — a ${costumeName}` : '';
   const declaredAge = declaredAgeBlock(character);
   const ageFromPhoto = declaredAge ? '' : " matching the person's apparent age in Image 2";
@@ -813,13 +826,10 @@ Art style: ${styleLine}${ageFromPhoto ? `. Natural proportions${ageFromPhoto}` :
 ${buildFootwearRule(false, seasonOutfit?.footwear)}
 ${buildGarmentRule()}
 ${SHEET_EMPTY_HANDS_RULE}
-The outfit is identical in all eight cells, layers included, and the neckline in the top row is the one the body below wears. ${buildUnnamedTrimRule(false)} ${SHEET_GROUND_RULE} ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}${redoFeedback ? `
-
-A previous attempt at this sheet had faults. Cells are numbered 1-4 across the top row and 5-8 across the bottom row (the numbers are never drawn). Correct them:
-${redoFeedback}` : ''}`;
+The outfit is identical in all eight cells, layers included, and the neckline in the top row is the one the body below wears. ${buildUnnamedTrimRule(false)} ${SHEET_GROUND_RULE} ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
 }
 
-async function generateOneCallSheet(character, { artStyle, costumeDescription = 'standard outfit', costumeName = null, seasonOutfit = null, usageTracker = null, grokModel = GROK_MODELS.STANDARD, redoFeedback = null } = {}) {
+async function generateOneCallSheet(character, { artStyle, costumeDescription = 'standard outfit', costumeName = null, seasonOutfit = null, usageTracker = null, grokModel = GROK_MODELS.STANDARD } = {}) {
   if (!artStyle || artStyle === 'realistic') throw new Error('generateOneCallSheet: a non-realistic art style is required');
   const facePhoto = await resolveFacePhoto(character);
   if (!facePhoto) throw new Error(`No face photo for ${character?.name || 'character'}.`);
@@ -831,11 +841,50 @@ async function generateOneCallSheet(character, { artStyle, costumeDescription = 
   const bH = (await sharp(body).metadata()).height;
   const guide = await sharp({ create: { width: W, height: hH + bH, channels: 3, background: '#ffffff' } })
     .composite([{ input: headFit, top: 0, left: 0 }, { input: body, top: hH, left: 0 }]).png().toBuffer();
-  const prompt = buildOneCallSheetPrompt(character, { costumeDescription, costumeName, seasonOutfit, styleLine: resolveStyleLineForSheet(artStyle), redoFeedback });
+  const prompt = buildOneCallSheetPrompt(character, { costumeDescription, costumeName, seasonOutfit, styleLine: resolveStyleLineForSheet(artStyle) });
   const res = await editWithGrok(prompt, [`data:image/png;base64,${guide.toString('base64')}`, facePhoto], { aspectRatio: '1:1', model: grokModel, skipOutputCrop: true });
   if (!res?.imageData) throw new Error(`generateOneCallSheet: no image for ${character?.name}`);
   if (usageTracker && res.usage) usageTracker('grok', res.usage, 'character_2x4_one_call', res.modelId);
   return { imageData: res.imageData, usage: res.usage, modelId: res.modelId || grokModel, prompt };
+}
+
+/**
+ * The 1×4 full-body row of a sheet as its OWN render (stage 1 of generateComposited2x4), drawn ahead of the rest.
+ * The trial draws it the moment the photo is analysed, from the photo's age/gender estimates, so the visitor sees a
+ * full-body figure while the form is still being filled; the finished sheet reuses it (`precomputedBody`) when the
+ * age band and gender it was drawn for still hold. No extra paid call: the same body-row call the sheet would make.
+ *
+ * @returns {Promise<{ row: string, review: object, attemptHistory: object[], usage: object }>} `row` is the row image (data URI)
+ */
+async function generateBodyRow(character, { costumeDescription = 'standard outfit', costumeName = null, redress = false, usageTracker = null, skipReview = false, seasonOutfit = null, rowTries = PASS1_ROW_TRIES } = {}) {
+  const facePhoto = await resolveFacePhoto(character);
+  if (!facePhoto) throw new Error(`No face photo for ${character?.name || 'character'}.`);
+  const standardAvatar = await resolveStandardAvatar(character);
+  const bodyPhantom = await phantomRow(loadPhantomVariant(character?.age, 'plain'), 'bottom');
+  const bodyRefs = standardAvatar ? [bodyPhantom, standardAvatar, facePhoto] : [bodyPhantom, facePhoto];
+  const bodyPrompt = buildBodyRowPrompt(costumeDescription, character, redress, costumeName, seasonOutfit);
+  const attemptHistory = [];
+  const usage = { input_tokens: 0, output_tokens: 0 };
+  const addUsage = (u, fn, id) => { if (u) { usage.input_tokens += u.input_tokens || 0; usage.output_tokens += u.output_tokens || 0; if (usageTracker) usageTracker('grok', u, fn, id); } };
+  const best = await runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model: MODEL_DEFAULTS.sheetEvalModel, usageTracker, attemptHistory, addUsage });
+  return { row: best.row, review: best.review, attemptHistory, usage };
+}
+
+/**
+ * Pass 2 on the FULL-BODY row alone: the same style transfer the sheet gets (styleTransferGenerate, the sheet's prompt worded
+ * for a 1x4 row), one attempt, no judge and no anchor (nothing can act on a verdict in the trial; the anchor is only attached
+ * when a judge can reject a contaminated result, see runStyleTransferPass). The trial shows the row's cells before the sheet
+ * exists, so they must already be in the story's style (owner, 2026-10-10: "some avatars are not watercolour"). The row it is
+ * given stays the sheet's pass-1 body row: the sheet is restyled as a whole, so head and body keep ONE painter's hand.
+ * Throws when the backend returns no image.
+ * @returns {Promise<string>} the styled row (data URI)
+ */
+async function styleBodyRow(rowImageData, artStyle, { usageTracker = null } = {}) {
+  if (!artStyle || artStyle === 'realistic') throw new Error('styleBodyRow: a non-realistic art style is required');
+  const result = await styleTransferGenerate(buildStyleTransferPrompt(artStyle, { bodyRowOnly: true }), rowImageData, null, null);
+  if (!result?.imageData) throw new Error('styleBodyRow: the style transfer returned no image');
+  if (usageTracker && result.usage) usageTracker(result.provider || 'grok', { ...result.usage, cost: result.usage.cost ?? require('../config/models').priceUsage(result.modelId, result.usage) }, 'character_2x4_body_row_style_transfer', result.modelId);
+  return result.imageData;
 }
 
 /**
@@ -1135,7 +1184,7 @@ function resolveStyleLineForSheet(artStyle) {
 // Grok's stylisation ceiling, but the tidy prompt holds the style without the
 // realism backfire the over-constrained variant caused. `hasAnchor` adds the
 // "Image 2 is the style reference" line only when styleTransferGenerate passes one.
-function buildStyleTransferPrompt(artStyle, { hasAnchor = false } = {}) {
+function buildStyleTransferPrompt(artStyle, { hasAnchor = false, bodyRowOnly = false } = {}) {
   const styleLine = resolveStyleLineForSheet(artStyle);
   // Image 2's PEOPLE keep bleeding into the sheet (job_1786277779744 2026-08-09;
   // again job_1786484554633 2026-08-12 — the anchor family ghosted across Noah's
@@ -1146,10 +1195,14 @@ function buildStyleTransferPrompt(artStyle, { hasAnchor = false } = {}) {
   const anchorLine = hasAnchor
     ? '\nImage 2 is a swatch of the painting technique, brushwork and paper texture only. Take nothing else from it: no figure, face, garment, garment colour, or composition — every painted element and every garment colour in the output comes from Image 1. Where Image 2 and the style text above disagree, the style text wins.'
     : '';
-  return `Change the art style of Image 1 — a 2×4 character reference sheet (8 cells) — to: ${styleLine}
-Render all 8 cells uniformly in this style — no cell left photographic.
+  // The trial styles the full-body row alone, right after it is drawn (docs/decisions.md 2026-10-10): same rules, a 1×4 row.
+  const what = bodyRowOnly ? 'a row of four full-body character views (4 cells)' : 'a 2×4 character reference sheet (8 cells)';
+  const cells = bodyRowOnly ? 'all 4 cells' : 'all 8 cells';
+  const where = bodyRowOnly ? 'in the row' : 'on the sheet';
+  return `Change the art style of Image 1 — ${what} — to: ${styleLine}
+Render ${cells} uniformly in this style — no cell left photographic.
 
-Keep the content of Image 1 unchanged; only the art style changes. Every cell shows the same single character as Image 1, alone — no other person or figure anywhere on the sheet. Hair colour and skin tone stay as Image 1 shows them, with no colour patch on the face that Image 1 does not have. ${garmentColourRule('Image 1')} ${SHEET_GROUND_RULE} ${SHEET_EMPTY_HANDS_RULE} ${SHEET_NO_LETTERING_RULE}${anchorLine}`;
+Keep the content of Image 1 unchanged; only the art style changes. Every cell shows the same single character as Image 1, alone — no other person or figure anywhere ${where}. Hair colour and skin tone stay as Image 1 shows them, with no colour patch on the face that Image 1 does not have. ${garmentColourRule('Image 1')} ${SHEET_GROUND_RULE} ${SHEET_EMPTY_HANDS_RULE} ${SHEET_NO_LETTERING_RULE}${anchorLine}`;
 }
 
 // Optional per-art-style STYLE ANCHOR asset (server/assets/style-anchor-<style>.jpg|png)
@@ -1998,6 +2051,11 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     // child is wearing. Never touches identity; ignored on a redress sheet,
     // where the costume owns the outfit.
     seasonOutfit = null,
+    // fastPass1 = the trial prewarm (decisions 2026-10-08, parallel rows replaced 2026-10-10): pass 1 draws the body row, then the head row against it, one
+    // try each, and pass 2 restyles whatever comes back. The full-story path leaves it false: sequential rows, two tries each.
+    fastPass1 = false,
+    // A body row drawn ahead of the sheet by generateBodyRow (the trial draws it at the photo); stage 1 is skipped.
+    precomputedBody = null,
     // Test Lab avatar_sheet_variant knobs (server/lib/testlab.js). Every default is the production value, so production calls
     // are unchanged; nothing but the Lab passes them (tests/unit/avatar-sheet-variant-options.test.ts pins the defaults).
     //   grokModel        the Grok tier of every call of the sheet (pass 1 rows and pass 2); undefined = Standard, resolved by the callee
@@ -2029,8 +2087,11 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   try {
     composed = await generateComposited2x4(character, {
       costumeDescription, costumeName, redress, usageTracker, skipReview: skipQualityEval, seasonOutfit,
+      // fastPass1 = the trial prewarm: one try per row, so the row judges only record; they run beside the next render and pass 2 (see generateComposited2x4).
       grokModel,
       ...(styledPass1 ? { styleLine: resolveStyleLineForSheet(artStyle) } : {}),
+      precomputedBody,
+      ...(fastPass1 ? { rowTries: 1, deferJudges: true } : {}),
     });
   } catch (err) {
     throw new Error(`[CHARACTER 2×4] pass-1 generation failed for ${character?.name}: ${err.message}`);
@@ -2084,7 +2145,8 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     }
   }
 
-  const { verdict, judgePrompts } = composed;
+  // The pass-1 row judges (deferred in the trial prewarm) have had the whole of pass 2 to answer; their verdict is read only now.
+  const { verdict, judgePrompts } = await composed.verdictPromise;
   log.info(`[CHARACTER 2×4] ${character?.name} pass-1 (decoupled 2-call): layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} final=${verdict.finalScore} valid=${verdict.valid}`);
   const pass1 = {
     imageData: composed.imageData,
@@ -2618,8 +2680,10 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
 
 module.exports = {
   generateCharacter2x4Sheet,
+  generateBodyRow,
   generateOneCallSheet,
   buildOneCallSheetPrompt,
+  styleBodyRow,
   phantomTierForAge,
   redressSheetVariant,
   gateRecordOf,
