@@ -1,0 +1,299 @@
+{
+ "job_1789944735873_vmbd0or30": {
+  "v2": {
+   "id": "job_1789944735873_vmbd0or30",
+   "aVbMs": 12868,
+   "aTitleMs": 6244,
+   "aTotalMs": 15359,
+   "aOut": 1748,
+   "aIn": 8824,
+   "aCost": 0.013173,
+   "bFirstMs": 585,
+   "bPage1Ms": 5193,
+   "bPagesMs": {
+    "1": 5193,
+    "2": 9899,
+    "3": 13976,
+    "4": 18095,
+    "5": 22417,
+    "6": 26490
+   },
+   "bTotalMs": 26490,
+   "bOut": 4510,
+   "bIn": 15835,
+   "bCost": 0.07677,
+   "page1ImageStartS": 20.552,
+   "totalS": 41.849,
+   "costUsd": 0.08994300000000001,
+   "stops": [
+    "stop",
+    "end_turn"
+   ],
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 0,
+     "ani": 0,
+     "art": 2,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+    "coverEventWithSentinel": true
+   },
+   "respect": {
+    "vbIds": 4,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "arcRespect": {
+    "arcPages": 6,
+    "withItems": 18,
+    "inHint": 18,
+    "inVb": 12,
+    "missing": [],
+    "notInVb": [
+     "p1:Serena",
+     "p2:Serena",
+     "p3:Serena",
+     "p4:Serena",
+     "p5:Serena",
+     "p6:Serena"
+    ]
+   },
+   "arcLines": 6
+  },
+  "medium": {
+   "id": "job_1789944735873_vmbd0or30",
+   "vbMs": 91069,
+   "page1Ms": 98056,
+   "totalMs": 119411,
+   "costUsd": 0.200674,
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 0,
+     "ani": 1,
+     "art": 2,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   }
+  }
+ },
+ "job_1791490151653_r9mypyn0c": {
+  "v2": {
+   "id": "job_1791490151653_r9mypyn0c",
+   "aVbMs": 11977,
+   "aTitleMs": 5378,
+   "aTotalMs": 14808,
+   "aOut": 1737,
+   "aIn": 9414,
+   "aCost": 0.01357425,
+   "bFirstMs": 1347,
+   "bPage1Ms": 7722,
+   "bPagesMs": {
+    "1": 7722,
+    "2": 14090,
+    "3": 20425,
+    "4": 26458,
+    "5": 31761,
+    "6": 37747
+   },
+   "bTotalMs": 37747,
+   "bOut": 5828,
+   "bIn": 16731,
+   "bCost": 0.09174199999999999,
+   "page1ImageStartS": 22.53,
+   "totalS": 52.555,
+   "costUsd": 0.10531624999999999,
+   "stops": [
+    "stop",
+    "end_turn"
+   ],
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 0,
+     "ani": 1,
+     "art": 2,
+     "loc": 1,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+    "coverEventWithSentinel": true
+   },
+   "respect": {
+    "vbIds": 4,
+    "foreign": [
+     "p6:ART003"
+    ],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "arcRespect": {
+    "arcPages": 6,
+    "withItems": 19,
+    "inHint": 19,
+    "inVb": 10,
+    "missing": [],
+    "notInVb": [
+     "p1:Lukas",
+     "p1:hand-drawn map",
+     "p2:Lukas",
+     "p2:hand-drawn map",
+     "p3:Lukas",
+     "p4:Lukas",
+     "p5:Lukas",
+     "p6:Lukas",
+     "p6:storybook"
+    ]
+   },
+   "arcLines": 6
+  },
+  "medium": {
+   "id": "job_1791490151653_r9mypyn0c",
+   "vbMs": 103642,
+   "page1Ms": 111798,
+   "totalMs": 138904,
+   "costUsd": 0.228834,
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 0,
+     "ani": 1,
+     "art": 2,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   }
+  }
+ },
+ "job_1791497394846_v01s6ndpn": {
+  "v2": {
+   "id": "job_1791497394846_v01s6ndpn",
+   "aVbMs": 11028,
+   "aTitleMs": 5110,
+   "aTotalMs": 13602,
+   "aOut": 1683,
+   "aIn": 8715,
+   "aCost": 0.0128475,
+   "bFirstMs": 541,
+   "bPage1Ms": 6557,
+   "bPagesMs": {
+    "1": 6557,
+    "2": 12440,
+    "3": 17935,
+    "4": 22864,
+    "5": 28574,
+    "6": 33848
+   },
+   "bTotalMs": 33848,
+   "bOut": 5133,
+   "bIn": 15564,
+   "bCost": 0.082458,
+   "page1ImageStartS": 20.159,
+   "totalS": 47.45,
+   "costUsd": 0.0953055,
+   "stops": [
+    "stop",
+    "end_turn"
+   ],
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 0,
+     "art": 2,
+     "loc": 1,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+    "coverEventWithSentinel": true
+   },
+   "respect": {
+    "vbIds": 4,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "arcRespect": {
+    "arcPages": 6,
+    "withItems": 17,
+    "inHint": 14,
+    "inVb": 8,
+    "missing": [
+     "p1:lonely boy",
+     "p2:lonely boy",
+     "p6:lonely boy"
+    ],
+    "notInVb": [
+     "p1:Mia",
+     "p1:lonely boy",
+     "p2:Mia",
+     "p2:lonely boy",
+     "p3:Mia",
+     "p4:Mia",
+     "p5:Mia",
+     "p6:Mia",
+     "p6:lonely boy"
+    ]
+   },
+   "arcLines": 6
+  },
+  "medium": {
+   "id": "job_1791497394846_v01s6ndpn",
+   "vbMs": 105278,
+   "page1Ms": 113729,
+   "totalMs": 136310,
+   "costUsd": 0.21781,
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 0,
+     "art": 2,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   }
+  }
+ }
+}

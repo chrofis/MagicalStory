@@ -1,0 +1,18 @@
+{
+ "note": "One reader (the agent), arm hidden by blind-key-run.json (medium was X on all three by chance); only 3 of 5 chosen inputs run because the USD 1.00 cap covers 3 pairs (v2 0.29 + medium 0.65). Not run: job_1789643978035_ljafiqwgg, job_1788181867610_qfo6zmnvw.",
+ "verdicts": {
+  "job_1791490151653_r9mypyn0c": "medium better: v2 Eli kept but the raven mimicry never pays off, slow first page, map never returns",
+  "job_1789944735873_vmbd0or30": "medium better: v2 mixes imparfait and passe compose (tournait ... a ramassé), flat; animals trait unused",
+  "job_1791497394846_v01s6ndpn": "medium slightly better: v2 coherent, invents toy name Barnaby and boy Lukas; medium has the walking-the-wall payoff"
+ },
+ "tally": {
+  "v2_better": 0,
+  "tie": 0,
+  "medium_better": 3
+ },
+ "special_details": {
+  "Lukas": "Eli yes (arc 6/6, story)",
+  "Serena": "dance yes, fear of dark yes, animals no",
+  "Mia": "none stored; toy parrot yes"
+ }
+}

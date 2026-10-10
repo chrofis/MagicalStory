@@ -20,12 +20,21 @@ const BASE = path.join(ROOT, 'evals/runs/2026-10-09_trial-writer-effort');
 const V2 = path.join(ROOT, 'evals/runs/2026-10-10_trial-split-writer-v2');
 // --v=2 (owner 2026-10-10 "Run it"): mandatory cast & objects line from the characters' special details + Flash reasoning effort low
 const V2ON = arg('v') === '2';
-const OUT = path.join(ROOT, V2ON ? 'evals/runs/2026-10-10_trial-flash-arc-vb-v2' : 'evals/runs/2026-10-10_trial-flash-arc-vb');
+// --set=fresh (owner 2026-10-10 "5 more tries"): fresh stored staging/prod trial inputs, pulled from the stories table, with their own single-medium baseline
+const FRESH = {
+  job_1791490151653_r9mypyn0c: 'STAGING_DATABASE_URL', // de-ch, 9, life-challenge, plush elephant Eli, landmarks
+  job_1789944735873_vmbd0or30: 'DATABASE_URL',         // fr-ch, 4, life-challenge, dance / fear of dark / animals
+  job_1791497394846_v01s6ndpn: 'STAGING_DATABASE_URL', // en, 6, adventure, toy parrot, landmarks
+  job_1789643978035_ljafiqwgg: 'DATABASE_URL',         // fr-ch, 7, adventure, likes felines
+  job_1788181867610_qfo6zmnvw: 'DATABASE_URL',         // fr-ch, 6, life-challenge, dinosaurs and travel
+};
+const FRESHON = arg('set') === 'fresh';
+const OUT = path.join(ROOT, FRESHON ? 'evals/runs/2026-10-10_trial-flash-arc-vb-v2-fresh' : V2ON ? 'evals/runs/2026-10-10_trial-flash-arc-vb-v2' : 'evals/runs/2026-10-10_trial-flash-arc-vb');
 const VBF = path.join(ROOT, 'evals/runs/2026-10-10_trial-vb-first');
 const OLD_IDS = ['job_1791579344291_rk2bno6av', 'job_1791496820206_qwcnrq30r', 'job_1791391658361_4eylyr1w4', 'job_1791554548909_kl0phznw2', 'job_1791551298726_19tfcxccl'];
 const NEW_IDS = ['job_1791450452362_pv0l5hf49', 'job_1791450270543_n1iu8ipsu', 'job_1790769860433_2bhhj0pyi', 'job_1790680992018_nd95o89r7', 'job_1791500208126_at0wow7xa'];
-const IDS = [...OLD_IDS, ...NEW_IDS];
-const inputDir = id => (OLD_IDS.includes(id) ? path.join(BASE, id) : path.join(V2, id));
+const IDS = FRESHON ? Object.keys(FRESH) : [...OLD_IDS, ...NEW_IDS];
+const inputDir = id => FRESHON ? path.join(OUT, id) : (OLD_IDS.includes(id) ? path.join(BASE, id) : path.join(V2, id));
 const range = s => { if (!s) return IDS; const [a, b] = s.split('-').map(Number); return IDS.slice(a - 1, (b || a)); };
 const readJson = (f, d) => (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : d);
 
@@ -124,10 +133,30 @@ function parseSimple(text) {
   const build = (tpl, input) => { PROMPT_TEMPLATES.storyTrial = tpl; try { let t = buildTrialStoryPrompt(input, input.pages); if (V2ON) { const m = mandatoryLine(input); if (m) { if (!t.includes('- **Story Idea**:')) throw new Error('story idea line not found'); t = t.replace('- **Story Idea**:', () => m + '- **Story Idea**:'); } } return t; } finally { PROMPT_TEMPLATES.storyTrial = orig; } };
   const loadInput = id => JSON.parse(fs.readFileSync(path.join(inputDir(id), 'inputData.json'), 'utf8'));
   const mediumFile = id => {
+    if (FRESHON) return path.join(OUT, id, 'output-medium.txt');
     if (!OLD_IDS.includes(id)) return path.join(V2, id, 'output-medium.txt');
     const k = readJson(path.join(BASE, 'arms-key.json'), {})[id];
     return path.join(BASE, id, `output-${['A', 'B'].find(l => k[l] === 'medium')}.txt`);
   };
+
+  if (phase === 'inputs') {
+    const { Pool } = require('pg');
+    for (const [id, env] of Object.entries(FRESH)) {
+      const pool = new Pool({ connectionString: process.env[env], ssl: { rejectUnauthorized: false } });
+      const st = (await pool.query('select data from stories where id=$1', [id])).rows[0]?.data;
+      await pool.end();
+      if (!st) throw new Error('no stored story ' + id);
+      const input = {};
+      for (const k of ['pages', 'layout', 'artStyle', 'ideaKind', 'ideaPick', 'language', 'characters', 'storyTheme', 'storyTopic', 'storyDetails', 'userLocation', 'languageLevel', 'storyCategory']) if (st[k] !== undefined) input[k] = st[k];
+      if (st.replayInputs?.availableLandmarks) input.availableLandmarks = st.replayInputs.availableLandmarks;
+      input.trialMode = true;
+      input.characters = (input.characters || []).map(c => { const { photos, avatars, ...rest } = c; return rest; });
+      const d = path.join(OUT, id); fs.mkdirSync(d, { recursive: true });
+      fs.writeFileSync(path.join(d, 'inputData.json'), JSON.stringify(input, null, 2));
+      console.log(id, input.language, input.storyCategory, input.characters.map(c => c.age).join(','), 'landmarks=' + (input.availableLandmarks || []).length, 'pages=' + input.pages);
+    }
+    return;
+  }
 
   if (phase === 'prompts') {
     for (const id of IDS) {
@@ -231,6 +260,20 @@ function arcRespect(arc, hints, vb) {
     return { vbIds: Object.keys(el).length, foreign, outside, unused, unlistedFigs, unlistedObjs, noLocId: badLoc };
   }
   const guard = (est) => { const s = spendOf(); if (s + est > CAP) { console.log(`STOP: spend ${s.toFixed(3)} + est ${est} > cap ${CAP}`); process.exit(0); } };
+
+  if (phase === 'baseline') {
+    const ids = range(arg('ids')).filter(id => !fs.existsSync(path.join(OUT, id, 'baseline-metrics.json')));
+    guard(0.22 * ids.length);
+    await Promise.all(ids.map(async id => { try {
+      const dir = path.join(OUT, id);
+      const c = await timedCall(fs.readFileSync(path.join(dir, 'prompt-full.txt'), 'utf8'), 'claude-sonnet-5-5', 'medium');
+      fs.writeFileSync(path.join(dir, 'output-medium.txt'), c.r.text); book({ part: 'baseline', id, cost: c.cost });
+      fs.writeFileSync(path.join(dir, 'baseline-metrics.json'), JSON.stringify({ id, vbMs: c.ev.vb, page1Ms: c.ev.pages[1], totalMs: c.ms, costUsd: c.cost, real: realParse(c.r.text) }, null, 2));
+      console.log(id, 'MEDIUM vb=' + (c.ev.vb / 1000).toFixed(1) + 's p1=' + (c.ev.pages[1] / 1000).toFixed(1) + 's total=' + (c.ms / 1000).toFixed(1) + 's $' + c.cost.toFixed(3) + ' spend=$' + spendOf().toFixed(3));
+    } catch (e) { console.log(id, 'ERROR', String(e.message || e).slice(0, 300)); } }));
+    console.log('DONE spend', spendOf().toFixed(3));
+    return;
+  }
 
   if (phase === 'run') {
     const ids = range(arg('ids')).filter(id => !fs.existsSync(path.join(OUT, id, 'run-metrics.json')));
