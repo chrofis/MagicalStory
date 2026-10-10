@@ -153,4 +153,28 @@ async function judgeAvatarSheet({ sheet, photo = null, kind, model, usageTracker
   return { parsed: parseAvatarSheetVerdict(raw), raw, prompt };
 }
 
-module.exports = { VERDICTS, DEFECT_TYPES, CELL_ENUMS, buildAvatarSheetJudgePrompt, parseAvatarSheetVerdict, cellSignals, defectsOf, judgeAvatarSheet };
+// The trial's standard sheet runs ONE judge pass for the defect types this judge reads reliably (docs/decisions.md 2026-10-10
+// "Trial standard sheet: whole-sheet judge, one redo"): a bald or headless cell, a held object, a broken layout (not a grid,
+// a second person, lettering, a photograph). Hat, hair, costume and head-row questions stay off: measured precision 5-28%
+// (decisions 2026-10-10 "Avatar sheet defect judge"), a redo on every second clean sheet. Signal per type as tuned there.
+const TRIAL_REDO_SIGNALS = { bald: 'verdict', held: 'cells', layout: 'verdict' };
+
+/** The redo-worthy defects of a parsed verdict: [{ type, word, cells }]; `cells` are the numbers the judge named. */
+function trialSheetDefects(parsed) {
+  const found = defectsOf(parsed, TRIAL_REDO_SIGNALS).filter(t => t in TRIAL_REDO_SIGNALS);
+  return found.map(type => {
+    const v = parsed.verdicts[type];
+    // held is decided from the per-cell enum answers, so its cells come from there
+    const cells = type === 'held' ? parsed.cells.filter(c => c.heldObject === 'something').map(c => c.cell) : v.cells;
+    return { type, word: type === 'held' ? 'object_in_hand' : v.verdict, cells };
+  });
+}
+
+/** The better of two judged sheets: fewer defect types, then fewer flagged cells; a tie keeps `a` (the first). */
+function betterSheet(a, b) {
+  const size = (d) => [d.length, d.reduce((n, x) => n + x.cells.length, 0)];
+  const [ta, ca] = size(a.defects); const [tb, cb] = size(b.defects);
+  return (tb < ta || (tb === ta && cb < ca)) ? b : a;
+}
+
+module.exports = { TRIAL_REDO_SIGNALS, trialSheetDefects, betterSheet, VERDICTS, DEFECT_TYPES, CELL_ENUMS, buildAvatarSheetJudgePrompt, parseAvatarSheetVerdict, cellSignals, defectsOf, judgeAvatarSheet };

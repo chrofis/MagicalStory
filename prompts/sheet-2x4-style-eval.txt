@@ -51,6 +51,7 @@ TASK 6: AGE MATCH
 
 TASK 7: SINGLE SUBJECT — NO OTHER PEOPLE
 - Every cell of Image 3 shows the SAME one person as Image 2. No other or additional people may appear anywhere in the sheet — no second face, no extra figure, no background person, not even partial.
+- Look at the empty paper beside and behind every figure, at the cell corners and edges and in the head cells too, not only at the character: a face or body painted into the ground is a person, however pale the paint. Name each extra figure and the cell it is in, in `solo.reason`.
 - This includes faint, ghosted, semi-transparent, or sketchy figures blended into the background or margins — a washed-out extra face or body counts the same as a solid one. Compare against Image 2: any human shape in Image 3 that is not in Image 2 is a defect.
 - Score 1-10. Any extra or different person anywhere in Image 3 (a second face, an added body, a ghosted figure, a crowd) scores 1-3. Only the single target character across all 8 cells = 9-10.
 - `soloScore` is the score.
@@ -58,6 +59,7 @@ TASK 7: SINGLE SUBJECT — NO OTHER PEOPLE
 TASK 8: PLAIN GROUND
 - {SHEET_GROUND}
 - {SHEET_LETTERING} Read the paper above, below and beside every figure and between the cells, and quote in `background.reason` any word, letter or number written there.
+- A person, face or figure painted into the ground is also a TASK 7 defect: score `soloScore` 1-3 for it, and here score the ground 1-3 as well.
 - Score 1-10. Plain paper and the dividers in every cell = 9-10. A faint shadow under the feet only = 7-8. A painted wash, shape or scenery behind a figure, or the dividers gone = 3-5. Any written caption, word, letter or number anywhere on the sheet = 1-2.
 - `backgroundScore` is the score.
 

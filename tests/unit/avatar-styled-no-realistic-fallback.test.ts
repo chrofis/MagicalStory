@@ -22,7 +22,7 @@ import vm from 'vm';
 const SRC = fs.readFileSync(path.join(__dirname, '../../server/lib/character2x4Sheet.js'), 'utf8');
 
 function extractFunction(src: string, name: string): string {
-  const start = src.indexOf(`async function ${name}(`);
+  const start = [`async function ${name}(`, `function ${name}(`].map(n => src.indexOf(n)).find(i => i !== -1) ?? -1;
   if (start === -1) throw new Error(`could not find function ${name}`);
   let p = src.indexOf('(', start);
   let pdepth = 0;
@@ -40,7 +40,7 @@ function extractFunction(src: string, name: string): string {
 }
 
 // The real module constants, not copies.
-const CONSTS = [/const SHEET_VALID_MIN = [^;]+;/, /const STYLED_IDENTITY_AXES = [^;]+;/]
+const CONSTS = [/const SHEET_VALID_MIN = [^;]+;/, /const STYLED_BLOCK_BELOW = [^;]+;/]
   .map(re => { const m = SRC.match(re); if (!m) throw new Error(`constant not found: ${re}`); return m[0]; })
   .join('\n');
 
@@ -85,7 +85,8 @@ function makeCtx(attempts: Attempt[]) {
 async function runPass2(attempts: Attempt[]) {
   const { ctx, calls } = makeCtx(attempts);
   vm.createContext(ctx);
-  vm.runInContext(`${CONSTS}\n${extractFunction(SRC, 'runStyleTransferPass')}\nmodule.exports = runStyleTransferPass;`, ctx);
+  vm.runInContext(`${CONSTS}\n${extractFunction(SRC, 'blockingAxesOf')}
+${extractFunction(SRC, 'runStyleTransferPass')}\nmodule.exports = runStyleTransferPass;`, ctx);
   const out = await ctx.module.exports({
     pass1ImageData: 'PASS1', facePhoto: 'FACE', artStyle: 'watercolor', characterName: 'Kid', usageTracker: null,
   });
@@ -107,7 +108,8 @@ async function runSheet(attempts: Attempt[], artStyle = 'watercolor') {
   });
   vm.createContext(ctx);
   vm.runInContext(
-    `${CONSTS}\n${extractFunction(SRC, 'runStyleTransferPass')}\n${extractFunction(SRC, 'generateCharacter2x4Sheet')}\nmodule.exports = generateCharacter2x4Sheet;`,
+    `${CONSTS}\n${extractFunction(SRC, 'blockingAxesOf')}
+${extractFunction(SRC, 'runStyleTransferPass')}\n${extractFunction(SRC, 'generateCharacter2x4Sheet')}\nmodule.exports = generateCharacter2x4Sheet;`,
     ctx
   );
   const out = await ctx.module.exports({ name: 'Kid', age: 6 }, { artStyle });
@@ -115,16 +117,38 @@ async function runSheet(attempts: Attempt[], artStyle = 'watercolor') {
 }
 
 describe('runStyleTransferPass — which styled attempt ships', () => {
-  it('both attempts fail STYLE only → the higher-scoring one ships, flagged invalid', async () => {
-    const { out } = await runPass2([{ ...GOOD, styleScore: 3 }, { ...GOOD, backgroundScore: 5 }]);
+  it('both attempts fail only NON-blocking axes → the higher-scoring one ships, flagged invalid', async () => {
+    const { out } = await runPass2([{ ...GOOD, styleScore: 4 }, { ...GOOD, cleanScore: 5 }]);
     expect(out.shippable).toBe(true);
     expect(out.valid).toBe(false);
     expect(out.imageData).toBe('STYLED_2');
     expect(out.finalScore).toBe(5);
   });
 
+  // docs/decisions.md 2026-10-10: background, extra people and a photographic look BLOCK like identity.
+  it('Julian regression: solo 9 / background 3 outranks nothing - the unblocked attempt 2 ships', async () => {
+    // attempt 1 scores higher overall on solo but its ground is painted; attempt 2 is clean but lower overall
+    const { out } = await runPass2([{ ...GOOD, backgroundScore: 3 }, { ...GOOD, styleScore: 4 }]);
+    expect(out.shippable).toBe(true);
+    expect(out.imageData).toBe('STYLED_2');
+    expect(out.attempts[0].identityRejected).toBe(true);
+    expect(out.attempts[1].identityRejected).toBe(false);
+  });
+
+  it('a photographic sheet (style 1-3) is blocked and never beats an unblocked one', async () => {
+    const { out } = await runPass2([{ ...GOOD, styleScore: 2 }, { ...GOOD, cleanScore: 4 }]);
+    expect(out.imageData).toBe('STYLED_2');
+    expect(out.attempts[0].identityRejected).toBe(true);
+  });
+
+  it.each([['background', 5], ['style', 3], ['solo', 5]])('every attempt blocked on %s → not shippable', async (axis, v) => {
+    const { out } = await runPass2([{ ...GOOD, [`${axis}Score`]: v }, { ...GOOD, [`${axis}Score`]: v }]);
+    expect(out.shippable).toBe(false);
+    expect(out.identityFailing).toEqual([axis]);
+  });
+
   it('an identity-failed attempt never ships, even when it outscores the other', async () => {
-    const { out } = await runPass2([{ ...GOOD, identityScore: 5 }, { ...GOOD, styleScore: 3 }]);
+    const { out } = await runPass2([{ ...GOOD, identityScore: 5 }, { ...GOOD, styleScore: 4 }]);
     expect(out.shippable).toBe(true);
     expect(out.imageData).toBe('STYLED_2');
     expect(out.attempts[0].identityRejected).toBe(true);
@@ -154,13 +178,13 @@ describe('runStyleTransferPass — which styled attempt ships', () => {
 });
 
 describe('generateCharacter2x4Sheet — never ships the realistic sheet in a styled story', () => {
-  it('style-rejected on both attempts → ships the best STYLED attempt with a warning', async () => {
-    const { out, calls } = await runSheet([{ ...GOOD, styleScore: 2 }, { ...GOOD, cleanScore: 4 }]);
+  it('rejected on a non-blocking axis on both attempts → ships the best STYLED attempt with a warning', async () => {
+    const { out, calls } = await runSheet([{ ...GOOD, styleScore: 4 }, { ...GOOD, cleanScore: 5 }]);
     expect(out.imageData).toBe('STYLED_2');
     expect(out.imageData).not.toBe('PASS1_REALISTIC');
     expect(out.styleJudgeRejected).toBe(true);
     expect(out.styleJudgeReasons.length).toBeGreaterThan(0);
-    expect(out.finalScore).toBe(4);
+    expect(out.finalScore).toBe(5);
     expect(out.realisticImageData).toBe('PASS1_REALISTIC');
     expect(calls.warns.some(w => /shipping the best styled attempt/.test(w))).toBe(true);
   });
@@ -173,7 +197,7 @@ describe('generateCharacter2x4Sheet — never ships the realistic sheet in a sty
 
   it('every attempt fails IDENTITY → throws; Pass 1 is not a substitute', async () => {
     await expect(runSheet([{ ...GOOD, identityScore: 2 }, { ...GOOD, identityScore: 3 }]))
-      .rejects.toThrow(/failed IDENTITY \(identity/);
+      .rejects.toThrow(/was BLOCKED \(identity/);
   });
 
   it('no attempt produced an image → throws; Pass 1 is not a substitute', async () => {

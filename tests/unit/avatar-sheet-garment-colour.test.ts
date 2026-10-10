@@ -81,7 +81,7 @@ describe('critic: the style judge is sent the same rule and scores it', () => {
 
 // ── The retry path, with the REAL runStyleTransferPass sliced into a vm ──────
 function extractFunction(src: string, name: string): string {
-  const start = src.indexOf(`async function ${name}(`);
+  const start = [`async function ${name}(`, `function ${name}(`].map(n => src.indexOf(n)).find(i => i !== -1) ?? -1;
   if (start === -1) throw new Error(`could not find function ${name}`);
   let p = src.indexOf('(', start);
   let pdepth = 0;
@@ -97,7 +97,7 @@ function extractFunction(src: string, name: string): string {
   }
   return src.slice(start, i);
 }
-const CONSTS = [/const SHEET_VALID_MIN = [^;]+;/, /const STYLED_IDENTITY_AXES = [^;]+;/]
+const CONSTS = [/const SHEET_VALID_MIN = [^;]+;/, /const STYLED_BLOCK_BELOW = [^;]+;/]
   .map(re => { const m = SRC.match(re); if (!m) throw new Error(`constant not found: ${re}`); return m[0]; })
   .join('\n');
 
@@ -120,7 +120,8 @@ async function runPass2(attempts: Record<string, number>[]) {
   };
   ctx.globalThis = ctx;
   vm.createContext(ctx);
-  vm.runInContext(`${CONSTS}\n${extractFunction(SRC, 'runStyleTransferPass')}\nmodule.exports = runStyleTransferPass;`, ctx);
+  vm.runInContext(`${CONSTS}\n${extractFunction(SRC, 'blockingAxesOf')}
+${extractFunction(SRC, 'runStyleTransferPass')}\nmodule.exports = runStyleTransferPass;`, ctx);
   const out = await ctx.module.exports({ pass1ImageData: 'PASS1', facePhoto: 'FACE', artStyle: 'watercolor', characterName: 'Kid', usageTracker: null });
   return { out, gens };
 }
