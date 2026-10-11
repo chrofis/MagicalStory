@@ -1334,7 +1334,7 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
       if (!analyzerResponse.ok) {
         const text = await analyzerResponse.text().catch(() => '');
         reportAnalyzerFailure('📸 [PHOTO]', new AnalyzerError('/analyze', `HTTP ${analyzerResponse.status} ${text.substring(0, 200)}`, { status: analyzerResponse.status }), { severity: 'customer', userId: req.user?.id });
-        return res.status(502).json({ error: 'Photo analysis service error', details: `HTTP ${analyzerResponse.status}` });
+        return res.status(502).json({ error: 'Photo analysis service error', code: 'PHOTO_ANALYSIS_FAILED', details: `HTTP ${analyzerResponse.status}` });
       }
       const analyzerData = await analyzerResponse.json();
 
@@ -1357,12 +1357,14 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
           log.warn('📸 [PHOTO] No face detected in photo');
           return res.json({
             success: false,
-            error: 'no_face_detected'
+            error: 'no_face_detected',
+            code: 'PHOTO_NO_PERSON'
           });
         }
         reportAnalyzerFailure('📸 [PHOTO] analysis failed', new AnalyzerError('/analyze', String(analyzerData.error || 'success:false')), { severity: 'customer', userId: req.user?.id, detail: { traceback: analyzerData.traceback ? String(analyzerData.traceback).slice(0, 500) : null } });
         return res.status(500).json({
           error: 'Photo analysis failed',
+          code: 'PHOTO_ANALYSIS_FAILED',
           details: analyzerData.error || 'Unknown error',
           traceback: analyzerData.traceback
         });
@@ -1536,7 +1538,7 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         // client holding a characterId with no row, and the avatar job could not
         // find the character (review 2026-10 V6): fail loudly instead.
         log.error(`📸 [PHOTO] Failed to create character in DB: ${dbErr.message}`);
-        return res.status(500).json({ error: 'Could not save the character. Please try again.' });
+        return res.status(500).json({ error: 'Could not save the character. Please try again.', code: 'PHOTO_ANALYSIS_FAILED' });
       }
 
       // Convert snake_case to camelCase for frontend compatibility
@@ -1567,6 +1569,7 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
       if (fetchErr.cause?.code === 'ECONNREFUSED') {
         return res.status(503).json({
           error: 'Photo analysis service unavailable',
+          code: 'PHOTO_ANALYSIS_FAILED',
           details: 'The photo analysis service is not running. Please contact support.',
           fallback: true
         });
@@ -1579,6 +1582,7 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
     log.error('Error analyzing photo:', err);
     res.status(500).json({
       error: 'Failed to analyze photo',
+      code: 'PHOTO_ANALYSIS_FAILED',
       details: err.message,
       fallback: true
     });

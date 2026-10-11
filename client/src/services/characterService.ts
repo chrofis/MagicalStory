@@ -922,6 +922,7 @@ export const characterService = {
   async analyzePhoto(imageData: string, language?: string, selectedFaceId?: number, cachedFaces?: Array<{ id: number; x: number; y: number; width: number; height: number; confidence: number }>, existingCharacterId?: number): Promise<{
     success: boolean;
     error?: string;  // Error code (e.g., 'no_face_detected')
+    cause?: unknown;  // what photoFailureMessage() needs: { code, status } of the server answer, or the thrown error
     // Character ID created by server
     characterId?: number;
     // Multi-face detection fields
@@ -1007,6 +1008,7 @@ export const characterService = {
           other_features?: string;  // Distinctive markings (glasses, etc.)
         };
         error?: string;
+        code?: string;  // PHOTO_NO_PERSON | PHOTO_ANALYSIS_FAILED
         fallback?: boolean;
         _debug?: { rawResponse?: string; error?: string };
       }>('/api/analyze-photo', { imageData, language, selectedFaceId, cachedFaces, existingCharacterId });
@@ -1016,6 +1018,7 @@ export const characterService = {
         return {
           success: false,
           error: response.error,
+          cause: { code: response.code, status: 200 },
         };
       }
 
@@ -1068,7 +1071,7 @@ export const characterService = {
     } catch (error) {
       // The raw server text (e.g. "Could not save the character") is logged; the wizard shows a localised message
       log.error('Photo analysis failed:', error);
-      return { success: false, error: 'analysis_failed' };
+      return { success: false, error: 'analysis_failed', cause: error };
     }
   },
 

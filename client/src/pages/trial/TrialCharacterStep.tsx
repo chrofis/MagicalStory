@@ -10,7 +10,7 @@ import { MAX_STRENGTHS } from '@/constants/traitLimits';
 import type { Language } from '@/types/story';
 import { trackTrialStep } from '@/utils/trialFunnel';
 import { classifyAccountCreateFailure } from '@/utils/trialSession';
-import { localizedApiError } from '@/utils/apiErrors';
+import { photoFailureMessage } from '@/utils/apiErrors';
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 // The standard avatar sheet starts once the form has not changed for this long (an age of two digits passes the
@@ -53,9 +53,7 @@ const strings: Record<string, {
   consentAfter: string;
   pleaseAccept: string;
   selectFace: string;
-  noFaceDetected: string;
   multipleFaces: string;
-  photoError: string;
   photoUploaded: string;
   traitsOptional: string;
   avatarReward: string;
@@ -95,9 +93,7 @@ const strings: Record<string, {
     consentAfter: ', including AI processing of the photo for the story.',
     pleaseAccept: 'Please accept the terms above to upload a photo',
     selectFace: 'Select the correct face',
-    noFaceDetected: 'No face detected. Please try a different photo.',
     multipleFaces: 'Multiple faces detected. Please select the correct one.',
-    photoError: 'Failed to analyze photo. Please try again.',
     accountFailed: 'Account creation failed. Please try again.',
     verificationFailed: 'The security check did not go through. Please try again in a moment.',
     photoUploaded: 'Photo uploaded',
@@ -137,9 +133,7 @@ const strings: Record<string, {
     consentAfter: ', inklusive KI-Verarbeitung des Fotos für die Geschichte.',
     pleaseAccept: 'Bitte akzeptiere die obigen Bedingungen, um ein Foto hochzuladen',
     selectFace: 'Wähle das richtige Gesicht',
-    noFaceDetected: 'Kein Gesicht erkannt. Bitte versuche ein anderes Foto.',
     multipleFaces: 'Mehrere Gesichter erkannt. Bitte wähle das richtige aus.',
-    photoError: 'Foto konnte nicht analysiert werden. Bitte versuche es erneut.',
     accountFailed: 'Das Konto konnte nicht erstellt werden. Bitte versuche es erneut.',
     verificationFailed: 'Die Sicherheitsprüfung hat nicht geklappt. Bitte versuche es gleich noch einmal.',
     photoUploaded: 'Foto hochgeladen',
@@ -179,9 +173,7 @@ const strings: Record<string, {
     consentAfter: ', y compris le traitement de la photo par IA pour l’histoire.',
     pleaseAccept: 'Veuillez accepter les conditions ci-dessus pour importer une photo',
     selectFace: 'Sélectionnez le bon visage',
-    noFaceDetected: 'Aucun visage détecté. Veuillez essayer une autre photo.',
     multipleFaces: 'Plusieurs visages détectés. Veuillez sélectionner le bon.',
-    photoError: "Échec de l'analyse de la photo. Veuillez réessayer.",
     accountFailed: 'La création du compte a échoué. Veuillez réessayer.',
     verificationFailed: "La vérification de sécurité n'a pas abouti. Veuillez réessayer dans un instant.",
     photoUploaded: 'Photo importée',
@@ -221,9 +213,7 @@ const strings: Record<string, {
     consentAfter: ', inclusa l\'elaborazione della foto tramite IA per la storia.',
     pleaseAccept: 'Accetta le condizioni qui sopra per caricare una foto',
     selectFace: 'Seleziona il viso corretto',
-    noFaceDetected: 'Nessun viso rilevato. Prova con un\'altra foto.',
     multipleFaces: 'Rilevati più visi. Seleziona quello corretto.',
-    photoError: 'Impossibile analizzare la foto. Riprova.',
     accountFailed: "Creazione dell'account non riuscita. Riprova.",
     verificationFailed: 'Il controllo di sicurezza non è andato a buon fine. Riprova tra un momento.',
     photoUploaded: 'Foto caricata',
@@ -706,11 +696,19 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
         body.cachedFaces = cachedFaces;
       }
 
-      const response = await postAnalyzePhoto(body);
-      const result = await response.json();
+      // Three different failures, three different messages (owner 2026-10-11): upload (no HTTP answer, even after the
+      // one retry), analysis (the server answered an error), no person (answered, no face). photoFailureMessage decides.
+      let response: Response;
+      try {
+        response = await postAnalyzePhoto(body);
+      } catch (err) {
+        setPhotoError(photoFailureMessage(err, language));
+        return false;
+      }
+      const result = await response.json().catch(() => ({} as any));
 
       if (!response.ok) {
-        setPhotoError(localizedApiError({ code: result.code, status: response.status }, language, t.photoError));
+        setPhotoError(photoFailureMessage({ code: result.code, status: response.status }, language));
         return false;
       }
 
@@ -740,15 +738,17 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
         }
         return true;
       }
-      setPhotoError(t.noFaceDetected);
+      setPhotoError(photoFailureMessage({ code: result.code, status: response.status }, language));
       return false;
     } catch (err) {
-      setPhotoError(t.photoError);
+      // Not a transport failure (that returned above): the answer could not be used.
+      console.error('[TRIAL] analyze-photo answer unusable:', err);
+      setPhotoError(photoFailureMessage({ code: 'PHOTO_ANALYSIS_FAILED' }, language));
       return false;
     } finally {
       setIsAnalyzing(false);
     }
-  }, [onChange, t]);
+  }, [onChange, language]);
 
   // Resize image to reduce upload size (max 1500px on longest side, JPEG 85%)
   const resizeImage = (dataUrl: string, maxSize = 1500): Promise<string> => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { avatarFailureMessage, photoAnalysisFailureMessage, errorStatusOf } from '../../client/src/utils/avatarErrors';
+import { avatarFailureMessage, errorStatusOf } from '../../client/src/utils/avatarErrors';
 import { buildOrderDetailLines } from '../../client/src/utils/orderDetails';
 
 describe('W10 / W5 localised avatar and photo failures', () => {
@@ -9,7 +9,6 @@ describe('W10 / W5 localised avatar and photo failures', () => {
       const plain = avatarFailureMessage(lang, 500);
       expect(limit).not.toBe(plain);
       expect(limit).not.toMatch(/Error:|undefined/);
-      expect(photoAnalysisFailureMessage(lang).length).toBeGreaterThan(5);
     }
     expect(avatarFailureMessage('de', 429)).toMatch(/Tageslimit/);
     expect(avatarFailureMessage('de', 429)).not.toContain('ß');

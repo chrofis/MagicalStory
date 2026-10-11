@@ -2301,7 +2301,7 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
         const text = await analyzerResponse.text().catch(() => '');
         const { AnalyzerError, reportAnalyzerFailure } = require('../lib/photoAnalyzerClient');
         reportAnalyzerFailure('[TRIAL] [PHOTO]', new AnalyzerError('/analyze', `HTTP ${analyzerResponse.status} ${text.substring(0, 200)}`, { status: analyzerResponse.status }), { severity: 'customer' });
-        return res.status(502).json({ error: 'Photo analysis service error', details: `HTTP ${analyzerResponse.status}` });
+        return res.status(502).json({ error: 'Photo analysis service error', code: 'PHOTO_ANALYSIS_FAILED', details: `HTTP ${analyzerResponse.status}` });
       }
       const analyzerData = await analyzerResponse.json();
 
@@ -2324,13 +2324,15 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
           log.warn('[TRIAL] [PHOTO] No face detected in photo');
           return res.json({
             success: false,
-            error: 'no_face_detected'
+            error: 'no_face_detected',
+            code: 'PHOTO_NO_PERSON'
           });
         }
         const { AnalyzerError, reportAnalyzerFailure } = require('../lib/photoAnalyzerClient');
         reportAnalyzerFailure('[TRIAL] [PHOTO] analysis failed', new AnalyzerError('/analyze', String(analyzerData.error || 'success:false')), { severity: 'customer', detail: { traceback: analyzerData.traceback ? String(analyzerData.traceback).slice(0, 500) : null } });
         return res.status(500).json({
           error: 'Photo analysis failed',
+          code: 'PHOTO_ANALYSIS_FAILED',
           details: analyzerData.error || 'Unknown error'
         });
       }
@@ -2401,6 +2403,7 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
       if (fetchErr.cause?.code === 'ECONNREFUSED') {
         return res.status(503).json({
           error: 'Photo analysis service unavailable',
+          code: 'PHOTO_ANALYSIS_FAILED',
           details: 'The photo analysis service is not running. Please contact support.',
           fallback: true
         });
@@ -2413,6 +2416,7 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
     log.error('[TRIAL] Error analyzing photo:', err);
     res.status(500).json({
       error: 'Failed to analyze photo',
+      code: 'PHOTO_ANALYSIS_FAILED',
       details: err.message,
       fallback: true
     });

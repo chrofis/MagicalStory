@@ -50,7 +50,6 @@ export interface TranslationStrings {
   uploadPhotoFirst: string;
   photoGoodExamples: string;
   photoBadExamples: string;
-  noFaceDetected: string;
   orDescribe: string;
   characterAge: string;
   hairColor: string;
@@ -227,7 +226,6 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     uploadPhotoFirst: 'Please upload a photo to continue',
     photoGoodExamples: 'Good: Full body or upper body',
     photoBadExamples: 'Avoid: Close-up face only, sunglasses, hats, helmets, blurry',
-    noFaceDetected: 'No face detected in the photo. Please upload a clear photo showing a face.',
     orDescribe: 'OR describe the character',
     characterAge: 'Age',
     hairColor: 'Hair Color',
@@ -402,7 +400,6 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     uploadPhotoFirst: 'Bitte lade ein Foto hoch, um fortzufahren',
     photoGoodExamples: 'Gut: Ganzkörper oder Oberkörper',
     photoBadExamples: 'Vermeiden: Nur Gesicht, Sonnenbrille, Hüte, Helme, unscharf',
-    noFaceDetected: 'Kein Gesicht im Foto erkannt. Bitte lade ein klares Foto mit einem sichtbaren Gesicht hoch.',
     orDescribe: 'ODER Figur beschreiben',
     characterAge: 'Alter',
     hairColor: 'Haarfarbe',
@@ -577,7 +574,6 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     uploadPhotoFirst: 'Veuillez importer une photo pour continuer',
     photoGoodExamples: 'Bien : corps entier ou buste',
     photoBadExamples: 'Éviter : gros plan visage, lunettes de soleil, chapeaux, casques, flou',
-    noFaceDetected: 'Aucun visage détecté dans la photo. Veuillez importer une photo claire montrant un visage.',
     orDescribe: 'OU décrivez le personnage',
     characterAge: 'Âge',
     hairColor: 'Couleur des cheveux',
@@ -752,7 +748,6 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     uploadPhotoFirst: 'Carica una foto per continuare',
     photoGoodExamples: 'Bene: corpo intero o busto',
     photoBadExamples: 'Evita: solo viso, occhiali da sole, cappelli, caschi, foto sfocate',
-    noFaceDetected: 'Nessun volto rilevato nella foto. Carica una foto nitida che mostri un viso.',
     orDescribe: 'OPPURE descrivi il personaggio',
     characterAge: 'Età',
     hairColor: 'Colore dei capelli',

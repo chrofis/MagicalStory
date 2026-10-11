@@ -1,6 +1,7 @@
 import { defaultMainCharacterId, addMainCharacter, trimMainCharacters, MAX_CHARACTERS_PER_STORY } from '@/utils/mainCharacters';
 import { buildOrderDetailLines } from '@/utils/orderDetails';
-import { avatarFailureMessage, photoAnalysisFailureMessage, errorStatusOf } from '@/utils/avatarErrors';
+import { avatarFailureMessage, errorStatusOf } from '@/utils/avatarErrors';
+import { photoFailureMessage } from '@/utils/apiErrors';
 import { findVersionByIndex, iterateErrorMessage } from '@/utils/imageVersions';
 import { useState, useEffect, useRef, lazy, Suspense, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -2732,19 +2733,19 @@ export default function StoryWizard() {
           // Check for specific errors
           if (analysis.error === 'no_face_detected') {
             log.warn('No face detected in photo');
-            showError(t.noFaceDetected);
+            showError(photoFailureMessage(analysis.cause, language));
             // Don't set the photo - user needs to upload a different one
           } else {
             // Analysis failed (analyser down, character save failed): fail loudly. The photo is NOT
             // adopted: no face box / body crop / server record exists for it.
             log.error(`Photo analysis failed: ${analysis.error}`);
-            showError(photoAnalysisFailureMessage(language));
+            showError(photoFailureMessage(analysis.cause, language));
             if (!currentCharacter?.name || currentCharacter.name.trim().length < 2) setCharacterStep('photo');
           }
         }
       } catch (error) {
         log.error('Photo analysis error:', error);
-        showError(photoAnalysisFailureMessage(language));
+        showError(photoFailureMessage(error, language));
         if (!currentCharacter?.name || currentCharacter.name.trim().length < 2) setCharacterStep('photo');
       } finally {
         setIsAnalyzingPhoto(false);
@@ -2987,11 +2988,11 @@ export default function StoryWizard() {
         }
       } else {
         log.warn('Photo analysis failed after face selection');
-        showError(t.noFaceDetected);
+        showError(photoFailureMessage(analysis.cause, language));
       }
     } catch (error) {
       log.error('Photo analysis error after face selection:', error);
-      showError(photoAnalysisFailureMessage(language));
+      showError(photoFailureMessage(error, language));
     } finally {
       setIsAnalyzingPhoto(false);
       // Clear pending data

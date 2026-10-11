@@ -57,9 +57,14 @@ const BY_CODE: Record<string, Table> = {
   REFERRAL_FIRST_ORDER_ONLY: t('Referral codes are only valid for your first book order.', 'Empfehlungscodes gelten nur für deine erste Buchbestellung.', 'Les codes de parrainage ne sont valables que pour votre première commande de livre.', 'I codici di invito valgono solo per il tuo primo ordine di un libro.'),
   INSUFFICIENT_REFERRAL_BALANCE: t('Your referral balance is not sufficient for this.', 'Dein Empfehlungsguthaben reicht dafür nicht aus.', 'Votre solde de parrainage ne suffit pas.', 'Il tuo saldo di segnalazione non è sufficiente.'),
   REFERRAL_BALANCE_CHANGED: t('Your referral balance has changed. Please try the checkout again.', 'Dein Empfehlungsguthaben hat sich geändert. Bitte starte die Bestellung erneut.', 'Votre solde de parrainage a changé. Veuillez relancer la commande.', 'Il tuo saldo di segnalazione è cambiato. Riavvia l’ordine.'),
+  // The three photo failures the customer must tell apart (owner, 2026-10-11). PHOTO_UPLOAD_FAILED is client-only
+  // (no HTTP answer arrived); the other two are sent by POST /api/analyze-photo and /api/trial/analyze-photo.
+  PHOTO_UPLOAD_FAILED: t('The photo could not be uploaded. Check your internet connection and try again.', 'Das Foto konnte nicht hochgeladen werden. Prüfe deine Internetverbindung und versuche es nochmals.', 'La photo n’a pas pu être envoyée. Vérifiez votre connexion Internet et réessayez.', 'Impossibile caricare la foto. Controlla la connessione a Internet e riprova.'),
+  PHOTO_ANALYSIS_FAILED: t('The photo could not be analyzed right now. Please try again in a moment.', 'Das Foto konnte gerade nicht ausgewertet werden. Bitte versuche es gleich nochmals.', 'La photo n’a pas pu être analysée pour le moment. Veuillez réessayer dans un instant.', 'Al momento non è stato possibile analizzare la foto. Riprova tra poco.'),
+  PHOTO_NO_PERSON: t('No person was found in the photo. Choose a photo where a face is clearly visible.', 'Auf dem Foto wurde keine Person gefunden. Wähle ein Foto, auf dem ein Gesicht gut zu sehen ist.', 'Aucune personne n’a été trouvée sur la photo. Choisissez une photo où un visage est bien visible.', 'Nessuna persona trovata nella foto. Scegli una foto in cui si veda bene un viso.'),
 };
 
-const NETWORK = t('Connection problem. Please check your internet connection and try again.', 'Verbindungsproblem. Bitte überprüfe deine Internetverbindung und versuche es erneut.', 'Problème de connexion. Veuillez vérifier votre connexion Internet et réessayer.', 'Problema di connessione. Controlla la connessione a Internet e riprova.');
+const NETWORK =t('Connection problem. Please check your internet connection and try again.', 'Verbindungsproblem. Bitte überprüfe deine Internetverbindung und versuche es erneut.', 'Problème de connexion. Veuillez vérifier votre connexion Internet et réessayer.', 'Problema di connessione. Controlla la connessione a Internet e riprova.');
 const GENERIC = t('Something went wrong. Please try again.', 'Etwas ist schiefgelaufen. Bitte versuche es erneut.', 'Une erreur s’est produite. Veuillez réessayer.', 'Qualcosa è andato storto. Riprova.');
 const SERVER = t('Something went wrong on our side. Please try again in a moment.', 'Bei uns ist etwas schiefgelaufen. Bitte versuche es gleich noch einmal.', 'Une erreur est survenue de notre côté. Veuillez réessayer dans un instant.', 'Si è verificato un problema da parte nostra. Riprova tra un momento.');
 
@@ -90,6 +95,22 @@ export function localizedApiError(error: unknown, language: string, fallback?: s
   if (fallback) return fallback;
   if (status !== undefined && status >= 500) return pick(SERVER, language);
   return pick(GENERIC, language);
+}
+
+/**
+ * Message for a failed photo step: exactly one of upload failed / analysis failed / no person found.
+ * `error` is a thrown fetch/api error, a parsed server body `{ code, status }`, or `{ code: 'PHOTO_NO_PERSON' }`.
+ * No HTTP answer at all (fetch rejected, request aborted) = upload. A server answer with a code or status the UI
+ * already explains (too large, rate limit, sign-in, ...) keeps that message. Any other server answer = analysis.
+ */
+export function photoFailureMessage(error: unknown, language: string): string {
+  const e = error as { code?: unknown; status?: unknown } | null;
+  const code = typeof e?.code === 'string' ? e.code : undefined;
+  const status = typeof e?.status === 'number' ? e.status : undefined;
+  if (code === 'PHOTO_NO_PERSON' || code === 'PHOTO_ANALYSIS_FAILED') return pick(BY_CODE[code], language);
+  if (status === undefined) return pick(BY_CODE.PHOTO_UPLOAD_FAILED, language);
+  if ((code && BY_CODE[code]) || BY_STATUS[status]) return localizedApiError({ code, status }, language);
+  return pick(BY_CODE.PHOTO_ANALYSIS_FAILED, language);
 }
 
 /** Codes the table can explain (used by the server-code parity test). */
