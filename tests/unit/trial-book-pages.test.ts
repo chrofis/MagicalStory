@@ -88,3 +88,19 @@ describe('the back cover is the last page of the trial book (owner 2026-10-11)',
     expect(entries.map(e => e.type)).toEqual(['frontCover', 'story', 'story']);
   });
 });
+
+describe('one sign-in page after the back cover while the visitor is not linked (owner 2026-10-11)', () => {
+  const pages = [pg(1, { text: 'one', imageData: 'i1' }), pg(2, { text: 'two', imageData: 'i2' })];
+  it('not linked: the sign-in page is the last entry', () => {
+    const { entries } = buildTrialBook({ titlePageImage: 'T', backCoverImage: 'B', signInPage: true, pages, textOnFacingPage: false });
+    expect(entries.map(e => e.type)).toEqual(['frontCover', 'story', 'story', 'backCover', 'signIn']);
+  });
+  it('linked: no extra page', () => {
+    const { entries } = buildTrialBook({ titlePageImage: 'T', backCoverImage: 'B', signInPage: false, pages, textOnFacingPage: false });
+    expect(entries.map(e => e.type)).not.toContain('signIn');
+  });
+  it('no back cover yet: the locked pages carry the block, no extra page', () => {
+    const { entries } = buildTrialBook({ titlePageImage: 'T', backCoverImage: null, signInPage: true, pages, textOnFacingPage: false });
+    expect(entries.map(e => e.type)).not.toContain('signIn');
+  });
+});

@@ -47,7 +47,7 @@ test('title page and page images arriving never blank the page', async ({ page }
   // the back cover is the book's last page: the page counter reaches N / N and the arrow stops there
   const counter = page.locator('p', { hasText: /^\d+ \/ \d+$/ });
   const total = Number((await counter.innerText()).split('/')[1]);
-  expect(total).toBe(8); // front cover + 6 pages + back cover (mobile: picture with text under it)
+  expect(total).toBe(9); // front cover + 6 pages + back cover + the sign-in page (mobile: picture with text under it)
   for (let i = 1; i < total; i++) { await page.getByRole('button', { name: /next page|nächste seite|page suivante/i }).first().click(); await page.waitForTimeout(700); }
   expect(await counter.innerText()).toBe(`${total} / ${total}`);
   await page.screenshot({ path: process.env.TRIAL_BACK_SHOT || 'trial-back-cover.png' });

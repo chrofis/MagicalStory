@@ -30,6 +30,8 @@ const GateSlot = () => {
   return <div ref={elRef}>{node}</div>;
 };
 const gateNode = <GateSlot />;
+// On its own page the block is inset so the page arrows (over the page edges, mid-height) stay off the email field.
+const signInPageNode = <div className="px-7">{gateNode}</div>;
 
 // Same threshold as BookViewer's own mobile switch (single page vs spread).
 function useIsMobile() {
@@ -47,6 +49,8 @@ interface TrialBookProps {
   language: string;
   titlePageImage: string | null;
   backCoverImage: string | null;
+  /** The visitor is not linked yet: one more page after the back cover holds the sign-in block. */
+  signInPage: boolean;
   pages: TrialPreviewPage[];
   pendingImageLabel: string;
   /** Rendered as the title page while it is still being drawn. */
@@ -63,12 +67,12 @@ function samePages(a: TrialPreviewPage[], b: TrialPreviewPage[]) {
  * preview. Memoized on content, so the 3 s poll (new array identity, same data)
  * does not re-render the viewer; when an image lands only that page's props change.
  */
-const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePageImage, backCoverImage, pages, pendingImageLabel, titlePendingNode }: TrialBookProps) {
+const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePageImage, backCoverImage, signInPage, pages, pendingImageLabel, titlePendingNode }: TrialBookProps) {
   const isMobile = useIsMobile();
   // Desktop spread: picture on the left page, its text on the right page.
   const { storyPages, entries } = useMemo(
-    () => buildTrialBook({ titlePageImage, backCoverImage, pages, textOnFacingPage: !isMobile }),
-    [titlePageImage, backCoverImage, pages, isMobile]);
+    () => buildTrialBook({ titlePageImage, backCoverImage, signInPage, pages, textOnFacingPage: !isMobile }),
+    [titlePageImage, backCoverImage, signInPage, pages, isMobile]);
   const story = useMemo(() => ({
     id: 'trial',
     title: storyTitle,
@@ -86,13 +90,14 @@ const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePag
   // put them: WebKit throws NotFoundError ("The object can not be found here") and React unmounts the whole
   // page - the white page when the title arrived (owner iPhone, 2026-10-09). A changed structure therefore
   // remounts the viewer, on the page the visitor was reading. Image/text updates keep the same structure.
-  const structureKey = `${isMobile ? 'm' : 'd'}:${titlePageImage ? 'cover' : 'pending'}:${backCoverImage ? 'back' : 'noback'}:${pages.length}`;
+  const structureKey = `${isMobile ? 'm' : 'd'}:${titlePageImage ? 'cover' : 'pending'}:${backCoverImage ? 'back' : 'noback'}:${signInPage ? 'signin' : 'nosignin'}:${pages.length}`;
   const logicalPageRef = useRef(0);
   const [currentPage, setCurrentPage] = useState(0);
   const bookRef = useRef<BookViewerHandle>(null);
   const onPageChange = useCallback((i: number) => { logicalPageRef.current = i; setCurrentPage(i); }, []);
   const pageList = useMemo(() => entries.map(e => {
     if (e.type === 'titlePending') return { type: 'custom' as const, key: 'title-pending', node: titlePendingNode };
+    if (e.type === 'signIn') return { type: 'custom' as const, key: 'sign-in', node: signInPageNode };
     return e;
   }), [entries, titlePendingNode]);
 
@@ -102,7 +107,7 @@ const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePag
         <BookViewer
           key={structureKey}
           ref={bookRef}
-          initialLogicalPage={logicalPageRef.current}
+          initialLogicalPage={Math.min(logicalPageRef.current, pageList.length - 1)}
           onPageChange={onPageChange}
           textOnSidePage
           pageList={pageList}
@@ -124,7 +129,7 @@ const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePag
     </>
   );
 }, (a, b) =>
-  a.storyTitle === b.storyTitle && a.language === b.language && a.titlePageImage === b.titlePageImage && a.backCoverImage === b.backCoverImage &&
+  a.storyTitle === b.storyTitle && a.language === b.language && a.titlePageImage === b.titlePageImage && a.backCoverImage === b.backCoverImage && a.signInPage === b.signInPage &&
   a.pendingImageLabel === b.pendingImageLabel && samePages(a.pages, b.pages));
 
 export default TrialBook;

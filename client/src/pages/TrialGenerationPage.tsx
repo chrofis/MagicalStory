@@ -757,8 +757,10 @@ export default function TrialGenerationPage() {
   // counts as shown when the slide lists arrive (HERO_FIGURE).
   useEffect(() => {
     if (avatarSrc !== null || !avatarPool[0]) return;
-    if (avatarPool[0] === state?.heroAvatar) shownAvatarsRef.current.add(HERO_FIGURE);
-    setAvatarSrc(avatarPool[0]);
+    // The hero first when it is all there is; slides without the hero start where the turning order starts.
+    const isHero = avatarPool[0] === state?.heroAvatar;
+    if (isHero) shownAvatarsRef.current.add(HERO_FIGURE);
+    setAvatarSrc(isHero ? avatarPool[0] : nextAvatarSource(avatarPool, shownAvatarsRef.current, null));
   }, [avatarPool, avatarSrc, state?.heroAvatar]);
 
   const slideshowItems = useMemo<Slide[]>(() => {
@@ -1042,6 +1044,7 @@ export default function TrialGenerationPage() {
           language={state?.storyInput?.language || language}
           titlePageImage={titlePageImage}
           backCoverImage={backCoverImage}
+          signInPage={!isLinked}
           pages={pages}
           pendingImageLabel={t.imagePending}
           titlePendingNode={imagePlaceholder}

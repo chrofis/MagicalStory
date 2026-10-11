@@ -29,6 +29,7 @@ export type TrialBookEntry =
   | { type: 'frontCover' }
   | { type: 'titlePending' }
   | { type: 'backCover' }
+  | { type: 'signIn' }
   | { type: 'story'; storyPageIdx: number }
   | { type: 'storyText'; storyPageIdx: number };
 
@@ -58,10 +59,12 @@ export function buildTrialBook(args: {
   titlePageImage: string | null;
   /** The back cover, the last page of the book once it exists. */
   backCoverImage?: string | null;
+  /** One more page after the back cover that carries the sign-in block (visitor not linked yet). */
+  signInPage?: boolean;
   pages: TrialPreviewPage[];
   textOnFacingPage: boolean;
 }): { storyPages: TrialBookStoryPage[]; entries: TrialBookEntry[] } {
-  const { titlePageImage, backCoverImage, pages, textOnFacingPage } = args;
+  const { titlePageImage, backCoverImage, signInPage, pages, textOnFacingPage } = args;
   const storyPages: TrialBookStoryPage[] = pages.map(p => ({
     pageNumber: p.pageNumber,
     text: (p.locked ? p.teaser : p.text) || '',
@@ -76,5 +79,8 @@ export function buildTrialBook(args: {
     if (textOnFacingPage) entries.push({ type: 'storyText', storyPageIdx: i });
   }
   if (backCoverImage) entries.push({ type: 'backCover' });
+  // The back cover is the end of the book, so a visitor who reaches it must still find the way to log on (owner iPhone
+  // 2026-10-11). Only behind a back cover that exists: before it the locked pages carry the same block.
+  if (backCoverImage && signInPage) entries.push({ type: 'signIn' });
   return { storyPages, entries };
 }
