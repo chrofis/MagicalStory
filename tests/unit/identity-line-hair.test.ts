@@ -148,7 +148,7 @@ describe('identity line — hair', () => {
 
   it('a category label is still never emitted as clothing', () => {
     // sceneCharacterClothing holds tags like "standard" / "costumed:mermaid".
-    for (const tag of ['standard', 'winter', 'costumed:mermaid']) {
+    for (const tag of ['standard', 'costumed', 'costumed:mermaid']) {
       expect(buildCastIdentityDescription(MAX, tag)).not.toMatch(/Wearing:/);
     }
   });

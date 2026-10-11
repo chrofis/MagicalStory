@@ -20,7 +20,7 @@ const FIONA = {
   avatars: { clothing: { standard: 'white and light blue tunic, dark blue jeans', costumed: { pirate: COSTUME } } },
 };
 const REQS = {
-  Fiona: { standard: { used: false }, summer: { used: false }, winter: { used: false }, costumed: { used: true, costume: 'pirate', description: COSTUME } },
+  Fiona: { standard: { used: false }, costumed: { used: true, costume: 'pirate', description: COSTUME } },
 };
 
 describe('resolveRenderedClothingCategory', () => {
@@ -42,8 +42,8 @@ describe('resolveRenderedClothingCategory', () => {
 
   it('a trial (hint-made) cover: the cover hint\'s characterClothing', () => {
     const cover = { description: 'cover' };
-    const story = { coverImages: { frontCover: cover }, coverHints: { frontCover: { characterClothing: { Fiona: 'winter' } } }, pageClothing: { primaryClothing: 'standard' } };
-    expect(resolveRenderedClothingCategory(story, -1, 'Fiona', cover)).toBe('winter');
+    const story = { coverImages: { frontCover: cover }, coverHints: { frontCover: { characterClothing: { Fiona: 'costumed' } } }, pageClothing: { primaryClothing: 'standard' } };
+    expect(resolveRenderedClothingCategory(story, -1, 'Fiona', cover)).toBe('costumed');
   });
 
   it('a cover with neither brief nor hint entry: the story primary category', () => {
@@ -52,9 +52,9 @@ describe('resolveRenderedClothingCategory', () => {
   });
 
   it('a page: its persisted sceneCharacterClothing wins over pageClothing', () => {
-    const page = { sceneCharacterClothing: { Fiona: 'summer' } };
-    const story = { pageClothing: { primaryClothing: 'standard', pageClothing: { 4: { Fiona: 'winter' } } } };
-    expect(resolveRenderedClothingCategory(story, 4, 'Fiona', page)).toBe('summer');
+    const page = { sceneCharacterClothing: { Fiona: 'costumed' } };
+    const story = { pageClothing: { primaryClothing: 'standard', pageClothing: { 4: { Fiona: 'standard' } } } };
+    expect(resolveRenderedClothingCategory(story, 4, 'Fiona', page)).toBe('costumed');
   });
 
   it('an in-run pipeline image: perCharClothing', () => {
@@ -63,9 +63,9 @@ describe('resolveRenderedClothingCategory', () => {
   });
 
   it('a page without a per-page entry for the character: pageClothing', () => {
-    const page = { sceneCharacterClothing: { Someone: 'summer' } };
-    const story = { pageClothing: { primaryClothing: 'standard', pageClothing: { 4: { Fiona: 'winter' } } } };
-    expect(resolveRenderedClothingCategory(story, 4, 'Fiona', page)).toBe('winter');
+    const page = { sceneCharacterClothing: { Someone: 'standard' } };
+    const story = { pageClothing: { primaryClothing: 'standard', pageClothing: { 4: { Fiona: 'costumed' } } } };
+    expect(resolveRenderedClothingCategory(story, 4, 'Fiona', page)).toBe('costumed');
   });
 
   it('nothing known: null (callers refuse — never a guessed standard)', () => {

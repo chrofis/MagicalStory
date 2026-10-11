@@ -49,10 +49,10 @@ describe('grid grouping carries the wardrobe state', () => {
   });
 
   it('a story with no off-declarations groups exactly as before', () => {
-    const apps = [app(1, 'standard'), app(2, 'winter'), app(3, 'standard')];
-    expect([...groupAppearancesByClothing(apps).keys()]).toEqual(['standard', 'winter']);
+    const apps = [app(1, 'standard'), app(2, 'costumed'), app(3, 'standard')];
+    expect([...groupAppearancesByClothing(apps).keys()]).toEqual(['standard', 'costumed']);
     const { tasks } = plan(apps);
-    expect(tasks.map((t: any) => [t.mode, t.reportKey])).toEqual([['both', 'standard'], ['both', 'winter']]);
+    expect(tasks.map((t: any) => [t.mode, t.reportKey])).toEqual([['both', 'standard'], ['both', 'costumed']]);
   });
 });
 

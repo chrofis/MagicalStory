@@ -212,11 +212,11 @@ describe('a briefed cover reads its clothing from its own record', () => {
     const story = (rec: any) => ({
       characters: [{ id: 1, name: 'Child1' }],
       coverImages: { frontCover: rec },
-      coverHints: { frontCover: { characterClothing: { Child1: 'winter' } } },
+      coverHints: { frontCover: { characterClothing: { Child1: 'costumed' } } },
       pageClothing: { primaryClothing: 'standard' },
     });
-    expect(resolvePageClothingCategory(story({ briefedAsPage: true, perCharClothing: { Child1: 'summer' } }), -1, 'Child1')).toBe('summer');
-    expect(resolvePageClothingCategory(story({}), -1, 'Child1')).toBe('winter');
+    expect(resolvePageClothingCategory(story({ briefedAsPage: true, perCharClothing: { Child1: 'standard' } }), -1, 'Child1')).toBe('standard');
+    expect(resolvePageClothingCategory(story({}), -1, 'Child1')).toBe('costumed');
   });
 });
 

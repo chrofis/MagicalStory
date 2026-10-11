@@ -20,7 +20,7 @@ describe('C3 parseClothingCategory', () => {
     expect(parseClothingCategory('The child wears warm clothing of some kind, nothing more to say here.', false)).toBeNull();
   });
   it('still reads a real value', () => {
-    expect(parseClothingCategory('**Clothing:** winter', false)).toBe('winter');
+    expect(parseClothingCategory('**Clothing:** costumed', false)).toBe('costumed');
   });
 });
 
