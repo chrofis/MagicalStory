@@ -1257,7 +1257,7 @@ test.describe('Demo Story Generation', () => {
       }
       const labelRe = artStyleLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const summaryRow = page.locator('div, li, p').filter({
-        hasText: new RegExp(`(Art Style|Kunststil|Style artistique)\\s*:?\\s*${labelRe}`, 'i'),
+        hasText: new RegExp(`(Art Style|Kunststil|Style artistique|Style|Stil|Stile)\\s*:?\\s*${labelRe}`, 'i'),
       }).first();
       if (await summaryRow.isVisible({ timeout: 5000 }).catch(() => false)) {
         console.log(`  Art style confirmed selected (Step 5 summary): ${artStyleLabel}`);
