@@ -108,7 +108,7 @@ const sectionTranslations = {
     localDesc: 'Erlebe Schweizer Geschichte als Held – oder ein Abenteuer, das genau in deiner Stadt spielt.',
     localCta: 'Stadtgeschichten entdecken',
     localBullet1: 'Spielt in deiner Stadt – echte Orte und Wahrzeichen',
-    localBullet2: 'Oder erlebe historische Helden hautnah',
+    localBullet2: 'Oder erlebe Geschichte als Held',
     step5: 'Schritt 5',
     whyLink: 'Erfahre warum es wirkt',
     // CTA
@@ -159,7 +159,7 @@ const sectionTranslations = {
     printShare: 'Imprimez & partagez',
     printShareDesc: "Votre histoire est prête ! Téléchargez-la instantanément en PDF ou commandez un beau livre imprimé livré à votre porte.",
     pdfDownload: "Téléchargement PDF instantané – parfait pour lire sur tablette ou imprimer à la maison",
-    printOptions: 'Impression à couverture rigide ou souple – 20 × 20 cm, qualité professionnelle',
+    printOptions: 'Impression à couverture rigide ou souple – format A4, qualité professionnelle',
     shipping: 'Imprimé et expédié en Suisse – le cadeau parfait pour toute occasion',
     giftGuideLink: 'Idées cadeaux par âge et occasion',
     // Why It Works
@@ -169,7 +169,7 @@ const sectionTranslations = {
     localDesc: "Soyez le héros de l'histoire suisse – ou d'une aventure qui se déroule dans votre propre ville.",
     localCta: 'Découvrir les histoires de villes',
     localBullet1: 'Se déroule dans votre ville – lieux et monuments réels',
-    localBullet2: "Ou revis l'histoire en héros",
+    localBullet2: "Ou revivez l'histoire en héros",
     step5: 'Étape 5',
     whyLink: 'Découvrez pourquoi ça marche',
     // CTA

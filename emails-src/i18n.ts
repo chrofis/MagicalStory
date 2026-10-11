@@ -33,10 +33,10 @@ export const langMarkers: Record<Lang, string> = {
 //   1. tagline
 //   2. magicalstory.ch · info@magicalstory.ch · {country}   (built by Footer)
 export const footer: Record<Lang, { tagline: string; country: string }> = {
-  en: { tagline: 'Magical Story - Creating Magical Moments, One Story at a Time', country: 'Switzerland' },
-  de: { tagline: 'Magical Story – Magische Momente schaffen, eine Geschichte nach der anderen', country: 'Schweiz' },
-  fr: { tagline: 'Magical Story - Des moments magiques, une histoire à la fois', country: 'Suisse' },
-  it: { tagline: 'Magical Story - Momenti magici, una storia alla volta', country: 'Svizzera' },
+  en: { tagline: 'Magical Story: Creating Magical Moments, One Story at a Time', country: 'Switzerland' },
+  de: { tagline: 'Magical Story: Magische Momente schaffen, eine Geschichte nach der anderen', country: 'Schweiz' },
+  fr: { tagline: 'Magical Story : Des moments magiques, une histoire à la fois', country: 'Suisse' },
+  it: { tagline: 'Magical Story: Momenti magici, una storia alla volta', country: 'Svizzera' },
 };
 
 // ─── story-complete ──────────────────────────────────────────────────────────
@@ -47,7 +47,7 @@ export const storyComplete: Record<Lang, {
 }> = {
   en: {
     subject: 'Your magical story "{title}" is ready!',
-    preview: 'Your personalized story is ready — view it, order a printed book, or download as PDF.',
+    preview: 'Your personalized story is ready. View it, order a printed book, or download as PDF.',
     headline: 'Your story is ready!',
     greeting: 'Hello{greeting},',
     body: 'Great news! Your personalized story "{title}" has been created and is waiting for you.',
@@ -64,7 +64,7 @@ export const storyComplete: Record<Lang, {
   },
   de: {
     subject: 'Deine magische Geschichte «{title}» ist fertig!',
-    preview: 'Deine personalisierte Geschichte ist fertig — ansehen, als Buch bestellen oder als PDF herunterladen.',
+    preview: 'Deine personalisierte Geschichte ist fertig. Ansehen, als Buch bestellen oder als PDF herunterladen.',
     headline: 'Deine Geschichte ist fertig!',
     greeting: 'Hallo{greeting},',
     body: 'Tolle Neuigkeiten! Deine personalisierte Geschichte «{title}» wurde erstellt und wartet auf dich.',
@@ -81,7 +81,7 @@ export const storyComplete: Record<Lang, {
   },
   fr: {
     subject: 'Votre histoire magique « {title} » est prête !',
-    preview: 'Votre histoire personnalisée est prête — voir, commander en livre imprimé ou télécharger en PDF.',
+    preview: 'Votre histoire personnalisée est prête. Voir, commander en livre imprimé ou télécharger en PDF.',
     headline: 'Votre histoire est prête !',
     greeting: 'Bonjour{greeting},',
     body: 'Bonne nouvelle ! Votre histoire personnalisée « {title} » a été créée et vous attend.',
@@ -98,7 +98,7 @@ export const storyComplete: Record<Lang, {
   },
   it: {
     subject: 'La tua storia magica «{title}» è pronta!',
-    preview: 'La tua storia personalizzata è pronta — guarda, ordina come libro stampato o scarica in PDF.',
+    preview: 'La tua storia personalizzata è pronta. Guarda, ordina come libro stampato o scarica in PDF.',
     headline: 'La tua storia è pronta!',
     greeting: 'Ciao{greeting},',
     body: 'Buone notizie! La tua storia personalizzata «{title}» è stata creata e ti aspetta.',
@@ -123,7 +123,7 @@ export const storyFailed: Record<Lang, {
 }> = {
   en: {
     subject: 'We encountered an issue with your story',
-    preview: 'A problem came up while creating your story — our team has been notified.',
+    preview: 'A problem came up while creating your story. Our team has been notified.',
     headline: 'Something went wrong',
     greeting: 'Hello{greeting},',
     body: "We're sorry, but we encountered a problem while creating your story. Our team has been notified and is looking into it. You can try again now, or contact us if the problem persists.",
@@ -134,7 +134,7 @@ export const storyFailed: Record<Lang, {
   },
   de: {
     subject: 'Bei deiner Geschichte ist ein Problem aufgetreten',
-    preview: 'Bei der Erstellung deiner Geschichte gab es ein Problem — unser Team wurde informiert.',
+    preview: 'Bei der Erstellung deiner Geschichte gab es ein Problem. Unser Team wurde informiert.',
     headline: 'Etwas ist schiefgelaufen',
     greeting: 'Hallo{greeting},',
     body: 'Es tut uns leid, aber bei der Erstellung deiner Geschichte ist ein Problem aufgetreten. Unser Team wurde benachrichtigt und untersucht das Problem. Du kannst es jetzt nochmals versuchen oder uns kontaktieren, wenn es weiterhin besteht.',
@@ -145,7 +145,7 @@ export const storyFailed: Record<Lang, {
   },
   fr: {
     subject: 'Un problème est survenu avec votre histoire',
-    preview: 'Un problème est survenu lors de la création de votre histoire — notre équipe a été informée.',
+    preview: 'Un problème est survenu lors de la création de votre histoire. Notre équipe a été informée.',
     headline: 'Quelque chose s\'est mal passé',
     greeting: 'Bonjour{greeting},',
     body: "Nous sommes désolés, mais nous avons rencontré un problème lors de la création de votre histoire. Notre équipe a été informée et examine la situation. Vous pouvez réessayer maintenant ou nous contacter si le problème persiste.",
@@ -156,7 +156,7 @@ export const storyFailed: Record<Lang, {
   },
   it: {
     subject: "C'è stato un problema con la tua storia",
-    preview: 'Si è verificato un problema durante la creazione della tua storia — il nostro team è stato avvisato.',
+    preview: 'Si è verificato un problema durante la creazione della tua storia. Il nostro team è stato avvisato.',
     headline: 'Qualcosa è andato storto',
     greeting: 'Ciao{greeting},',
     body: 'Ci dispiace, ma abbiamo avuto un problema nella creazione della tua storia. Il nostro team è stato avvisato e sta esaminando la questione. Puoi riprovare ora o contattarci se il problema persiste.',
@@ -182,7 +182,7 @@ export const trialStoryComplete: Record<Lang, {
     greeting: 'Hello{greeting},',
     body: 'Great news! Your personalized story "{title}" has been created.',
     attachmentNote: 'The story PDF is attached to this email so you can enjoy it right away.',
-    claimLine: 'Set your password to unlock {credits} free credits — enough to create one more full story, free.',
+    claimLine: 'Set your password to unlock {credits} free credits. Enough for one more full story.',
     cta: 'Claim your free story',
     perksIntro: 'With a full account you also unlock:',
     perks: [
@@ -201,7 +201,7 @@ export const trialStoryComplete: Record<Lang, {
     greeting: 'Hallo{greeting},',
     body: 'Tolle Neuigkeiten! Deine personalisierte Geschichte «{title}» wurde erstellt.',
     attachmentNote: 'Das PDF der Geschichte ist dieser E-Mail angehängt, damit du sie sofort lesen kannst.',
-    claimLine: 'Setze dein Passwort und erhalte {credits} Gratis-Credits — genug für eine weitere komplette Geschichte.',
+    claimLine: 'Setze dein Passwort und erhalte {credits} Gratis-Credits. Genug für eine weitere komplette Geschichte.',
     cta: 'Gratis-Geschichte sichern',
     perksIntro: 'Mit einem vollständigen Konto erhältst du ausserdem:',
     perks: [
@@ -220,7 +220,7 @@ export const trialStoryComplete: Record<Lang, {
     greeting: 'Bonjour{greeting},',
     body: 'Bonne nouvelle ! Votre histoire personnalisée « {title} » a été créée.',
     attachmentNote: "Le PDF de l'histoire est joint à cet e-mail pour que vous puissiez en profiter immédiatement.",
-    claimLine: 'Définissez votre mot de passe et débloquez {credits} crédits gratuits — de quoi créer une histoire complète de plus, gratuitement.',
+    claimLine: 'Définissez votre mot de passe et débloquez {credits} crédits gratuits. De quoi créer une histoire complète de plus.',
     cta: 'Récupérer mon histoire gratuite',
     perksIntro: 'Avec un compte complet, vous débloquez aussi :',
     perks: [
@@ -239,7 +239,7 @@ export const trialStoryComplete: Record<Lang, {
     greeting: 'Ciao{greeting},',
     body: 'Buone notizie! La tua storia personalizzata «{title}» è stata creata.',
     attachmentNote: "Il PDF della storia è allegato a questa e-mail, così puoi leggerla subito.",
-    claimLine: "Imposta la tua password e sblocca {credits} crediti gratuiti — abbastanza per creare un'altra storia completa, gratis.",
+    claimLine: "Imposta la tua password e sblocca {credits} crediti gratuiti. Abbastanza per un'altra storia completa.",
     cta: 'Sblocca la mia storia gratuita',
     perksIntro: 'Con un account completo sblocchi anche:',
     perks: [
@@ -268,7 +268,7 @@ export const trialReminder: Record<Lang, {
   unsubscribeNote: string; unsubscribe: string;
 }> = {
   en: {
-    preview: 'Your free credits are still waiting — claim your account to keep them.',
+    preview: 'Your free credits are still waiting. Claim them now.',
     greeting: 'Hello{greeting},',
     perks: [
       'Multiple characters in one story',
@@ -282,7 +282,7 @@ export const trialReminder: Record<Lang, {
     unsubscribe: 'Unsubscribe',
   },
   de: {
-    preview: 'Deine Gratis-Credits warten noch — aktiviere dein Konto, um sie zu sichern.',
+    preview: 'Deine Gratis-Credits warten noch. Hol sie dir jetzt.',
     greeting: 'Hallo{greeting},',
     perks: [
       'Mehrere Figuren in einer Geschichte',
@@ -296,7 +296,7 @@ export const trialReminder: Record<Lang, {
     unsubscribe: 'Abmelden',
   },
   fr: {
-    preview: 'Vos crédits gratuits vous attendent toujours — activez votre compte pour les conserver.',
+    preview: 'Vos crédits gratuits vous attendent toujours. Récupérez-les maintenant.',
     greeting: 'Bonjour{greeting},',
     perks: [
       'Plusieurs personnages dans une même histoire',
@@ -310,7 +310,7 @@ export const trialReminder: Record<Lang, {
     unsubscribe: 'Se désabonner',
   },
   it: {
-    preview: 'I tuoi crediti gratuiti ti aspettano ancora — attiva il tuo account per conservarli.',
+    preview: 'I tuoi crediti gratuiti ti aspettano ancora. Riscattali ora.',
     greeting: 'Ciao{greeting},',
     perks: [
       'Più personaggi in una sola storia',
@@ -337,7 +337,7 @@ export const orderConfirmation: Record<Lang, {
   coverAlt: string;
 }> = {
   en: {
-    subject: 'Order confirmed — your Magical Story book is being printed!',
+    subject: 'Order confirmed: your Magical Story book is being printed!',
     preview: 'Your order is confirmed. We\'ll email you again when it ships.',
     headline: 'Your book is being printed',
     coverAlt: 'The cover of your book',
@@ -352,7 +352,7 @@ export const orderConfirmation: Record<Lang, {
     signoff: 'Thank you for choosing Magical Story!',
   },
   de: {
-    subject: 'Bestellung bestätigt — dein Magical Story Buch wird gedruckt!',
+    subject: 'Bestellung bestätigt: dein Magical Story Buch wird gedruckt!',
     preview: 'Deine Bestellung ist bestätigt. Wir melden uns wieder, sobald sie versandt wird.',
     headline: 'Dein Buch wird gedruckt',
     coverAlt: 'Das Cover deines Buches',
@@ -367,7 +367,7 @@ export const orderConfirmation: Record<Lang, {
     signoff: 'Vielen Dank, dass du Magical Story gewählt hast!',
   },
   fr: {
-    subject: 'Commande confirmée — votre livre Magical Story est en cours d\'impression !',
+    subject: 'Commande confirmée : votre livre Magical Story est en cours d\'impression !',
     preview: 'Votre commande est confirmée. Nous vous écrirons à nouveau lors de l\'expédition.',
     headline: 'Votre livre est en cours d\'impression',
     coverAlt: 'La couverture de votre livre',
@@ -382,7 +382,7 @@ export const orderConfirmation: Record<Lang, {
     signoff: "Merci d'avoir choisi Magical Story !",
   },
   it: {
-    subject: 'Ordine confermato — il tuo libro Magical Story è in stampa!',
+    subject: 'Ordine confermato: il tuo libro Magical Story è in stampa!',
     preview: 'Il tuo ordine è confermato. Ti scriveremo di nuovo al momento della spedizione.',
     headline: 'Il tuo libro è in stampa',
     coverAlt: 'La copertina del tuo libro',
@@ -410,7 +410,7 @@ export const orderShipped: Record<Lang, {
 }> = {
   en: {
     subject: 'Your Magical Story book has shipped!',
-    preview: 'Your personalized storybook is on its way — track it here.',
+    preview: 'Your personalized storybook is on its way. Track it here.',
     headline: 'Your book is on its way',
     coverAlt: 'The cover of your book',
     greeting: 'Hello{greeting},',
@@ -425,7 +425,7 @@ export const orderShipped: Record<Lang, {
   },
   de: {
     subject: 'Dein Magical Story Buch ist unterwegs!',
-    preview: 'Dein personalisiertes Geschichtenbuch ist auf dem Weg — Sendung verfolgen.',
+    preview: 'Dein personalisiertes Geschichtenbuch ist auf dem Weg. Sendung verfolgen.',
     headline: 'Dein Buch ist unterwegs',
     coverAlt: 'Das Cover deines Buches',
     greeting: 'Hallo{greeting},',
@@ -440,7 +440,7 @@ export const orderShipped: Record<Lang, {
   },
   fr: {
     subject: 'Votre livre Magical Story est en route !',
-    preview: 'Votre livre personnalisé est en route — suivez son acheminement.',
+    preview: 'Votre livre personnalisé est en route. Suivez son acheminement.',
     headline: 'Votre livre est en route',
     coverAlt: 'La couverture de votre livre',
     greeting: 'Bonjour{greeting},',
@@ -455,7 +455,7 @@ export const orderShipped: Record<Lang, {
   },
   it: {
     subject: 'Il tuo libro Magical Story è in viaggio!',
-    preview: 'Il tuo libro personalizzato è in viaggio — seguilo qui.',
+    preview: 'Il tuo libro personalizzato è in viaggio. Seguilo qui.',
     headline: 'Il tuo libro è in viaggio',
     coverAlt: 'La copertina del tuo libro',
     greeting: 'Ciao{greeting},',
@@ -477,42 +477,42 @@ export const orderFailed: Record<Lang, {
   body: string; reassurance: string; questions: string; signoff: string;
 }> = {
   en: {
-    subject: "Order issue — we're on it",
+    subject: "Order issue: we're on it",
     preview: 'A technical issue interrupted your book order. We are on it; no action needed.',
     headline: "We're on it",
     greeting: 'Hello{greeting},',
     body: 'Unfortunately, a technical issue occurred while processing your book order. Our team has been automatically notified and is working on a resolution.',
-    reassurance: "No action is needed from you — we'll reach out once the issue is resolved. If a refund is necessary, we will process it for you.",
+    reassurance: "No action is needed from you. We'll reach out once the issue is resolved. If a refund is necessary, we will process it for you.",
     questions: 'For questions: info@magicalstory.ch',
     signoff: 'Magical Story Team',
   },
   de: {
-    subject: 'Bestellproblem — wir kümmern uns darum',
+    subject: 'Bestellproblem: wir kümmern uns darum',
     preview: 'Ein technisches Problem hat deine Buchbestellung unterbrochen. Wir kümmern uns darum.',
     headline: 'Wir kümmern uns darum',
     greeting: 'Hallo{greeting},',
     body: 'Bei der Verarbeitung deiner Buchbestellung ist leider ein technisches Problem aufgetreten. Unser Team wurde automatisch benachrichtigt und kümmert sich um die Lösung.',
-    reassurance: 'Du musst nichts weiter tun — wir melden uns bei dir, sobald das Problem behoben ist. Sollte eine Rückerstattung nötig sein, werden wir diese veranlassen.',
+    reassurance: 'Du musst nichts weiter tun. Wir melden uns bei dir, sobald das Problem behoben ist. Sollte eine Rückerstattung nötig sein, werden wir diese veranlassen.',
     questions: 'Bei Fragen: info@magicalstory.ch',
     signoff: 'Magical Story Team',
   },
   fr: {
-    subject: 'Problème de commande — nous nous en occupons',
+    subject: 'Problème de commande : nous nous en occupons',
     preview: 'Un problème technique a interrompu votre commande. Nous nous en occupons, aucune action requise.',
     headline: 'Nous nous en occupons',
     greeting: 'Bonjour{greeting},',
     body: "Malheureusement, un problème technique est survenu lors du traitement de votre commande de livre. Notre équipe a été automatiquement informée et travaille à la résolution du problème.",
-    reassurance: "Aucune action n'est requise de votre part — nous vous contacterons dès que le problème sera résolu. Si un remboursement est nécessaire, nous le traiterons pour vous.",
+    reassurance: "Aucune action n'est requise de votre part. Nous vous contacterons dès que le problème sera résolu. Si un remboursement est nécessaire, nous le traiterons pour vous.",
     questions: 'Pour toute question : info@magicalstory.ch',
     signoff: "L'équipe Magical Story",
   },
   it: {
-    subject: 'Problema con il tuo ordine — ce ne stiamo occupando',
+    subject: 'Problema con il tuo ordine: ce ne stiamo occupando',
     preview: "Un problema tecnico ha interrotto il tuo ordine. Ce ne stiamo occupando, nessuna azione richiesta.",
     headline: 'Ce ne stiamo occupando',
     greeting: 'Ciao{greeting},',
     body: "Purtroppo si è verificato un problema tecnico durante l'elaborazione del tuo ordine. Il nostro team è stato avvisato automaticamente e sta lavorando per risolverlo.",
-    reassurance: 'Non devi fare nulla — ti contatteremo non appena il problema sarà risolto. Se sarà necessario un rimborso, lo elaboreremo per te.',
+    reassurance: 'Non devi fare nulla. Ti contatteremo non appena il problema sarà risolto. Se sarà necessario un rimborso, lo elaboreremo per te.',
     questions: 'Per qualsiasi domanda: info@magicalstory.ch',
     signoff: 'Il team di Magical Story',
   },

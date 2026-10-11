@@ -119,7 +119,7 @@ const introStrings: Record<string, {
     step2Desc: 'A fun adventure, or a story that gently teaches something.',
     step3Title: 'Sit back',
     step3Desc: 'Ready in a few minutes. You\'ll receive it as a PDF by email.',
-    freeNote: 'This first story is a quick free trial — ready in a few minutes. Sign up for full, high-quality stories (a bit slower to create) — your first one is free.',
+    freeNote: 'Sign up for full stories in higher quality (they take longer). Your first one is free.',
     cta: 'Let\'s start',
   },
   de: {
@@ -131,7 +131,7 @@ const introStrings: Record<string, {
     step2Desc: 'Ein Abenteuer oder eine Geschichte, die spielerisch etwas vermittelt.',
     step3Title: 'Lehn dich zurück',
     step3Desc: 'In wenigen Minuten fertig. Du erhältst sie als PDF per E-Mail.',
-    freeNote: 'Diese erste Geschichte ist eine schnelle Gratis-Probe — in wenigen Minuten fertig. Melde dich an für vollständige Geschichten in hoher Qualität (etwas langsamer) — die erste ist gratis.',
+    freeNote: 'Melde dich an für vollständige Geschichten in höherer Qualität (sie dauern länger). Die erste ist gratis.',
     cta: 'Los geht\'s',
   },
   fr: {
@@ -143,7 +143,7 @@ const introStrings: Record<string, {
     step2Desc: 'Une aventure, ou une histoire qui transmet un message en douceur.',
     step3Title: 'Détendez-vous',
     step3Desc: 'Prête en quelques minutes. Vous la recevrez en PDF par e-mail.',
-    freeNote: 'Cette première histoire est un essai gratuit rapide — prête en quelques minutes. Inscrivez-vous pour des histoires complètes de haute qualité (un peu plus longues à créer) — la première est offerte.',
+    freeNote: 'Inscrivez-vous pour des histoires complètes de meilleure qualité (elles prennent plus de temps). La première est offerte.',
     cta: 'C\'est parti',
   },
   it: {
@@ -155,7 +155,7 @@ const introStrings: Record<string, {
     step2Desc: 'Un\'avventura, o una storia che insegna qualcosa con dolcezza.',
     step3Title: 'Rilassati',
     step3Desc: 'Pronta in pochi minuti. La riceverai in PDF via e-mail.',
-    freeNote: 'Questa prima storia è una prova gratuita veloce — pronta in pochi minuti. Registrati per storie complete di alta qualità (un po\' più lente) — la prima è gratis.',
+    freeNote: 'Registrati per storie complete di qualità superiore (richiedono più tempo). La prima è gratis.',
     cta: 'Iniziamo',
   },
 };

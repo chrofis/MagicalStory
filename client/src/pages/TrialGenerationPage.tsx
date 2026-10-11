@@ -103,7 +103,7 @@ const translations = {
     gateTitle: 'What happens next?',
     gateDesc: 'Leave your email or sign in with Google and read on right away.',
     keepStoryNote: 'Check your email to keep your story',
-    rotationEmailHint: 'Add your email after the story finishes so we can send you the PDF. Set a password too and you get free credits for a full-length story.',
+    rotationEmailHint: 'Enter your email to read the whole story and get the PDF. Set a password for free credits.',
   },
   de: {
     brand: 'Magical Story',
@@ -116,10 +116,10 @@ const translations = {
     emailLabel: 'E-Mail-Adresse',
     emailPlaceholder: 'du@beispiel.com',
     emailSubmit: 'Geschichte ansehen',
-    terms: 'Mit der Fortsetzung stimmst du unseren',
+    terms: 'Wenn du weitermachst, akzeptierst du unsere',
     termsLink: 'Nutzungsbedingungen',
     and: 'und',
-    privacyLink: 'Datenschutzrichtlinien',
+    privacyLink: 'Datenschutzerklärung',
     emailSent: 'Fast geschafft — prüfe deine E-Mails!',
     emailSentDesc: 'Klicke auf den Link in deiner E-Mail, um dein Konto einzurichten und deine Geschichte zu behalten.',
     emailSentNote: 'Nicht erhalten? Prüfe deinen Spam-Ordner.',
@@ -151,7 +151,7 @@ const translations = {
     gateTitle: 'Wie geht es weiter?',
     gateDesc: 'Gib deine E-Mail-Adresse an oder melde dich mit Google an und lies sofort weiter.',
     keepStoryNote: 'Prüfe deine E-Mails, um deine Geschichte zu behalten',
-    rotationEmailHint: 'Gib am Ende deine E-Mail an, damit wir dir die Geschichte als PDF schicken können. Setze auch ein Passwort, dann bekommst du Gratis-Credits für eine richtige Geschichte in voller Länge.',
+    rotationEmailHint: 'Gib deine E-Mail an, um die ganze Geschichte zu lesen und das PDF zu erhalten. Setze ein Passwort für Gratis-Credits.',
   },
   fr: {
     brand: 'Magical Story',
@@ -199,7 +199,7 @@ const translations = {
     gateTitle: 'Que se passe-t-il ensuite ?',
     gateDesc: 'Indiquez votre e-mail ou connectez-vous avec Google et lisez la suite tout de suite.',
     keepStoryNote: 'Vérifiez vos e-mails pour garder votre histoire',
-    rotationEmailHint: 'Saisissez votre e-mail à la fin pour que nous puissions vous envoyer le PDF de l\'histoire. Définissez aussi un mot de passe et vous recevez des crédits gratuits pour une histoire complète.',
+    rotationEmailHint: 'Saisissez votre e-mail pour lire toute l\'histoire et recevoir le PDF. Définissez un mot de passe pour des crédits gratuits.',
   },
   it: {
     brand: 'Magical Story',
@@ -247,7 +247,7 @@ const translations = {
     gateTitle: 'Come continua?',
     gateDesc: 'Inserisci la tua e-mail o accedi con Google e continua subito a leggere.',
     keepStoryNote: 'Controlla la tua e-mail per conservare la tua storia',
-    rotationEmailHint: 'Inserisci la tua e-mail al termine, così possiamo inviarti la storia in PDF. Imposta anche una password e ricevi crediti gratuiti per una storia completa.',
+    rotationEmailHint: 'Inserisci la tua e-mail per leggere tutta la storia e ricevere il PDF. Imposta una password per crediti gratuiti.',
   },
 };
 
