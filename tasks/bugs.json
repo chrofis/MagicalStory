@@ -4186,6 +4186,13 @@
       "source": "staging trials since 2f0143e5c: 6/6 landmark plates without photo (Ruine Stein job_1791732897090_u7q6rp4p5, Grossmuenster job_1791628382638_yka3zzxte); storyHelpers.js:505-506 spreads loc before descriptionsPromise resolves; now on production (44dff16b)",
       "status": "fixed",
       "fixedIn": "c23be8537"
+    },
+    {
+      "id": "showcase-mermaid-costume-sheet-fails",
+      "title": "Full story fails: the costume sheet for the main character could not be created (mermaid, Grok 2 single call)",
+      "reportedAt": "2026-10-11",
+      "source": "production showcase job_1791748539342_ikyl88w1h (Dubois/FR mermaid, watercolour) failed at 58% after ~68 min: \"The costume sheet for Léa could not be created\"; build dfc9591a",
+      "status": "open"
     }
   ]
 }
