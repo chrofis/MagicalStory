@@ -49,7 +49,7 @@ const endPageText: Record<string, Record<string, string>> = {
     f1: 'Plusieurs personnages',
     f2: 'Des histoires plus longues',
     f3: 'Différents styles de dessin',
-    f4: 'Qualité d\'image supérieure : chaque image est vérifiée et améliorée',
+    f4: 'Qualité d\'image supérieure',
     f5: 'Commander en livre imprimé',
   },
   it: {

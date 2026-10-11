@@ -190,7 +190,7 @@ const translations = {
       'Plusieurs personnages dans une même histoire',
       'Des histoires plus longues',
       'Plusieurs styles de dessin',
-      'Qualité d\'image supérieure : chaque image est vérifiée et améliorée',
+      'Qualité d\'image supérieure',
       'Commander en livre imprimé',
     ],
     rotationTrialIntro: 'Ceci est une histoire d\'essai — elle devrait être prête en quelques minutes. Les histoires d\'essai sont courtes. Une histoire complète prend plus de temps mais offre beaucoup plus de pages et des scènes plus riches.',
