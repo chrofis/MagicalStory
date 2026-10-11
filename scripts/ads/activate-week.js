@@ -28,7 +28,10 @@ const ARMS = [
   // (5 of 14 opened /try) but the pages lose them on phones: 8 of 14 never left the homepage (Google rates its
   // landing-page experience BELOW_AVERAGE on all 5 keywords) and 4 of the 5 who opened /try left on its first
   // screen without a tap. Resume once the phone first screen is fixed.
-  { name: 'Search-Deutschschweiz-v1', budget: 3, status: 'PAUSED', why: 'existing high-intent converter (all 9 account conversions came from here)' },
+  // RESUMED 2026-10-11 (owner): the phone /try fixes (6ab466467, 911ff7dcf) and the 3-page trial preview are on
+  // master. 5-day test, ~CHF 15 at the CHF 3/day budget; re-read trials per franc on 2026-10-16 and pause again
+  // if still 0 trials.
+  { name: 'Search-Deutschschweiz-v1', budget: 3, why: 'existing high-intent converter (all 9 account conversions came from here)' },
   { name: 'Search-Cheap-Age-CH', budget: 3, why: 'age-gift cluster, CPC cap 0.20 - the most clicks per franc' },
   { name: 'Search-Cheap-Occasion-CH', budget: 2, why: 'Goettikind / Einschulung / Geschwisterkind, mostly unbid tails' },
   { name: 'Search-LifeChallenge-CH', budget: 2, why: 'life-challenge topics (Trotzphase, Schnuller, Eingewoehnung, Aengste) - zero advertisers bidding' },
