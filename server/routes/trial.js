@@ -3230,7 +3230,7 @@ async function triggerAvatarGenerationForUser(userId) {
 
       // Skip characters that already have avatars or are already generating
       const avatars = char.avatars;
-      if (avatars?.standard || avatars?.winter || avatars?.summer || avatars?.hasFullAvatars) {
+      if (avatars?.standard || avatars?.hasFullAvatars) {
         log.debug(`[TRIAL] Character ${char.name} already has avatars - skipping`);
         continue;
       }

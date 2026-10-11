@@ -1308,14 +1308,14 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
   const isCategoryLabel = (str) => {
     if (!str || typeof str !== 'string') return false;
     const s = str.trim().toLowerCase();
-    if (['standard', 'winter', 'summer', 'costumed'].includes(s)) return true;
+    if (['standard', 'costumed'].includes(s)) return true;
     if (s.startsWith('costumed:')) return true;
     return false;
   };
 
   // Resolve a clothing category (including nested costumed:type) to a prose
   // description. char.avatars.clothing has this shape:
-  //   { standard: "...", winter: "...", costumed: { cowboy: "...", wizard: "..." } }
+  //   { standard: "...", costumed: { cowboy: "...", wizard: "..." } }
   // so "costumed:cowboy" needs to hit avatars.clothing.costumed.cowboy, not
   // avatars.clothing["costumed:cowboy"] which doesn't exist.
   const resolveClothingDesc = (clothingDescriptions, category) => {
@@ -1346,7 +1346,7 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
     const position = expectedPositions?.[name] || expectedPositions?.[name.charAt(0).toUpperCase() + name.slice(1)] || '';
     // Use clothing from characterClothing map, or from parsed description (covers), or empty
     let clothingCategory = getClothing(name) || desc.clothing || '';
-    // Resolve category names (standard/winter/summer/costumed:X) to actual descriptions
+    // Resolve category names (standard/costumed:X) to actual descriptions
     let clothing = clothingCategory;
     if (desc.clothingDescriptions && clothingCategory) {
       const resolved = resolveClothingDesc(desc.clothingDescriptions, clothingCategory);

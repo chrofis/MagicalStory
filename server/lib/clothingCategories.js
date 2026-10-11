@@ -2,47 +2,52 @@
  * Clothing Categories — canonical normalizer.
  *
  * Single source of truth for mapping AI-produced clothing category strings
- * to one of 4 canonical buckets. Used on BOTH write and read sides of the
+ * to one of 2 canonical buckets. Used on BOTH write and read sides of the
  * styled avatar cache so lookups are guaranteed to match regardless of
  * AI variability (case, language, costume subtype).
  *
- * Four buckets:
+ * Two buckets:
  *   - "standard"  — default everyday clothing
- *   - "winter"    — STORED ONLY: old stories/characters (never generated since 2026-10-10)
- *   - "summer"    — STORED ONLY: old stories/characters (never generated since 2026-10-10)
  *   - "costumed"  — story-specific outfit (costume subtype lives elsewhere)
  *
  * Tolerates:
- *   - Case variations: "Summer", "SUMMER" → "summer"
- *   - Language variants: "Sommer" (DE), "été" (FR), "verano" (ES) → "summer"
+ *   - Case variations: "Costumed", "COSTUMED" → "costumed"
  *   - Costume subtypes: "costumed:pirate", "costumed:wizard" → "costumed"
  *   - Visual Bible bracket IDs: "[CLO001] costumed" → "costumed"
  *   - Leading/trailing whitespace
  *
- * Unknown strings fall through to "standard" — deterministic degradation
- * rather than a cache miss + face photo fallback.
+ * Unknown strings (a season word included: it is prose, not a category) fall through
+ * to "standard" — deterministic degradation rather than a cache miss + face photo fallback.
  */
 
 // Canonical buckets — the ONLY valid cache key values
-const CANONICAL = Object.freeze(['standard', 'winter', 'summer', 'costumed']);
+const CANONICAL = Object.freeze(['standard', 'costumed']);
 const { buildCastIndex, lookupByName } = require('./castResolver');
 
-// The base avatar slot every character gets GENERATED (excludes story-specific
-// 'costumed', which is generated on demand). Winter and summer base sheets are no
-// longer generated (docs/decisions.md 2026-10-10: winter used in 0 stories, summer in
-// 5 over 60 days; season dress comes through the standard outfit description).
+// The one base avatar slot a character has (excludes story-specific 'costumed', which is
+// generated on demand). Winter and summer are NOT clothing categories any more
+// (docs/decisions.md 2026-10-10, second entry): a season word is prose, season dress comes
+// through the standard outfit description.
 const AVATAR_SLOTS = Object.freeze(['standard']);
 
-// Slots a stored character may still HAVE (winter/summer exist only on characters
-// created before 2026-10-10). READERS iterate this so stored characters and stored
-// stories that asked for summer keep loading; nothing generates them.
-const STORED_AVATAR_SLOTS = Object.freeze(['standard', 'winter', 'summer']);
+/**
+ * A stored page that asked for the removed winter/summer category cannot be rebuilt:
+ * no fallback, no repair. Called by the entry points that rebuild a page's references
+ * (repair, regenerate, covers, Lab); viewing a stored story never calls it.
+ * Only the bare category token counts. "winter jacket" is prose and never reaches here.
+ */
+function assertNotRemovedSeasonCategory(raw, who = '') {
+  const t = String(raw || '').trim().toLowerCase();
+  if (t === 'winter' || t === 'summer') {
+    throw new Error(`[CLOTHING] ${who ? who + ': ' : ''}this story asks for the clothing category "${t}", which no longer exists. Pages of such a story cannot be repaired or regenerated.`);
+  }
+}
 
 /**
- * Normalize any clothing category string to one of 4 canonical buckets.
+ * Normalize any clothing category string to one of 2 canonical buckets (standard, costumed).
  *
  * @param {string|null|undefined} category - Raw category from AI output
- * @returns {'standard'|'winter'|'summer'|'costumed'}
+ * @returns {'standard'|'costumed'}
  */
 function normalizeClothingCategory(category) {
   if (!category) return 'standard';
@@ -66,19 +71,6 @@ function normalizeClothingCategory(category) {
       raw.startsWith('deguis') ||
       raw.startsWith('disfraz')) {
     return 'costumed';
-  }
-
-  // Winter — multi-language
-  if (raw === 'winter' || raw === 'wintertime' ||
-      raw === 'hiver' || raw === 'inverno' || raw === 'invierno') {
-    return 'winter';
-  }
-
-  // Summer — multi-language
-  if (raw === 'summer' || raw === 'summertime' ||
-      raw === 'sommer' || raw === 'été' || raw === 'ete' ||
-      raw === 'estate' || raw === 'verano') {
-    return 'summer';
   }
 
   // Everything else (including unknown/typo) → standard
@@ -346,7 +338,7 @@ function resolveRenderedClothingCategory(storyData, pageNumber, charName, record
 module.exports = {
   CANONICAL,
   AVATAR_SLOTS,
-  STORED_AVATAR_SLOTS,
+  assertNotRemovedSeasonCategory,
   normalizeClothingCategory,
   getUsedClothingCategories,
   reconcileCoverClothingWithRequirements,

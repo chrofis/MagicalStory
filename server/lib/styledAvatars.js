@@ -12,7 +12,7 @@
  */
 
 const fs = require('fs');
-const { STORED_AVATAR_SLOTS } = require('./clothingCategories');
+const { AVATAR_SLOTS } = require('./clothingCategories');
 const path = require('path');
 const { log } = require('../utils/logger');
 const { compressImageToJPEG, callGeminiAPIForImage } = require('./images');
@@ -34,7 +34,7 @@ const { slugifyCostume, costumeSubKey, pickCostumed } = require('../utils/costum
  * Returns a `data:image/...;base64,...` data URL or null.
  *
  * @param {Object} avatars - the character's avatars object (char.avatars)
- * @param {string} category - 'standard' | 'winter' | 'summer'
+ * @param {string} category - 'standard'
  */
 async function resolveAvatarBytes(avatars, category) {
   if (!avatars || !category) return null;
@@ -952,8 +952,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 }
 
 // Canonical buckets a styled avatar can live under in the cache.
-// winter/summer buckets: stored-only (old stories), see clothingCategories STORED_AVATAR_SLOTS.
-const STYLED_AVATAR_BUCKETS = ['costumed', ...STORED_AVATAR_SLOTS];
+const STYLED_AVATAR_BUCKETS = ['costumed', ...AVATAR_SLOTS];
 
 /**
  * A required costumed sheet could not be generated. "No costume, no book"
@@ -1199,7 +1198,7 @@ function getStyledAvatar(characterRef, clothingCategory, artStyle) {
     log.error(`❌ [STYLED-AVATAR] COSTUMED CACHE MISS: ${cacheKey} — no other bucket substitutes for a costume`);
     return null;
   }
-  const fallbackOrder = ['costumed', 'standard'];  // winter/summer sheets never stand in (decisions 2026-10-10)
+  const fallbackOrder = ['costumed', 'standard'];  // no other sheet stands in
   for (const bucket of fallbackOrder) {
     if (bucket === requestedCanonical) continue;
     const altKey = getAvatarCacheKey(characterRef, bucket, artStyle);
@@ -1554,7 +1553,7 @@ function applyStyledAvatars(characterPhotos, artStyle) {
 
 /**
  * Find nearest matching clothing category using fuzzy matching
- * Handles typos like "COSTUUM" → "costumed", "sommer" → "summer", "winer" → "winter"
+ * Handles typos like "COSTUUM" → "costumed"
  *
  * @param {string} raw - Raw clothing value from scene description
  * @returns {string|null} Normalized clothing category or null if no match
@@ -1564,7 +1563,7 @@ function findNearestClothingCategory(raw) {
   const normalized = raw.toLowerCase().trim();
 
   // Valid categories
-  const validCategories = ['standard', 'winter', 'summer', 'costumed'];
+  const validCategories = ['standard', 'costumed'];
 
   // Exact match
   if (validCategories.includes(normalized)) return normalized;
@@ -1591,7 +1590,7 @@ function findNearestClothingCategory(raw) {
     }
   }
 
-  // Simple similarity: find closest match (handles "sommer" → "summer", "winer" → "winter")
+  // Simple similarity: find closest match (handles typos of the two categories)
   const similarity = (a, b) => {
     const longer = a.length > b.length ? a : b;
     const shorter = a.length > b.length ? b : a;
@@ -1779,7 +1778,7 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
  * @returns {Record<string, string>|null} Map of clothingCategory -> styledAvatar, or null if none found
  */
 function getStyledAvatarsForCharacter(characterRef, artStyle) {
-  const clothingCategories = STORED_AVATAR_SLOTS;
+  const clothingCategories = AVATAR_SLOTS;
   const result = {};
   let foundAny = false;
 

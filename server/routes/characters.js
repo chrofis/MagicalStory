@@ -80,16 +80,15 @@ router.get('/', authenticateToken, async (req, res) => {
                 // Dual-shape (Phase 1 migration): NEW `faceThumb.standard` wins,
                 // OLD `faceThumbnailsUrl.standard` / `faceThumbnails.standard`
                 // fall back. Same for the hasFullAvatars probe: any of the main
-                // avatar fields (NEW URL strings on .standard/.winter/.summer
-                // OR OLD .standardUrl/.winterUrl/.summerUrl) counts.
+                // avatar fields (NEW URL string on .standard
+                // OR OLD .standardUrl) counts.
                 const av = light.avatars;
                 const stdThumb = av.faceThumb?.standard
                   || av.faceThumbnailsUrl?.standard
                   || av.faceThumbnails?.standard;
                 light.avatars = {
                   status: av.status, stale: av.stale, generatedAt: av.generatedAt,
-                  hasFullAvatars: !!(av.winter || av.standard || av.summer
-                    || av.winterUrl || av.standardUrl || av.summerUrl),
+                  hasFullAvatars: !!(av.standard || av.standardUrl),
                   faceThumbnails: stdThumb ? { standard: stdThumb } : undefined,
                   clothing: av.clothing
                 };
@@ -293,7 +292,7 @@ router.put('/roles', authenticateToken, async (req, res) => {
         avatars: avatars ? {
           // Don't include full avatars in metadata - use hasFullAvatars flag instead
           // Full avatars are loaded on-demand via /api/characters/:id/avatars
-          hasFullAvatars: !!(avatars.standard || avatars.winter || avatars.summer),
+          hasFullAvatars: !!avatars.standard,
           status: avatars.status,
           stale: avatars.stale,
           generatedAt: avatars.generatedAt,
@@ -715,8 +714,7 @@ router.post('/', authenticateToken, async (req, res) => {
             status: av.status,
             stale: av.stale,
             generatedAt: av.generatedAt,
-            hasFullAvatars: !!(av.winter || av.standard || av.summer
-              || av.winterUrl || av.standardUrl || av.summerUrl),
+            hasFullAvatars: !!(av.standard || av.standardUrl),
             // Keep only standard thumbnail for list view (~70KB per char instead of 273KB)
             faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
             // Keep clothing descriptions (small text, needed for display and preservation)
@@ -808,7 +806,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // DELETE /api/characters/avatars/styled - Clear styled/costumed avatar data (admin only)
-// Keeps base clothing avatars (winter, standard, summer, formal)
+// Keeps base clothing avatars (standard)
 // Only removes styledAvatars and costumed which are the bulk of the data
 // NOTE: Must be defined BEFORE /:characterId to avoid route conflict
 router.delete('/avatars/styled', authenticateToken, async (req, res) => {

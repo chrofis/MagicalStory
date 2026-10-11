@@ -4,8 +4,7 @@
  * The target architecture (see plans/story-scoped-avatars) is that every
  * reference image used during a story's generation is sourced from a
  * story-level 2×4 sheet stored at `story.data.characterAvatars[name].<key>`.
- * `<key>` is one of: `'costumed'`, `'styled-standard'`, `'styled-winter'`,
- * `'styled-summer'`. There is ONE `costumed` slot per character per story —
+ * `<key>` is one of: `'costumed'`, `'styled-standard'`. There is ONE `costumed` slot per character per story —
  * no `costumed:pirate` / `costumed:knight` subtype keying.
  *
  * Phase 1 of the migration adds a SHADOW WRITE: project the existing per-
@@ -17,7 +16,7 @@
 'use strict';
 
 const { log } = require('../utils/logger');
-const { STORED_AVATAR_SLOTS } = require('./clothingCategories');
+const { AVATAR_SLOTS } = require('./clothingCategories');
 const { isOverTheShoulderPerspective } = require('./shotVocabulary');
 
 /**
@@ -43,8 +42,6 @@ function extractUrl(slot) {
  *     Emma: {
  *       costumed:        '<url>',     // first costumed.<anyKey>
  *       'styled-standard': '<url>',   // .standard
- *       'styled-winter':   '<url>',   // .winter
- *       'styled-summer':   '<url>',   // .summer
  *     },
  *     Noah: { costumed: '<url>' },
  *   }
@@ -86,7 +83,7 @@ function projectStoryCharacterAvatars(characters, artStyle) {
 
     // Non-costumed styled sheets (optional add-ons, "the character out of
     // costume in art style"). Each is keyed as `styled-<clothing>`.
-    for (const clothing of STORED_AVATAR_SLOTS) {
+    for (const clothing of AVATAR_SLOTS) {
       const url = extractUrl(styled[clothing]);
       if (!url) continue;
       entry[`styled-${clothing}`] = url;
@@ -101,7 +98,7 @@ function projectStoryCharacterAvatars(characters, artStyle) {
     for (const key of Object.keys(styled)) {
       if (!isOffCategory(key)) continue;
       const parsed = parseOffCategory(key);
-      if (!parsed || ![...STORED_AVATAR_SLOTS, 'costumed'].includes(parsed.baseCategory)) continue;
+      if (!parsed || ![...AVATAR_SLOTS, 'costumed'].includes(parsed.baseCategory)) continue;
       const url = extractUrl(styled[key]);
       if (!url) continue;
       // The costumed slot is bare 'costumed' (one costume per story), so its
@@ -236,7 +233,7 @@ function resolveSheetForRef(story, ref, opts = {}) {
   const clothingRaw = String(ref.clothingCategory || '').toLowerCase();
   let slotKey;
   if (clothingRaw.startsWith('costumed')) slotKey = 'costumed';
-  else if (STORED_AVATAR_SLOTS.includes(clothingRaw)) slotKey = `styled-${clothingRaw}`;
+  else if (AVATAR_SLOTS.includes(clothingRaw)) slotKey = `styled-${clothingRaw}`;
   else slotKey = 'costumed';
 
   // WARDROBE STATE. Same substitution mechanism as the costumed-vs-standard

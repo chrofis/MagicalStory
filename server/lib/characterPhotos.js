@@ -19,7 +19,7 @@
  */
 
 const { fetchImageBytes } = require('./r2');
-const { STORED_AVATAR_SLOTS } = require('./clothingCategories');
+const { AVATAR_SLOTS } = require('./clothingCategories');
 
 const _avatarFetchCache = new Map();
 async function _getOrFetch(url) {
@@ -84,7 +84,7 @@ function _toUrlString(value) {
  *
  * @param {Object} character - character object (or an avatars sub-object —
  *                             we accept both for ergonomics)
- * @param {string} variant   - 'standard' | 'winter' | 'summer'
+ * @param {string} variant   - 'standard'
  * @returns {string|null}    - URL string, data: URI, or null
  */
 function getStandardAvatar(character, variant = 'standard') {
@@ -109,7 +109,7 @@ function getStandardAvatar(character, variant = 'standard') {
  * `avatars.faceThumbnailsUrl.{variant}` and `avatars.faceThumbnails.{variant}`.
  *
  * @param {Object} character
- * @param {string} variant - 'standard' | 'winter' | 'summer'
+ * @param {string} variant - 'standard'
  * @returns {string|null}
  */
 function getFaceThumb(character, variant = 'standard') {
@@ -156,9 +156,7 @@ function getBodyThumb(character, variant = 'standard') {
  */
 function hasAnyStandardAvatar(character) {
   if (!character) return false;
-  return !!(getStandardAvatar(character, 'standard')
-         || getStandardAvatar(character, 'winter')
-         || getStandardAvatar(character, 'summer'));
+  return !!(getStandardAvatar(character, 'standard'));
 }
 
 /**
@@ -317,7 +315,7 @@ function normalizeAllPhotos(characters) {
  * sharp/Buffer decode, or null when no URL is set or the fetch failed.
  *
  * @param {Object} avatar - The avatars object from character.avatars
- * @param {string} slot   - 'standard' | 'summer' | 'winter'
+ * @param {string} slot   - 'standard'
  * @returns {Promise<string|null>} base64 string (no data: prefix) or null
  */
 async function loadAvatarBytes(avatar, slot) {
@@ -367,7 +365,7 @@ async function loadVbReferenceBytes(vbEntry) {
 function normalizeAvatarsForResponse(avatars) {
   if (!avatars || typeof avatars !== 'object') return avatars;
   const out = { ...avatars };
-  for (const slot of STORED_AVATAR_SLOTS) {
+  for (const slot of AVATAR_SLOTS) {
     const url = out[`${slot}Url`];
     if (url) out[slot] = url;
     delete out[`${slot}Url`];
@@ -433,7 +431,7 @@ function hasUsableAvatar(c, artStyleId) {
   if (!av || typeof av !== 'object') return false;
   const styled = artStyleId ? av.styledAvatars?.[artStyleId] : null;
   const styledOk = !!(styled && typeof styled === 'object' && Object.keys(styled).length > 0);
-  const baseOk = !!(av.standard || av.standardUrl || av.summer || av.summerUrl || av.winter || av.winterUrl);
+  const baseOk = !!(av.standard || av.standardUrl);
   return styledOk || baseOk;
 }
 

@@ -1920,7 +1920,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
     // character who also uses standard/winter/summer is left unresolved here and
     // their crop is skipped downstream — ambiguity is not a licence to guess.
     if (Object.keys(characterClothing).length === 0 && clothingRequirements) {
-      const NON_COSTUMED = ['standard', 'winter', 'summer', 'formal'];
+      const NON_COSTUMED = ['standard', 'formal'];
       for (const char of characters) {
         const charReqs = clothingRequirements[char.name];
         if (!charReqs?.costumed?.used || !charReqs.costumed.costume) continue;
@@ -2055,9 +2055,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           // the wrong reference clothing.
           const styledForArt = fullChar?.avatars?.styledAvatars?.[artStyle] || {};
           const onlyHasCostumed = !!styledForArt.costumed
-            && !styledForArt.standard
-            && !styledForArt.winter
-            && !styledForArt.summer;
+            && !styledForArt.standard;
           const fallbackCategory = onlyHasCostumed ? 'costumed' : 'standard';
           // Case-insensitive lookup — scene metadata can key characterClothing
           // with different casing than the canonical character name, and an
@@ -3547,8 +3545,6 @@ function buildClothingDescription(character, clothingCategory, artStyle, clothin
 
   // Default based on category
   const categoryDefaults = {
-    winter: 'Warm winter clothing as shown in reference',
-    summer: 'Light summer clothing as shown in reference',
     formal: 'Formal attire as shown in reference',
     standard: 'Casual everyday clothing as shown in reference'
   };

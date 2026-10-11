@@ -1,7 +1,6 @@
 // Database Service - PostgreSQL connection and query utilities
 const { Pool } = require('pg');
 const { dbIndexFor, arrayIndexForDb } = require('../lib/versionManager');
-const { STORED_AVATAR_SLOTS } = require('../lib/clothingCategories');
 const r2 = require('../lib/r2');
 const { log } = require('../utils/logger');
 
@@ -1468,7 +1467,7 @@ async function extractInlineImagesToR2(storyId, data) {
             });
           }
         } else {
-          // Plain category: 'standard' | 'summer' | 'winter'
+          // Plain category: 'standard'
           const inline = (typeof slot === 'string')
             ? slot
             : (typeof slot.imageData === 'string') ? slot.imageData : null;
@@ -1799,7 +1798,7 @@ function stripInlineImagesFromStoryData(data, { keepDisplayBytes = false } = {})
       // live under `standard` (inline) OR `standardUrl` (URL string); post
       // Phase-2 migration they collapse onto `standard` (URL string). We
       // null both for consistency (the canonical character row owns these).
-      for (const k of STORED_AVATAR_SLOTS) {
+      for (const k of ['standard', 'summer', 'winter']) {  // winter/summer: legacy keys stripped, never read (decisions 2026-10-10)
         c.avatars[k] = undefined;
         c.avatars[`${k}Url`] = undefined;
       }
@@ -2773,7 +2772,7 @@ async function upsertStory(storyId, userId, storyData, options = {}) {
  *
  * @param {string|number} userId
  * @param {string|number} characterId
- * @param {string} slot           - 'standard' | 'summer' | 'winter'
+ * @param {string} slot           - 'standard'
  * @param {string} imageData      - base64 (with or without data: prefix)
  * @returns {Promise<string|null>} public R2 URL, or null on failure
  */
@@ -2850,7 +2849,7 @@ async function saveStyledAvatarToR2(userId, characterId, key, imageData) {
  * @param {string|number} userId
  * @param {string|number} characterId
  * @param {string} artStyle           - e.g. 'watercolor', 'pixar'
- * @param {string} clothingCategory   - 'standard' | 'winter' | 'summer' | 'costumed:<key>'
+ * @param {string} clothingCategory   - 'standard' | 'costumed:<key>'
  * @param {string} imageData          - data:image/png;base64,...
  */
 async function persistStyledAvatar(userId, characterId, artStyle, clothingCategory, imageData) {
@@ -2866,7 +2865,7 @@ async function persistStyledAvatar(userId, characterId, artStyle, clothingCatego
   if (!Object.prototype.hasOwnProperty.call(ART_STYLES, artStyle)) {
     throw new Error(`persistStyledAvatar: unknown artStyle "${artStyle}" (not in ART_STYLES)`);
   }
-  // clothingCategory is one of: 'standard' | 'winter' | 'summer' | 'costumed'
+  // clothingCategory is one of: 'standard' | 'costumed'
   // (bare) | 'costumed:<costumeKey>' (legacy). Anything else is a bug.
   const CLOTHING_BARE_RE = /^[a-z][a-z0-9_]{0,30}$/;
   const isCostumed = clothingCategory === 'costumed' || clothingCategory.startsWith('costumed:');
@@ -2966,7 +2965,7 @@ async function persistStyledAvatar(userId, characterId, artStyle, clothingCatego
  * @param {string|number} userId
  * @param {string|number} characterId
  * @param {string} kind           - 'face' | 'body'
- * @param {string} slot           - 'standard' | 'summer' | 'winter'
+ * @param {string} slot           - 'standard'
  * @param {string} imageData      - base64
  * @returns {Promise<string|null>}
  */

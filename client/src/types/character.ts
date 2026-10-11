@@ -100,7 +100,7 @@ export interface CharacterPhotos {
 }
 
 // Clothing categories for scene-appropriate avatars
-export type ClothingCategory = 'winter' | 'standard' | 'summer' | 'formal';
+export type ClothingCategory = 'standard' | 'formal';
 
 // LPIPS perceptual similarity result
 export interface LpipsResult {
@@ -131,9 +131,7 @@ export type StyledAvatarSlot = string | { imageUrl?: string; imageData?: string;
 
 // Styled avatar set for a specific art style (includes standard clothing + costumed)
 export interface StyledAvatarSet {
-  winter?: StyledAvatarSlot;
   standard?: StyledAvatarSlot;
-  summer?: StyledAvatarSlot;
   formal?: StyledAvatarSlot;
   costumed?: Record<string, StyledAvatarSlot>; // Key: costume type (e.g., "Cowboy")
 }
@@ -147,9 +145,7 @@ export interface CostumedAvatarData {
 
 // Generated avatars for each clothing category
 export interface CharacterAvatars {
-  winter?: string;
   standard?: string;
-  summer?: string;
   formal?: string;
   faceThumbnails?: Record<ClothingCategory, string>; // Extracted face thumbnails for display (OLD shape — pre-migration)
   bodyThumbnails?: Record<ClothingCategory, string>; // Extracted body-front thumbnails for display (OLD shape)
@@ -165,10 +161,8 @@ export interface CharacterAvatars {
   faceThumb?: Partial<Record<ClothingCategory, string>>;
   bodyThumb?: Partial<Record<ClothingCategory, string>>;
   // OLD-shape main avatar URL siblings. NEW shape stores the URL directly on
-  // `standard` / `winter` / `summer` above. Use `getStandardAvatar` to read.
+  // `standard` above. Use `getStandardAvatar` to read.
   standardUrl?: string;
-  winterUrl?: string;
-  summerUrl?: string;
   hasFullAvatars?: boolean; // Flag indicating full avatars exist and can be loaded on-demand
   generatedAt?: string;
   status?: 'pending' | 'generating' | 'complete' | 'failed';

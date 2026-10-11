@@ -719,7 +719,7 @@ function buildCastIdentityDescription(char, clothingText = '') {
   // expected to resolve the category to prose (buildClothingDescription); this
   // is the backstop for when it cannot.
   const tag = String(clothingText || '').trim().toLowerCase();
-  const isCategory = ['standard', 'winter', 'summer', 'costumed'].includes(tag) || tag.startsWith('costumed:');
+  const isCategory = ['standard', 'costumed'].includes(tag) || tag.startsWith('costumed:');
   const wearable = isCategory ? '' : clothingText;
   return wearable ? `${base}. Wearing: ${wearable}` : base;
 }
@@ -3646,7 +3646,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // canonical clothing-token pattern as outlineParser/shared.js:117-126.
     // Requiring `costumed:type` silently dropped every bare-costumed
     // character's depth/perspective/position locks.
-    const lineRegex = /[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?)\s*:\s*(?:standard|winter|summer|formal|costumed(?::(?:\{[^}]*\}|[^\r\n,]+))?)((?:\s*,\s*(?:depth|perspective|position)\s*:\s*[^,\r\n]+)+)/gi;
+    const lineRegex = /[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?)\s*:\s*(?:standard|formal|costumed(?::(?:\{[^}]*\}|[^\r\n,]+))?)((?:\s*,\s*(?:depth|perspective|position)\s*:\s*[^,\r\n]+)+)/gi;
     let lockMatch;
     const seen = new Set();
     while ((lockMatch = lineRegex.exec(rawOutlineContext.currentPage)) !== null) {
@@ -4232,7 +4232,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       // Match each Characters: line that has perspective or depth annotations.
       // Bare `costumed` accepted (optional `:type` / `:{type}` suffix) — same
       // canonical clothing-token pattern as outlineParser/shared.js:117-126.
-      const lineRegex = /[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?)\s*:\s*(?:standard|winter|summer|formal|costumed(?::(?:\{[^}]*\}|[^\r\n,]+))?)((?:\s*,\s*(?:depth|perspective|position)\s*:\s*[^,\r\n]+)+)/gi;
+      const lineRegex = /[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?)\s*:\s*(?:standard|formal|costumed(?::(?:\{[^}]*\}|[^\r\n,]+))?)((?:\s*,\s*(?:depth|perspective|position)\s*:\s*[^,\r\n]+)+)/gi;
       let lockMatch;
       const seen = new Set();
       while ((lockMatch = lineRegex.exec(rawForLock)) !== null) {
@@ -12500,7 +12500,7 @@ function parseClothingReview(raw) {
   // `costumed:<name>` is how check 9 ADDS a category the bible missed — the
   // costume name rides in the heading and the merge needs it to mark the
   // category used.
-  const re = /^[ \t]*#{1,4}[ \t]*\**([^/\n]+?)\**[ \t]*\/[ \t]*\**(standard|winter|summer|costumed(?::[\w-]+)?)\b[^\n]*$/gim;
+  const re = /^[ \t]*#{1,4}[ \t]*\**([^/\n]+?)\**[ \t]*\/[ \t]*\**(standard|costumed(?::[\w-]+)?)\b[^\n]*$/gim;
   const marks = [];
   let m;
   while ((m = re.exec(body)) !== null) {

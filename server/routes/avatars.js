@@ -1506,8 +1506,7 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
               status: av.status,
               stale: av.stale,
               generatedAt: av.generatedAt,
-              hasFullAvatars: !!(av.winter || av.standard || av.summer
-                || av.winterUrl || av.standardUrl || av.summerUrl),
+              hasFullAvatars: !!(av.standard || av.standardUrl),
               faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
               clothing: av.clothing
             };
@@ -1731,7 +1730,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     log.debug(`👔 [AVATAR JOB ${jobId}] Starting background generation for ${name || 'unnamed'} (id: ${characterId}), model: ${selectedModel}, backend: ${useGrok ? 'grok' : useRunware ? 'runware' : 'gemini'}`);
 
     const clothingCategories = {
-      // Standard only: winter/summer base sheets are no longer generated (docs/decisions.md 2026-10-10);
+      // Standard only: winter and summer are not clothing categories (docs/decisions.md 2026-10-10, second entry);
       // season dress comes through the standard outfit description.
       standard: { emoji: '👕' }
     };

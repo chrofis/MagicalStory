@@ -987,8 +987,6 @@ function extractSceneMetadata(sceneDescription) {
         const costumedMatch = raw.match(/costumed:(?!costumed)(.+)/);
         if (costumedMatch) characterClothing[char.name] = `costumed:${costumedMatch[1].trim()}`;
         else if (raw.includes('costumed')) characterClothing[char.name] = 'costumed';
-        else if (raw.includes('winter')) characterClothing[char.name] = 'winter';
-        else if (raw.includes('summer')) characterClothing[char.name] = 'summer';
         else characterClothing[char.name] = 'standard';
       }
       // Perspective and depth from metadata
@@ -1146,8 +1144,6 @@ function extractSceneMetadata(sceneDescription) {
           const costumedMatch = raw.match(/costumed:(?!costumed)(.+)/);
           if (costumedMatch) characterClothing[char.name] = `costumed:${costumedMatch[1].trim()}`;
           else if (raw.includes('costumed')) characterClothing[char.name] = 'costumed';
-          else if (raw.includes('winter')) characterClothing[char.name] = 'winter';
-          else if (raw.includes('summer')) characterClothing[char.name] = 'summer';
           else characterClothing[char.name] = 'standard';
         }
         if (char.position) {
@@ -1680,7 +1676,7 @@ function parseSceneHintMetadata(sceneHint) {
       const charEntries = [];
       // Bare `costumed` accepted (optional `:type` / `:{type}` suffix) — same
       // canonical clothing-token pattern as outlineParser/shared.js:117-126.
-      const linePattern = /^[-*]\s*([^:\r\n]+:\s*(?:standard|winter|summer|formal|costumed(?::(?:\{[^}]*\}|[^\r\n,]+))?))/gim;
+      const linePattern = /^[-*]\s*([^:\r\n]+:\s*(?:standard|formal|costumed(?::(?:\{[^}]*\}|[^\r\n,]+))?))/gim;
       let lineMatch;
       while ((lineMatch = linePattern.exec(charBlock)) !== null) {
         charEntries.push(lineMatch[1].trim());

@@ -359,7 +359,7 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
     const characters = inputData.characters || [];
     const charsWithoutAvatars = characters.filter(char => {
       const avatars = char.avatars || char.clothingAvatars || {};
-      // Only check actual avatar URLs (winter, standard, summer, formal), not metadata like status/stale/faceMatch
+      // Only check actual avatar URLs (standard), not metadata like status/stale/faceMatch
       const hasAnyAvatar = Object.values(avatars).some(url => typeof url === 'string' && url.startsWith('data:image'));
       return !hasAnyAvatar && (char.photoUrl || char.bodyPhotoUrl); // Has photo but no avatars
     });

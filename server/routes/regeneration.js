@@ -4804,7 +4804,7 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
       const coverCastIdx = buildCastIndex(storyData, storyData.visualBible || null);
       for (const name of Object.keys(expectedPositions)) {
         const existing = expectedClothing[name];
-        const isCat = typeof existing === 'string' && /^(standard|winter|summer|costumed(:.*)?)$/i.test(existing.trim());
+        const isCat = typeof existing === 'string' && /^(standard|costumed(:.*)?)$/i.test(existing.trim());
         if (existing && !isCat) continue;
         // RESOLVE: expectedPositions is keyed by whatever spelling the cover
         // hint used; one resolver decides which roster entry that is.

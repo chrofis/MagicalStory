@@ -208,8 +208,7 @@ function createLightCharacter(char) {
       status: av.status,
       stale: av.stale,
       generatedAt: av.generatedAt,
-      hasFullAvatars: !!(av.winter || av.standard || av.summer
-                      || av.winterUrl || av.standardUrl || av.summerUrl),
+      hasFullAvatars: !!(av.standard || av.standardUrl),
       // Keep writing under the OLD field name during Phase 1 — the list-view
       // SQL/UI still reads `faceThumbnails.standard`. Phase 3 will rename
       // both the write and read sides once all rows are migrated.

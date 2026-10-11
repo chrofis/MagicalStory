@@ -566,9 +566,7 @@ export function CharacterForm({
 
   // Check if character already has avatars (meaning this is a photo change, not initial upload)
   const hasExistingAvatars = !!(
-    character.avatars?.winter ||
-    character.avatars?.standard ||
-    character.avatars?.summer
+    character.avatars?.standard
   );
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -1106,9 +1104,7 @@ export function CharacterForm({
     // and OLD (`faceThumbnails` / `faceThumbnailsUrl` / `standardUrl` / inline)
     // shapes uniformly.
     const displayAvatar = getFaceThumb(character, 'standard') ||
-                          getStandardAvatar(character, 'standard') ||
-                          getStandardAvatar(character, 'winter') ||
-                          getStandardAvatar(character, 'summer');
+                          getStandardAvatar(character, 'standard');
     const hasAvatar = !!displayAvatar || character.avatars?.hasFullAvatars;
     const isStillGenerating = isGeneratingAvatar || isRegeneratingAvatarsWithTraits || avatarStatus === 'generating';
     const hasFailed = avatarStatus === 'failed';
@@ -1737,14 +1733,14 @@ export function CharacterForm({
             )}
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {/* Standard is the only generated base avatar; winter/summer show only when an older character still stores one (docs/decisions.md 2026-10-10) */}
-            {(['winter', 'standard', 'summer'] as const).filter((category) => category === 'standard' || !!character.avatars?.[category]).map((category) => (
+            {/* Standard is the only base avatar; winter and summer are not clothing categories (docs/decisions.md 2026-10-10) */}
+            {(['standard'] as const).map((category) => (
               <div key={category} className="text-center">
                 <div className="text-xs font-medium text-gray-600 mb-1 capitalize">
-                  {category === 'winter' ? '❄️' : category === 'summer' ? '☀️' : '👕'}
+                  👕
                   <span className="ml-0.5">
                     {language === 'de'
-                      ? (category === 'winter' ? 'Winter' : category === 'summer' ? 'Sommer' : 'Standard')
+                      ? 'Standard'
                       : category}
                   </span>
                 </div>
@@ -2061,7 +2057,7 @@ export function CharacterForm({
                 const rows: Array<{ key: string; label: string; emoji: string; url: string | null }> = [];
                 for (const cat of categories) {
                   const u = resolveImg(bucket[cat]);
-                  const emoji = cat === 'winter' ? '❄️' : cat === 'summer' ? '☀️' : cat === 'standard' ? '👕' : '🎨';
+                  const emoji = cat === 'standard' ? '👕' : '🎨';
                   rows.push({ key: cat, label: cat, emoji, url: u });
                 }
                 for (const c of costumeKeys) {
@@ -2137,7 +2133,7 @@ export function CharacterForm({
             // If no avatars yet and we can generate them, save + generate
             // Otherwise just save
             // Also check if avatars are currently being generated (don't start a second generation)
-            const hasAvatars = !!(character.avatars?.winter || character.avatars?.standard || character.avatars?.summer);
+            const hasAvatars = !!character.avatars?.standard;
             const isCurrentlyGenerating = character.avatars?.status === 'generating';
             if (!hasAvatars && !isCurrentlyGenerating && onSaveAndRegenerateWithTraits) {
               onSaveAndRegenerateWithTraits();

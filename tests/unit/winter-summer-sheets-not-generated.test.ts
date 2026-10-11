@@ -6,16 +6,18 @@ import path from 'node:path';
 const nodeRequire = createRequire(import.meta.url);
 const cats: any = nodeRequire('../../server/lib/clothingCategories.js');
 const resolve: any = nodeRequire('../../server/lib/clothingResolve.js');
+const { extractSceneMetadata } = nodeRequire('../../server/lib/sceneMetadata.js');
 
 const IMG = 'data:image/jpeg;base64,/9j/AAAA';
 const read = (f: string) => fs.readFileSync(path.join(__dirname, '../../prompts', f), 'utf8');
 
-// docs/decisions.md 2026-10-10: winter and summer base sheets are no longer generated; a stored
-// story that asked for summer still reads the sheet its character holds, and errors when it is gone.
-describe('winter/summer base sheets are stored-only', () => {
-  it('generates the standard slot only, reads all three', () => {
+// docs/decisions.md 2026-10-10 (second entry): winter and summer are not clothing categories at all.
+// A season word is prose. A stored page that asked for the category cannot be repaired.
+describe('winter/summer are not clothing categories', () => {
+  it('one base slot, two category buckets', () => {
     expect([...cats.AVATAR_SLOTS]).toEqual(['standard']);
-    expect([...cats.STORED_AVATAR_SLOTS]).toEqual(['standard', 'winter', 'summer']);
+    expect([...cats.CANONICAL]).toEqual(['standard', 'costumed']);
+    expect(cats.STORED_AVATAR_SLOTS).toBeUndefined();
   });
 
   it('the prompts no longer offer or style winter/summer', () => {
@@ -28,26 +30,41 @@ describe('winter/summer base sheets are stored-only', () => {
     }
   });
 
-  const withSummer = { id: 'c1', name: 'Emma', avatars: { standard: IMG + 'STD', summer: IMG + 'SUM' } };
-  const standardOnly = { id: 'c2', name: 'Noah', avatars: { standard: IMG + 'STD' } };
-  const reqs = (cat: string) => ({ Emma: { _currentClothing: cat }, Noah: { _currentClothing: cat } });
-
-  it('a stored summer story reads the stored summer sheet', () => {
-    const [d] = resolve.getCharacterPhotoDetails([withSummer], 'summer', null, reqs('summer'));
-    expect(d.photoType).toBe('clothing-summer');
-    expect(d.photoUrl).toBe(IMG + 'SUM');
-    expect(resolve.getCharacterPhotos([withSummer], 'summer')).toEqual([IMG + 'SUM']);
+  it('text with a season word resolves by the normal rules and never throws', () => {
+    for (const t of ['winter jacket', 'a warm winter coat', 'summer dress', 'Sommer', 'wintertime', 'Winter', 'summer']) {
+      expect(cats.normalizeClothingCategory(t)).toBe('standard');
+    }
+    expect(cats.normalizeClothingCategory('costumed:winter wizard')).toBe('costumed');
+    expect(() => resolve.parseClothingCategory('Clothing: a winter jacket')).not.toThrow();
+    expect(resolve.parseClothingCategory('Clothing: a winter jacket')).not.toBe('winter');
+    expect(resolve.parseClothingCategory('**Clothing:** summer')).not.toBe('summer');
   });
 
-  it('a missing stored summer sheet is an error, never the standard sheet', () => {
-    expect(() => resolve.getCharacterPhotoDetails([standardOnly], 'summer', null, reqs('summer'))).toThrow(/no stored summer sheet/);
-    expect(() => resolve.getCharacterPhotos([standardOnly], 'summer')).toThrow(/no stored summer sheet/);
+  it('a brief whose metadata says "winter jacket" or "summer" parses to standard/costumed', () => {
+    const brief = (clothing: string) => `Ana stands on the quay.\n\n---METADATA---\n${JSON.stringify({
+      sceneIntent: 'Ana stands.', shot: 'medium', timeOfDay: 'dusk',
+      characters: [{ name: 'Ana', clothing, position: 'center', depth: 'foreground' }],
+    })}`;
+    for (const c of ['winter jacket', 'summer', 'winter', 'costumed:winter knight', 'standard']) {
+      const m = extractSceneMetadata(brief(c));
+      const got = m?.characterClothing?.Ana;
+      expect(['standard', 'costumed', 'costumed:winter knight', undefined]).toContain(got);
+      expect(String(got)).not.toMatch(/^(winter|summer)$/);
+    }
   });
 
-  it('standard no longer borrows a winter/summer sheet', () => {
-    const summerOnly = { id: 'c3', name: 'Mia', avatars: { summer: IMG + 'SUM' }, photos: { face: IMG + 'FACE' } };
-    const [d] = resolve.getCharacterPhotoDetails([summerOnly], 'standard', null, { Mia: { _currentClothing: 'standard' } });
-    expect(d.photoType).not.toBe('clothing-summer');
-    expect(d.photoUrl).not.toBe(IMG + 'SUM');
+  const standardOnly = { id: 'c2', name: 'Noah', avatars: { standard: IMG + 'STD' }, photos: { face: IMG + 'F' } };
+
+  it('a stored page that asked for the removed category errors clearly: no fallback, no repair', () => {
+    for (const c of ['summer', 'winter']) {
+      expect(() => resolve.getCharacterPhotoDetails([standardOnly], c, null, { Noah: { _currentClothing: c } })).toThrow(/no longer exists/);
+      expect(() => resolve.getCharacterPhotos([standardOnly], c)).toThrow(/no longer exists/);
+    }
+  });
+
+  it('standard and costumed requests are untouched', () => {
+    const [d] = resolve.getCharacterPhotoDetails([standardOnly], 'standard', null, { Noah: { _currentClothing: 'standard' } });
+    expect(d.photoType).toBe('clothing-standard');
+    expect(resolve.getCharacterPhotos([standardOnly], 'standard')).toEqual([IMG + 'STD']);
   });
 });

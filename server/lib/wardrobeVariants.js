@@ -33,7 +33,7 @@
  */
 
 const { log } = require('../utils/logger');
-const { STORED_AVATAR_SLOTS } = require('./clothingCategories');
+const { AVATAR_SLOTS } = require('./clothingCategories');
 const {
   WORN_SLOTS, resolveWornItemsForPage, isOffForCharacter, sameName, outfitVersionOf,
 } = require('./wornItems');
@@ -157,7 +157,7 @@ function versionRedressNote(versions) {
  * job_1790446348343_z3fw660ie, four pages). One costume per character per
  * story, so 'costumed' names the sheet.
  */
-const SHEET_BASE_CATEGORIES = ['standard', 'winter', 'summer', 'costumed'];
+const SHEET_BASE_CATEGORIES = ['standard', 'costumed'];
 function sheetCategoryOf(raw) {
   const c = String(raw || '').trim().toLowerCase();
   if (c.startsWith('costumed')) return 'costumed';
@@ -176,7 +176,7 @@ function baseCategoryFor(clothingRequirements, characterName) {
   const charReqs = resolveCharacterReqs(clothingRequirements, characterName);
   if (!charReqs) return null;
   if (charReqs.costumed?.used === true) return 'costumed';
-  for (const cat of STORED_AVATAR_SLOTS) {
+  for (const cat of AVATAR_SLOTS) {
     if (charReqs[cat]?.used === true) return cat;
   }
   return null;
@@ -341,9 +341,9 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
         continue;
       }
       const categories = [...new Set(versions.map(v => String(v.category || '').toLowerCase()))];
-      const baseCat = categories.length === 1 && ['standard', 'winter', 'summer'].includes(categories[0]) ? categories[0] : null;
+      const baseCat = categories.length === 1 && ['standard'].includes(categories[0]) ? categories[0] : null;
       if (!baseCat) {
-        log.error(`👕 [WARDROBE-VARIANT] ${where}: outfit version of category "${categories.join('+')}" — only a plain (standard/winter/summer) sheet can be redressed; no version sheet`);
+        log.error(`👕 [WARDROBE-VARIANT] ${where}: outfit version of category "${categories.join('+')}" — only a plain (standard) sheet can be redressed; no version sheet`);
         refusals.push({ name, offIds, pages, reason: 'version-not-plain-category' });
         continue;
       }

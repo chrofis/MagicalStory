@@ -1093,7 +1093,7 @@ export const characterService = {
     if (avatars.status === 'failed') return true; // Retry failed ones
 
     // Check if at least one avatar exists (or hasFullAvatars flag is set)
-    const hasAnyAvatar = !!(avatars.winter || avatars.standard || avatars.summer || avatars.hasFullAvatars);
+    const hasAnyAvatar = !!(avatars.standard || avatars.hasFullAvatars);
     return !hasAnyAvatar;
   },
 
@@ -1166,7 +1166,7 @@ export const characterService = {
         }
         freshCharacter = await characterService.loadFullCharacter(character.id);
         // Check if avatars are actually present in the response
-        if (freshCharacter?.avatars?.standard || freshCharacter?.avatars?.winter || freshCharacter?.avatars?.summer) {
+        if (freshCharacter?.avatars?.standard) {
           log.info(`[AVATAR] Got fresh data with avatars on attempt ${attempt + 1}`);
           break;
         }
@@ -1175,7 +1175,7 @@ export const characterService = {
       if (freshCharacter) {
         result.character = freshCharacter;
         // Warn if avatars are missing - this indicates a server-side issue
-        const hasAvatars = freshCharacter.avatars?.standard || freshCharacter.avatars?.winter || freshCharacter.avatars?.summer;
+        const hasAvatars = freshCharacter.avatars?.standard;
         if (!hasAvatars) {
           log.warn(`⚠️ Fresh DB data for ${character.name} missing avatars after ${maxAttempts} retries - server may not have saved them`);
         }

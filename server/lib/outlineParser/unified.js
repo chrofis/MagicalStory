@@ -641,8 +641,6 @@ class UnifiedStoryParser {
                 const raw = char.clothing.toLowerCase();
                 let clothing = 'standard';
                 if (raw.includes('costumed')) clothing = 'costumed';
-                else if (raw.includes('winter')) clothing = 'winter';
-                else if (raw.includes('summer')) clothing = 'summer';
                 characterClothing[baseName] = clothing;
                 characters.push(char.name);
                 // Capture optional depth/perspective from JSON char object

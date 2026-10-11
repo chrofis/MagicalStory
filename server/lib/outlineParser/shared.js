@@ -40,7 +40,7 @@ const KEYWORDS = {
 
 // Clothing categories (same across languages). 'formal' was a legacy
 // category, fully removed Phase 5. 'costumed' is the bare key — no subtype.
-const CLOTHING_CATEGORIES = ['winter', 'summer', 'costumed', 'standard'];
+const CLOTHING_CATEGORIES = ['costumed', 'standard'];
 
 // ============================================================================
 // SHARED HELPERS - Used by both UnifiedStoryParser and ProgressiveUnifiedParser
@@ -116,7 +116,7 @@ function parseCharacterClothingBlock(content) {
     // We capture an optional trailing annotations group (depth/perspective/position) up to end-of-line.
     // Annotations after clothing: depth / perspective / position / holds / gazes at / priority.
     // "gazes at" has a space inside the key — regex matches both with and without space.
-    // Clothing tokens: bare `standard|winter|summer|formal|costumed` OR
+    // Clothing tokens: bare `standard|formal|costumed` OR
     // `costumed:type` / `costumed:{type with spaces}`. The cover-hints prompt
     // (prompts/scene-expansion-all.txt §"Cover scene hints"; the rule lived in
     // the since-deleted story-unified.txt when this was written) allows
@@ -126,7 +126,7 @@ function parseCharacterClothingBlock(content) {
     // → boilerplate fallback fired on every cover. Making the `:type` suffix
     // optional fixes that without affecting scene hints that DO carry typed
     // costumed values.
-    const linePattern = /(?:^|,\s*)[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?[^:\r\n]*):\s*(standard|winter|summer|formal|costumed(?::(?:\{[^}]*\}|[^\r\n,]+?))?)((?:\s*,\s*(?:depth|perspective|position|holds|holding|gazes\s+at|gaze|priority)\s*:\s*[^,\r\n]+)*)/gim;
+    const linePattern = /(?:^|,\s*)[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?[^:\r\n]*):\s*(standard|formal|costumed(?::(?:\{[^}]*\}|[^\r\n,]+?))?)((?:\s*,\s*(?:depth|perspective|position|holds|holding|gazes\s+at|gaze|priority)\s*:\s*[^,\r\n]+)*)/gim;
     // Annotation keys Claude may slip into the line (e.g. "depth: foreground", "perspective: side", "holds: book", "gazes at: chest", "priority: essential").
     // We never want these mistaken for character names — they should be silently dropped.
     const ANNOTATION_KEYS = new Set(['depth', 'perspective', 'position', 'pose', 'view', 'shot', 'action', 'holds', 'holding', 'gazes', 'gaze', 'priority', 'mood']);
@@ -605,7 +605,7 @@ function extractCharacterNamesFromScene(sceneDescription) {
       /^\s*\*\*([^*:]+?)\*\*\s*:?/gm,
       // Non-bold: "- Name (position): clothing" or "- Name: clothing"
       // Requires bullet + clothing value to avoid matching section headers
-      /^[\t ]*[-*\u2022]\s+([^:\r\n(]+?)(?:\s*\([^)]*\))?\s*:\s*(?:standard|winter|summer|formal|costumed)/gm,
+      /^[\t ]*[-*\u2022]\s+([^:\r\n(]+?)(?:\s*\([^)]*\))?\s*:\s*(?:standard|formal|costumed)/gm,
     ];
 
     for (const pattern of namePatterns) {

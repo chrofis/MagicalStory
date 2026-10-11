@@ -90,7 +90,7 @@ export function GenerationProgress({
   // `avatars.faceThumbnails` reads — one helper, one source of truth.
   const getAllAvatarUrls = (char: Character): string[] => {
     const urls: string[] = [];
-    const variants: Array<'standard' | 'winter' | 'summer'> = ['standard', 'winter', 'summer'];
+    const variants: Array<'standard'> = ['standard'];
     for (const v of variants) {
       const face = getFaceThumb(char, v);
       if (face) urls.push(face);

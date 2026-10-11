@@ -24,7 +24,7 @@ import type { Character } from '../types/character';
 
 // Read either a character or a sub-avatars object — both common in practice.
 type CharOrAvatars = Character | { avatars?: unknown } | Record<string, unknown> | null | undefined;
-type Variant = 'standard' | 'winter' | 'summer';
+type Variant = 'standard';
 
 /**
  * Pull a non-empty string out of a value that might be:
@@ -189,11 +189,11 @@ export function getAvatarInputPhoto(input: CharOrAvatars): string | null {
   // image of the same person in standard clothing — close enough to a raw
   // photo for avatar-regen-style endpoints to use as input. Without this,
   // regen 400s on every legacy character.
-  const standardAvatar = getStandardAvatar(c, 'standard') || getStandardAvatar(c, 'winter') || getStandardAvatar(c, 'summer');
+  const standardAvatar = getStandardAvatar(c, 'standard');
   if (standardAvatar) return standardAvatar;
-  const bodyThumb = getBodyThumb(c, 'standard') || getBodyThumb(c, 'winter') || getBodyThumb(c, 'summer');
+  const bodyThumb = getBodyThumb(c, 'standard');
   if (bodyThumb) return bodyThumb;
-  const faceThumb = getFaceThumb(c, 'standard') || getFaceThumb(c, 'winter') || getFaceThumb(c, 'summer');
+  const faceThumb = getFaceThumb(c, 'standard');
   if (faceThumb) return faceThumb;
   return null;
 }
