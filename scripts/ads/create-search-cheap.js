@@ -17,7 +17,9 @@
  *
  *   MANUAL_CPC, no enhanced CPC · every ad group max CPC CHF 0.20 · SEARCH (budget per spec, see above)
  *   Geo: read at runtime from Search-Deutschschweiz-v1 (the 19 German-speaking cantons) · language German (1001)
- *   No device bid modifiers (the audit flagged the −30 % mobile modifier on the main campaign as self-inflicted rank loss)
+ *   Device bids are NOT set by this script. LIVE since 2026-10-11 (owner, via the API): desktop +50% (1.5), mobile/tablet
+ *   neutral, on ALL four Search campaigns; the main campaign's old -30 % mobile modifier (flagged by the audit as
+ *   self-inflicted rank loss) was removed the same day. Re-creating a campaign must re-apply desktop 1.5.
  *   Keywords: PHRASE, every one measured by Keyword Planner on 2026-09-09 with a LOW top-of-page bid <= CHF 0.20 or no
  *   estimate at all (unbid); direction traps (gift for the godparent / teacher, toys, crafts, baby, rites) are negatives.
  *   Final URLs carry utm_term={keyword} (ValueTrack) so trial_events → attribution-report.js can attribute per keyword.
