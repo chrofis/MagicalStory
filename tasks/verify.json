@@ -9946,7 +9946,7 @@
     {
       "id": "trial-plate-landmark-photo-live-loc",
       "commits": [
-        "HASHPLACEHOLDER"
+        "c23be8537"
       ],
       "addedAt": "2026-10-11",
       "claim": "On a trial whose story stands at an indexed landmark, each background plate is painted with the photo its entry cites (log: 'Empty scene ... landmark \"X\" variant N attached', never 'no photo available (fetchStatus=pending_lazy)').",
