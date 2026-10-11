@@ -11,7 +11,7 @@
  *   row boundary     the least painted row near the seam of the two rows (a 2x4 sheet only);
  *   column boundary  the least painted column near each quarter of the width (figures may touch, so no gap is required);
  *   cell             the paint inside one row x column window, trimmed to its bounding box plus a margin.
- * Hairline gutters (the seam, the column dividers) are not paint. A window with no figure in it throws: that sheet truly does
+ * Hairline gutters (the seam, the column dividers) are not paint, and a frame or divider stroke on a crop's edge is peeled off it (trimStrokes). A window with no figure in it throws: that sheet truly does
  * not hold the figures to cut, and the caller reports it instead of showing an empty image.
  * See docs/decisions.md 2026-10-10 "One figure-based sheet cutter".
  */
@@ -24,6 +24,8 @@ const HAIRLINE_MAX = 5;        // a gutter line is at most this many px thick
 const ROW_SEAM_WINDOW = [0.28, 0.62]; // where the seam between head row and body row may sit (share of the height)
 const COLUMN_WINDOW = 0.08;    // a column boundary is searched this share of the width either side of its quarter
 const SEAM_SMOOTH = 3;
+const STROKE_DELTA = 15;       // a pixel this far from the paper tone counts toward a frame stroke (fainter than paint: antialiased edges are 26 off)
+const STROKE_SHARE = 0.5;      // a crop edge line is a stroke when this share of its pixels is off the paper tone
 
 /** Pure: the paper tone of an interleaved RGB buffer: the centre of the most populated 16-level colour bin (the ground is the biggest single colour of a sheet). */
 function paperTone(rgb) {
@@ -94,6 +96,37 @@ function contentSpan(profile) {
   return first < 0 ? null : { start: first, end: last };
 }
 
+/**
+ * Pure: shrink a crop rectangle off any frame or divider STROKE on its edges. The model sometimes draws a thin grey frame
+ * round the whole sheet (1-3 px, edge mean ~188 against paper ~252, staging trial job_1791700480532_ul7f67gii, every standard
+ * slide); a crop whose margin reaches the sheet edge or a divider kept it. A stroke is an edge line (column or row) of which at
+ * least STROKE_SHARE of the pixels are off the paper tone; each side is peeled up to the innermost such line within its outer HAIRLINE_MAX + 1 lines. Figure
+ * paint cannot match: the margin keeps a figure at least 12 px off the crop edge unless its window clips it, and a clipped figure
+ * covers far less than half of an edge line.
+ */
+function trimStrokes(rgb, W, tone, rect) {
+  const off = (x, y) => {
+    const i = 3 * (y * W + x);
+    return Math.max(Math.abs(rgb[i] - tone[0]), Math.abs(rgb[i + 1] - tone[1]), Math.abs(rgb[i + 2] - tone[2])) > STROKE_DELTA;
+  };
+  let { left, top, right, bottom } = rect;
+  const colStroke = (x) => { let n = 0; for (let y = top; y < bottom; y++) if (off(x, y)) n++; return n >= STROKE_SHARE * (bottom - top); };
+  const rowStroke = (y) => { let n = 0; for (let x = left; x < right; x++) if (off(x, y)) n++; return n >= STROKE_SHARE * (right - left); };
+  // The stroke need not sit on the very edge (a divider two px in, paper outside it): peel everything up to the innermost
+  // stroke line within the outer HAIRLINE_MAX + 1 lines.
+  const depth = (isStroke, at, room) => {
+    let d = 0;
+    for (let k = 0; k <= HAIRLINE_MAX && k < room - 2; k++) if (isStroke(at(k))) d = k + 1;
+    return d;
+  };
+  const dl = depth(colStroke, (k) => left + k, right - left);
+  const dr = depth(colStroke, (k) => right - 1 - k, right - left);
+  const dt = depth(rowStroke, (k) => top + k, bottom - top);
+  const db = depth(rowStroke, (k) => bottom - 1 - k, bottom - top);
+  left += dl; right -= dr; top += dt; bottom -= db;
+  return { left, top, width: right - left, height: bottom - top };
+}
+
 function boxOf(mask, W, x0, x1, y0, y1) {
   const colInk = new Float32Array(x1 - x0), rowInk = new Float32Array(y1 - y0);
   for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (mask[y * W + x]) { colInk[x - x0]++; rowInk[y - y0]++; }
@@ -113,6 +146,7 @@ async function cutSheet(sheetBuf, { rows = 2, cols = 4 } = {}) {
   const { data, info } = await sharp(sheetBuf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width: W, height: H } = info;
   const mask = paintMask(data, W, H);
+  const tone = paperTone(data);
 
   const rowInk = new Float32Array(H);
   for (let y = 0; y < H; y++) { let c = 0; for (let x = 0; x < W; x++) c += mask[y * W + x]; rowInk[y] = c / W; }
@@ -145,10 +179,10 @@ async function cutSheet(sheetBuf, { rows = 2, cols = 4 } = {}) {
       // The margin never leaves the figure's own window: no neighbour, no gutter line.
       const left = Math.max(colEdges[c], box.x[0] - margin), right = Math.min(colEdges[c + 1], box.x[1] + margin);
       const top = Math.max(y0, box.y[0] - margin), bottom = Math.min(y1, box.y[1] + margin);
-      boxes.push({ left, top, width: right - left, height: bottom - top });
+      boxes.push(trimStrokes(data, W, tone, { left, top, right, bottom }));
     }
   }
   return Promise.all(boxes.map(b => sharp(sheetBuf).extract(b).png().toBuffer()));
 }
 
-module.exports = { cutSheet, paintMask, contentSpan, leastPainted, paperTone };
+module.exports = { cutSheet, trimStrokes, paintMask, contentSpan, leastPainted, paperTone };
