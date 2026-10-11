@@ -50,7 +50,7 @@ async function main() {
     : sheetLib.generateOneCallSheet;
   sheetLib.generateOneCallSheet = async (...a) => { if (spent + GROK_USD > cap) throw new Error(`spend cap USD ${cap} reached`); counts.grok++; spent += GROK_USD; return rawGen(...a); };
   const rawJudge = dry
-    ? async () => ({ parsed: judgeLib.parseAvatarSheetVerdict({ cells: [1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ cell: n, headgear: 'none', hairVisible: 'full', hairColour: 'brown', hairStyle: 'down', head: 'present', top: 'x', extras: 'none', heldObject: 'none', view: n % 4 === 0 ? 'rear' : 'front' })), ...Object.fromEntries(judgeLib.DEFECT_TYPES.map(t => [t, { verdict: 'ok', cells: [] }])), evidence: 'dry' }), raw: {}, prompt: 'dry' })
+    ? async () => ({ parsed: judgeLib.parseAvatarSheetVerdict({ cells: [1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ cell: n, headgear: 'none', hairVisible: 'full', hairColour: 'brown', hairStyle: 'down', head: 'present', top: 'x', extras: 'none', heldObject: 'none' })), ...Object.fromEntries(judgeLib.DEFECT_TYPES.map(t => [t, { verdict: 'ok', cells: [] }])), evidence: 'dry' }), raw: {}, prompt: 'dry' })
     : judgeLib.judgeAvatarSheet;
   judgeLib.judgeAvatarSheet = async (...a) => { if (spent + JUDGE_USD > cap) throw new Error(`spend cap USD ${cap} reached`); counts.judge++; spent += JUDGE_USD; return rawJudge(...a); };
 

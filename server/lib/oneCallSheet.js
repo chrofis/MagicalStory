@@ -30,7 +30,6 @@ function countMetric(name) {
 // One fixed correction line per judge word, written here, never read from the judge's prose. The redo is told what to fix and in which cells.
 function redoLinesOf(defects) {
   const { SHEET_EMPTY_HANDS_RULE, SHEET_NO_LETTERING_RULE, TAIL_POSE_RULE } = require('./character2x4Sheet');
-  const { REAR_TURN_POSE, REAR_TURN_NEVER } = require('./character2x4Sheet')._internal;
   const lines = {
     bald: () => 'Every cell shows a complete head with the same hair: no bald scalp, no blank, missing or cut-off face.',
     held: () => SHEET_EMPTY_HANDS_RULE,
@@ -40,7 +39,6 @@ function redoLinesOf(defects) {
       extra_figures: 'Only the one person appears, once per cell: no second person, ghost figure or part of another person.',
       lettering: SHEET_NO_LETTERING_RULE,
       not_illustrated: 'Every cell is a painted illustration, not a photograph or a cut-out.',
-      wrong_pose: `Cell 4 and cell 8 are the rear turn (${REAR_TURN_POSE}), never ${REAR_TURN_NEVER}.`,
     }[word]),
   };
   return defects.map(({ type, word, cells }) => {

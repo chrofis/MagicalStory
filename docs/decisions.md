@@ -68541,3 +68541,8 @@ Replaces: 2026-08-09 "Realistic 2×4 sheet is generated in TWO calls (body row, 
 **Considered:** adding the outfit to `buildCoverSceneFromHint` (rejected: outfits resolve later from the reference photos, after the worn/held dedupe); dropping the cover from the check (rejected: the check is right that the prose is the image model's only description). The outfit now appears twice in a cover prompt (reference list and prose), about 100 characters per figure.
 **Revisit if:** a cover prompt exceeds Grok's cap because of the extra sentence; the judge passes a face-forward cell 4 on a larger set (then raise its view question or drop the `either` mode to `cells`).
 **Touched files:** server/lib/promptBuilders.js, server/lib/character2x4Sheet.js, server/lib/avatarSheetJudge.js, server/lib/oneCallSheet.js, prompts/avatar-sheet-defect-judge.txt, tests/unit/cover-outfit-sentence-2026-10-11.test.ts, tests/unit/sheet-rear-turn-cells-2026-10-11.test.ts
+
+## 2026-10-11 — REVERSED: the sheet's 4th view goes back to the rear three-quarter turn (one eye and the near cheek)
+**Context:** commit 3bc5943be changed cells 4 and 8 of the Grok 2 single-call sheet to a true back head (REAR_TURN_POSE / REAR_TURN_NEVER) and made a non-rear cell a layout defect in the sheet judge. Owner on staging: "No, undo this. The back view was fine. Revert."
+**Decision:** reverted; the previous rear-turn pose wording and judge are restored. The avatar slide order keeps all four angles (front, three-quarter, profile, rear turn), owner: "keep profile as is, just make sure all four angles are displayed".
+Replaces: the 2026-10-11 back-head entry above (3bc5943be).
