@@ -4184,7 +4184,8 @@
       "title": "Trial background plates lose their landmark photo: the per-background photo citation copies the location before its photo list has loaded",
       "reportedAt": "2026-10-11",
       "source": "staging trials since 2f0143e5c: 6/6 landmark plates without photo (Ruine Stein job_1791732897090_u7q6rp4p5, Grossmuenster job_1791628382638_yka3zzxte); storyHelpers.js:505-506 spreads loc before descriptionsPromise resolves; now on production (44dff16b)",
-      "status": "open"
+      "status": "fixed",
+      "fixedIn": "HASHPLACEHOLDER"
     }
   ]
 }

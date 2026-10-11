@@ -186,3 +186,21 @@ describe('trialPlateLandmarkPromisesByPage — one landmark, several plates', ()
     expect(loc.landmarkPhoto).toBe(1); // the bible is never rewritten
   });
 });
+
+describe('trialPlateLandmarkPromisesByPage — per-background citation with late-loading photos', () => {
+  it('REGRESSION: a background citation is applied to the LIVE location after descriptions load (no stale copy)', async () => {
+    const loc: any = { id: 'LOC001', name: 'A Bridge', isRealLandmark: true, pages: [1, 2, 3, 4] };
+    const vb: any = { locations: [loc] };
+    const descriptionsPromise = Promise.resolve().then(() => {
+      loc.photoVariants = [
+        { variantNumber: 1, kind: 'exterior', description: 'front', url: 'https://x/1.jpg', cachedPhotoData: 'data:image/jpeg;base64,AAAA' },
+        { variantNumber: 2, kind: 'close', description: 'side', url: 'https://x/2.jpg', cachedPhotoData: 'data:image/jpeg;base64,BBBB' },
+      ];
+    });
+    const byPage = trialPlateLandmarkPromisesByPage(vb, [
+      { pages: [1, 2], landmarkPhoto: 2 }, { pages: [3, 4], landmarkPhoto: 1 },
+    ], { descriptionsPromise });
+    expect((await byPage[1])?.variantNumber).toBe(2);
+    expect((await byPage[3])?.variantNumber).toBe(1);
+  });
+});

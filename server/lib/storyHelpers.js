@@ -209,9 +209,15 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata, opts = {}) 
  * Nothing here looks at the page's shot, a view word or a photo's framing: the
  * citation is the whole selection.
  *
- * @returns {{value: number|'none'|null, source: 'page'|'vantage'|'location'|null, vantageId: string|null, raw: *}}
+ * @returns {{value: number|'none'|null, source: 'background'|'page'|'vantage'|'location'|null, vantageId: string|null, raw: *}}
  */
-function landmarkPhotoCitation(visualBible, loc, { sceneMetadata = null, pageNumber = null, vantageIds = [] } = {}) {
+function landmarkPhotoCitation(visualBible, loc, { sceneMetadata = null, pageNumber = null, vantageIds = [], backgroundCitation } = {}) {
+  // A trial plan's background entry names its own photo: it wins, and is passed
+  // as a value so the caller never copies `loc` (a copy made before the photo
+  // descriptions load would never see the `photoVariants` they fill in).
+  if (backgroundCitation !== undefined && backgroundCitation !== null && backgroundCitation !== '') {
+    return { value: parseLandmarkPhotoCitation(backgroundCitation), source: 'background', vantageId: null, raw: backgroundCitation };
+  }
   const locId = String(loc?.id || '').toUpperCase();
   const own = sceneMetadata?.landmarkPhoto ?? sceneMetadata?.fullData?.landmarkPhoto;
   if (own !== undefined && own !== null && sceneMetadata) {
@@ -500,14 +506,12 @@ function trialPlateLandmarkPromisesByPage(visualBible, groups, opts = {}) {
       .map(pn => locations.find(l => l?.isRealLandmark && Array.isArray(l.pages) && l.pages.includes(pn)))
       .find(Boolean);
     if (!loc) continue;
-    // The entry's own citation wins; absent → the location's (a copy, so the
-    // bible itself is never rewritten).
-    const cited = group.landmarkPhoto !== undefined && group.landmarkPhoto !== null && group.landmarkPhoto !== ''
-      ? { ...loc, landmarkPhoto: group.landmarkPhoto } : loc;
+    // The entry's own citation wins; absent → the location's. NEVER a copy of
+    // `loc` (see landmarkPhotoCitation): the live loc is read after the await.
     const p = (async () => {
       if (opts.descriptionsPromise) await opts.descriptionsPromise;
-      const photo = await resolveLandmarkPhotoForLocation(visualBible, cited, {
-        citation: landmarkPhotoCitation(visualBible, cited, { pageNumber: group.pages[0] }),
+      const photo = await resolveLandmarkPhotoForLocation(visualBible, loc, {
+        citation: landmarkPhotoCitation(visualBible, loc, { pageNumber: group.pages[0], backgroundCitation: group.landmarkPhoto }),
       });
       if (!photo) return null;
       // block ⇔ bytes: a legacy entry can resolve to a URL with no inline data,

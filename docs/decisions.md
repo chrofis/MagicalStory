@@ -68546,3 +68546,10 @@ Replaces: 2026-08-09 "Realistic 2×4 sheet is generated in TWO calls (body row, 
 **Context:** commit 3bc5943be changed cells 4 and 8 of the Grok 2 single-call sheet to a true back head (REAR_TURN_POSE / REAR_TURN_NEVER) and made a non-rear cell a layout defect in the sheet judge. Owner on staging: "No, undo this. The back view was fine. Revert."
 **Decision:** reverted; the previous rear-turn pose wording and judge are restored. The avatar slide order keeps all four angles (front, three-quarter, profile, rear turn), owner: "keep profile as is, just make sure all four angles are displayed".
 Replaces: the 2026-10-11 back-head entry above (3bc5943be).
+
+## 2026-10-11 - Trial plates read the LIVE landmark location; a background's photo number is passed as a citation, never as a copy of the location
+**Context:** every trial landmark plate since 2f0143e5c (per-background photo citations) was drawn without its photo (staging 6/6, Ruine Stein job_1791732897090_u7q6rp4p5, Grossmuenster job_1791628382638_yka3zzxte; "no photo available (fetchStatus=pending_lazy)"). `trialPlateLandmarkPromisesByPage` spread `loc` into a copy carrying the background's `landmarkPhoto` BEFORE `descriptionsPromise` filled `photoVariants` on the original, so the photo decision read a variant-less copy. The existing test loaded photos up front and could not see it.
+**Decision:** `landmarkPhotoCitation` takes `backgroundCitation` (source `'background'`, wins over vantage/location); the resolver is called with the live `loc` after the await. No location copy remains in that path (the only caller of the pattern; page and cover paths pass `loc` itself).
+**Rationale / evidence:** replay over the 6 stored staging trial landmark plates (all trials since 2f0143e5c with a real landmark, 2 stories): old shape resolves 0/6, new 6/6, and the resolved variant equals the cited number 6/6. Regression test fails on the old shape. USD 0.
+**Revisit if:** a plate path needs the citation of something other than a background entry (add another source to the citation, not a copy).
+**Touched files:** server/lib/storyHelpers.js, tests/unit/landmark-plate-resolve.test.ts
