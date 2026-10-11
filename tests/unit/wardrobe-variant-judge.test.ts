@@ -41,7 +41,7 @@ describe('1 — the variant is judged by the ONE sheet judge plus a garment-gone
   const realFetch = globalThis.fetch;
   afterEach(() => { globalThis.fetch = realFetch; vi.restoreAllMocks(); });
 
-  const cell = (n: number) => ({ cell: n, headgear: 'none', hairVisible: 'full', hairColour: 'brown', hairStyle: 'down', head: 'present', top: 'blue', extras: 'none', heldObject: 'none' });
+  const cell = (n: number) => ({ cell: n, headgear: 'none', hairVisible: 'full', hairColour: 'brown', hairStyle: 'down', head: 'present', top: 'blue', extras: 'none', heldObject: 'none', view: n % 4 === 0 ? 'rear' : 'front' });
   const parsedWith = (over: any = {}) => judgeLib.parseAvatarSheetVerdict({
     cells: [1, 2, 3, 4, 5, 6, 7, 8].map(cell),
     ...Object.fromEntries(judgeLib.DEFECT_TYPES.map((t: string) => [t, { verdict: 'ok', cells: [] }])), ...over, evidence: 'x',

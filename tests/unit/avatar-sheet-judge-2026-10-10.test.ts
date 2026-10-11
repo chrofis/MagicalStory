@@ -12,7 +12,7 @@ const judge = require('../../server/lib/avatarSheetJudge.js');
 
 const cell = (n: number, over: Record<string, string> = {}) => ({
   cell: n, headgear: 'none', hairVisible: 'full', hairColour: 'brown', hairStyle: 'down', head: 'present',
-  top: 'blue hoodie', extras: 'none', heldObject: 'none', ...over,
+  top: 'blue hoodie', extras: 'none', heldObject: 'none', view: n % 4 === 0 ? 'rear' : 'front', ...over,
 });
 const clean = () => ({
   cells: [1, 2, 3, 4, 5, 6, 7, 8].map(n => cell(n)),

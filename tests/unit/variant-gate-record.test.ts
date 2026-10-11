@@ -18,7 +18,7 @@ const { loadPromptTemplates } = cjs('../../server/services/prompts.js');
 const PIXEL = 'data:image/jpeg;base64,/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAQABADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKpAB//Z';
 // The ONE sheet judge's clean answer (every type ok, 8 cells without a defect); stored sheet flags are [] for it.
 const JUDGE_OK = {
-  cells: [1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ cell: n, headgear: 'none', hairVisible: 'full', hairColour: 'brown', hairStyle: 'down', head: 'present', top: 'grey tunic', extras: 'none', heldObject: 'none' })),
+  cells: [1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ cell: n, headgear: 'none', hairVisible: 'full', hairColour: 'brown', hairStyle: 'down', head: 'present', top: 'grey tunic', extras: 'none', heldObject: 'none', view: n % 4 === 0 ? 'rear' : 'front' })),
   hat: { verdict: 'ok', cells: [] }, hair: { verdict: 'ok', cells: [] }, bald: { verdict: 'ok', cells: [] }, costume: { verdict: 'ok', cells: [] },
   rowMatch: { verdict: 'ok', cells: [] }, held: { verdict: 'ok', cells: [] }, tail: { verdict: 'ok', cells: [] }, layout: { verdict: 'ok', cells: [] },
   identity: { verdict: 'ok', cells: [] }, age: { verdict: 'ok', cells: [] }, evidence: 'none',

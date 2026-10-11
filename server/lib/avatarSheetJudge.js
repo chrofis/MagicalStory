@@ -37,7 +37,10 @@ const CELL_ENUMS = {
   hairStyle: ['down', 'ponytail', 'braids', 'bun', 'short_crop', 'hidden', 'none'],
   head: ['present', 'missing_or_blank_face', 'cut_off'],
   heldObject: ['none', 'something'],
+  view: ['front', 'three_quarter', 'profile', 'rear'],
 };
+// The rear-turn cells of the sheet (1-based): the head and the body cell of the fourth view.
+const REAR_CELLS = [4, 8];
 
 const SHEET_KIND_RULES = {
   standard: 'This is the person\'s EVERYDAY-CLOTHES sheet, not a costume. Headgear belongs on it only when the photo shows the person wearing it.',
@@ -59,6 +62,8 @@ function buildAvatarSheetJudgePrompt({ kind, hasPhoto }) {
     SHEET_KIND_RULE: SHEET_KIND_RULES[kind],
     HEADGEAR_EXPECTATION: HEADGEAR_EXPECTATIONS[kind],
     AND_PHOTO: hasPhoto ? ' and compared with the photo' : '',
+    REAR_TURN_POSE: require('./character2x4Sheet')._internal.REAR_TURN_POSE,
+    REAR_TURN_NEVER: require('./character2x4Sheet')._internal.REAR_TURN_NEVER,
   });
 }
 
@@ -109,6 +114,8 @@ function cellSignals(cells) {
   const anyHair = cells.some(c => c.hairVisible === 'full' || c.hairVisible === 'thin_or_buzzed');
   out.bald = cells.some(c => c.head !== 'present' || (c.hairVisible === 'bald' && anyHair));
   out.held = cells.some(c => c.heldObject === 'something');
+  // Cells 4 and 8 must be the rear turn: the waiting-page rotation needs a back head and a back body.
+  out.layout = REAR_CELLS.some(n => cells[n - 1].view !== 'rear');
   const colours = new Set(cells.filter(c => c.hairVisible === 'full' || c.hairVisible === 'thin_or_buzzed').map(c => c.hairColour));
   out.hair = colours.size > 1;
   return out;
@@ -159,7 +166,7 @@ async function judgeAvatarSheet({ sheet, photo = null, kind, model, usageTracker
 // Grok 2 call"): a bald or headless cell, a held object, a broken layout (not a grid, a second person, lettering, a photograph) and a
 // tail costume drawn standing without a fin. Hat, hair, costume and head-row questions stay off: measured precision 5-28%
 // (decisions 2026-10-10 "Avatar sheet defect judge"), a redo on every second clean sheet. Signal per type as tuned there.
-const SHEET_CHECK_SIGNALS = { bald: 'verdict', held: 'cells', layout: 'verdict', tail: 'verdict' };
+const SHEET_CHECK_SIGNALS = { bald: 'verdict', held: 'cells', layout: 'either', tail: 'verdict' };
 
 /** The redo-worthy defects of a parsed verdict: [{ type, word, cells }]; `cells` are the numbers the judge named. */
 function sheetDefects(parsed) {
@@ -167,8 +174,10 @@ function sheetDefects(parsed) {
   return found.map(type => {
     const v = parsed.verdicts[type];
     // held is decided from the per-cell enum answers, so its cells come from there
-    const cells = type === 'held' ? parsed.cells.filter(c => c.heldObject === 'something').map(c => c.cell) : v.cells;
-    return { type, word: type === 'held' ? 'object_in_hand' : v.verdict, cells };
+    if (type === 'held') return { type, word: 'object_in_hand', cells: parsed.cells.filter(c => c.heldObject === 'something').map(c => c.cell) };
+    // layout is decided by the verdict word or by the rear-turn cells (per-cell `view` enums); the word is the judge's, else wrong_pose
+    if (type === 'layout' && v.verdict === 'ok') return { type, word: 'wrong_pose', cells: REAR_CELLS.filter(n => parsed.cells[n - 1].view !== 'rear') };
+    return { type, word: v.verdict, cells: v.cells };
   });
 }
 
@@ -179,4 +188,4 @@ function betterSheet(a, b) {
   return (tb < ta || (tb === ta && cb < ca)) ? b : a;
 }
 
-module.exports = { SHEET_CHECK_SIGNALS, sheetDefects, betterSheet, VERDICTS, DEFECT_TYPES, CELL_ENUMS, buildAvatarSheetJudgePrompt, parseAvatarSheetVerdict, cellSignals, defectsOf, judgeAvatarSheet };
+module.exports = { REAR_CELLS, SHEET_CHECK_SIGNALS, sheetDefects, betterSheet, VERDICTS, DEFECT_TYPES, CELL_ENUMS, buildAvatarSheetJudgePrompt, parseAvatarSheetVerdict, cellSignals, defectsOf, judgeAvatarSheet };

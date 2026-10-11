@@ -2,7 +2,7 @@ You are inspecting ONE character reference sheet before it is used. Find defects
 
 {INPUT_IMAGES}
 
-The sheet is meant to be a 2 x 4 grid of the SAME single child or adult on plain paper: the top row is four head-and-shoulder cells (front, three-quarter, profile, back), the bottom row is four full-body cells in the same four views. Number the cells 1-4 across the top row and 5-8 across the bottom row. Cell 5 is the full-body twin of cell 1, cell 6 of cell 2, cell 7 of cell 3, cell 8 of cell 4.
+The sheet is meant to be a 2 x 4 grid of the SAME single child or adult on plain paper: the top row is four head-and-shoulder cells (front, three-quarter, profile, rear turn), the bottom row is four full-body cells in the same four views. Number the cells 1-4 across the top row and 5-8 across the bottom row. Cell 5 is the full-body twin of cell 1, cell 6 of cell 2, cell 7 of cell 3, cell 8 of cell 4. Cells 4 and 8 are meant to be the rear turn: {REAR_TURN_POSE}.
 
 {SHEET_KIND_RULE}
 
@@ -14,6 +14,7 @@ STEP 1 - read every cell on its own, from the pixels, before judging anything. E
 - head: present | missing_or_blank_face | cut_off.
 - top: the main upper garment as "<colour> <kind>" in at most 6 words, for example "blue hoodie" or "red striped shirt, brown vest".
 - extras: anything else worn on the body that you can see (cape, backpack, belt, necklace, glasses) in at most 4 words, or "none".
+- view: front | three_quarter | profile | rear. Read it from where the face and the shoulders point, in THAT cell: front = face and shoulders square to the camera; three_quarter = face about 45 degrees to one side, eyes still toward the camera; profile = the face in side view; rear = the shoulders turned away from the camera and the face turned away from it, the back of the head toward the camera. {REAR_TURN_NEVER} is not rear.
 - heldObject: none | something. "something" means an object is held in a hand or carried in an arm, however small. Hands in pockets, on hips or empty are none. A garment, a belt-attached pouch, or a sword or tool hanging in a sheath or from a belt is not a held object.
 
 A head cell ends at the shoulders or chest, so it cannot show a belt, trousers, skirt, boots or any piece that sits lower: such a piece being absent from a head cell is NOT a difference. Compare a head cell with its body twin only on what both can show (head, hair, headgear, neckline, collar, shoulders, straps, sleeves, upper chest). A view from behind shows the back of the same garments, so a chest emblem or front pocket that cannot be seen from behind is NOT a difference.
@@ -77,7 +78,7 @@ age - Does the figure look the age of the photo's person?
 Write each cell object on ONE line, with no line breaks inside it. Return EXACTLY this JSON shape. Every answer comes from what you see - never return these placeholders:
 {
   "cells": [
-    {"cell": 1, "headgear": "<word>", "hairVisible": "<word>", "hairColour": "<word>", "hairStyle": "<word>", "head": "<word>", "top": "<colour kind>", "extras": "<text>", "heldObject": "<none|something>"},
+    {"cell": 1, "headgear": "<word>", "hairVisible": "<word>", "hairColour": "<word>", "hairStyle": "<word>", "head": "<word>", "view": "<word>", "top": "<colour kind>", "extras": "<text>", "heldObject": "<none|something>"},
     {"cell": 2, "...": "same fields for each of the 8 cells"}
   ],
   "hat":      {"verdict": "<word>", "cells": [<cell numbers>]},

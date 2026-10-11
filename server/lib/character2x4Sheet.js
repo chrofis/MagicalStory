@@ -92,7 +92,11 @@ const MAX_SHEET_RETRIES = 1;
 // here: until 2026-09-23 the generators asked for a rear turn while three of the
 // four judges were told the cell is a plain "back" view and the style judge that
 // "cell 8 needs no face", so a flat back or a second profile passed every gate.
-const REAR_TURN_POSE = 'shoulders and body fully away from camera, head rotated back over the right shoulder toward camera so one eye and the near cheek are visible';
+const REAR_TURN_POSE = 'shoulders and body fully away from camera, the back of the head toward the camera with the face turned away, at most the edge of one cheek visible past the ear';
+// What cells 4 and 8 are never, ONE definition: the one-call generator states it and the sheet judge's `layout: wrong_pose` scores it.
+// Staging job_1791709770102_cnksoiyxt: Serafin's costumed head row repeated a face looking at the camera in cell 4, so the
+// waiting-page rotation had no back head. see docs/decisions.md 2026-10-11 "Rear-turn cells are a layout defect".
+const REAR_TURN_NEVER = 'a front or three-quarter view of the face (eyes looking toward the camera) or a second profile';
 
 // The styled sheet's ground, ONE definition: the pass-2 prompt states it and the
 // pass-2 style judge scores it (filled into its template as {SHEET_GROUND}).
@@ -383,7 +387,7 @@ Image 2 is the character's face photo — the identity; match this exact face.${
 
 Output ONE image: a 2×4 grid, thin dividers between the cells, pure white background, the same layout as Image 1. Every cell shows the SAME PERSON as Image 2, alone, in the same art style, wearing the same costume.
 TOP ROW (4 cells): head, neck and the top of the shoulders, cut off at the upper chest, with plain white above the hair; never crop the top of the head. BOTTOM ROW (4 cells): the COMPLETE FULL BODY from the very top of the head to the figure's lowest point (normally both feet with shoes), the whole figure inside its cell; if it does not fit, scale it down with white margin above and below. ${proportionsRule}
-In both rows: cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 a REAR TURN: ${REAR_TURN_POSE}. Cell 4 is never a second profile and never a flat back view with no face showing.
+In both rows: cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 a REAR TURN: ${REAR_TURN_POSE}. Cell 4 is never ${REAR_TURN_NEVER}.
 
 Costume${named}: ${costumeDescription}${buildSeasonOutfitBlock(seasonOutfit, costumeOwnsOutfit)}${buildHairBlock(character)}${buildGlassesBlock(character)}
 Art style: ${styleLine}${ageFromPhoto ? `. Natural proportions${ageFromPhoto}` : ''}. The face, hair colour and skin tone stay recognisably the person in Image 2.
@@ -1005,5 +1009,5 @@ module.exports = {
   buildGlassesBlock,
   resolveFacePhoto,
   readAvatarHair,
-  _internal: { askSheetJudge, inlinePartOf, hairRequest, parseJudgeJson, isEchoedJudgeVerdict, resolveStyleLineForSheet, REAR_TURN_POSE, SHEET_GROUND_RULE, CELL_NAMES_NOT_DRAWN, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildUnnamedTrimRule, resolveBodyReference },
+  _internal: { askSheetJudge, inlinePartOf, hairRequest, parseJudgeJson, isEchoedJudgeVerdict, resolveStyleLineForSheet, REAR_TURN_POSE, REAR_TURN_NEVER, SHEET_GROUND_RULE, CELL_NAMES_NOT_DRAWN, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildUnnamedTrimRule, resolveBodyReference },
 };
