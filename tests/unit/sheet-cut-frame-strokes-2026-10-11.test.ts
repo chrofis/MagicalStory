@@ -12,12 +12,12 @@ const grey = (x: number, y: number, w: number, h: number) => ({ input: { create:
 const figs = () => { const f: any[] = []; for (let c = 0; c < 4; c++) { f.push(figure(c * 100 + 30, 120, 40, 60)); f.push(figure(c * 100 + 30, 220, 40, 150)); } return f; };
 const sheet = (extra: any[]) => sharp({ create: { width: 400, height: 400, channels: 3, background: '#fcfcf4' } }).composite([...figs(), ...extra]).png().toBuffer();
 
-async function greyEdgeLines(cell: Buffer) {
+async function greyEdgeLines(cell: Buffer, depth = 6) {
   const { data, info } = await sharp(cell).removeAlpha().greyscale().raw().toBuffer({ resolveWithObject: true });
   const { width: W, height: H } = info;
   const isGrey = (v: number) => v > 150 && v < 225;
   let n = 0;
-  for (let k = 0; k < 6; k++) {
+  for (let k = 0; k < depth; k++) {
     let l = 0, r = 0, t = 0, b = 0;
     for (let y = 0; y < H; y++) { if (isGrey(data[y * W + k])) l++; if (isGrey(data[y * W + W - 1 - k])) r++; }
     for (let x = 0; x < W; x++) { if (isGrey(data[k * W + x])) t++; if (isGrey(data[(H - 1 - k) * W + x])) b++; }
@@ -42,5 +42,19 @@ describe('cutSheet leaves no frame or divider stroke on a cell', () => {
     expect(r.width).toBe(36);
     const r2 = trimStrokes(rgb, W, [252, 252, 252], { left: 5, top: 0, right: W, bottom: H });
     expect(r2.left).toBe(5);              // paper edge untouched
+  });
+  it('a full-width grey divider 10 px above the bottom of a head cell is not in the cell (trial job_1791709770102_cnksoiyxt)', async () => {
+    // the head row ends at y=200; the model drew the row divider at y=190..192 with a strip of paper below it
+    const cells = await cutSheet(await sheet([grey(0, 190, 400, 2)]));
+    expect(cells).toHaveLength(8);
+    for (const c of cells) expect(await greyEdgeLines(c, 14)).toBe(0);
+    // the figure was not shaved: a head cell keeps its 60 px figure
+    const head = await sharp(cells[0]).metadata();
+    expect(head.height).toBeGreaterThanOrEqual(60);
+  });
+  it('figure paint near the edge is not mistaken for a divider (coloured, continues inward)', async () => {
+    const cells = await cutSheet(await sheet([]));
+    const m = await sharp(cells[5]).metadata();
+    expect(m.height).toBeGreaterThanOrEqual(150); // the 150 px body is intact
   });
 });

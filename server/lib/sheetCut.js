@@ -25,6 +25,9 @@ const ROW_SEAM_WINDOW = [0.28, 0.62]; // where the seam between head row and bod
 const COLUMN_WINDOW = 0.08;    // a column boundary is searched this share of the width either side of its quarter
 const SEAM_SMOOTH = 3;
 const STROKE_DELTA = 15;       // a pixel this far from the paper tone counts toward a frame stroke (fainter than paint: antialiased edges are 26 off)
+const LINE_SHARE = 0.8;        // a divider line deeper than the crop edge: this share of its pixels is off the paper tone AND neutral grey (a wash or a figure is coloured)
+const LINE_GREY = 24;          // max channel spread of a grey line pixel
+const DIVIDER_BAND = 40;       // how far in from a crop edge a thin divider line is looked for (px)
 const STROKE_SHARE = 0.5;      // a crop edge line is a stroke when this share of its pixels is off the paper tone
 
 /** Pure: the paper tone of an interleaved RGB buffer: the centre of the most populated 16-level colour bin (the ground is the biggest single colour of a sheet). */
@@ -110,19 +113,37 @@ function trimStrokes(rgb, W, tone, rect) {
     return Math.max(Math.abs(rgb[i] - tone[0]), Math.abs(rgb[i + 1] - tone[1]), Math.abs(rgb[i + 2] - tone[2])) > STROKE_DELTA;
   };
   let { left, top, right, bottom } = rect;
+  const grey = (x, y) => { const i = 3 * (y * W + x); return Math.max(rgb[i], rgb[i + 1], rgb[i + 2]) - Math.min(rgb[i], rgb[i + 1], rgb[i + 2]) <= LINE_GREY; };
+  const colLine = (x) => { let n = 0; for (let y = top; y < bottom; y++) if (off(x, y) && grey(x, y)) n++; return n >= LINE_SHARE * (bottom - top); };
+  const rowLine = (y) => { let n = 0; for (let x = left; x < right; x++) if (off(x, y) && grey(x, y)) n++; return n >= LINE_SHARE * (right - left); };
   const colStroke = (x) => { let n = 0; for (let y = top; y < bottom; y++) if (off(x, y)) n++; return n >= STROKE_SHARE * (bottom - top); };
   const rowStroke = (y) => { let n = 0; for (let x = left; x < right; x++) if (off(x, y)) n++; return n >= STROKE_SHARE * (right - left); };
   // The stroke need not sit on the very edge (a divider two px in, paper outside it): peel everything up to the innermost
-  // stroke line within the outer HAIRLINE_MAX + 1 lines.
-  const depth = (isStroke, at, room) => {
+  // stroke line within the outer HAIRLINE_MAX + 1 lines. Further in (up to DIVIDER_BAND lines) a THIN stroke run with paper
+  // on its inner side is the row seam / a column divider the window kept (trial job_1791709770102_cnksoiyxt: a full-width grey
+  // line 10 px above the bottom of every standard head cell): the crop ends on its inner side. Figure paint is not such a run:
+  // it continues inward, and a run thicker than HAIRLINE_MAX is never a line.
+  const depth = (isStroke, isLine, at, room) => {
+    const limit = Math.min(DIVIDER_BAND, Math.floor(room / 3));
+    const stroke = [], line = [];
+    for (let k = 0; k < limit; k++) { stroke.push(isStroke(at(k))); line.push(k > HAIRLINE_MAX && isLine(at(k))); }
     let d = 0;
-    for (let k = 0; k <= HAIRLINE_MAX && k < room - 2; k++) if (isStroke(at(k))) d = k + 1;
+    for (let k = 0; k <= HAIRLINE_MAX && k < room - 2; k++) if (stroke[k]) d = k + 1;
+    for (let k = HAIRLINE_MAX + 1; k < limit; k++) {
+      if (!line[k]) continue;
+      let end = k;
+      while (end + 1 < limit && line[end + 1]) end++;
+      const thin = end - k + 1 <= HAIRLINE_MAX;
+      const paperInside = end + 2 < limit && !stroke[end + 1] && !stroke[end + 2];
+      if (thin && paperInside) d = end + 1;
+      k = end;
+    }
     return d;
   };
-  const dl = depth(colStroke, (k) => left + k, right - left);
-  const dr = depth(colStroke, (k) => right - 1 - k, right - left);
-  const dt = depth(rowStroke, (k) => top + k, bottom - top);
-  const db = depth(rowStroke, (k) => bottom - 1 - k, bottom - top);
+  const dl = depth(colStroke, colLine, (k) => left + k, right - left);
+  const dr = depth(colStroke, colLine, (k) => right - 1 - k, right - left);
+  const dt = depth(rowStroke, rowLine, (k) => top + k, bottom - top);
+  const db = depth(rowStroke, rowLine, (k) => bottom - 1 - k, bottom - top);
   left += dl; right -= dr; top += dt; bottom -= db;
   return { left, top, width: right - left, height: bottom - top };
 }
