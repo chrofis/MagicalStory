@@ -185,3 +185,32 @@ Weekly content creation (2-3 hours/week):
 - Later or Buffer: Content scheduling
 - Instagram native: Reels editing
 - Google Sheets: Content calendar
+
+---
+
+## Short-video pilot and series plan (2026-10-11)
+
+**Pilot:** 6 vertical videos (1080x1920, 18-43 s, German AI voice "Sulafat", label "Beispiel · mit KI erstellt")
+in `C:\Users\roger\Videos\MagicalStory-pilot\out\`; narration and fact checks in `NARRATION.md` there, render specs
+next to it. Made with the Marketing system: `pnpm tts:generate` (Gemini TTS, ~USD 0.007 per video) and
+`pnpm video:render` (ffmpeg). Total cost of the pilot: USD 0.042. Only fictional demo families were used (photos
+AI-generated from `tests/fixtures/demo-photos`).
+
+**Series** (each video goes to TikTok, Instagram Reels and YouTube Shorts unchanged):
+1. *Ein Abenteuer in ...*: one town per episode from the approved city creatives (photo -> hero pan). Tag the town's
+   tourism / city accounts.
+2. *Life challenges*: pages of a life-challenge story + one tip for parents. Needs German demo stories; only a French
+   one (brushing teeth) exists on production, so generate German ones for the Berger family first.
+3. *Foto -> Held*: photo -> figure -> story page, 15-20 s, the hook format.
+4. *Swiss German read-alouds* (YouTube, "made for kids"): needs a human voice (no Swiss German TTS); no buy message
+   in the video, only a parents' link in the description.
+5. *Book in hand*: owner films a printed book (unboxing, page flip, gift wrapping in December).
+
+**First 4 weeks:** 4 posts a week (Mon, Wed, Fri, Sun), same video on all three platforms, posted by hand from the
+phone (API posting from unaudited apps is private-only on TikTok and YouTube). Order: the 6 pilot videos in weeks 1-2,
+then new towns (Aarau, Biel, Luzern, Schaffhausen, St. Gallen have approved creatives) and the influencer posts
+(biz/12) as they arrive. After 20-30 videos, compare views and profile visits per series and drop the weakest.
+
+**Rules:** AI-content toggle on every platform; no real child's face without written parental consent; never address
+children with a call to buy; captions only state facts from the product (no prices, reviews or numbers without a
+source).
