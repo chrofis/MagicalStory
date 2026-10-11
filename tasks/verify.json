@@ -9926,7 +9926,11 @@
     {
       "id": "trial-signin-page-and-avatar-turning-order",
       "title": "Trial book ends with a sign-in page after the back cover; waiting-screen avatars turn head/body, pose cycle, variant every 2; slide cells carry no divider line",
-      "commits": [],
+      "commits": [
+        "9a4cd6a1a",
+        "5e265aa18",
+        "8b7e45d31"
+      ],
       "addedAt": "2026-10-11",
       "claim": "On a real trial: (1) arrows reach one more page after the back cover with the sign-in block, gone once the email is linked; (2) the waiting-screen avatars alternate head/body, never repeat a pose in a row, change sheet variant every 2 pictures and include the back views; (3) no standard head slide keeps a grey divider line.",
       "runShape": [
@@ -9935,7 +9939,9 @@
       "check": {
         "kind": "human",
         "what": "Open a trial on a phone: wait for the back cover, flip once more (sign-in page), watch the waiting avatars for ~2 minutes, open the slide images of the standard head cells."
-      }
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
