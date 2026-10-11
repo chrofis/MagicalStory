@@ -44,6 +44,27 @@ function decision(kind) {
   };
 }
 
+/**
+ * A pre-approval the OWNER granted in chat for a run while they are away (owner, 2026-10-11: "I will be away, I want
+ * to give you permission now"). Local file, never committed: .claude/paid-run-preapproval.json
+ *   { grantedBy, grantedAt, expiresAt (ISO), kinds: ['showcase', ...], remaining: N, reason }
+ * A run of a listed kind before expiresAt consumes one `remaining`; anything else still asks.
+ */
+const path = require('path');
+const fs = require('fs');
+const GRANT_FILE = path.join(__dirname, '..', '..', '.claude', 'paid-run-preapproval.json');
+
+function consumeGrant(kind, now = Date.now(), file = GRANT_FILE) {
+  let g;
+  try { g = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return false; }
+  if (!g || !Array.isArray(g.kinds) || !g.kinds.some((k) => kind.startsWith(k))) return false;
+  if (!(Date.parse(g.expiresAt) > now) || !(g.remaining > 0)) return false;
+  g.remaining -= 1;
+  g.used = [...(g.used || []), { kind, at: new Date(now).toISOString() }];
+  fs.writeFileSync(file, JSON.stringify(g, null, 2));
+  return true;
+}
+
 if (require.main === module) {
   let raw = '';
   process.stdin.on('data', (d) => { raw += d; });
@@ -51,9 +72,9 @@ if (require.main === module) {
     let cmd = '';
     try { cmd = JSON.parse(raw || '{}')?.tool_input?.command || ''; } catch { /* not a Bash call */ }
     const kind = paidRunKind(cmd);
-    process.stdout.write(JSON.stringify(kind ? decision(kind) : ALLOW));
+    process.stdout.write(JSON.stringify(kind && !consumeGrant(kind) ? decision(kind) : ALLOW));
     process.exit(0);
   });
 }
 
-module.exports = { paidRunKind, decision };
+module.exports = { paidRunKind, decision, consumeGrant };
