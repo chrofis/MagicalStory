@@ -22,7 +22,7 @@ const { log } = require('../../server/utils/logger');
 const root = path.resolve(__dirname, '../..');
 const read = (p: string) => fs.readFileSync(path.join(root, p), 'utf8');
 
-const cell = (n: number) => ({ cell: n, headgear: 'none', hairVisible: 'full', hairColour: 'brown', hairStyle: 'down', head: 'present', top: 'blue hoodie', extras: 'none', heldObject: 'none' });
+const cell = (n: number) => ({ cell: n, headgear: 'none', hairVisible: 'full', hairColour: 'brown', hairStyle: 'down', head: 'present', top: 'blue hoodie', extras: 'none', heldObject: 'none', view: n % 4 === 0 ? 'rear' : 'front' });
 function verdict(over: Record<string, { verdict: string; cells: number[] }> = {}) {
   return {
     cells: [1, 2, 3, 4, 5, 6, 7, 8].map(cell),
@@ -283,7 +283,7 @@ describe('4. the wiring', () => {
     }
     const sheet = await sharp({ create: { width: W, height: W, channels: 3, background: '#fff' } }).composite(figs).jpeg().toBuffer();
     const slides = await avatarSlides.slidesFromSheet(`data:image/jpeg;base64,${sheet.toString('base64')}`, 'standard');
-    expect(slides).toHaveLength(6); // front / three-quarter / profile, head + body
+    expect(slides).toHaveLength(8); // front / three-quarter / profile / back, head + body
     for (const s of slides) {
       const { width } = await sharp(Buffer.from(s.split(',')[1], 'base64')).metadata();
       expect(width).toBeLessThan(W * 0.35);

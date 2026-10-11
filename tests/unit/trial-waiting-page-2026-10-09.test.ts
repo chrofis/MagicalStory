@@ -26,10 +26,10 @@ describe('avatar slides are whole cells (not 1:4 column strips)', () => {
   beforeEach(() => { vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}), text: async () => '' }))); });
   afterEach(() => { vi.unstubAllGlobals(); });
 
-  it('one standard sheet gives six cells, head and body alternating, each a whole cell', async () => {
+  it('one standard sheet gives eight cells, head and body alternating, each a whole cell', async () => {
     const { slidesFromSheet } = require('../../server/lib/avatarSlides');
     const slides = await slidesFromSheet(await sheet());
-    expect(slides).toHaveLength(6);
+    expect(slides).toHaveLength(8);
     const dims: any[] = [];
     for (const s of slides) dims.push(await sharp(Buffer.from(s.split(',')[1], 'base64')).metadata());
     for (const m of dims) { expect(m.width).toBeGreaterThan(140); expect(m.width).toBeLessThanOrEqual(256); } // one figure plus its margin, never a strip of columns
@@ -52,14 +52,14 @@ describe('avatar slides are whole cells (not 1:4 column strips)', () => {
     expect(sheetSourcesOf({ standard: 'S', costumed: { default: 'C' } })).toEqual(['C', 'S']);
     expect(interleaveSheetSlides([['c0', 'c1', 'c2', 'c3'], ['s0', 's1', 's2', 's3']])).toEqual(['c0', 'c1', 's0', 's1', 'c2', 'c3', 's2', 's3']);
     const both = await buildAvatarSlides({ standard: await sheet(), costumed: { default: await sheet(7) } }, { error: () => {} });
-    expect(both).toHaveLength(12);
+    expect(both).toHaveLength(16);
   });
 
   it('a broken sheet is skipped and logged, the other still shows', async () => {
     const { buildAvatarSlides } = require('../../server/lib/avatarSlides');
     const errors: string[] = [];
     const slides = await buildAvatarSlides({ standard: 'data:image/jpeg;base64,AAAA', costumed: { default: await sheet() } }, { error: (m: string) => errors.push(m) });
-    expect(slides).toHaveLength(6);
+    expect(slides).toHaveLength(8);
     expect(errors).toHaveLength(1);
   });
 });

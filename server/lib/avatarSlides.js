@@ -14,8 +14,9 @@ const { bytesFromAnyImage, uploadImage, contentKey } = require('./r2');
 const { log: defaultLog } = require('../utils/logger');
 const { markCutCell, brandCutList, figuresOf, isSingleCellWidth, writeCutSlides } = require('./clientAvatarImages');
 
-// front / three-quarter / profile; the back view has no face and is skipped.
-const SLIDE_POSES = ['front', 'threeQuarter', 'profile'];
+// All four views of the sheet. The back HEAD (180 degrees) is part of the rotation the owner asked for (2026-10-11), so the
+// back cells are cut too; the client orders the pictures (utils/trialPoll nextAvatarSource).
+const SLIDE_POSES = ['front', 'threeQuarter', 'profile', 'back'];
 
 /**
  * The identity of a figure on the waiting screen: sheet variant, pose, head or body. The early body-row slides and the
@@ -37,7 +38,7 @@ async function readSheet(source) {
 
 /**
  * The six cells of one styled sheet as JPEG data URIs, alternating head and body per angle:
- * [head front, body front, head 3/4, body 3/4, head profile, body profile].
+ * [head front, body front, head 3/4, body 3/4, head profile, body profile, head back, body back].
  * Throws on an image that is not a 2x4 sheet so the caller logs it and shows no slide rather than a wrong one.
  */
 async function slidesFromSheet(source, variant = 'sheet') {

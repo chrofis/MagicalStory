@@ -79,12 +79,68 @@ export function avatarPoolSources(hero: string | null | undefined, slides: strin
   return out;
 }
 
+/** The turning order of the waiting screen (owner, 2026-10-11): head straight, body 45, head 180, body 90, head 45, body straight. */
+const POSE_CYCLE = ['front', 'threeQuarter', 'back', 'profile', 'threeQuarter', 'front'] as const;
+/** Pictures of one sheet variant shown in a row before the other variant (standard, standard, costumed, costumed, ...). */
+const VARIANT_RUN = 2;
+
+interface AvatarFigure { variant: string; pose: string; kind: 'head' | 'body' }
+
+/** A figure label `<variant>-<pose>-<head|body>` (server avatarSlides.figureLabel) as its parts; null for anything else. */
+export function parseAvatarFigure(label: string): AvatarFigure | null {
+  const m = /^(.+)-(front|threeQuarter|profile|back)-(head|body)$/.exec(label);
+  return m ? { variant: m[1], pose: m[2], kind: m[3] as 'head' | 'body' } : null;
+}
+
+/** Poses in the order they should follow `cur`: the cycle on from where `cur` stands, never `cur`'s own pose first. */
+function poseWalk(cur: AvatarFigure | null): string[] {
+  let pos = -1;
+  if (cur) {
+    const at = POSE_CYCLE.map((p, i) => (p === cur.pose ? i : -1)).filter(i => i >= 0);
+    pos = at.find(i => (i % 2 === 0) === (cur.kind === 'head')) ?? at[0];
+  }
+  const walk: string[] = [];
+  for (let d = 1; d <= POSE_CYCLE.length; d++) {
+    const pose = POSE_CYCLE[(pos + d + POSE_CYCLE.length) % POSE_CYCLE.length];
+    if (pose !== cur?.pose && !walk.includes(pose)) walk.push(pose);
+  }
+  if (cur) walk.push(cur.pose);
+  return walk;
+}
+
 /**
- * The next avatar to show: walking on from the current one in list order, the first FIGURE that has not been shown yet;
+ * The index of the next picture among the figures not shown yet, or -1 when none of them is labelled. Every picture differs
+ * from the last in what the owner asked for: head and body alternate, the pose follows the turning cycle and never repeats,
+ * and the sheet variant changes every VARIANT_RUN pictures when both exist. What the pool lacks relaxes pose first, then
+ * head/body, then the variant, so the rotation always continues with the next best picture. `shown` keeps insertion order,
+ * which is how the length of the current variant run is known without a counter.
+ */
+function nextLabelledIndex(figures: string[], shown: Set<string>, curFigure: string | null): number {
+  const parsed = figures.map(parseAvatarFigure);
+  const open = parsed.map((f, i) => (f && !shown.has(figures[i]) ? i : -1)).filter(i => i >= 0);
+  if (open.length === 0) return -1;
+  const cur = curFigure ? parseAvatarFigure(curFigure) : null;
+  const variants = [...new Set(parsed.filter((f): f is AvatarFigure => !!f).map(f => f.variant))];
+  variants.sort((a, b) => Number(b === 'standard') - Number(a === 'standard'));
+  let run = 0;
+  if (cur) for (const h of [...shown].reverse()) { if (parseAvatarFigure(h)?.variant === cur.variant) run++; else break; }
+  const startAt = cur ? Math.max(0, variants.indexOf(cur.variant)) + (run >= VARIANT_RUN ? 1 : 0) : 0;
+  const variantOrder = variants.map((_, k) => variants[(startAt + k) % variants.length]);
+  const kinds: Array<'head' | 'body'> = !cur || cur.kind === 'body' ? ['head', 'body'] : ['body', 'head'];
+  for (const variant of variantOrder) for (const kind of kinds) for (const pose of poseWalk(cur)) {
+    const i = open.find(j => parsed[j]!.variant === variant && parsed[j]!.kind === kind && parsed[j]!.pose === pose);
+    if (i !== undefined) return i;
+  }
+  return open[0];
+}
+
+/**
+ * The next avatar to show: the first FIGURE that has not been shown yet in the turning order (nextLabelledIndex; a pool
+ * without figure labels is walked on from the current one in list order);
  * once every figure of the pool has been shown the round starts again (`shown` holds figure labels and is cleared in place,
  * the current one kept). Position comes from the figure, not from a counter or the URL, so a pool that grows or is replaced
  * while the slideshow runs (body-row slides, then the finished sheet's) never restarts it and never repeats a figure.
- * Returns the pool's first picture when nothing is current.
+ * Returns the rotation's first picture (standard, head straight) when nothing is current.
  */
 export function nextAvatarSource(pool: string[], shown: Set<string>, current: string | null, hero?: string | null): string | null {
   if (pool.length === 0) return null;
@@ -97,6 +153,8 @@ export function nextAvatarSource(pool: string[], shown: Set<string>, current: st
     if (curFigure) shown.add(curFigure);
     if (pool.length === 1) return pool[0];
   }
+  const ordered = nextLabelledIndex(figures, shown, curFigure);
+  if (ordered >= 0) return pool[ordered];
   for (let k = 1; k <= pool.length; k++) {
     const i = (at + k + pool.length) % pool.length;
     if (!shown.has(figures[i])) return pool[i];
