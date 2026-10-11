@@ -37,7 +37,7 @@ const { frameColorForName } = require('./characterFrames');
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish, getNarrationTenseRule } = require('./languages');
 const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
-const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE, normalisePopulation, POPULATION_LEVELS } = require('./sceneMetadata');
+const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE, normalisePopulation, POPULATION_LEVELS, splitBrief, METADATA_DELIMITER } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction, SEASON_NO_SKY_RULE } = require('./season');
 const { gazeTokenRow, GAZE_TOKEN_LIST } = require('./gazeTargets');
@@ -2817,7 +2817,7 @@ function buildCoverPrompt(coverType, {
   const bakedTitle = key === 'front' ? String(options.bakeTitle || '').trim() : '';
 
   const prompt = buildImagePrompt(
-    sceneDescription,
+    withCoverOutfits(sceneDescription, referencePhotos),
     inputData,
     characters,
     visualBible,
@@ -2826,6 +2826,31 @@ function buildCoverPrompt(coverType, {
     { ...options, coverComposition: composition }
   );
   return withBakedTitle(prompt, bakedTitle);
+}
+
+/**
+ * A cover brief dresses each figure, like a page brief does. The page prose
+ * weaves in each character's outfit; a cover's prose is built in code from the
+ * hint and names none, so the clothing check (jevDecisions.decideOutfitsStated)
+ * flagged every trial back cover. The outfit sentence is read from the same
+ * reference photos the check compares against (`clothingDescription`), placed
+ * in the prose before the METADATA tail. A fenced-JSON brief (the trial front
+ * cover) is the writer's own and states its outfits itself: returned unchanged.
+ * see docs/decisions.md 2026-10-11 "Cover prose dresses the cast".
+ */
+function withCoverOutfits(sceneDescription, referencePhotos) {
+  const text = String(sceneDescription || '');
+  if (/^\s*```json/i.test(text)) return text;
+  const sentences = (Array.isArray(referencePhotos) ? referencePhotos : [])
+    .filter(p => p?.name && p?.clothingDescription)
+    .map(p => `${p.name} wears ${String(p.clothingDescription).trim().replace(/[.\s]+$/, '')}.`);
+  if (sentences.length === 0) return text;
+  const { prose, metadataText, carrier } = splitBrief(text);
+  if (carrier === 'delimiter') return `${prose} ${sentences.join(' ')}
+
+${METADATA_DELIMITER}
+${metadataText}`;
+  return `${text.trim()} ${sentences.join(' ')}`;
 }
 
 /**
@@ -13750,6 +13775,7 @@ module.exports = {
   buildCharacterReferenceList,
   buildReferenceCardColours,
   buildCoverPrompt,
+  withCoverOutfits,
   withBakedTitle,
   bakedTitleLine,
   buildBasePrompt,
