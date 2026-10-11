@@ -134,6 +134,17 @@ function recordCall(tokenUsage, provider, usage, functionName = null, modelName 
   const f = tokenUsage.byFunction[fn];
   apply(f, true);
   f.provider = provider;
+  // A function bucket can hold calls of SEVERAL providers (the trial planner is
+  // an OpenRouter call booked under unified_story beside the Anthropic writer),
+  // and `f.provider` only remembers the last one. The tokens are therefore also
+  // kept per provider, which is what reconciliation against the provider
+  // totals must read (providerBucketDrift).
+  if (usage && tokenUsage[provider]) {
+    f.byProvider = f.byProvider || {};
+    const pb = f.byProvider[provider] = f.byProvider[provider] || { input_tokens: 0, output_tokens: 0 };
+    pb.input_tokens += usage.input_tokens || 0;
+    pb.output_tokens += usage.output_tokens || 0;
+  }
   if (modelId) f.models.add(modelId);
   return { cost, unpriced };
 }
@@ -143,4 +154,25 @@ function ledgerTotal(tokenUsage) {
   return Object.values(tokenUsage.byFunction).reduce((sum, f) => sum + (f.cost || 0), 0);
 }
 
-module.exports = { newTokenUsage, recordCall, ledgerTotal, modelIdOf };
+/**
+ * Reconciliation: each token provider's total must equal the sum of what the
+ * function buckets booked FOR THAT PROVIDER. A difference means a call reached
+ * a provider total but no bucket, or the reverse. Returns one entry per drift.
+ */
+function providerBucketDrift(tokenUsage, providers = ['anthropic', 'gemini_text', 'gemini_quality', 'openrouter']) {
+  const drift = [];
+  for (const prov of providers) {
+    const pt = tokenUsage[prov]; if (!pt) continue;
+    let binp = 0, bout = 0;
+    for (const fd of Object.values(tokenUsage.byFunction || {})) {
+      const pb = fd.byProvider?.[prov];
+      if (pb) { binp += pb.input_tokens || 0; bout += pb.output_tokens || 0; }
+    }
+    if (Math.abs(binp - (pt.input_tokens || 0)) > 1 || Math.abs(bout - (pt.output_tokens || 0)) > 1) {
+      drift.push({ provider: prov, providerIn: pt.input_tokens || 0, providerOut: pt.output_tokens || 0, bucketIn: binp, bucketOut: bout });
+    }
+  }
+  return drift;
+}
+
+module.exports = { newTokenUsage, recordCall, ledgerTotal, modelIdOf, providerBucketDrift };

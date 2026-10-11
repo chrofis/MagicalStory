@@ -18,6 +18,7 @@ const { stripDataUriPrefix } = require('../lib/r2');
 const { deleteStoryDerivedRows } = require('../lib/userErasure');
 const { lookupIpLocation } = require('../lib/ipLocation');
 const { normalizeCharacterName } = require('../lib/characterName');
+const { trialCharacterListFields } = require('../lib/trialCharacterMeta');
 const { trialSourceWhereClause } = require('../lib/trialSource');
 // Every full-blob characters.data write in this file goes through this —
 // image bytes belong in R2, the row holds URLs. Never throws; on an R2
@@ -1264,6 +1265,12 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
     if (!saved) {
       return res.status(404).json({ error: missing || 'Character not found' });
     }
+    // The metadata copy carries the same list fields; merge them into entry 0 (a sheet writer's avatars key is left alone).
+    await pool.query(
+      `UPDATE characters SET metadata = jsonb_set(metadata, '{characters,0}', COALESCE(metadata->'characters'->0, '{}'::jsonb) || $1::jsonb)
+        WHERE id = $2 AND metadata ? 'characters'`,
+      [JSON.stringify(trialCharacterListFields(saved.characters[0])), characterId]
+    );
     log.debug(`[TRIAL] Character details updated for ${userId}: ${saved.characters[0].name}`);
     res.json({ success: true, characterId, charId });
   } catch (err) {
@@ -3060,14 +3067,7 @@ async function saveTrialCharacter(pool, userId, characterData) {
 
   // Lightweight metadata for list queries (strip heavy base64 photos)
   const metadata = {
-    characters: [{
-      id: charId,
-      name: character.name,
-      age: character.age,
-      gender: character.gender,
-      traits: character.traits,
-      role: character.role,
-    }],
+    characters: [trialCharacterListFields(character)],
     relationships: {},
   };
 

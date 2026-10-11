@@ -6709,15 +6709,8 @@ ${trialWriter.pagesPrompt}`;
     if (Math.abs(emittedCostSum - totalCost) > 0.001) {
       log.warn(`⚠️ [ACCOUNTING] totalCost $${totalCost.toFixed(4)} != sum of per-call costs $${emittedCostSum.toFixed(4)} — cost breakdown drift`);
     }
-    for (const prov of ['anthropic', 'gemini_text', 'gemini_quality']) {
-      const pt = tokenUsage[prov]; if (!pt) continue;
-      let binp = 0, bout = 0;
-      for (const fd of Object.values(byFunc)) {
-        if (fd.provider === prov) { binp += fd.input_tokens || 0; bout += fd.output_tokens || 0; }
-      }
-      if (Math.abs(binp - (pt.input_tokens || 0)) > 1 || Math.abs(bout - (pt.output_tokens || 0)) > 1) {
-        log.warn(`⚠️ [ACCOUNTING] ${prov}: provider total ${pt.input_tokens}/${pt.output_tokens} != bucket sum ${binp}/${bout} — a call escaped per-function tracking`);
-      }
+    for (const d of require('./server/lib/costLedger').providerBucketDrift(tokenUsage)) {
+      log.warn(`⚠️ [ACCOUNTING] ${d.provider}: provider total ${d.providerIn}/${d.providerOut} != bucket sum ${d.bucketIn}/${d.bucketOut} — a call escaped per-function tracking`);
     }
     // Add total cost summary to generation log
     genLog.info('total_cost', `💰 Total API cost: $${totalCost.toFixed(4)}`, null, {
@@ -7343,21 +7336,6 @@ ${trialWriter.pagesPrompt}`;
 
     // Clear styled avatar cache to free memory
     clearStyledAvatarCache();
-
-    // Score-model mix telemetry: which fraction of versions ended up scored
-    // by the consolidator prompt vs the math fallback? Makes the 60-threshold
-    // tunable from logs alone instead of needing to query the DB.
-    try {
-      const { logScoreModelSummary } = require('./server/lib/scoring');
-      const sceneVersions = (storyData?.sceneImages || []).flatMap(p => Array.isArray(p?.imageVersions) ? p.imageVersions : []);
-      const coverVersions = ['frontCover', 'initialPage', 'backCover'].flatMap(k => {
-        const c = storyData?.coverImages?.[k];
-        return Array.isArray(c?.imageVersions) ? c.imageVersions : [];
-      });
-      logScoreModelSummary(jobId, [...sceneVersions, ...coverVersions]);
-    } catch (err) {
-      log.debug(`[SCORE-SUMMARY] skipped: ${err.message}`);
-    }
 
     // Bbox cache hit-rate telemetry — high hit rate means the eval and
     // entity-consistency passes are reusing the same detection rather than
