@@ -68553,3 +68553,9 @@ Replaces: the 2026-10-11 back-head entry above (3bc5943be).
 **Rationale / evidence:** replay over the 6 stored staging trial landmark plates (all trials since 2f0143e5c with a real landmark, 2 stories): old shape resolves 0/6, new 6/6, and the resolved variant equals the cited number 6/6. Regression test fails on the old shape. USD 0.
 **Revisit if:** a plate path needs the citation of something other than a background entry (add another source to the citation, not a copy).
 **Touched files:** server/lib/storyHelpers.js, tests/unit/landmark-plate-resolve.test.ts
+
+## 2026-10-11 - A missing face/body cut-out is produced at job start, or the job fails at job start
+**Context:** prod showcase job_1791748539342_ikyl88w1h failed after 68 min: Lea's stored character had only photos.original, and since 2026-10-10 the Grok 2 sheet call always needs face + body (avatarSheetReferences 'face+body'), so generateOneCallSheet threw "has no body photo" before any Grok call; the early avatar pass only warns, the story failed at the end. 4 prod rows (7 of 220 characters) lack a cut-out; they are seeded demo/showcase accounts, not the upload route (which always stores face/body/bodyNoBg).
+**Decision:** `ensureCharacterCutouts` (server/lib/characterCutouts.js) runs once at the start of processUnifiedStoryJob (non-realistic styles): a character with an original photo gets face/body/bodyNoBg from the same analyzer `/analyze` call the upload route makes, stored in R2 and on the character row. No photo, no person/body found, several faces or an analyzer failure throws CharacterInputError at once, before the writer. No face-only sheet fallback.
+**Rationale:** Lea's original run through the staging analyzer returns one face, a face thumbnail, body crop and bodyNoBg (checked 2026-10-11).
+**Touched files:** server/lib/characterCutouts.js, storyJobPipeline.js, tests/unit/character-cutouts-at-job-start.test.ts
