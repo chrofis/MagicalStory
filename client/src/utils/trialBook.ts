@@ -28,6 +28,7 @@ export interface TrialBookStoryPage {
 export type TrialBookEntry =
   | { type: 'frontCover' }
   | { type: 'titlePending' }
+  | { type: 'backCover' }
   | { type: 'story'; storyPageIdx: number }
   | { type: 'storyText'; storyPageIdx: number };
 
@@ -55,10 +56,12 @@ export function isTrialBookReady(
  */
 export function buildTrialBook(args: {
   titlePageImage: string | null;
+  /** The back cover, the last page of the book once it exists. */
+  backCoverImage?: string | null;
   pages: TrialPreviewPage[];
   textOnFacingPage: boolean;
 }): { storyPages: TrialBookStoryPage[]; entries: TrialBookEntry[] } {
-  const { titlePageImage, pages, textOnFacingPage } = args;
+  const { titlePageImage, backCoverImage, pages, textOnFacingPage } = args;
   const storyPages: TrialBookStoryPage[] = pages.map(p => ({
     pageNumber: p.pageNumber,
     text: (p.locked ? p.teaser : p.text) || '',
@@ -72,5 +75,6 @@ export function buildTrialBook(args: {
     entries.push({ type: 'story', storyPageIdx: i });
     if (textOnFacingPage) entries.push({ type: 'storyText', storyPageIdx: i });
   }
+  if (backCoverImage) entries.push({ type: 'backCover' });
   return { storyPages, entries };
 }

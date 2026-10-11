@@ -731,6 +731,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // location. The trial front cover reuses it as its people-free plate
     // instead of rendering on the raw landmark photograph.
     const trialPlatesByLoc = new Map();
+    // The people-free plate a trial COVER reuses instead of rendering its own:
+    // the first page plate at the cover's location (no extra call, 9 s and
+    // USD 0.02 off the tail - docs/decisions.md 2026-10-11 "Trial back cover
+    // reuses a page plate"). Null when the cover names no location with a
+    // plate or that plate failed; the cover helper then renders its own.
+    const reuseTrialPagePlate = async (locId, label) => {
+      const pagePlate = locId ? trialPlatesByLoc.get(locId) : null;
+      if (!pagePlate) return null;
+      await pagePlate.promise;
+      const plate = sceneBackgrounds[pagePlate.page]?.imageData || null;
+      log.info(`🎬 [TRIAL-COVER] ${label} ${locId}: ${plate ? `reusing the page ${pagePlate.page} plate` : `page ${pagePlate.page} plate unavailable - rendering a cover plate`}`);
+      return plate;
+    };
 
     // Track parallel tasks started during streaming
     const streamingSceneExpansionPromises = new Map(); // pageNum -> promise
@@ -742,31 +755,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const streamingTrialPageImagePromises = new Map(); // pageNum -> promise (trial mode only)
     const streamingExpandedPages = new Map(); // pageNum -> page data (for scene expansion)
     let coversStartedDuringStreaming = false;
-
-    // Landmark-photo barrier. Covers start during streaming (before the landmark
-    // fetch is even kicked off) and resolve their backdrop via
-    // getLandmarkPhotosForScene — which reads loc.photoFetchStatus. Without a
-    // barrier they race ahead of prefetchLandmarkPhotos, see status still
-    // pending, get 0 landmark photos, and the composite cover path silently
-    // falls back to figures-on-white. Pages don't hit this because they only
-    // start after the landmark fetch is awaited. Covers await this promise;
-    // it's resolved once the fetch completes (or is skipped when there's
-    // nothing to fetch). The main flow always reaches the landmark block, so
-    // this never deadlocks.
-    let resolveLandmarksReady;
-    const landmarksReady = new Promise((r) => { resolveLandmarksReady = r; });
-
-    // Same gate for VB ELEMENT REFERENCE SHEETS. Covers stream early (they only
-    // waited for the Visual Bible TEXT and the landmark photos), while element
-    // sheets are generated much later in the flow — so a cover built its VB grid
-    // while entries still had no referenceImageUrl, and getElementReferenceImages*
-    // silently dropped them for lack of a ref. The dragon on a dragon story's
-    // cover therefore had only its TEXT description and came out a different
-    // colour than on the pages, which do get the picture (job_1787001865052).
-    // Resolved right after the sheets are awaited; the main flow always reaches
-    // that block, so this cannot deadlock, and the covers are awaited later still.
-    let resolveRefSheetsReady;
-    const refSheetsReady = new Promise((r) => { resolveRefSheetsReady = r; });
 
     // TRIAL MODE: Start avatar styling immediately using pre-defined costumes
     // This runs in parallel with story generation (no need to wait for outline clothing)
@@ -1497,14 +1485,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           return null;
         }
 
-        // Wait for landmark photos before resolving the cover backdrop. See the
-        // landmarksReady declaration: covers otherwise race the landmark fetch
-        // and the composite path silently skips for lack of a landmark buffer.
-        await landmarksReady;
-        // …and for the element reference sheets, so a dominant VB element (a
-        // creature, a vehicle, a secondary character) reaches the cover as a
-        // PICTURE, not only as prose.
-        await refSheetsReady;
+        // The trial cover needs the element reference sheets (a dominant VB
+        // element reaches the cover as a PICTURE, not only as prose) - awaited
+        // on the early trial promise itself, as the front cover does, NOT on the
+        // main-flow reference-sheet and landmark gates (deleted), which opened ~4 s after
+        // the text ends and held the back cover for that long. No landmark wait:
+        // the trial cover's backdrop is a page plate (which carries the landmark
+        // photo), never the raw photograph. docs/decisions.md 2026-10-11.
+        if (trialReferenceSheetPromise) {
+          try { await trialReferenceSheetPromise; } catch { /* logged in onVisualBible */ }
+        }
 
         // Build per-character clothing requirements from hint.characterClothing
         // hint.characterClothing = { 'Manuel': 'winter', 'Sophie': 'standard', 'Roger': 'costumed:knight' }
@@ -1964,6 +1954,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           coverHint: hint, // hint.objects carries LOC + ART IDs from the unified prompt
           sceneMetadata: coverExpandedMetadata, // pre-computed by scene expansion
           emptyScenePromptOverride: coverExpandedMetadata?.emptyScenePrompt || null,
+          // The trial back cover reuses the page plate at its location, as the front does.
+          sceneBackground: await reuseTrialPagePlate(
+            require('./server/lib/coverIterate').trialCoverLocationId({ objects: hint?.objects }), 'back'),
           usageTracker: (usage, modelId) => {
             const isRunware = modelId?.startsWith('runware:');
             const isGrok = modelId?.startsWith('grok-imagine');
@@ -2548,13 +2541,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               trialCoverPlateDescription,
             } = require('./server/lib/coverIterate');
             const coverLocId = trialCoverLocationId(coverScene);
-            const pagePlate = coverLocId ? trialPlatesByLoc.get(coverLocId) : null;
-            let reusedPlate = null;
-            if (pagePlate) {
-              await pagePlate.promise;
-              reusedPlate = sceneBackgrounds[pagePlate.page]?.imageData || null;
-              log.info(`🎬 [TRIAL-COVER] ${coverLocId}: ${reusedPlate ? `reusing the page ${pagePlate.page} plate` : `page ${pagePlate.page} plate unavailable — rendering a cover plate`}`);
-            }
+            const reusedPlate = await reuseTrialPagePlate(coverLocId, 'front');
             const coverRefs = await buildTrialCoverReferences({
               coverKey: 'frontCover',
               visualBible: streamingVisualBible,
@@ -3317,12 +3304,6 @@ ${trialWriter.pagesPrompt}`;
       const swissIndexOnly = isSwissCountry(inputData.userLocation?.country);
       log.info(`🌍 [UNIFIED] Starting background fetch for ${nonVariantLandmarks.length} non-variant landmark photo(s)${swissIndexOnly ? ' (Swiss: index-only)' : ''}`);
       landmarkFetchPromise = prefetchLandmarkPhotos(visualBible, { swissIndexOnly });
-      // Release the cover barrier once the fetch settles (success or failure) so
-      // covers resolve their backdrop against fully-populated locations.
-      landmarkFetchPromise.finally(() => resolveLandmarksReady());
-    } else {
-      // Nothing to fetch (all variants/curated/none) — covers can proceed now.
-      resolveLandmarksReady();
     }
 
     // Start background reference sheet generation for secondary elements.
@@ -3983,7 +3964,6 @@ ${trialWriter.pagesPrompt}`;
         const carried = adoptReferenceRenders(streamingVisualBible, visualBible);
         log.info(`🖼️ [TRIAL] Carried ${carried} reference cell(s) from the stream-time bible onto the final parse`);
       }
-      resolveRefSheetsReady();
       if (refResult.generated > 0) {
         log.info(`🖼️ [UNIFIED] Reference images ready: ${refResult.generated} generated for secondary elements`);
       }
@@ -4000,10 +3980,6 @@ ${trialWriter.pagesPrompt}`;
         }));
       }
     }
-    // ALWAYS release the gate, including the no-sheets paths (nothing to
-    // generate, generation failed, skipImages). A cover awaiting a promise that
-    // never resolves would hang the whole job.
-    resolveRefSheetsReady();
 
     // PHASE 5: Generate page images
     // Sequential mode when incremental consistency is enabled, parallel otherwise

@@ -71,3 +71,20 @@ describe('buildTrialBook', () => {
     expect(b.storyPages[1].imagePending).toBe(false);
   });
 });
+
+describe('the back cover is the last page of the trial book (owner 2026-10-11)', () => {
+  const pages = [pg(1, { text: 'one', imageData: 'i1' }), pg(2, { text: 'two', imageData: 'i2' })];
+  it('mobile: cover, pages, back cover', () => {
+    const { entries } = buildTrialBook({ titlePageImage: 'T', backCoverImage: 'B', pages, textOnFacingPage: false });
+    expect(entries.map(e => e.type)).toEqual(['frontCover', 'story', 'story', 'backCover']);
+  });
+  it('desktop spread: the back cover follows the last text page', () => {
+    const { entries } = buildTrialBook({ titlePageImage: 'T', backCoverImage: 'B', pages, textOnFacingPage: true });
+    expect(entries[entries.length - 1]).toEqual({ type: 'backCover' });
+    expect(entries).toHaveLength(6);
+  });
+  it('no back cover yet: no entry (it joins the book when it lands)', () => {
+    const { entries } = buildTrialBook({ titlePageImage: 'T', backCoverImage: null, pages, textOnFacingPage: false });
+    expect(entries.map(e => e.type)).toEqual(['frontCover', 'story', 'story']);
+  });
+});

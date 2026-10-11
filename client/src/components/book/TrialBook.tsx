@@ -46,6 +46,7 @@ interface TrialBookProps {
   storyTitle: string;
   language: string;
   titlePageImage: string | null;
+  backCoverImage: string | null;
   pages: TrialPreviewPage[];
   pendingImageLabel: string;
   /** Rendered as the title page while it is still being drawn. */
@@ -62,12 +63,12 @@ function samePages(a: TrialPreviewPage[], b: TrialPreviewPage[]) {
  * preview. Memoized on content, so the 3 s poll (new array identity, same data)
  * does not re-render the viewer; when an image lands only that page's props change.
  */
-const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePageImage, pages, pendingImageLabel, titlePendingNode }: TrialBookProps) {
+const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePageImage, backCoverImage, pages, pendingImageLabel, titlePendingNode }: TrialBookProps) {
   const isMobile = useIsMobile();
   // Desktop spread: picture on the left page, its text on the right page.
   const { storyPages, entries } = useMemo(
-    () => buildTrialBook({ titlePageImage, pages, textOnFacingPage: !isMobile }),
-    [titlePageImage, pages, isMobile]);
+    () => buildTrialBook({ titlePageImage, backCoverImage, pages, textOnFacingPage: !isMobile }),
+    [titlePageImage, backCoverImage, pages, isMobile]);
   const story = useMemo(() => ({
     id: 'trial',
     title: storyTitle,
@@ -76,14 +77,16 @@ const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePag
     // Locked pages: teaser + the sign-in block under it.
     pages: storyPages.map(p => ({ ...p, textFooter: p.locked ? gateNode : undefined })),
     hasImages: true,
-    coverImageSrc: titlePageImage ? { frontCover: titlePageImage } : undefined,
-  }), [storyTitle, language, storyPages, titlePageImage]);
+    coverImageSrc: titlePageImage || backCoverImage
+      ? { ...(titlePageImage ? { frontCover: titlePageImage } : {}), ...(backCoverImage ? { backCover: backCoverImage } : {}) }
+      : undefined,
+  }), [storyTitle, language, storyPages, titlePageImage, backCoverImage]);
   // react-pageflip moves its page elements out of React's tree, so a change of the page LIST (the pending
   // title page becoming the cover, more pages arriving) makes React remove nodes that are no longer where it
   // put them: WebKit throws NotFoundError ("The object can not be found here") and React unmounts the whole
   // page - the white page when the title arrived (owner iPhone, 2026-10-09). A changed structure therefore
   // remounts the viewer, on the page the visitor was reading. Image/text updates keep the same structure.
-  const structureKey = `${isMobile ? 'm' : 'd'}:${titlePageImage ? 'cover' : 'pending'}:${pages.length}`;
+  const structureKey = `${isMobile ? 'm' : 'd'}:${titlePageImage ? 'cover' : 'pending'}:${backCoverImage ? 'back' : 'noback'}:${pages.length}`;
   const logicalPageRef = useRef(0);
   const [currentPage, setCurrentPage] = useState(0);
   const bookRef = useRef<BookViewerHandle>(null);
@@ -121,7 +124,7 @@ const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePag
     </>
   );
 }, (a, b) =>
-  a.storyTitle === b.storyTitle && a.language === b.language && a.titlePageImage === b.titlePageImage &&
+  a.storyTitle === b.storyTitle && a.language === b.language && a.titlePageImage === b.titlePageImage && a.backCoverImage === b.backCoverImage &&
   a.pendingImageLabel === b.pendingImageLabel && samePages(a.pages, b.pages));
 
 export default TrialBook;

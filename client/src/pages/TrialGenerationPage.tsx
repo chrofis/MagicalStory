@@ -308,6 +308,7 @@ export default function TrialGenerationPage() {
 
   // Title page image — always arrives via polling from the story generation pipeline
   const [titlePageImage, setTitlePageImage] = useState<string | null>(null);
+  const [backCoverImage, setBackCoverImage] = useState<string | null>(null);
 
 
   // Story preview (title + pages) once the writer step has finished. The book
@@ -493,9 +494,11 @@ export default function TrialGenerationPage() {
       // prepare-title finished saw one static preview avatar for ~2.5 min).
       setAvatarSlides(prev => mergeAvatarSlides(prev, data.avatarSlides));
 
+      if (data.backCoverImage) setBackCoverImage(data.backCoverImage);
+      // The title page stops the covers query for the waiting screen; the back cover (a later render) keeps it asking until it lands.
       if (data.titlePageImage) {
         setTitlePageImage(data.titlePageImage);
-        needTitlePageRef.current = false;
+        needTitlePageRef.current = !data.backCoverImage;
       }
 
       setServerUnlocked(data.unlocked === true);
@@ -1038,6 +1041,7 @@ export default function TrialGenerationPage() {
           storyTitle={storyTitle || ''}
           language={state?.storyInput?.language || language}
           titlePageImage={titlePageImage}
+          backCoverImage={backCoverImage}
           pages={pages}
           pendingImageLabel={t.imagePending}
           titlePendingNode={imagePlaceholder}

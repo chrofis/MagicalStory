@@ -1796,29 +1796,31 @@ async function loadTrialStorySource(pool, jobId, userId, jobStatus) {
 }
 
 /**
- * The title page of a trial job: { image, title } or null. Running job: the front `partial_cover`
- * checkpoint. Completed job: the checkpoints are deleted, so the stored story's front cover is the
- * source (it was missing: a visitor whose tab slept through the last minutes - a locked phone - came
- * back to "done" with the title page still "being painted" for good; docs/decisions.md 2026-10-09).
+ * One cover of a trial job: { image, title } or null. Running job: the cover's `partial_cover` checkpoint (front at step 0, back at
+ * step 2 - the indexes storyJobPipeline saves them under). Completed job: the checkpoints are deleted, so the stored story's cover is
+ * the source (it was missing: a visitor whose tab slept through the last minutes - a locked phone - came back to "done" with the title
+ * page still "being painted" for good; docs/decisions.md 2026-10-09).
  */
-async function loadTrialTitlePage(pool, jobId, jobStatus) {
+const TRIAL_COVER_STEP = { frontCover: 0, backCover: 2 };
+async function loadTrialCover(pool, jobId, jobStatus, coverKey) {
   if (jobStatus === 'completed') {
     const { getActiveStoryImages } = require('../services/database');
-    const front = (await getActiveStoryImages(jobId)).find(r => r.image_type === 'frontCover');
-    const image = front ? trialImageSrc(front) : null;
+    const cover = (await getActiveStoryImages(jobId)).find(r => r.image_type === coverKey);
+    const image = cover ? trialImageSrc(cover) : null;
     if (!image) return null;
     const t = await pool.query(`SELECT data::jsonb->>'title' AS title FROM stories WHERE id = $1`, [jobId]);
     return { image, title: t.rows[0]?.title || null };
   }
   const coverResult = await pool.query(
     `SELECT step_data FROM story_job_checkpoints
-     WHERE job_id = $1 AND step_name = 'partial_cover' AND step_index = 0
+     WHERE job_id = $1 AND step_name = 'partial_cover' AND step_index = $2
      LIMIT 1`,
-    [jobId]
+    [jobId, TRIAL_COVER_STEP[coverKey]]
   );
   const data = coverResult.rows[0]?.step_data;
   return data?.imageUrl ? { image: data.imageUrl, title: data.storyTitle || null } : null;
 }
+const loadTrialTitlePage = (pool, jobId, jobStatus) => loadTrialCover(pool, jobId, jobStatus, 'frontCover');
 
 /**
  * GET /api/trial/job-status/:jobId
@@ -1895,6 +1897,14 @@ router.get('/job-status/:jobId', jobStatusLimiter, verifySessionToken, async (re
         }
       } catch (err) {
         log.error(`[TRIAL] Title page query failed: ${err.message}`);
+      }
+
+      // The back cover is the last page of the trial book (owner, 2026-10-11): it lands after the title page, so it is read on its own.
+      try {
+        const back = await loadTrialCover(pool, jobId, job.status, 'backCover');
+        if (back) response.backCoverImage = back.image;
+      } catch (err) {
+        log.error(`[TRIAL] Back cover query failed: ${err.message}`);
       }
 
       // Avatar slides from character data (independent of title page)
@@ -3595,6 +3605,7 @@ function resetTrialRateLimits() {
 module.exports = router;
 module.exports.initTrialRoutes = initTrialRoutes;
 module.exports.loadTrialTitlePage = loadTrialTitlePage;
+module.exports.loadTrialCover = loadTrialCover;
 module.exports.loadTrialStorySource = loadTrialStorySource;
 module.exports.saveTrialCharacter = saveTrialCharacter;
 module.exports.createTrialStoryJob = createTrialStoryJob;

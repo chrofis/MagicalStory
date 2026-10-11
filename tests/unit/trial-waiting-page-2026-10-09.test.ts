@@ -180,3 +180,18 @@ describe('the finished-story redirect to /stories', () => {
     expect(shouldRedirectToStories('completed', false, true)).toBe(true);
   });
 });
+
+describe('job-status back cover', () => {
+  const trial = require('../../server/routes/trial.js');
+  const db = require('../../server/services/database');
+  const original = db.getActiveStoryImages;
+  afterEach(() => { db.getActiveStoryImages = original; });
+  it('the back cover is read from its own checkpoint step (2) while running and from the stored backCover when completed', async () => {
+    const pool = { query: vi.fn(async () => ({ rows: [{ step_data: { imageUrl: 'https://r2/preview/backCover-1.jpg' } }] })) };
+    expect(await trial.loadTrialCover(pool, 'job_1', 'processing', 'backCover')).toEqual({ image: 'https://r2/preview/backCover-1.jpg', title: null });
+    expect((pool.query as any).mock.calls[0][1]).toEqual(['job_1', 2]);
+    db.getActiveStoryImages = async () => [{ image_type: 'backCover', page_number: null, image_url: 'https://r2/back.jpg' }];
+    const done = { query: vi.fn(async () => ({ rows: [{ title: 'T' }] })) };
+    expect((await trial.loadTrialCover(done, 'job_1', 'completed', 'backCover')).image).toBe('https://r2/back.jpg');
+  });
+});
