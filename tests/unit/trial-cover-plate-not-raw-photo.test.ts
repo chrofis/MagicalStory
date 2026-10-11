@@ -165,7 +165,8 @@ describe('the trial cover call site', () => {
 
   it('uses the shared cover helper with the page plate (render use, the default)', () => {
     expect(site).toContain('buildCoverReferences: buildTrialCoverReferences');
-    expect(site).toContain('trialPlatesByLoc.get(coverLocId)');
+    expect(site).toContain("reuseTrialPagePlate(coverLocId, 'front')");
+    expect(pipeline).toContain('trialPlatesByLoc.get(locId)'); // the one helper both trial covers use
     expect(site).toContain('sceneBackground: reusedPlate');
     expect(site).not.toContain('use:'); // default 'render': plated or fails
     expect(site).toContain('sceneBackground: coverSceneBackground');
