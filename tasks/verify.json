@@ -9957,7 +9957,8 @@
         "kind": "human",
         "what": "In the trial log find the [TRIAL] Empty scene lines of the landmark plates and check each says 'landmark ... variant N attached' with N equal to the background's landmarkPhoto in the plan; look at the plates for the landmark's silhouette."
       },
-      "status": "pending"
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
