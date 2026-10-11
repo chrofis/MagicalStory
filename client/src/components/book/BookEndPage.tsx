@@ -21,7 +21,7 @@ const endPageText: Record<string, Record<string, string>> = {
     f1: 'Mehrere Figuren in einer Geschichte',
     f2: 'Längere Geschichten mit mehr Seiten',
     f3: 'Verschiedene Zeichenstile',
-    f4: 'Höhere Bildqualität: jedes Bild wird geprüft und verbessert',
+    f4: 'Höhere Bildqualität',
     f5: 'Als gedrucktes Buch bestellen',
   },
   en: {
@@ -35,7 +35,7 @@ const endPageText: Record<string, Record<string, string>> = {
     f1: 'Multiple characters in one story',
     f2: 'Longer stories with more pages',
     f3: 'Different drawing styles',
-    f4: 'Higher image quality: every picture is checked and improved',
+    f4: 'Higher image quality',
     f5: 'Order as a printed book',
   },
   fr: {
@@ -63,7 +63,7 @@ const endPageText: Record<string, Record<string, string>> = {
     f1: 'Più personaggi in una storia',
     f2: 'Storie più lunghe con più pagine',
     f3: 'Diversi stili di disegno',
-    f4: 'Qualità delle immagini superiore: ogni immagine viene controllata e migliorata',
+    f4: 'Qualità delle immagini superiore',
     f5: 'Ordina come libro stampato',
   },
 };
