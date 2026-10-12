@@ -33,7 +33,7 @@ async function persist(userId, character) {
 }
 
 /** Derive and attach photos.face/body/bodyNoBg for every character that has only an original photo. Throws CharacterInputError. */
-async function ensureCharacterCutouts(characters, { userId = null, analyze = analyzerJson } = {}) {
+async function ensureCharacterCutouts(characters, { userId = null, analyze = analyzerJson, genLog = null } = {}) {
   for (const character of (characters || [])) {
     if (!character || hasCutout(character)) continue;
     const name = character.name || 'a character';
@@ -61,7 +61,10 @@ async function ensureCharacterCutouts(characters, { userId = null, analyze = ana
     } else {
       character.photos = photos;
     }
-    log.info(`[CUTOUT] ${name}: derived face/body cut-outs from the original photo${userId ? ' and stored them' : ''}`);
+    const msg = `${name}: derived face/body cut-outs from the original photo${userId ? ' and stored them' : ''}`;
+    log.info(`[CUTOUT] ${msg}`);
+    // The story's own log, so a reviewer of the stored story sees the derivation (prod showcase 2026-10-12 had it only in Railway).
+    genLog?.info('character_cutout_derived', msg, name);
   }
 }
 

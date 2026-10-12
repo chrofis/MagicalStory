@@ -14,8 +14,11 @@ describe('ensureCharacterCutouts', () => {
   it('derives face + body from the original (analyzer mocked) and the sheet reference then resolves', async () => {
     vi.spyOn(r2, 'bytesFromAnyImage').mockResolvedValue(Buffer.from('jpegbytes'));
     const analyze = vi.fn().mockResolvedValue(ok);
+    const genLog = { info: vi.fn() };
     const c: any = { name: 'Lea', photos: { original: 'https://x/original.jpg', face: null, body: null, bodyNoBg: null } };
-    await ensureCharacterCutouts([c], { analyze });
+    await ensureCharacterCutouts([c], { analyze, genLog });
+    // the derivation is in the story's stored log, not only the server log
+    expect(genLog.info).toHaveBeenCalledWith('character_cutout_derived', expect.stringContaining('Lea'), 'Lea');
     expect(analyze).toHaveBeenCalledTimes(1);
     expect(analyze.mock.calls[0][0]).toBe('/analyze');
     expect(c.photos.face).toBe('FACE');
@@ -44,5 +47,6 @@ describe('ensureCharacterCutouts', () => {
     const i = src.indexOf('ensureCharacterCutouts');
     expect(i).toBeGreaterThan(0);
     expect(i).toBeLessThan(src.indexOf('ensureAvatarDerivedHair(inputData.characters'));
+    expect(src).toMatch(/ensureCharacterCutouts\(inputData\.characters \|\| \[\], \{ userId, genLog \}\)/);
   });
 });

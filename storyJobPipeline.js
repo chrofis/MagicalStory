@@ -629,7 +629,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   // The Grok 2 sheet call needs each character's face + body cut-out. Produce a missing one now, or fail the job
   // now: a missing input must never surface after the writer (prod job_1791748539342_ikyl88w1h, 68 min).
   if ((inputData.artStyle || 'pixar') !== 'realistic' && MODEL_DEFAULTS.avatarSheetReferences === 'face+body') {
-    await require('./server/lib/characterCutouts').ensureCharacterCutouts(inputData.characters || [], { userId });
+    await require('./server/lib/characterCutouts').ensureCharacterCutouts(inputData.characters || [], { userId, genLog });
   }
 
   // The hair text follows the approved avatar, read once per character and kept on the character row
