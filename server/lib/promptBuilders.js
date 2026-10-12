@@ -13400,7 +13400,7 @@ function landmarksStagedRule(inputData = {}) {
   const ask = landmarkGuidelineActive(inputData)
     ? ` The list asks for at least ${landmarkRequirement(inputData)}.`
     : '';
-  return `"Landmarks staged:" then a dash list, one line per landmark from the REAL LANDMARKS list that an arc sentence takes place at or beside, the name exactly as the list gives it and nothing else on the line; the single word "none" where the arc stages none.${ask} A landmark is listed only where a sentence stages it.`;
+  return `"Landmarks staged:" followed by a dash list, one line per landmark from the REAL LANDMARKS list that an arc sentence takes place at or beside, the name exactly as the list gives it and nothing else on the line; the single word "none" where the arc stages none.${ask} A landmark is listed only where a sentence stages it.`;
 }
 
 /** The Art Director's half: how a chosen landmark is recorded, and the typed backdrop row. */
