@@ -8459,7 +8459,8 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     const { arcBlock, critique } = splitCommittedBlock(created.commit.committed);
     // + the Jev cast check, as production (jevAudit.arcRepairFindingsWithCastCheck).
     let jevCast = null;
-    ({ gate, jevCast } = await require('./jevAudit').arcRepairFindingsWithCastCheck({ critique, reviewedArc: arcBlock, panel: voices, castNames: require('./castCoverage').commissionedCast(storyData).children }));
+    // + the landmark shortfall code counts on the created arc's "Landmarks staged:" block, as production (beatsPipeline PANEL + RE-TELL).
+    ({ gate, jevCast } = await require('./jevAudit').arcRepairFindingsWithCastCheck({ critique, reviewedArc: arcBlock, panel: voices, castNames: require('./castCoverage').commissionedCast(storyData).children, codeFindings: require('./landmarkGuideline').arcLandmarkCodeFindings(created.commit.landmarkLines, storyData) }));
     gateJevCast = jevCast;
     if (!gate.retell) {
       retellSkipped = gate.skipReason;
@@ -9001,7 +9002,8 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
       // no quoted MAJOR or CRITICAL finding, no re-telling.
       const { arcBlock, critique } = H.splitCommittedBlock(committed);
       // + the Jev cast check, as production (jevAudit.arcRepairFindingsWithCastCheck).
-      const { gate, jevCast } = await require('./jevAudit').arcRepairFindingsWithCastCheck({ critique, reviewedArc: arcBlock, panel, castNames: require('./castCoverage').commissionedCast(storyData).children });
+      // + the landmark shortfall code counts on the stored block's "Landmarks staged:" lines, as production.
+      const { gate, jevCast } = await require('./jevAudit').arcRepairFindingsWithCastCheck({ critique, reviewedArc: arcBlock, panel, castNames: require('./castCoverage').commissionedCast(storyData).children, codeFindings: require('./landmarkGuideline').arcLandmarkCodeFindings(require('./promptBuilders').takeLandmarksStaged(committed).lines, inputData) });
       const gateReport = { repair: gate.count, duplicates: gate.duplicates, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueMalformed: gate.critique.malformed, jevCast };
       if (!gate.retell) {
         retell = { ok: true, skipped: gate.skipReason, gate: gateReport };
@@ -10097,7 +10099,9 @@ async function runBeatsReplanStage(target, { params = {} }) {
   const readCastTable = (reply) => {
     if (!(storyData?.characters || []).some(c => c && c.name)) return null;
     try {
-      return parsePlanCastBlock(reply, { listed: commissionedCast(storyData).listed });
+      // leadEach as production (beatsPipeline Step 1b): an "also on" page that is another character's deed page is refused at the parse.
+      const castCov = require('./castCoverage').castCoverage({ pageCount, castCount: (storyData.characters || []).filter(x => x && x.name).length });
+      return parsePlanCastBlock(reply, { listed: commissionedCast(storyData).listed, leadEach: !!(castCov && castCov.leadEach) });
     } catch (err) {
       castTableNote = `the planner's CAST block could not be read: ${err.message} — as in the run, no plan line is held to a cast table`;
       return null;

@@ -82,6 +82,19 @@ function landmarkShortfallFinding(stagedNames, inputData) {
 }
 
 /**
+ * The findings code counts on an arc's "Landmarks staged:" lines, as the array
+ * arcRepairFindings({ codeFindings }) takes: [] or [the shortfall line]. A missing
+ * block (`lines` null) counts as none staged, as production reads it. The Test Lab's
+ * arc mirrors call this where beatsPipeline reads its landmark answer (sibling set
+ * arc-retell-gate).
+ */
+function arcLandmarkCodeFindings(lines, inputData) {
+  const { names } = parseLandmarksStaged(lines, (inputData && inputData.availableLandmarks) || []);
+  const finding = landmarkShortfallFinding(names, inputData);
+  return finding ? [finding] : [];
+}
+
+/**
  * The landmarks a Visual Bible STAGES on a story page (pages > 0; the covers
  * are -1..-3): a real-landmark location whose pages include one, or a
  * `backdropLandmarks` row ({landmarkQuery, pages}) naming an OFFERED landmark.
@@ -120,6 +133,7 @@ module.exports = {
   offeredEntryFor,
   parseLandmarksStaged,
   landmarkShortfallFinding,
+  arcLandmarkCodeFindings,
   stagedLandmarks,
   describeStagedLandmarks,
 };
