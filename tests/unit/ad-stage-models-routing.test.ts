@@ -36,7 +36,7 @@ describe('Art Director stage models', () => {
   });
   it('the calls use the routed models, and the bible call carries the effort only on the routed model', () => {
     const src = readFileSync(join(ROOT, 'server/lib/beatsPipeline.js'), 'utf8');
-    expect(src).toContain("callTextModelStreaming(vbPrompt, null, onChunk, vbModel, { usageLabel: 'beats_visual_bible', ...(vbModel === MODEL_DEFAULTS.visualBibleModel && MODEL_DEFAULTS.visualBibleEffort");
+    expect(src).toContain("callTextModelStreaming(prompt, null, onChunk, vbModel, { usageLabel: 'beats_visual_bible', ...(vbModel === MODEL_DEFAULTS.visualBibleModel && MODEL_DEFAULTS.visualBibleEffort");
     expect(src).toContain("callTextModelStreaming(allPrompt, null, onChunk, briefsModel, { usageLabel: 'beats_scene_expansion'");
   });
 });
