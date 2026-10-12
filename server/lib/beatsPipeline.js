@@ -11,6 +11,7 @@ const { salvageReplanRound } = require('./replanSalvage');
 // so a replay or a test can load them without the pipeline's provider graph.
 const { decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf } = require('./jevBriefFields');
 const { JevDecisionError } = jevDecisions;
+const { LANDMARK_MINIMUM, landmarkGuidelineActive, stagedRealLandmarks, describeStagedLandmarks, landmarkRetryNote } = require('./landmarkGuideline');
 const jevPlanCheck = require('./jevPlanCheck');
 const jevSelection = require('./jevSelection');
 const { lookupByName } = require('./castResolver');
@@ -1701,7 +1702,7 @@ function adStageModels(sceneModel) {
  * @param {Map<number,string[]>} present - the shipped plan check's head count per page (the gaze roster)
  * @returns {Promise<{expansions: Array, visualBible: object|null, bibleSections: string|null, wardrobeBibleReport: object|null, sceneExpansionReport: object, briefBeats: Array, coverBeats: Array, briefsPrompt: string|null}>}
  */
-async function runArtDirector({ inputData, modelOverrides, clothingRequirements, visualBible, bibleSections, sceneModel, onChunk, gl, meta, stage, beats, arcCentralFigure, approvedArc, present = null, onVisualBible = null, wardrobeBibleReport = null, labCallOptions = {}, labForcePerPage = false, onCall = null, jevReport = null, visualBibleModel = null, labAdoptBibleFrom = null }) {
+async function runArtDirector({ inputData, modelOverrides, clothingRequirements, visualBible, bibleSections, sceneModel, onChunk, gl, meta, stage, beats, arcCentralFigure, approvedArc, present = null, wardrobeBibleReport = null, labCallOptions = {}, labForcePerPage = false, onCall = null, jevReport = null, visualBibleModel = null, labAdoptBibleFrom = null }) {
   const lang = inputData.language || 'en';
   const imgModelConfig = IMAGE_MODELS[modelOverrides.imageModel || inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage];
   const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || [], clothingRequirements);
@@ -1824,19 +1825,43 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
     adBible = { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: 'stored bible (Lab)' };
   } else {
     await stage(30, 'Writing the visual bible...', { next: 36, ms: 90000 });
-    for (let attempt = 1; attempt <= 2 && !adBible; attempt++) {
+    // One call, parsed; null when the reply is not a whole bible (JSON parse is the completeness test).
+    const askBible = async (prompt, attempt) => {
       try {
-        const res = await textModels.callTextModelStreaming(vbPrompt, null, onChunk, vbModel, { usageLabel: 'beats_visual_bible', ...(vbModel === MODEL_DEFAULTS.visualBibleModel && MODEL_DEFAULTS.visualBibleEffort ? { effort: MODEL_DEFAULTS.visualBibleEffort } : {}), ...labCallOptions });
+        const res = await textModels.callTextModelStreaming(prompt, null, onChunk, vbModel, { usageLabel: 'beats_visual_bible', ...(vbModel === MODEL_DEFAULTS.visualBibleModel && MODEL_DEFAULTS.visualBibleEffort ? { effort: MODEL_DEFAULTS.visualBibleEffort } : {}), ...labCallOptions });
         if (onCall) onCall(res);
         const raw = res?.text || '';
         vbReplies.push({ attempt, modelId: res?.modelId || vbModel, text: raw });
         const sections = extractBibleSections(raw, AD_BIBLE_MARKERS);
         const parsedVb = sections ? new UnifiedStoryParser(sections.body).extractVisualBible() : null;
-        if (sections && parsedVb) adBible = { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: res?.modelId || vbModel };
-        else log.error(`🚨 [BEATS] Visual Bible attempt ${attempt}: ${sections ? `---VISUAL BIBLE--- present but its JSON did not parse (${sections.body.length} chars)` : `no ---VISUAL BIBLE--- section (${raw.length} chars)`}`);
+        if (sections && parsedVb) return { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: res?.modelId || vbModel };
+        log.error(`🚨 [BEATS] Visual Bible attempt ${attempt}: ${sections ? `---VISUAL BIBLE--- present but its JSON did not parse (${sections.body.length} chars)` : `no ---VISUAL BIBLE--- section (${raw.length} chars)`}`);
       } catch (err) {
         log.error(`🚨 [BEATS] Visual Bible attempt ${attempt} failed: ${err.message}`);
         gl.warn('beats_visual_bible_failed', `Visual Bible call failed on attempt ${attempt}: ${err.message}`);
+      }
+      return null;
+    };
+    for (let attempt = 1; attempt <= 2 && !adBible; attempt++) adBible = await askBible(vbPrompt, attempt);
+
+    // Landmark guideline: two real landmarks staged is a strong guideline. A
+    // shortfall re-asks THIS call once with the shortfall fed back; arc, plan and
+    // wardrobe stay (decisions.md "Landmark retry re-asks only the Visual Bible").
+    // The second answer replaces the first only if it stages more; the story is
+    // never failed on landmark count.
+    if (adBible && landmarkGuidelineActive(inputData)) {
+      const staged = stagedRealLandmarks(adBible.visualBible);
+      if (staged.length < LANDMARK_MINIMUM) {
+        const offered = inputData.availableLandmarks.map(l => l.name);
+        log.error(`🚨 [LANDMARK-MIN] Binding location offered ${offered.length} landmark(s) but the bible staged only ${staged.length} (${describeStagedLandmarks(staged)}; offered e.g. ${offered.slice(0, 5).join(', ')}) — re-asking the Visual Bible once with feedback`);
+        gl.warn('landmark_minimum', `Bible staged ${staged.length} real landmark(s) (${describeStagedLandmarks(staged)}); the binding location asks for at least ${LANDMARK_MINIMUM} — re-asking the Visual Bible with feedback`);
+        const retryPrompt = buildVisualBibleCallPrompt({ ...inputData, landmarkRetryNote: landmarkRetryNote(staged) }, briefBeats, {
+          jevBackup: !jevActive(jevReport), availableAvatars, maxCharactersPerScene, finalArc: approvedArc, clothingRequirements,
+        });
+        const second = await askBible(retryPrompt, 'landmark-retry');
+        const secondStaged = second ? stagedRealLandmarks(second.visualBible).length : null;
+        meta.landmarkRetry = { before: staged.length, after: secondStaged };
+        if (secondStaged !== null && secondStaged > staged.length) adBible = second;
       }
     }
   }
@@ -1957,11 +1982,6 @@ ${bibleBody}` : bibleBody;
       log.error(`🚨 [BEATS] Wardrobe-vs-bible check failed: ${err.message} — a contract/bible contradiction would ship unnoticed`);
     }
   }
-
-  // Deliberately OUTSIDE every try/catch above: a throw from the caller's hook
-  // must abort the run (the landmark-shortfall retry uses exactly that). Since
-  // the split it fires before any page brief is paid for.
-  if (onVisualBible && visualBible) await onVisualBible(visualBible);
 
   // ── The decided fields of every story page (Jev first) ───────────────────
   if (jevActive(jevReport)) try {
@@ -2229,14 +2249,6 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // at 1% "Starting story generation..." for the entire ~10-minute text
     // phase — heartbeat only bumps updated_at, never the visible bar.
     onStage = null,
-    // Fired once with the parsed Visual Bible the moment it exists (after the
-    // bible stage, before wardrobe review and the avatar kickoff). The caller
-    // may THROW from it to abort the run early — that is the landmark
-    // guideline's retry seam: aborting here costs arc+bible only, not the
-    // scene briefs and the full page-text phase (measured ~30min per attempt,
-    // of which the post-bible stages are ~20min). Not called when the bible
-    // stage failed (visualBible stays null — the run ships degraded by design).
-    onVisualBible = null,
   } = opts;
   const gl = genLog || NOOP_LOG;
   const onChunk = heartbeat ? () => heartbeat() : null;
@@ -3251,7 +3263,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   await checkCancellation();
   const ad = await runArtDirector({
     inputData, modelOverrides, clothingRequirements, visualBible, bibleSections, sceneModel, onChunk, gl, meta, stage,
-    beats, arcCentralFigure, approvedArc, onVisualBible, wardrobeBibleReport, jevReport,
+    beats, arcCentralFigure, approvedArc, wardrobeBibleReport, jevReport,
     // The gaze roster: the head count of the division that shipped — the same
     // `present` the shot assignment read (finalizePlanShots).
     present: presentOf(shippedCheck),

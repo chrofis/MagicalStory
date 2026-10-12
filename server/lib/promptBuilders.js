@@ -34,7 +34,7 @@ const { COVER_PAGE_NUMBERS } = require('./coverKeys');
 const { getPlausiblePhysical, FACIAL_HAIR_MIN_AGE } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
 const { frameColorForName } = require('./characterFrames');
-const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish, getNarrationTenseRule } = require('./languages');
+const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish, getNarrationTenseRule, getAddressRegisterRule } = require('./languages');
 const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE, normalisePopulation, POPULATION_LEVELS, splitBrief, METADATA_DELIMITER } = require('./sceneMetadata');
@@ -10588,8 +10588,9 @@ const STYLE_RULEBOOK = [
  * @returns {string}
  */
 function styleRulebook(language) {
-  const tense = getNarrationTenseRule(language || 'en');
-  return tense ? `${STYLE_RULEBOOK}\n- ${tense}` : STYLE_RULEBOOK;
+  // Tense and form of address (languages.js NARRATION_TENSE, ADDRESS_REGISTER).
+  const lines = [getNarrationTenseRule(language || 'en'), getAddressRegisterRule(language || 'en')].filter(Boolean);
+  return lines.length ? `${STYLE_RULEBOOK}\n${lines.map(l => `- ${l}`).join('\n')}` : STYLE_RULEBOOK;
 }
 
 /**

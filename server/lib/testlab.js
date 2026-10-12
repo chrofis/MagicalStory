@@ -4547,7 +4547,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       clothingRequirements: storyData.clothingRequirements || null, visualBible: null, bibleSections: null,
       sceneModel, onChunk: null, gl, meta, stage: async () => {}, beats: beatsIn,
       arcCentralFigure: Array.isArray(params.centralFigure) ? params.centralFigure : resolveReplayCentralFigure(storyData),
-      approvedArc: resolveReplayArc(storyData, { parseBeats }), onVisualBible: null, wardrobeBibleReport: null,
+      approvedArc: resolveReplayArc(storyData, { parseBeats }), wardrobeBibleReport: null,
       // The run's gaze roster: the shipped division's head count, as stored.
       present: resolveReplayPresent(storyData),
       labCallOptions: sceneCallOptions(params),

@@ -143,7 +143,7 @@ const LANGUAGES = {
     code: 'fr-ch',
     name: 'Français (Suisse)',
     nameEnglish: 'French (Switzerland)',
-    instruction: 'You MUST write your response in French. Use Swiss French vocabulary and expressions. CRITICAL RULES: (1) Use "septante" (70), "huitante" (80, in Vaud) or "quatre-vingts" (elsewhere), "nonante" (90). (2) Meal names: "déjeuner" (breakfast), "dîner" (lunch), "souper" (dinner). (3) Use Swiss vocabulary: "Natel" (not "portable"), "action" (special offer), "cornet" (plastic bag), "poutser" (to clean), "fourrer" (to put/stuff), "bancomat" (ATM), "course d\'école" (school trip), "régie" (property management). (4) More formal register, prefer "vous". (5) DIALOGUE TYPOGRAPHY — Swiss style, NOT French style: use guillemets «...» for direct speech with NO internal spaces (Swiss tight style), and NO em-dashes («— Bonjour») to OPEN a dialogue. Examples: «Bonjour!», not « Bonjour ! » (that\'s French style with spaces). Use a single em-dash only for speaker turns inside an already-open quoted block. NO space before !?:; that punctuation sits flush against the previous word. CORRECT: "septante", "nonante", "le souper", "le Natel", «Bonjour!», «As-tu vu Papa?», «—Oui, répond Idalia, je l\'ai vu.» | WRONG: "soixante-dix", "quatre-vingt-dix", "le dîner" for dinner, "le portable", « Bonjour ! » (spaces inside guillemets), — Bonjour ! (em-dash to open dialogue), "As-tu vu Papa ?" (space before ?).',
+    instruction: 'You MUST write your response in French. Use Swiss French vocabulary and expressions. CRITICAL RULES: (1) Use "septante" (70), "huitante" (80, in Vaud) or "quatre-vingts" (elsewhere), "nonante" (90). (2) Meal names: "déjeuner" (breakfast), "dîner" (lunch), "souper" (dinner). (3) Use Swiss vocabulary: "Natel" (not "portable"), "action" (special offer), "cornet" (plastic bag), "poutser" (to clean), "fourrer" (to put/stuff), "bancomat" (ATM), "course d\'école" (school trip), "régie" (property management). (4) DIALOGUE TYPOGRAPHY — Swiss style, NOT French style: use guillemets «...» for direct speech with NO internal spaces (Swiss tight style), and NO em-dashes («— Bonjour») to OPEN a dialogue. Examples: «Bonjour!», not « Bonjour ! » (that\'s French style with spaces). Use a single em-dash only for speaker turns inside an already-open quoted block. NO space before !?:; that punctuation sits flush against the previous word. CORRECT: "septante", "nonante", "le souper", "le Natel", «Bonjour!», «As-tu vu Papa?», «—Oui, répond Idalia, je l\'ai vu.» | WRONG: "soixante-dix", "quatre-vingt-dix", "le dîner" for dinner, "le portable", « Bonjour ! » (spaces inside guillemets), — Bonjour ! (em-dash to open dialogue), "As-tu vu Papa ?" (space before ?).',
     note: '(Swiss French: septante/nonante, «text» tight no spaces, NO em-dash dialogue opens. CORRECT: «Bonjour!», "le Natel" | WRONG: « Bonjour ! », — Bonjour!, "le portable")'
   },
 
@@ -176,7 +176,7 @@ const LANGUAGES = {
     code: 'fr-ch',
     name: 'Français (Suisse)',
     nameEnglish: 'French (Switzerland)',
-    instruction: 'You MUST write your response in French. Use Swiss French vocabulary and expressions. CRITICAL RULES: (1) Use "septante" (70), "huitante" (80, in Vaud) or "quatre-vingts" (elsewhere), "nonante" (90). (2) Meal names: "déjeuner" (breakfast), "dîner" (lunch), "souper" (dinner). (3) Use Swiss vocabulary: "Natel" (not "portable"), "action" (special offer), "cornet" (plastic bag), "poutser" (to clean), "fourrer" (to put/stuff), "bancomat" (ATM), "course d\'école" (school trip), "régie" (property management). (4) More formal register, prefer "vous". (5) DIALOGUE TYPOGRAPHY — Swiss style, NOT French style: use guillemets «...» for direct speech with NO internal spaces (Swiss tight style), and NO em-dashes («— Bonjour») to OPEN a dialogue. Examples: «Bonjour!», not « Bonjour ! » (that\'s French style with spaces). Use a single em-dash only for speaker turns inside an already-open quoted block. NO space before !?:; that punctuation sits flush against the previous word. CORRECT: "septante", "nonante", "le souper", "le Natel", «Bonjour!», «As-tu vu Papa?», «—Oui, répond Idalia, je l\'ai vu.» | WRONG: "soixante-dix", "quatre-vingt-dix", "le dîner" for dinner, "le portable", « Bonjour ! » (spaces inside guillemets), — Bonjour ! (em-dash to open dialogue), "As-tu vu Papa ?" (space before ?).',
+    instruction: 'You MUST write your response in French. Use Swiss French vocabulary and expressions. CRITICAL RULES: (1) Use "septante" (70), "huitante" (80, in Vaud) or "quatre-vingts" (elsewhere), "nonante" (90). (2) Meal names: "déjeuner" (breakfast), "dîner" (lunch), "souper" (dinner). (3) Use Swiss vocabulary: "Natel" (not "portable"), "action" (special offer), "cornet" (plastic bag), "poutser" (to clean), "fourrer" (to put/stuff), "bancomat" (ATM), "course d\'école" (school trip), "régie" (property management). (4) DIALOGUE TYPOGRAPHY — Swiss style, NOT French style: use guillemets «...» for direct speech with NO internal spaces (Swiss tight style), and NO em-dashes («— Bonjour») to OPEN a dialogue. Examples: «Bonjour!», not « Bonjour ! » (that\'s French style with spaces). Use a single em-dash only for speaker turns inside an already-open quoted block. NO space before !?:; that punctuation sits flush against the previous word. CORRECT: "septante", "nonante", "le souper", "le Natel", «Bonjour!», «As-tu vu Papa?», «—Oui, répond Idalia, je l\'ai vu.» | WRONG: "soixante-dix", "quatre-vingt-dix", "le dîner" for dinner, "le portable", « Bonjour ! » (spaces inside guillemets), — Bonjour ! (em-dash to open dialogue), "As-tu vu Papa ?" (space before ?).',
     note: '(Swiss French: septante/nonante, «text» tight no spaces, NO em-dash dialogue opens. CORRECT: «Bonjour!», "le Natel" | WRONG: « Bonjour ! », — Bonjour!, "le portable")'
   },
 
@@ -549,9 +549,36 @@ function getNarrationTenseRule(langCode) {
   return NARRATION_TENSE[key.split('-')[0]] || '';
 }
 
+/**
+ * FORM OF ADDRESS IN STORY DIALOGUE per language family (owner, 2026-10-12,
+ * failed showcase job_1791748539342_ikyl88w1h: a 4-year-old said "C'est pour
+ * vous, Grand-Papa" and a son said "vous" to his father, because the fr-ch
+ * instruction told the writer "prefer vous" - a register rule for the UI, not
+ * for how a family talks). ONE map beside NARRATION_TENSE; the STYLE_RULEBOOK
+ * lines are built from it, so the writer, the trial pages writer, the text
+ * refine, the proofread, the diff pass and the blind audit read the same sentence.
+ * A family with no entry gets no address line.
+ */
+const ADDRESS_REGISTER = {
+  fr: 'In dialogue, a character who speaks to ONE family member, friend or child says "tu" (a child to a grandparent, a son to his father, a friend to a friend); "vous" is only for several people at once, for a stranger, or between adults who address each other formally.',
+  de: 'In dialogue, a character who speaks to ONE family member, friend or child says "du" (a child to a grandparent, a son to his father, a friend to a friend); "ihr" is for several people at once and "Sie" only for a stranger or between adults who address each other formally.',
+  it: 'In dialogue, a character who speaks to ONE family member, friend or child says "tu" (a child to a grandparent, a son to his father, a friend to a friend); "voi" is for several people at once and "Lei" only for a stranger or between adults who address each other formally.'
+};
+
+/**
+ * @param {string} langCode
+ * @returns {string} the form-of-address rule for the language's family, or '' when none is set
+ */
+function getAddressRegisterRule(langCode) {
+  const code = String(langCode || '').toLowerCase();
+  const key = LANGUAGES[code] ? code : 'en';
+  return ADDRESS_REGISTER[key.split('-')[0]] || '';
+}
+
 module.exports = {
   LANGUAGES,
   getNarrationTenseRule,
+  getAddressRegisterRule,
   getLanguageInstruction,
   stripDialogueTypography,
   stripVocabulary,

@@ -93,6 +93,7 @@ const {
 const { UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const { checkSceneConsistency, formatSceneConsistencySummary } = require('./server/lib/sceneConsistencyCheck');
 const { generateStoryViaBeats, resolvePipelineMode } = require('./server/lib/beatsPipeline');
+const { LANDMARK_MINIMUM, landmarkGuidelineActive, stagedRealLandmarks, describeStagedLandmarks } = require('./server/lib/landmarkGuideline');
 const { createJobHeartbeat, startJobHeartbeat } = require('./server/lib/jobHeartbeat');
 const { newTokenUsage, recordCall, ledgerTotal } = require('./server/lib/costLedger');
 const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require('./server/lib/generationLogger');
@@ -2731,19 +2732,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // beatsResult carries the parsed pages + already-expanded scenes when the
     // beats pipeline ran; null on the unified path.
     let beatsResult = null;
-    // One writer invocation via the beats pipeline. Also the retry unit for the
-    // hard landmark minimum below: a re-run repeats the paid text stages, so it
-    // runs at most twice per job. Safe to call again — onClothingRequirementsReady
-    // is idempotent (see its declaration), so avatars never double-start.
-    const runBeatsWriter = async (writerOpts = {}) => {
+    // The beats writer (arc -> plan -> bible -> briefs -> page text).
+    const runBeatsWriter = async () => {
       beatsResult = await generateStoryViaBeats(inputData, {
         jobId,
         genLog,
         checkCancellation,
-        // Landmark guideline seam: attempt 1 passes a hook that aborts at the
-        // bible stage on a shortfall, so the retry never burns the scene-brief
-        // and page-text stages (see the landmark check below).
-        onVisualBible: writerOpts.onVisualBible || null,
         pageCount: sceneCount,
         modelOverrides,
         heartbeat: unifiedHeartbeat,
@@ -2774,62 +2768,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       unifiedUsage = { input_tokens: 0, output_tokens: 0 };
     };
 
-    // ── Landmark guideline (owner rulings 2026-09-04 / 2026-09-05) ──
-    // When the reader's location is the BINDING setting (premiseNamedWorld=false)
-    // and real landmarks were offered, the story should build in at least two of
-    // them. Two is a strong guideline, NOT an iron rule: a shortfall retries the
-    // writer ONCE with the failure fed back into the landmark section of its
-    // prompts (a blind retry made the same choice again — dragon run
-    // job_1788599801317_644e65uob staged 1 twice); a second shortfall SHIPS the
-    // story with a loud warn and `landmarkMinimumShortfall` on the story data,
-    // never fails the job. The attempt-1 check runs at the bible stage via
-    // onVisualBible — the staging is fully knowable there (beats order:
-    // arc → beats → bible → briefs → page text), so aborting saves the
-    // scene-brief and page-text stages (~20 of ~30 min per attempt).
-    // Beats mode only: the streaming path (trials) launches scene expansions
-    // mid-stream, so a post-hoc rewrite could not retract them.
+    // Landmark guideline (>= 2 staged real landmarks): enforced INSIDE the beats
+    // pipeline at the Visual Bible call, which re-asks only that call once
+    // (server/lib/landmarkGuideline.js; decisions.md "Landmark retry re-asks only the Visual Bible").
     let landmarkMinimumShortfall = null;
-    const stagedRealLandmarks = (vb) =>
-      ((vb || {}).locations || []).filter(l => l.isRealLandmark && (l.appearsInPages || []).length > 0);
-    const describeStaged = (staged) => staged.length
-      ? staged.map(l => `"${l.landmarkQuery || l.name}"`).join(', ')
-      : 'none';
-    const runBeatsWriterWithLandmarkGuideline = async () => {
-      const guidelineActive = inputData.premiseNamedWorld === false && (inputData.availableLandmarks?.length || 0) > 0;
-      if (!guidelineActive) { await runBeatsWriter(); return; }
-      const offeredNames = inputData.availableLandmarks.map(l => l.name);
-      class LandmarkShortfallAbort extends Error {}
-      try {
-        await runBeatsWriter({
-          onVisualBible: async (vb) => {
-            const staged = stagedRealLandmarks(vb);
-            if (staged.length < 2) {
-              const e = new LandmarkShortfallAbort(`staged ${staged.length}`);
-              e.staged = staged;
-              throw e;
-            }
-          },
-        });
-        return;
-      } catch (err) {
-        if (!(err instanceof LandmarkShortfallAbort)) throw err;
-        const staged = err.staged || [];
-        log.error(`🚨 [LANDMARK-MIN] Binding location offered ${offeredNames.length} landmark(s) but the bible staged only ${staged.length} (${describeStaged(staged)}; offered e.g. ${offeredNames.slice(0, 5).join(', ')}) — retrying the writer once with feedback`);
-        genLog.warn('landmark_minimum', `Story staged ${staged.length} real landmark(s) (${describeStaged(staged)}); the binding location asks for at least 2 — retrying the writer with feedback`);
-      }
-      await checkCancellation();
-      // Generic wording only — rides into the REAL LANDMARKS section of the
-      // arc/beats/bible prompts via buildAvailableLandmarksSection.
-      inputData.landmarkRetryNote = 'A previous attempt staged too few real landmarks from this list. Stage at least two, woven into the story\'s action.';
-      try {
-        await runBeatsWriter();  // no early abort: strike two ships
-      } finally {
-        delete inputData.landmarkRetryNote;
-      }
-    };
     try {
     if (beatsMode) {
-      await runBeatsWriterWithLandmarkGuideline();
+      await runBeatsWriter();
     } else {
       // Trial only (resolvePipelineMode returns 'unified' for trialMode alone).
       if (!inputData.trialMode) throw new Error('No writer: a non-trial job reached the trial writer branch');
@@ -2874,15 +2819,15 @@ ${trialWriter.pagesPrompt}`;
     // staged and offered landmarks, and stamps `landmarkMinimumShortfall` on
     // the story data so the shortfall is visible in rating. Read it with
     // `scripts/analysis/shipped-defects.js`.
-    if (beatsMode && inputData.premiseNamedWorld === false && (inputData.availableLandmarks?.length || 0) > 0) {
+    if (beatsMode && landmarkGuidelineActive(inputData)) {
       const staged = stagedRealLandmarks(new UnifiedStoryParser(unifiedResponse).extractVisualBible());
-      if (staged.length >= 2) {
-        log.info(`✅ [LANDMARK-MIN] Story staged ${staged.length} real landmark(s): ${describeStaged(staged)}`);
+      if (staged.length >= LANDMARK_MINIMUM) {
+        log.info(`✅ [LANDMARK-MIN] Story staged ${staged.length} real landmark(s): ${describeStagedLandmarks(staged)}`);
       } else {
         landmarkMinimumShortfall = staged.length;
         const offeredNames = inputData.availableLandmarks.map(l => l.name);
-        log.warn(`⚠️ [LANDMARK-MIN] Story ships BELOW the landmark guideline: staged ${staged.length} (${describeStaged(staged)}) of minimum 2; offered ${offeredNames.length} (e.g. ${offeredNames.slice(0, 5).join(', ')})`);
-        genLog.warn('landmark_minimum_shortfall', `Story ships with ${staged.length} real landmark(s) (${describeStaged(staged)}) — below the guideline of 2 after one fed-back writer retry`);
+        log.warn(`⚠️ [LANDMARK-MIN] Story ships BELOW the landmark guideline: staged ${staged.length} (${describeStagedLandmarks(staged)}) of minimum ${LANDMARK_MINIMUM}; offered ${offeredNames.length} (e.g. ${offeredNames.slice(0, 5).join(', ')})`);
+        genLog.warn('landmark_minimum_shortfall', `Story ships with ${staged.length} real landmark(s) (${describeStagedLandmarks(staged)}) — below the guideline of ${LANDMARK_MINIMUM} after one fed-back Visual Bible re-ask`);
       }
     }
 
