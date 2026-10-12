@@ -128,9 +128,10 @@ describe('(B) every child acts — the arc create and re-tell principles, produc
   const committed = '1. An arc.';
   const opts = { challengeIdeas: '# CHALLENGE IDEAS\n- one' };
 
-  it('carries the rule once, in create and in re-tell, with no switch to turn it off', () => {
-    expect(count(PB.buildArcCreatePrompt(input(), 12, opts), PB.EVERY_CHILD_ACTS_RULE)).toBe(1);
-    expect(count(PB.buildArcRetellPrompt(input(), 12, committed, '1. fix', opts), PB.EVERY_CHILD_ACTS_RULE)).toBe(1);
+  // Twice since 2026-10-12: once as the principle the arc is written to, once as a rule its own critique checks (C1).
+  it('carries the rule as a principle and as a critique check, in create and in re-tell, with no switch to turn it off', () => {
+    expect(count(PB.buildArcCreatePrompt(input(), 12, opts), PB.EVERY_CHILD_ACTS_RULE)).toBe(2);
+    expect(count(PB.buildArcRetellPrompt(input(), 12, committed, '1. fix', opts), PB.EVERY_CHILD_ACTS_RULE)).toBe(2);
     // The Lab-only switch is gone: passing it changes nothing.
     expect(PB.buildArcCreatePrompt(input(), 12, { ...opts, everyChildActs: false })).toBe(PB.buildArcCreatePrompt(input(), 12, opts));
   });

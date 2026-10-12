@@ -258,6 +258,15 @@ function castActionRule(cov, { centralFigure = null, mayAddDeeds = false } = {})
  */
 const LEAD_RULE = 'A page leads with one character: two characters never share a focal page.';
 
+/**
+ * A cast-out the review refused because the character sits at the page floor
+ * leaves that character on the page (planCounters.reviewPlanChanges, rule
+ * `span`). Told to the next re-plan round so the character does not stay as an
+ * onlooker (owner, 2026-10-12): a share of the action, never a place in frame
+ * alone. Generic wording.
+ */
+const FLOOR_REFUSED_ONLOOKER_RULE = 'A character who stays on a page because the page floor refused their removal takes a share of that page\'s action — a movement or a deed of their own inside the instant — and is never left in frame only to watch.';
+
 /** The Lab A/B sentence of castActionRule (`mayAddDeeds`). */
 const ADDED_DEED_RULE = 'A commissioned character the story gives no action of their own may be given one small action inside an existing event — one that serves that event and changes nothing in the plot, the order of events or the outcome.';
 
@@ -328,8 +337,8 @@ function noFocalFix(name) {
  * @param {Object} inputData  the job input (its `characters` list)
  * @param {string[]} [suppliedNames]  the arc's (commissioned)-tagged figure names
  *   children  the listed names the every-child-acts rule is about: a listed
- *             adult may comfort, permit or watch, so the cast-beat check
- *             (jevAudit.jevCastBeatVoice) asks only these to act. A character
+ *             adult's own act is judged by the arc critics (EVERY_CHILD_ACTS_RULE),
+ *             so the cast-beat check (jevAudit.jevCastBeatVoice) asks only these. A character
  *             with no readable age counts as a child.
  * @returns {{listed:string[], children:string[], supplied:string[], all:string[]}}
  */
@@ -419,6 +428,36 @@ function castTableFormat(cov, pageCount, { replan = false } = {}) {
 }
 
 /**
+ * The "also on" pages the table gives to a character although they are ANOTHER
+ * character's deed page (castTableSpec: "a character's deed page is never
+ * another character's 'also on' page"). Read off the parsed table, never off
+ * prose: { name, page, lead } per offence, the first claimant of a deed page
+ * being its lead. Only meaningful where the lead rule holds (cov.leadEach).
+ *
+ * REJECTED AT THE PARSE (owner, 2026-10-12: "the plan keeps its own spec").
+ * Measured on 12 stored lead-rule tables: 9 broke the rule (docs/decisions.md
+ * 2026-10-12). The counter used to set such a promise aside silently
+ * (planCounters castTablePromises, `leadWins`), but the re-plan and the plan
+ * check were still SHOWN it as a promise the plan lines must keep, and on
+ * job_1791315635053_t0t8qpebu a page held four figures to keep one. The parse
+ * now refuses the promise: the page leaves that character's "also on" list and
+ * the block both later stages read, and the offence is returned in `rejected`
+ * for the loud log. No extra model call.
+ */
+function alsoOnConflicts(characters) {
+  const lead = new Map();
+  for (const c of characters) if (!lead.has(Number(c.deedPage))) lead.set(Number(c.deedPage), c.name);
+  const out = [];
+  for (const c of characters) {
+    for (const p of c.alsoOn || []) {
+      const owner = lead.get(Number(p));
+      if (owner && owner !== c.name) out.push({ name: c.name, page: Number(p), lead: owner });
+    }
+  }
+  return out;
+}
+
+/**
  * The CAST block out of a planner reply. FAILS LOUDLY — no silent default: a
  * reply without the block, without the ending line, or without a line for a
  * character on the list throws, and the caller records the error.
@@ -432,18 +471,21 @@ function castTableFormat(cov, pageCount, { replan = false } = {}) {
  * @returns {{ raw: string, characters: Array<{name:string, deedPage:number, deed:string, alsoOn:number[]}>,
  *   ending: {page:number, names:string[]}, extra: string[] }}
  */
-function parsePlanCastBlock(raw, { listed = [] } = {}) {
+function parsePlanCastBlock(raw, { listed = [], leadEach = false } = {}) {
   const full = String(raw || '');
   const m = full.match(/---\s*CAST\s*---([\s\S]*?)(?=\n\s*---\s*[A-Z][A-Z ]*---|$)/i);
   if (!m) throw new Error('the planner wrote no ---CAST--- block');
   const block = m[1].trim();
   const characters = [];
   const extra = [];
+  const outLines = [];      // the block's lines as written, in order (a line with a rejected page is rewritten below)
+  const lineOfEntry = new Map();
   let ending = null;
   const byLower = new Map(listed.map(n => [String(n).trim().toLowerCase(), n]));
   for (const rawLine of block.split('\n')) {
     const line = rawLine.replace(/\*\*/g, '').replace(/^\s*[-*•]\s*/, '').trim();
     if (!line) continue;
+    outLines.push(rawLine.trim());
     const end = line.match(/^ending\s+page\s+(\d+)\s*:\s*(.+)$/i);
     if (end) {
       const names = end[2].split(/\s*,\s*|\s+and\s+|\s*&\s*/i).map(s => s.trim()).filter(Boolean);
@@ -462,12 +504,25 @@ function parsePlanCastBlock(raw, { listed = [] } = {}) {
     const name = deed[1].trim();
     const known = byLower.get(name.toLowerCase());
     if (!known) { extra.push(name); continue; }
-    characters.push({ name: known, deedPage: Number(deed[2]), deed: rest.trim(), alsoOn });
+    const entry = { name: known, deedPage: Number(deed[2]), deed: rest.trim(), alsoOn };
+    characters.push(entry);
+    lineOfEntry.set(entry, outLines.length - 1);
   }
   if (!ending) throw new Error('the CAST block has no "Ending page" line');
   const missing = listed.filter(n => !characters.some(c => c.name === n));
   if (missing.length) throw new Error(`the CAST block has no line for ${missing.join(', ')}`);
-  return { raw: block, characters, ending, extra };
+  // The lead rule's offences leave the table (alsoOnConflicts); the block later stages read is rewritten to match.
+  const rejected = leadEach ? alsoOnConflicts(characters) : [];
+  for (const c of characters) {
+    const gone = new Set(rejected.filter(r => r.name === c.name).map(r => r.page));
+    if (!gone.size) continue;
+    c.alsoOn = c.alsoOn.filter(p => !gone.has(Number(p)));
+    const at = lineOfEntry.get(c);
+    const written = outLines[at];
+    const alsoAt = written.search(/\s+[—–-]+\s+also\s+on\s+pages?\b/i);
+    outLines[at] = (alsoAt >= 0 ? written.slice(0, alsoAt) : written) + (c.alsoOn.length ? ` — also on pages ${c.alsoOn.join(', ')}` : '');
+  }
+  return { raw: rejected.length ? outLines.join('\n') : block, characters, ending, extra, rejected };
 }
 
 /**
@@ -486,6 +541,8 @@ module.exports = {
   castTableFormat,
   castTableBlock,
   parsePlanCastBlock,
+  alsoOnConflicts,
+  FLOOR_REFUSED_ONLOOKER_RULE,
   commissionedCast,
   castCoverage,
   typedPlanTargets,

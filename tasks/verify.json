@@ -10103,6 +10103,21 @@
         "result": "NOT COVERED",
         "note": "trial: not a trial run"
       }
+    },
+    {
+      "id": "cast-landmarks-arc-critic-2026-10-12",
+      "commits": [],
+      "addedAt": "2026-10-12",
+      "claim": "On a full story with a binding location and offered landmarks, the arc writes a typed 'Landmarks staged:' block that resolves against the offered list, the plan check asks question 19, the shipped count (story pages only, backdrops included) is logged, and no Visual Bible landmark retry runs; the arc panel files a CAST finding for a listed figure with no act of their own or a want the ending never answers.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In the story's generationLog find arc_landmarks_* events and arcReviewReport.landmarks (final names all on the offered list, no arc_landmarks_unlisted error), plan_check prompt contains question 19, [LANDMARK-MIN] counts story pages only (no beats_visual_bible_landmark retry, no second beats_visual_bible_* call), and read the arc panel issues for a CAST lens line where a listed figure only watches."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

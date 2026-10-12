@@ -80,12 +80,12 @@ describe('the plan check and the planner', () => {
     ]);
   });
 
-  it('bloat: a divider gets only the landmarks the arc names, without the author block', () => {
+  it('bloat: a divider gets only the landmarks the arc staged (its typed list), without the author block', () => {
     const lms = [
       { name: 'Old Square (Town)', type: 'Square', wikipediaExtract: 'A long description.', photoVariants: [{ kind: 'medium', description: 'the square' }] },
       { name: 'Far Tower', type: 'Tower', wikipediaExtract: 'Another.' },
     ];
-    const prompt = PB.buildBeatsPrompt({ ...inputData, availableLandmarks: lms }, 18, { finalArc: '1. They cross the Old Square.\n2. b\n3. c' });
+    const prompt = PB.buildBeatsPrompt({ ...inputData, availableLandmarks: lms, landmarksStaged: ['Old Square (Town)'] }, 18, { finalArc: '1. They cross the Old Square.\n2. b\n3. c' });
     expect(prompt).toContain('Old Square (Town)');
     expect(prompt).not.toContain('Far Tower');
     expect(prompt).not.toContain('A long description.');

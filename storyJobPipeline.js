@@ -93,7 +93,7 @@ const {
 const { UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const { checkSceneConsistency, formatSceneConsistencySummary } = require('./server/lib/sceneConsistencyCheck');
 const { generateStoryViaBeats, resolvePipelineMode } = require('./server/lib/beatsPipeline');
-const { LANDMARK_MINIMUM, landmarkGuidelineActive, stagedRealLandmarks, describeStagedLandmarks } = require('./server/lib/landmarkGuideline');
+const { landmarkGuidelineActive, landmarkRequirement, offeredLandmarkNames, stagedLandmarks, describeStagedLandmarks } = require('./server/lib/landmarkGuideline');
 const { createJobHeartbeat, startJobHeartbeat } = require('./server/lib/jobHeartbeat');
 const { newTokenUsage, recordCall, ledgerTotal } = require('./server/lib/costLedger');
 const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require('./server/lib/generationLogger');
@@ -2812,22 +2812,25 @@ ${trialWriter.pagesPrompt}`;
     log.debug(`⏱️ [UNIFIED] Story generation: ${((timing.storyGenEnd - timing.storyGenStart) / 1000).toFixed(1)}s`);
 
     // ── Landmark guideline: final count on the shipped transcript ──
-    // Counts VB locations with isRealLandmark and a non-empty page list (the
-    // parser already drops real-landmark entries staged on no page). A
-    // shortfall here NEVER fails the job (owner ruling 2026-09-05: "2 is a
-    // strong guideline, not an iron rule") — it warns loudly, naming the
-    // staged and offered landmarks, and stamps `landmarkMinimumShortfall` on
-    // the story data so the shortfall is visible in rating. Read it with
-    // `scripts/analysis/shipped-defects.js`.
+    // Counts the landmarks the Visual Bible stages on a STORY page (pages > 0): a
+    // real-landmark location, or a `backdropLandmarks` row naming an offered
+    // landmark. A place only a cover uses no longer counts (owner, 2026-10-12;
+    // landmarkGuideline.stagedLandmarks). A shortfall here NEVER fails the job
+    // (owner ruling 2026-09-05: "2 is a strong guideline, not an iron rule") — the
+    // arc's repair loop and plan check 19 are where it is pursued; here it warns
+    // loudly, naming the staged and offered landmarks, and stamps
+    // `landmarkMinimumShortfall` on the story data so the shortfall is visible in
+    // rating. Read it with `scripts/analysis/shipped-defects.js`.
     if (beatsMode && landmarkGuidelineActive(inputData)) {
-      const staged = stagedRealLandmarks(new UnifiedStoryParser(unifiedResponse).extractVisualBible());
-      if (staged.length >= LANDMARK_MINIMUM) {
-        log.info(`✅ [LANDMARK-MIN] Story staged ${staged.length} real landmark(s): ${describeStagedLandmarks(staged)}`);
+      const staged = stagedLandmarks(new UnifiedStoryParser(unifiedResponse).extractVisualBible(), inputData.availableLandmarks);
+      const need = landmarkRequirement(inputData);
+      if (staged.length >= need) {
+        log.info(`✅ [LANDMARK-MIN] Story staged ${staged.length} real landmark(s) on story pages: ${describeStagedLandmarks(staged)}`);
       } else {
         landmarkMinimumShortfall = staged.length;
-        const offeredNames = inputData.availableLandmarks.map(l => l.name);
-        log.warn(`⚠️ [LANDMARK-MIN] Story ships BELOW the landmark guideline: staged ${staged.length} (${describeStagedLandmarks(staged)}) of minimum ${LANDMARK_MINIMUM}; offered ${offeredNames.length} (e.g. ${offeredNames.slice(0, 5).join(', ')})`);
-        genLog.warn('landmark_minimum_shortfall', `Story ships with ${staged.length} real landmark(s) (${describeStagedLandmarks(staged)}) — below the guideline of ${LANDMARK_MINIMUM} after one fed-back Visual Bible re-ask`);
+        const offeredNames = offeredLandmarkNames(inputData);
+        log.warn(`⚠️ [LANDMARK-MIN] Story ships BELOW the landmark guideline: staged ${staged.length} (${describeStagedLandmarks(staged)}) of minimum ${need}; offered ${offeredNames.length} (e.g. ${offeredNames.slice(0, 5).join(', ')})`);
+        genLog.warn('landmark_minimum_shortfall', `Story ships with ${staged.length} real landmark(s) on story pages (${describeStagedLandmarks(staged)}) — below the guideline of ${need}`);
       }
     }
 
@@ -6807,6 +6810,8 @@ ${trialWriter.pagesPrompt}`;
       // .resolveReplayInputData, never as a top-level input of a later path.
       replayInputs: {
         availableLandmarks: require('./server/lib/beatsReplayInputs').landmarksForReplay(inputData.availableLandmarks),
+        // The names the arc staged ("Landmarks staged:"): the divider, plan check and Art Director read them.
+        landmarksStaged: inputData.landmarksStaged || null,
         modelOverrides: modelOverrides || null,
       },
       beatsReviewReport, // per-page before/after from the beats review (beats mode)

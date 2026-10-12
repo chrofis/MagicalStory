@@ -11,7 +11,7 @@ const { salvageReplanRound } = require('./replanSalvage');
 // so a replay or a test can load them without the pipeline's provider graph.
 const { decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf } = require('./jevBriefFields');
 const { JevDecisionError } = jevDecisions;
-const { LANDMARK_MINIMUM, landmarkGuidelineActive, stagedRealLandmarks, describeStagedLandmarks, landmarkRetryNote } = require('./landmarkGuideline');
+const { landmarkGuidelineActive, offeredLandmarkNames, parseLandmarksStaged, landmarkShortfallFinding } = require('./landmarkGuideline');
 const jevPlanCheck = require('./jevPlanCheck');
 const jevSelection = require('./jevSelection');
 const { lookupByName } = require('./castResolver');
@@ -119,6 +119,7 @@ const {
   arcShapeCounts,
   critiqueMaxSeverity,
   buildPlanCheckPrompt,
+  landmarksStagedBlock,
   parsePlanCheck,
   parsePlanCheckRoster,
   parsePlanCheckObstacles,
@@ -1844,26 +1845,9 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
     };
     for (let attempt = 1; attempt <= 2 && !adBible; attempt++) adBible = await askBible(vbPrompt, attempt);
 
-    // Landmark guideline: two real landmarks staged is a strong guideline. A
-    // shortfall re-asks THIS call once with the shortfall fed back; arc, plan and
-    // wardrobe stay (decisions.md "Landmark retry re-asks only the Visual Bible").
-    // The second answer replaces the first only if it stages more; the story is
-    // never failed on landmark count.
-    if (adBible && landmarkGuidelineActive(inputData)) {
-      const staged = stagedRealLandmarks(adBible.visualBible);
-      if (staged.length < LANDMARK_MINIMUM) {
-        const offered = inputData.availableLandmarks.map(l => l.name);
-        log.error(`🚨 [LANDMARK-MIN] Binding location offered ${offered.length} landmark(s) but the bible staged only ${staged.length} (${describeStagedLandmarks(staged)}; offered e.g. ${offered.slice(0, 5).join(', ')}) — re-asking the Visual Bible once with feedback`);
-        gl.warn('landmark_minimum', `Bible staged ${staged.length} real landmark(s) (${describeStagedLandmarks(staged)}); the binding location asks for at least ${LANDMARK_MINIMUM} — re-asking the Visual Bible with feedback`);
-        const retryPrompt = buildVisualBibleCallPrompt({ ...inputData, landmarkRetryNote: landmarkRetryNote(staged) }, briefBeats, {
-          jevBackup: !jevActive(jevReport), availableAvatars, maxCharactersPerScene, finalArc: approvedArc, clothingRequirements,
-        });
-        const second = await askBible(retryPrompt, 'landmark-retry');
-        const secondStaged = second ? stagedRealLandmarks(second.visualBible).length : null;
-        meta.landmarkRetry = { before: staged.length, after: secondStaged };
-        if (secondStaged !== null && secondStaged > staged.length) adBible = second;
-      }
-    }
+    // The landmark guideline is held by the arc and the plan now ("Landmarks staged:",
+    // plan check 19); this call is asked once, with no landmark retry (decisions.md
+    // 2026-10-12 "Landmarks are staged by the arc", replacing "Landmark retry re-asks only the Visual Bible").
   }
   const vbMs = Date.now() - t;
 
@@ -2399,6 +2383,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // The machine's full trail. Kept under the arcReviewReport key so the
   // storyJobPipeline persistence and the dev-mode wiring stay untouched.
   let arcReviewReport = null;
+  // The landmarks the arc staged ("Landmarks staged:", resolved against the offered list):
+  // the typed list the divider, the plan check and the Art Director read. null = no arc.
+  let arcLandmarksStaged = null;
+  let arcLandmarksReport = null;
   // CROSS-STORY MEMORY: the challenges this account's previous books used. Only
   // the arc-plan call sees them — that is the one call that invents challenges;
   // every later stage divides and dresses what this one decided.
@@ -2448,6 +2436,23 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // its own critique as the known weak points.
     approvedArc = commit.arc;
     arcWeakPoints = commit.critique;
+    // THE TYPED LANDMARK ANSWER (owner, 2026-10-12): resolved against the OFFERED list by
+    // name; code counts it, never the arc's prose. A missing block or a line naming
+    // nothing on the list is said loudly and counts as not staged.
+    const offeredLandmarks = inputData.availableLandmarks || [];
+    const readLandmarks = (label, round, lines) => {
+      if (!offeredLandmarks.length) return { present: true, names: [], unlisted: [] };
+      const r = parseLandmarksStaged(lines, offeredLandmarks);
+      if (!r.present) {
+        gl.error('arc_landmarks_block_missing', `${label}: ${offeredLandmarks.length} landmark(s) were offered and the reply holds no "Landmarks staged:" block — counted as none staged`, null, { round });
+      }
+      if (r.unlisted.length) {
+        gl.error('arc_landmarks_unlisted', `${label}: "Landmarks staged:" names ${r.unlisted.length} place(s) that are not on the offered list (${r.unlisted.join('; ')}) — not counted`, null, { round, unlisted: r.unlisted });
+      }
+      return r;
+    };
+    let currentLandmarks = readLandmarks('arc create', 0, commit.landmarkLines);
+    const landmarkTrail = [{ round: 0, names: currentLandmarks.names, present: currentLandmarks.present, unlisted: currentLandmarks.unlisted }];
 
     // PANEL + RE-TELL rounds. Round k>1 feeds the previous FINAL ARC + its
     // critique back to the same panel, then the same creator re-tells again.
@@ -2544,9 +2549,14 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // + the Jev cast check (owner, 2026-09-27): a character on the list with no
       // act of their own is FEEDBACK for this round's re-telling if the gate opens
       // on its own findings; it never opens the gate.
+      // + the landmark count (owner, 2026-10-12): fewer staged landmarks than the guideline
+      // asks is a finding code made; it opens the gate like a quoted MAJOR.
+      const landmarkFinding = landmarkShortfallFinding(currentLandmarks.names, inputData);
       const { gate, jevCast } = await arcRepairFindingsWithCastCheck({
         critique: roundCritique, reviewedArc: arcBlock, panel, castNames: commissionedCast(inputData).children,
+        codeFindings: landmarkFinding ? [landmarkFinding] : [],
       }, { jevFallback: jevReport.fallback });
+      if (landmarkFinding) gl.info('arc_landmarks_shortfall', `Round ${round}: the arc stages ${currentLandmarks.names.length} landmark(s) (${currentLandmarks.names.join(', ') || 'none'}) against the guideline; handed to the re-telling`, null, { round, staged: currentLandmarks.names });
       if (jevCast?.weak.length) {
         gl.info('arc_jev_cast', `Round ${round}: Jev cast check — ${jevCast.weak.map(w => `${w.name} ${w.score}`).join(', ')} with no act of their own; ${jevCast.delivered === 'retell' ? 'handed to the re-telling as feedback' : 'recorded only (the gate stayed shut)'}`, null, { round, ...jevCast });
       } else if (jevCast?.skipped) {
@@ -2598,6 +2608,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       }
       approvedArc = retold.finalArc;
       currentLogic = retold.logic;
+      currentLandmarks = readLandmarks(`arc re-tell round ${round}`, round, retold.landmarkLines);
+      landmarkTrail.push({ round, names: currentLandmarks.names, present: currentLandmarks.present, unlisted: currentLandmarks.unlisted });
       const retellCounts = arcShapeCounts({ sentences: retold.sentences, logic: retold.logic, inputData, pageCount });
       countsTrail.push({ round, ...retellCounts });
       logArcCounts(`arc re-tell round ${round}`, round, retellCounts);
@@ -2697,7 +2709,17 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         break;
       }
       prevCritique = retold.critique;
-      currentBlock = `STORY LOGIC:\n${retold.logic.text}\n\nFINAL ARC:\n${retold.finalArc}\n\nCRITIQUE:\n${retold.critique}`;
+      currentBlock = `STORY LOGIC:\n${retold.logic.text}\n\n${landmarksStagedBlock(retold.landmarkLines)}FINAL ARC:\n${retold.finalArc}\n\nCRITIQUE:\n${retold.critique}`;
+    }
+
+    // What the shipped arc stages: the list every later stage reads. A shortfall that
+    // survived the repair loop ships (the 2026-09-05 ruling: a guideline, never a gate).
+    arcLandmarksStaged = currentLandmarks.names;
+    arcLandmarksReport = { offered: offeredLandmarkNames(inputData), final: currentLandmarks.names, unlisted: currentLandmarks.unlisted, present: currentLandmarks.present, trail: landmarkTrail };
+    const arcShortfall = landmarkShortfallFinding(arcLandmarksStaged, inputData);
+    if (arcShortfall) {
+      log.warn(`⚠️ [LANDMARK-MIN] The shipped arc stages ${arcLandmarksStaged.length} landmark(s) (${arcLandmarksStaged.join(', ') || 'none'}) of ${offeredLandmarkNames(inputData).length} offered — below the guideline after the arc's repair loop`);
+      gl.warn('arc_landmarks_below_guideline', `The shipped arc stages ${arcLandmarksStaged.length} landmark(s) (${arcLandmarksStaged.join(', ') || 'none'}), below the guideline; the plan and the bible work from what it stages`, null, { staged: arcLandmarksStaged });
     }
 
     // GROK HINT PASS (owner verdict 2026-09-01, lean flow): one outside look
@@ -2765,6 +2787,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       logic: currentLogic.text,
       createLogic: commit.logic.text,
       centralFigure: arcCentralFigure,
+      // The typed "Landmarks staged:" answer, per round, against the offered list.
+      landmarks: arcLandmarksReport,
       // The code counts per round (round 0 = the create): sentences, chain
       // links and (new) figures against their ranges (D4: logged only).
       counts: countsTrail,
@@ -2814,7 +2838,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     arcPremiseNames = [];
     challengeTakenIds = [];
     challengeTakenTagged = 0;
+    arcLandmarksStaged = null;
+    arcLandmarksReport = null;
   }
+  // The typed list for every later prompt (divider, plan check, Art Director). null = no arc.
+  inputData.landmarksStaged = arcLandmarksStaged;
 
   // ── Step 1: beats plan ────────────────────────────────────────────────────
   await checkCancellation();
@@ -2871,7 +2899,15 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   let castTableError = null;
   if ((inputData?.characters || []).some(c => c && c.name)) {
     try {
-      castTable = parsePlanCastBlock(plannerReply, { listed: commissionedCast(inputData).listed });
+      // THE CAST BLOCK KEEPS ITS OWN SPEC (owner, 2026-10-12): an "also on" page that is another
+      // character's deed page is refused at the parse (castCoverage.alsoOnConflicts) — it leaves the
+      // block the check and the re-plan are shown. No second planner call: 9 of 12 stored lead-rule
+      // tables broke the rule (decisions.md 2026-10-12), so a re-ask would be paid for on most books.
+      const castCov = castCoverage({ pageCount, castCount: (inputData.characters || []).filter(c => c && c.name).length });
+      castTable = parsePlanCastBlock(plannerReply, { listed: commissionedCast(inputData).listed, leadEach: !!(castCov && castCov.leadEach) });
+      if (castTable.rejected.length) {
+        gl.warn('beats_cast_table_also_on_rejected', `The planner's CAST block gave ${castTable.rejected.map(c => `${c.name} page ${c.page} (${c.lead}'s deed page)`).join(', ')} as "also on"; refused — those pages leave the block the check and the re-plan are shown`, null, { rejected: castTable.rejected });
+      }
       log.info(`📋 [BEATS] CAST block: ${castTable.characters.map(c => `${c.name} deed p${c.deedPage} + ${c.alsoOn.join(',') || '-'}`).join('; ')}; ending p${castTable.ending.page}`);
     } catch (err) {
       castTableError = err.message;

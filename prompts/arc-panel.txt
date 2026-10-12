@@ -28,8 +28,9 @@ The critique above lists what the creator already sees; find what the creator MI
 - PLACE — the rule: {ARC_PLACE_RULE} An action that moves between inside and outside in a way the places forbid breaks it.
 - STAKES — the rules: {ARC_STAKES_RULES}
 - ENDING — the rule: {ARC_CLOSING_MOMENT_RULE} An arc whose last sentences give the main relationship no such moment breaks it.
+- CAST — the rule: {ARC_CAST_RULE} A figure on the character list who only stands by, an adult whose only part is a permission, a warning or watching, or a want or quarrel given before the middle that the ending never answers in that figure's own act or line, breaks it. That issue names the figure and quotes the sentence where they only watch, or the sentence that gives the want.
 - PROMISE — where a TOPIC PROMISE is given, the arc breaks it. That issue quotes the promise and the arc words where it should have been kept.
-- LANDMARK — the arc names a real place the REAL LANDMARKS list does not carry, or places a listed one at a vantage none of its photos shows and the commission's own words do not describe. A place the arc invents for its own world is not one.
+- LANDMARK — the arc names a real place the REAL LANDMARKS list does not carry, or places a listed one at a vantage none of its photos shows and the commission's own words do not describe, or its LANDMARKS STAGED block lists a landmark that no arc sentence takes place at or beside. A place the arc invents for its own world is not one.
 - ORPHAN — a plant that never pays off, or a payoff that traces to no plant.
 
 {ARC_ISSUE_RULE} Write each issue on its own numbered line, worst first, naming the lens it falls under:

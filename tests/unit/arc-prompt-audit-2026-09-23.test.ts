@@ -91,9 +91,9 @@ describe('arc prompts after the 2026-09-23 audit', () => {
     }
     // The trial writer (arc view, challenge line on) keeps it.
     expect(PB.buildStoryShapeSection(four, 12, { arc: true })).toContain(PB.EVERY_CHILD_ACTS_RULE);
-    // No tally in the critique or the panel: the page count stays plan-check Q12's.
-    expect(PB.arcCritiqueSpec({ inputData: four })).not.toContain(PB.EVERY_CHILD_ACTS_RULE);
-    expect(b.panel).not.toContain(PB.EVERY_CHILD_ACTS_RULE);
+    // The critics read the writer's constant since 2026-10-12 (no tally: the page count stays plan-check Q12's).
+    expect(PB.arcCritiqueSpec({ inputData: four })).toContain(PB.EVERY_CHILD_ACTS_RULE);
+    expect(b.panel).toContain(PB.EVERY_CHILD_ACTS_RULE);
     const check = PB.buildPlanCheckPrompt(four, [{ pageNumber: 1 }, { pageNumber: 2 }], '1. A story.', 'Page 1: wide — Anna — x — y');
     expect(check).toMatch(/give an ACTION line/);
   });

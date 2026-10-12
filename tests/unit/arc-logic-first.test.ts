@@ -188,7 +188,8 @@ describe('the arc prompts', () => {
     expect(b.panel).toContain(`- LOGIC — ${PB.ARC_LOGIC_CHECK}`);
     const lenses = [...b.panel.matchAll(/^- ([A-Z]+)\b/gm)].map(m => m[1]);
     expect(lenses[0]).toBe('LOGIC');
-    expect(lenses).not.toContain('CAST');
+    // CAST came back 2026-10-12 as a lens that reads the writer's constant (EVERY_CHILD_ACTS_RULE), not as a tally.
+    expect(lenses).toContain('CAST');
     expect(lenses).not.toContain('ACTION');
   });
 
@@ -577,14 +578,14 @@ describe('the arc prompts v3 (owner, 2026-09-25): a logical AND exciting plot, c
     expect(ctx).toContain(PB.ARC_EXCITING_DEF);
   });
 
-  it('every child acts is an arc PRINCIPLE (create, re-tell, judge context), never a critique or panel lens (variant B, 2026-09-25)', () => {
+  it('every child acts is an arc PRINCIPLE (create, re-tell, judge context) and, since 2026-10-12, the one constant its critics check: the creator\'s critique and the panel\'s CAST lens', () => {
     const b = build(input(5));
     for (const [stage, p] of Object.entries(b)) {
-      const want = stage === 'create' || stage === 'retell' ? 1 : 0;
+      const want = stage === 'create' || stage === 'retell' ? 2 : stage === 'panel' ? 1 : 0;
       expect(p.split(PB.EVERY_CHILD_ACTS_RULE).length - 1, stage).toBe(want);
       expect(p, stage).not.toMatch(/^- ACTION\b/m);
     }
-    expect(PB.arcCritiqueSpec({ retell: true })).not.toContain(PB.EVERY_CHILD_ACTS_RULE);
+    expect(PB.arcCritiqueSpec({ retell: true })).toContain(PB.EVERY_CHILD_ACTS_RULE);
     expect(sc.buildBriefContext({ ...input(5), pages: 18 }, { arc: true })).toContain(PB.EVERY_CHILD_ACTS_RULE);
     // The trial writer is plot and plan in one: it keeps the rule.
     expect(PB.buildStoryShapeSection(input(5), 18, { arc: true })).toContain(PB.EVERY_CHILD_ACTS_RULE);

@@ -52,6 +52,7 @@ Output, in this order:
 - One line "Fixing:" — which issues, by what repair.
 - One line "Keeping:" — the scenes and turns that survive untouched; landmarks the arc placed inside the commission's world stay unless Fixing names them, and no landmark from outside that world is added.
 - {CHALLENGES_TAKEN_RULE}
+{LANDMARKS_STAGED}
 - One line "Used:" naming which panelists you drew on, by letter ("Panelist A").
 - "FINAL ARC:" then the {ARC_LENGTH} numbered sentences. {ARC_SENTENCE_RULE}
 - "CRITIQUE:" then the critique of the final arc, built exactly like this:

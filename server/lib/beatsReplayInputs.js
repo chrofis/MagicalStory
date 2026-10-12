@@ -304,6 +304,8 @@ function resolveReplayInputData(storyData) {
   return {
     ...(storyData || {}),
     availableLandmarks: stored?.availableLandmarks || undefined,
+    // A story stored before 2026-10-12 has none: its replay shows the planner no landmark section.
+    landmarksStaged: stored?.landmarksStaged || undefined,
     modelOverrides: stored?.modelOverrides || {},
     replayInputsStored: !!stored,
   };

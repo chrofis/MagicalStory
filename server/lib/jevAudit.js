@@ -584,7 +584,7 @@ function arcSentencesText(arcBlock) {
  *
  * @param {string} arcBlock  the committed block's story logic + arc (splitCommittedBlock().arcBlock)
  * @param {string[]} names   the CHILDREN on the character list (castCoverage.commissionedCast().children): the generator
- *   rule is EVERY_CHILD_ACTS_RULE, and a listed adult may comfort, permit or watch
+ *   rule is EVERY_CHILD_ACTS_RULE, whose adult clause the arc critics (panel CAST lens, critique) judge
  * @returns {Promise<{ok:boolean, weak:Array<{name:string,score:number}>, feedback:string, scores?:Object, error?:string, cost?:number}|null>}
  */
 async function jevCastBeatVoice(arcBlock, names, { checks = JEV_CHECKS, callImpl = callJevWithOutageWait, jevFallback = null } = {}) {
@@ -619,17 +619,17 @@ const CAST_FEEDBACK_HEADING = '## AUTOMATIC CAST CHECK (feedback)';
  * (beatsPipeline round loop) and the Lab mirrors (testlab.js arc_effort,
  * arc_panel_replay) all call (sibling set arc-retell-gate).
  *
- * The gate is decided by arcRepairFindings on the critique and the panel ALONE
- * — a cast flag never opens it. When it is open, the cast feedback is appended
+ * The gate is decided by arcRepairFindings on the critique, the panel and the findings code
+ * counted (`codeFindings`: the landmark shortfall) — a cast flag never opens it. When it is open, the cast feedback is appended
  * to `gate.text`, the section the one re-telling reads; when it is closed,
  * the flag is only reported (`jevCast`).
  *
- * @param {{critique:string, reviewedArc:string, panel:Array, castNames:string[]}} args
+ * @param {{critique:string, reviewedArc:string, panel:Array, castNames:string[], codeFindings?:string[]}} args
  * @returns {Promise<{gate:Object, jevCast:Object|null}>}
  */
-async function arcRepairFindingsWithCastCheck({ critique, reviewedArc, panel = [], castNames = [] }, opts = {}) {
+async function arcRepairFindingsWithCastCheck({ critique, reviewedArc, panel = [], castNames = [], codeFindings = [] }, opts = {}) {
   const { arcRepairFindings } = require('./promptBuilders');
-  const gate = arcRepairFindings({ critique, reviewedArc, panel });
+  const gate = arcRepairFindings({ critique, reviewedArc, panel, codeFindings });
   const cast = await jevCastBeatVoice(reviewedArc, castNames, opts);
   const handed = !!(gate.retell && cast?.feedback);
   if (handed) gate.text = `${gate.text}\n\n${CAST_FEEDBACK_HEADING}\n${cast.feedback}`;

@@ -189,6 +189,7 @@ Exactly this, nothing before the marker and nothing after the closing fence:
       "vantages": "[OMIT unless the place appears from more than one camera position. Otherwise one row per viewpoint, and every page of this entry in exactly one of them: {\"id\": \"LOC001.1\", \"name\": \"[3-8 words]\", \"shot\": \"wide\", \"description\": \"[2-3 sentences, background only]\", \"cameraOn\": \"ground\", \"emptyScenePrompt\": \"[this viewpoint's plate]\", \"landmarkPhoto\": \"[a real landmark only: a photo number, or none]\", \"pages\": [X, Y]}]"
     }
   ],
+  "backdropLandmarks": "[OMIT unless a listed landmark stands visible behind the action of a story page set at another location (the REAL LANDMARKS section says when). Otherwise one row per such landmark: {\"landmarkQuery\": \"[its EXACT name as listed]\", \"pages\": [X, Y]}]",
   "vehicles": [
     {
       "id": "VEH001",

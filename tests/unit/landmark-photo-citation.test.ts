@@ -121,14 +121,14 @@ describe('NO FALLBACK: a missing or unlisted citation serves nothing, loudly', (
 describe('the Art Director sees every photo, numbered and whole', () => {
   const avail = [{ name: 'A Terrace Square', type: 'Square', photoVariants: landmark().photoVariants }];
   it('every servable photo, by slot number, with its framing, description uncut', () => {
-    const s = PB.buildAvailableLandmarksSection(avail, '', { forArtDirector: true });
+    const s = PB.buildAvailableLandmarksSection(avail, { forArtDirector: true });
     for (const n of [1, 2, 3]) expect(s).toContain(`Photo ${n} (exterior`);
     expect(s).toContain(LONG_DESC);
     expect(s).toContain('framed wide');
     expect(s).toContain(PB.LANDMARK_PHOTO_CITE_RULE);
   });
   it('the writers keep their one short PHOTOS line and are not given the citation rule', () => {
-    const s = PB.buildAvailableLandmarksSection(avail, '');
+    const s = PB.buildAvailableLandmarksSection(avail);
     expect(s).not.toContain(PB.LANDMARK_PHOTO_CITE_RULE);
     expect(s).not.toContain(LONG_DESC);
   });

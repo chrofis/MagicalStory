@@ -23,7 +23,7 @@ const { SCALE_CLASS_SPEC, ANIMAL_ANATOMY_SPEC, GROWN_CREATURE_SCALE_CLASSES, bui
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, CLOSEUP_KEPT_FIXED_SHOT_RULE, FOOTING_RULE, FOOTING_FIELD, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE, GROUP_STAGING_FIXED_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { SLOP_RULES } = require('./proseSlop');
-const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule, typedPlanTargets, typedTargetsRule, mainFloorRule, noCommissionedRule, planInstantRule } = require('./castCoverage');
+const { castCoverage, castCoverageRule, castActionRule, FLOOR_REFUSED_ONLOOKER_RULE, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule, typedPlanTargets, typedTargetsRule, mainFloorRule, noCommissionedRule, planInstantRule } = require('./castCoverage');
 const { PLAN_TYPE_IDS } = require('./shotVocabulary');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
 // clause and the judges' TEXT RULES block. Safe as a top-level require --
@@ -3275,7 +3275,7 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     // list in `landmarkPhoto` (LANDMARK_PHOTO_CITE_RULE, inside this section).
     // The Art Director variant: it marks which of the plan's places are listed
     // landmarks and writes no story (2026-09-23).
-    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote, { forArtDirector: true }),
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, { forArtDirector: true, staged: inputData.landmarksStaged }),
     CHILD_AGE_BAND: buildChildAgeBandNote(commissionedChildBand(inputData.characters || [])),
     CREATURE_TONE: buildCreatureToneSection(inputData),
     CREATURE_TONE_ENTRY: buildCreatureToneSection(inputData, { page: false }),
@@ -8037,7 +8037,9 @@ function buildChallengeIdeasSection(inputData, count = 25) {
 // one"), so the plan shipped with the fault the check had named. It names only a
 // page that stages a moment before its cause, a handful per book, never a sweep
 // like Q5. docs/decisions.md 2026-10-08 "Plan order is must-fix".
-const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 13, 14, 15, 16, 17]);
+// Q19 (a landmark the arc staged that no plan line stages) joined 2026-10-12 with the question itself: it names a
+// picture the book owes, like Q4/Q8, and an 'also noted' line can never spend a re-plan round.
+const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 13, 14, 15, 16, 17, 19]);
 
 /**
  * THE CHEAP-RELABEL BLOCK, declared ONCE (2026-09-20; shot codes removed 2026-09-27).
@@ -8493,7 +8495,8 @@ function buildReplanSection(pagePlan, findingLines, { pageCount = null, keep = [
     '',
     ...(must.length ? ['## MUST FIX', must.join('\n'), ''] : []),
     ...(also.length ? ['## ALSO NOTED', also.join('\n'), ''] : []),
-    ...(refusedLines.length ? ['## UNDONE LAST ROUND', 'These changes were refused and the pages restored; answer their findings another way.', refusedLines.join('\n')] : []),
+    // `span` is the review's page-floor refusal of a cast-out (a typed rule id, not prose).
+    ...(refusedLines.length ? ['## UNDONE LAST ROUND', 'These changes were refused and the pages restored; answer their findings another way.', ...((refused || []).some(r => r && r.rule === 'span') ? [FLOOR_REFUSED_ONLOOKER_RULE] : []), refusedLines.join('\n')] : []),
   ].join('\n').trimEnd();
 }
 
@@ -9012,14 +9015,15 @@ function plannerTypedFills(targets, mainName = null) {
   };
 }
 
-function checkerShotFills(legacyShots = false) {
+const CHECK_COUNT_WORDS = ['fifteen', 'sixteen', 'seventeen', 'eighteen'];
+function checkerShotFills(legacyShots = false, extra = 0) {
   return legacyShots ? {
     PLAN_LINE_HEAD: 'One line per page: shot — who is in frame — the instant the picture shows — what is true after this page that was not before.',
-    CHECK_COUNT: 'sixteen',
+    CHECK_COUNT: CHECK_COUNT_WORDS[1 + extra],
     OTS_CHECK: `14. Over-the-shoulder. ${OTS_NO_CONTACT_RULE} Name every over-the-shoulder page whose instant has the figure nearest the camera touching what they face, and ask for another shot.`,
   } : {
     PLAN_LINE_HEAD: `One line per page: ${PLAN_SHOT_PLACEHOLDER} — who is in frame — the instant the picture shows — what is true after this page that was not before. The first field is a placeholder: each page's camera shot is chosen after this check, so no point below is about a shot.`,
-    CHECK_COUNT: 'fifteen',
+    CHECK_COUNT: CHECK_COUNT_WORDS[extra],
     OTS_CHECK: '',
   };
 }
@@ -9180,8 +9184,8 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // the author's block (buildDividerLandmarksSection). Without an arc the
     // planner is dividing the idea itself, so it is the author and gets that block.
     AVAILABLE_LANDMARKS_SECTION: String(finalArc || '').trim()
-      ? buildDividerLandmarksSection(inputData.availableLandmarks, finalArc)
-      : buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
+      ? buildDividerLandmarksSection(inputData.availableLandmarks, inputData.landmarksStaged)
+      : buildAvailableLandmarksSection(inputData.availableLandmarks),
   });
 }
 
@@ -10806,7 +10810,7 @@ const ARC_PLACE_RULE = 'Every place the story stages is inside or outside, and a
  * Since 2026-09-25 (variant B, Lab #1490) arcPrinciples states it to the arc
  * create and re-tell; no arc critic lens came back with it.
  */
-const EVERY_CHILD_ACTS_RULE = 'Every child on the character list does at least one thing of their own that matters to the plot — never only present. Only where the book is too short for its cast do several children share one action, and no child is left with nothing. A commissioned adult has at least one act or line of their own too, and it may be to comfort, permit or watch. A want or quarrel a figure is given before the middle is answered by the ending, in an act or line of that figure, or it is not given.';
+const EVERY_CHILD_ACTS_RULE = 'Every child on the character list does at least one thing of their own that matters to the plot — never only present. Only where the book is too short for its cast do several children share one action, and no child is left with nothing. A commissioned adult has at least one act or line of their own too, and it is an act that changes what happens next: a permission, a warning or only watching does not count by itself. A want or quarrel a figure is given before the middle is answered by the ending, in an act or line of that figure, or it is not given.';
 
 /**
  * ARC PROMPTS v3 (owner, 2026-09-25, on Lab #1462-1465): "The other main
@@ -11066,7 +11070,7 @@ function arcLogicSpec(inputData = {}, pageCount = 10) {
 // (MAJOR/CRITICAL only) filtered it out, it rode into the pages, and the text
 // repair invented hardware to close it. The generator half is ARC_SENSE_RULE
 // ("that could not happen").
-const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line, a main character with no turn, and an action at the turn or the climax that could not happen as the arc states it always are; or [MINOR] — a blemish.';
+const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line, a main character with no turn, a figure on the character list with no act of their own, a want or quarrel given and never answered, and an action at the turn or the climax that could not happen as the arc states it always are; or [MINOR] — a blemish.';
 
 /**
  * THE ARC CRITIQUE SPEC — ONE source, both arc templates (owner, 2026-09-19).
@@ -11091,7 +11095,7 @@ const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real
 function arcCritiqueSpec({ retell = false, inputData = {} } = {}) {
   const remain = retell ? ' that remain' : '';
   return [
-    `"Faults:" then the arc's three worst faults${remain}, one per numbered line, or the single word "none". ${ARC_ISSUE_RULE} A fault is one of these: ${ARC_LOGIC_CHECK} Or one of these: ${ARC_PART_CHECK} Or a break of one of these rules: ${arcStakesRules(inputData).join(' ')} Each line: ${arcIssueLine()} ${ARC_FINDING_RULE} Tag each ${ARC_SEVERITY_DEF} A fault is never a count, a page number or a sourced measurement.`,
+    `"Faults:" then the arc's three worst faults${remain}, one per numbered line, or the single word "none". ${ARC_ISSUE_RULE} A fault is one of these: ${ARC_LOGIC_CHECK} Or one of these: ${ARC_PART_CHECK} Or a break of one of these rules: ${[...arcStakesRules(inputData), EVERY_CHILD_ACTS_RULE].join(' ')} Each line: ${arcIssueLine()} ${ARC_FINDING_RULE} Tag each ${ARC_SEVERITY_DEF} A fault is never a count, a page number or a sourced measurement.`,
     '',
     '"Commission honored:" one line — "yes", or the commission\'s own words the arc drops or inverts, quoted; a TOPIC PROMISE, where one is given, counts among the commission\'s words.',
   ].join('\n');
@@ -11114,13 +11118,15 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = 
     // the planner and the text writer; the low point they carried is stated in
     // the CHAIN spec (owner, 2026-09-24).
     AGE_MODE: buildAgeModeSection(inputData, { bandView: 'premise' }),
-    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
     TELLING_RULES: buildTellingRulesSection(inputData),
     CHALLENGE_IDEAS: ideas,
     // The created arc reports what it took, so a book whose re-telling gate
     // stays shut still records its cross-story memory (2026-09-27). Only when
     // there was a draw to take from.
     CHALLENGES_TAKEN: ideas ? `Then ${CHALLENGES_TAKEN_RULE}` : '',
+    // The typed landmark answer (landmarksStagedRule); '' where nothing was offered.
+    LANDMARKS_STAGED: landmarksStagedRule(inputData) ? `Then ${landmarksStagedRule(inputData)}` : '',
     ARC_LOGIC_SPEC: arcLogicSpec(inputData, pageCount),
     ARC_CRITIQUE_SPEC: arcCritiqueSpec({ inputData }),
     ARC_LENGTH: arcLengthRange(pageCount),
@@ -11164,13 +11170,18 @@ function buildArcPanelPrompt(inputData, committedBlock) {
     // The STAKES lens reads the rules the creator's TELLING_RULES carry, for
     // this band (2026-09-26).
     ARC_STAKES_RULES: arcStakesRules(inputData).join(' '),
+    // The CAST lens reads the SAME constant the arc writer is given among its
+    // principles (arcPrinciples) and the creator's critique checks (owner,
+    // 2026-10-12: the rule was stated to the writer only, so a want the ending
+    // never answered and an adult with no act of their own were never filed).
+    ARC_CAST_RULE: EVERY_CHILD_ACTS_RULE,
     // A14: the REAL LANDMARKS block is one constant with three consumers
     // (create, panel, retell). The panel is the only independent reader of the
     // arc; without the list it cannot see a real place the arc invented, and
     // the retell was told to keep landmarks "inside the commission's world"
     // while never being shown which ones those are. Without the DESCRIPTION
     // lines: the panel checks names and vantages, never what a place is.
-    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote, { descriptions: false }),
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, { descriptions: false }),
   });
 }
 
@@ -11195,6 +11206,7 @@ function buildArcRetellPrompt(inputData, pageCount, arcBlock, repairFindings, { 
   return fillTemplate(template, {
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
     CHALLENGES_TAKEN_RULE,
+    LANDMARKS_STAGED: landmarksStagedRule(inputData) ? `- ${landmarksStagedRule(inputData)}` : '',
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
     ARC_PRINCIPLES: arcPrinciples(inputData, pageCount),
@@ -11210,7 +11222,7 @@ function buildArcRetellPrompt(inputData, pageCount, arcBlock, repairFindings, { 
     ARC_LENGTH: arcLengthRange(pageCount),
     ARC_SENTENCE_RULE,
     // A14: same block the creator got (see buildArcPanelPrompt).
-    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
   });
 }
 
@@ -11447,7 +11459,7 @@ function filterCritiqueFaults(critique, reviewedArc) {
  *   panelRepair: {letter: string, findings: string[]}[], duplicates: number }}
  *   `text` is the REPAIR_FINDINGS section of the re-tell prompt.
  */
-function arcRepairFindings({ critique, reviewedArc, panel = [] }) {
+function arcRepairFindings({ critique, reviewedArc, panel = [], codeFindings = [] }) {
   const crit = filterCritiqueFaults(critique, reviewedArc);
   const repair = f => ARC_REPAIR_SEVERITIES.has(f.severity);
   const critiqueRepair = crit.findings.filter(repair).map(f => f.text);
@@ -11474,12 +11486,16 @@ function arcRepairFindings({ critique, reviewedArc, panel = [] }) {
   const panelRepair = sections
     .filter(s => s.items.length)
     .map(s => ({ letter: s.letter, findings: s.items.map(lineOf) }));
-  const count = critiqueRepair.length + panelRepair.reduce((n, p) => n + p.findings.length, 0);
+  // FINDINGS CODE COUNTED (2026-10-12): a number the model cannot certify for itself
+  // (the landmarks staged against the guideline). They open the gate like a quoted MAJOR.
+  const counted = (codeFindings || []).map(f => String(f || '').trim()).filter(Boolean);
+  const count = counted.length + critiqueRepair.length + panelRepair.reduce((n, p) => n + p.findings.length, 0);
   const text = [
+    counted.length ? `## AUTOMATIC LANDMARK CHECK (counted by code)\n${counted.map(f => `- ${f}`).join('\n')}` : '',
     critiqueRepair.length ? `## THE CREATOR'S CRITIQUE\n${critiqueRepair.join('\n')}` : '',
     ...panelRepair.map(p => `## PANELIST ${p.letter}\n${p.findings.join('\n')}`),
   ].filter(Boolean).join('\n\n');
-  return { retell: count > 0, skipReason: count > 0 ? null : 'no MAJOR', count, text, critique: crit, critiqueRepair, panelRepair, duplicates };
+  return { retell: count > 0, skipReason: count > 0 ? null : 'no MAJOR', count, text, critique: crit, critiqueRepair, panelRepair, codeFindings: counted, duplicates };
 }
 
 /**
@@ -11530,7 +11546,7 @@ function stripChallengesTaken(arc) {
  * Where the STORY LOGIC block ends: the next top-level output heading of the
  * create or the re-tell reply.
  */
-const LOGIC_BLOCK_STOP = /^\s*(?:\*\*|#+\s*)?(?:Fixing|Keeping|Challenges taken|Used|FINAL ARC|ARC|CRITIQUE)(?:\s*\*\*)?\s*(?::|$)/mi;
+const LOGIC_BLOCK_STOP = /^\s*(?:\*\*|#+\s*)?(?:Fixing|Keeping|Challenges taken|Landmarks staged|Used|FINAL ARC|ARC|CRITIQUE)(?:\s*\*\*)?\s*(?::|$)/mi;
 
 /**
  * The explicit "there are none" answers a figure line or the central-figure
@@ -11684,6 +11700,35 @@ function parseChallengesTaken(block) {
   return { ids, tagged, text: lines.join('\n').trim().replace(/\[(?:C\d+|own)\]\s*/gi, '') };
 }
 
+/**
+ * The "Landmarks staged:" block of an arc reply (landmarksStagedRule): its lines
+ * and the reply with the block cut out, so the arc and the logic around it parse
+ * as before. `lines` is null when the reply holds no such heading; the lines are
+ * resolved against the OFFERED list by landmarkGuideline.parseLandmarksStaged.
+ * @param {string} text
+ * @returns {{lines: string[]|null, rest: string}}
+ */
+function takeLandmarksStaged(text) {
+  const full = String(text || '');
+  const at = full.search(arcHeadingRe('Landmarks staged'));
+  if (at < 0) return { lines: null, rest: full };
+  const afterHeading = full.slice(at).replace(/^\s+/, '');   // the heading search may start on the blank line ahead of it
+  const headEnd = afterHeading.indexOf('\n');
+  const heading = headEnd < 0 ? afterHeading : afterHeading.slice(0, headEnd);
+  const tail = headEnd < 0 ? '' : afterHeading.slice(headEnd + 1);
+  // The answer may sit on the heading's own line ("Landmarks staged: none").
+  const inline = heading.replace(/^\s*(?:\*\*|#+\s*)?Landmarks staged(?:\s*\*\*)?\s*:?\s*(?:\*\*)?/i, '').trim();
+  const stop = tail.search(/^\s*(?:\*\*|#+\s*)?(?:STORY LOGIC|Fixing|Keeping|Challenges taken|Used|FINAL ARC|ARC|CRITIQUE)(?:\s*\*\*)?\s*(?::|$)/mi);
+  const body = stop >= 0 ? tail.slice(0, stop) : tail;
+  const lines = [inline, ...body.split('\n')].map(l => l.trim()).filter(Boolean);
+  return { lines, rest: full.slice(0, at) + (stop >= 0 ? tail.slice(stop) : '') };
+}
+
+/** The block the panel reads: the staged landmarks as a heading and dash lines ('' where the arc wrote none). */
+function landmarksStagedBlock(lines) {
+  return Array.isArray(lines) && lines.length ? `LANDMARKS STAGED:\n${lines.map(l => (/^\s*(?:[-–—*•]|\d{1,2}[.)])\s/.test(l) ? l : `- ${l}`)).join('\n')}\n\n` : '';
+}
+
 /** The highest numbered sentence of an arc (the same reading arcActSpans uses). */
 function arcSentenceCount(arcText) {
   let n = 0;
@@ -11701,7 +11746,9 @@ function arcSentenceCount(arcText) {
  * creator's own critique, each under its heading.
  */
 function parseArcCreate(raw) {
-  const full = String(raw || '');
+  // The typed landmark answer comes out first: it sits between the logic and the arc.
+  const { lines: landmarkLines, rest: withoutLandmarks } = takeLandmarksStaged(raw);
+  const full = String(withoutLandmarks || '');
   const logic = parseStoryLogic(full);
   const arcIdx = full.search(arcHeadingRe('ARC'));
   if (arcIdx < 0) throw new Error('no "ARC:" block');
@@ -11729,8 +11776,9 @@ function parseArcCreate(raw) {
     critique,
     takenIds: taken.ids,
     takenTagged: taken.tagged,
+    landmarkLines,
     sentences: arcSentenceCount(arc),
-    committed: `STORY LOGIC:\n${logic.text}\n\nARC:\n${arc}\n\nCRITIQUE:\n${critique}`,
+    committed: `STORY LOGIC:\n${logic.text}\n\n${landmarksStagedBlock(landmarkLines)}ARC:\n${arc}\n\nCRITIQUE:\n${critique}`,
   };
 }
 
@@ -11745,7 +11793,8 @@ function parseArcCreate(raw) {
  * block is missing or incomplete — the caller re-tells once, then gives up.
  */
 function parseArcRetell(raw) {
-  const full = String(raw || '');
+  const { lines: landmarkLines, rest: withoutLandmarks } = takeLandmarksStaged(raw);
+  const full = String(withoutLandmarks || '');
   const fa = full.search(/^\s*(?:\*\*|#+\s*)?FINAL ARC\s*:?/mi);
   if (fa < 0) throw new Error('no "FINAL ARC:" marker');
   // The contract lines precede FINAL ARC; take them from the head so a
@@ -11788,7 +11837,7 @@ function parseArcRetell(raw) {
   const critique = critIdx >= 0
     ? after.slice(critIdx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim()
     : '';
-  return { finalArc, used, critique, fixing, keeping, takenIds, takenTagged, logic, sentences };
+  return { finalArc, used, critique, fixing, keeping, takenIds, takenTagged, landmarkLines, logic, sentences };
 }
 
 /**
@@ -11883,6 +11932,8 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     log.error('[PROMPT] planCheck template not loaded — plan check unavailable');
     return null;
   }
+  // The landmarks the arc staged, resolved against the offered list (question 19 is asked only when there are some).
+  const staged = (inputData.landmarksStaged || []).filter(n => require('./landmarkGuideline').offeredEntryFor(n, inputData.availableLandmarks));
   return fillTemplate(template, {
     DEED_AND_EFFECT_DEF,
     PEOPLELESS_WEIGHT_DEF,
@@ -11921,12 +11972,16 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     // builder (owner, 2026-09-26). A page that breaks a stated fact could not
     // be judged by a checker never shown the facts.
     STORY_LOGIC_SECTION: buildStoryLogicSection(storyLogic),
+    // Question 19: the landmarks the arc staged (the typed list), in the section the
+    // planner divided against, and the question that holds the plan lines to them.
+    LANDMARKS_SECTION: buildDividerLandmarksSection(inputData.availableLandmarks, inputData.landmarksStaged),
+    LANDMARK_CHECK: staged.length ? `19. The story's landmarks. ${LANDMARK_STAGED_PAGES_RULE} For each landmark under REAL LANDMARKS, name a page whose plan line stages it as its place or visibly behind the action. A landmark no page stages is a finding.` : '',
     // Question 14 (over-the-shoulder on contact) is RETIRED with the planner's
     // shot word (2026-09-27): no page has a shot while the plan is checked. The
     // contact rule rides in the Jev over-the-shoulder question and the Art
     // Director / iterate templates. The numbering keeps its gap so stored
     // CHECK[n] rows stay comparable.
-    ...checkerShotFills(legacyShots),
+    ...checkerShotFills(legacyShots, staged.length ? 1 : 0),
     // THE CAST TABLE the planner wrote before its plan lines (2026-09-25). The
     // checker reads it beside the plan; every answer still comes from the plan
     // lines, and the counters hold each line to the table (CAST_PROMISE_BROKEN).
@@ -13197,9 +13252,6 @@ function buildVbLocationLines(loc) {
   return out;
 }
 
-// `retryNote` (optional): one generic sentence injected when a previous writer
-// attempt fell short of the landmark guideline — see the landmark check in
-// storyJobPipeline.js. Never story-specific.
 // ONE to TWO sentences of Wikipedia extract, never the whole article (owner,
 // 2026-09-19). The stored extract is a full lead paragraph and every one of the
 // ~20 offered landmarks carried it verbatim: the Zurich James Joyce Foundation
@@ -13308,29 +13360,54 @@ function landmarkPhotoLine(l) {
  * action" — ≈8.3k chars on staging job_1790100385959_1nitlympp, whose arc had
  * already chosen two. What a divider needs is which landmarks the story uses
  * and what their photos can show, so a page names only a vantage one of them
- * shows. The arc's choice is read off the arc by the landmark's own NAME (the
- * list's data, never a prose pattern); an arc that names none gets no block,
- * which is what the planner's landmark requirement already says it has chosen.
+ * shows. The arc's choice is the TYPED list it wrote ("Landmarks staged:",
+ * landmarkGuideline.parseLandmarksStaged, carried as inputData.landmarksStaged);
+ * since 2026-10-12 the section no longer searches the arc's prose for the
+ * listed names. An arc that stages none gets no block, which is what the
+ * planner's landmark requirement already says it has chosen.
  *
  * @param {Array} landmarks inputData.availableLandmarks
- * @param {string} finalArc the settled arc
+ * @param {string[]} stagedNames the OFFERED names the arc staged
  * @returns {string}
  */
-function buildDividerLandmarksSection(landmarks, finalArc) {
-  const arc = String(finalArc || '');
-  if (!landmarks || landmarks.length === 0 || !arc.trim()) return '';
-  const esc = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const named = landmarks.filter((l) => {
-    const full = String(l.name || '').trim();
-    const base = full.replace(/\s*\([^)]*\)\s*$/, '').trim();
-    return [full, base].filter(Boolean).some(n => new RegExp(`(^|[^\\p{L}])${esc(n)}`, 'iu').test(arc));
-  });
+function buildDividerLandmarksSection(landmarks, stagedNames) {
+  if (!landmarks || landmarks.length === 0 || !Array.isArray(stagedNames) || !stagedNames.length) return '';
+  const { offeredEntryFor } = require('./landmarkGuideline');
+  const named = stagedNames.map(n => offeredEntryFor(n, landmarks)).filter(Boolean);
   if (!named.length) return '';
   const list = named.map(l => `- ${l.name}${l.type ? ` [${l.type}]` : ''}${landmarkPhotoLine(l)}`).join('\n');
   const hasPhotos = named.some(l => Array.isArray(l.photoVariants) && l.photoVariants.length > 0);
   return `**REAL LANDMARKS the story above uses:**
 ${list}
-${hasPhotos ? `\n- ${LANDMARK_VANTAGE_RULE}` : ''}`;
+
+- ${LANDMARK_STAGED_PAGES_RULE}${hasPhotos ? `\n- ${LANDMARK_VANTAGE_RULE}` : ''}`;
+}
+
+// ── The landmark chain, typed (owner, 2026-10-12; docs/decisions.md "Landmarks are staged by the arc") ──
+// ONE sentence each, read by the generator and the critic of the same stage.
+/** The arc and the plan: what staging a listed landmark means. Arc writer, divider and plan check 19 all read it. */
+const LANDMARK_STAGED_PAGES_RULE = 'Each landmark the arc chose is the place of at least one page, or stands visible behind the action on one; a page may stand at one place only.';
+
+/**
+ * The arc's typed answer: which listed landmarks it stages. Filled into arc-create
+ * and arc-retell ({LANDMARKS_STAGED}); the PARSER is landmarkGuideline.parseLandmarksStaged,
+ * which resolves each line against the OFFERED list. Asked whenever landmarks were
+ * offered (the divider reads it), the minimum only where the guideline holds.
+ */
+function landmarksStagedRule(inputData = {}) {
+  if (!(inputData.availableLandmarks || []).length) return '';
+  const { landmarkGuidelineActive, landmarkRequirement } = require('./landmarkGuideline');
+  const ask = landmarkGuidelineActive(inputData)
+    ? ` The list asks for at least ${landmarkRequirement(inputData)}.`
+    : '';
+  return `"Landmarks staged:" then a dash list, one line per landmark from the REAL LANDMARKS list that an arc sentence takes place at or beside, the name exactly as the list gives it and nothing else on the line; the single word "none" where the arc stages none.${ask} A landmark is listed only where a sentence stages it.`;
+}
+
+/** The Art Director's half: how a chosen landmark is recorded, and the typed backdrop row. */
+function landmarkStagedAdBlock(staged) {
+  const names = Array.isArray(staged) ? staged.filter(Boolean) : [];
+  if (!names.length) return '';
+  return `\nThe story chose these listed landmarks: ${names.map(n => `"${n}"`).join(', ')}. ${LANDMARK_STAGED_PAGES_RULE} A landmark that is a page's own place is a \`locations\` entry. A landmark that stands visible behind the action of a page set at another location is listed once in the top-level \`backdropLandmarks\` as {"landmarkQuery": its EXACT name from the list, "pages": [the story pages it stands behind]}. A cover page never counts.\n`;
 }
 
 /**
@@ -13352,7 +13429,7 @@ ${hasPhotos ? `\n- ${LANDMARK_VANTAGE_RULE}` : ''}`;
  *               seen from a vantage a photo shows; the extracts were ~3k of its
  *               prompt it never used (audit 01 C, 2026-09-23).
  */
-function buildAvailableLandmarksSection(landmarks, retryNote = '', { forArtDirector = false, descriptions = true } = {}) {
+function buildAvailableLandmarksSection(landmarks, { forArtDirector = false, descriptions = true, staged = null } = {}) {
   if (!landmarks || landmarks.length === 0) {
     return '';
   }
@@ -13383,7 +13460,7 @@ function buildAvailableLandmarksSection(landmarks, retryNote = '', { forArtDirec
   // it changes here and nowhere else — both readers' wordings below.
   if (forArtDirector) {
     return `**REAL LANDMARKS — only where they belong to the world the commission names. When the places the plan lines stage are, or stand beside, landmarks from this list, stage at least two of them as those landmarks (two to four is the target), as the setting or its backdrop; never add a place or an action to a plan line to reach one. A story set anywhere else uses none — no entry with isRealLandmark or landmarkQuery — and no listed landmark is reworked into a feature of the story's own setting. A landmark carried as background scenery counts as used:**
-${retryNote ? `\n${retryNote}\n` : ''}
+${landmarkStagedAdBlock(staged)}
 ${landmarkList}
 
 For each landmark you use:
@@ -13392,7 +13469,7 @@ ${hasDescriptions ? `- The DESCRIPTION says what the landmark is; it is not word
 `;
   }
   return `**REAL LANDMARKS — use only where they belong to the world the commission names. When the story's own places offer landmarks from this list, build at least two of them in, woven into the story's action (two to four is the target); never relocate the story or bend the plot to collect them. A story set anywhere else uses none, and no listed landmark renamed or reworked into a feature of the story's own setting. A landmark carried as background scenery counts as used:**
-${retryNote ? `\n${retryNote}\n` : ''}
+
 ${landmarkList}
 
 When you use a landmark from the list (even if you rename it in your story):
@@ -13685,6 +13762,9 @@ function buildTrialIdeaPrompts({
 
 module.exports = {
   buildDividerLandmarksSection,
+  landmarksStagedRule,
+  landmarkStagedAdBlock,
+  LANDMARK_STAGED_PAGES_RULE,
   arcActSpans,
   replanKeepPages,
   parsePlanCheckWanted,
@@ -13991,6 +14071,8 @@ module.exports = {
   parseArcCreate,
   parseArcRetell,
   parseChallengesTaken,
+  takeLandmarksStaged,
+  landmarksStagedBlock,
   CHALLENGES_TAKEN_RULE,
   parseStoryLogic,
   stripChallengesTaken,

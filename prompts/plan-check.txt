@@ -10,6 +10,8 @@ Commissioned characters: {CHARACTER_NAMES}
 
 {STORY_LOGIC_SECTION}
 
+{LANDMARKS_SECTION}
+
 # CHARACTER DETAILS
 
 {CHARACTER_SOURCE_RULE}
@@ -58,6 +60,7 @@ Answer only these {CHECK_COUNT}:
 15. The opening. {EXCITING_START_DEF} Say whether it does. A page 1 whose instant is a pose, a look at the place or someone waiting is a finding.
 16. The ending's cast. {HAPPY_ENDING_DEF} Say whether it does. A commissioned character missing from the last page's who column while the story keeps them with the others is a finding.
 18. The story logic. Name every page that breaks a fact THE STORY LOGIC states, and the fact it breaks. When no story logic is given, write no line for this check.
+{LANDMARK_CHECK}
 
 # OUTPUT FORMAT
 
