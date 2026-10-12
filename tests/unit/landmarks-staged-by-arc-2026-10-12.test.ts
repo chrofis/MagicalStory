@@ -64,6 +64,13 @@ describe('L1: parseLandmarksStaged resolves the typed block against the offered 
     expect(r.unlisted).toEqual(['Some Invented Castle']);
   });
 
+  it('a name written without the list\'s trailing qualifier counts when only one listed entry has that bare name', () => {
+    // agent stand-in arcs wrote "Lindenhof" for the listed "Lindenhof (Zürcher Hügelzug)" in 2 of 2 cases (2026-10-12)
+    expect(LG.parseLandmarksStaged(['- Gamma Abbey'], OFFERED).names).toEqual(['Gamma Abbey (Old Town)']);
+    const twins = [{ name: 'Town Hall (North)', query: 'Town Hall (North)' }, { name: 'Town Hall (South)', query: 'Town Hall (South)' }];
+    expect(LG.parseLandmarksStaged(['- Town Hall'], twins)).toEqual({ present: true, names: [], unlisted: ['Town Hall'] });
+  });
+
   it('"none" is the empty answer; a missing block is NOT the same as an empty one', () => {
     expect(LG.parseLandmarksStaged(['none'], OFFERED)).toEqual({ present: true, names: [], unlisted: [] });
     expect(LG.parseLandmarksStaged(null, OFFERED)).toEqual({ present: false, names: [], unlisted: [] });

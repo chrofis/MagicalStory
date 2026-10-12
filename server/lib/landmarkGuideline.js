@@ -39,7 +39,13 @@ const keyOf = (name) => String(name || '').normalize('NFKC').replace(/\s+/g, ' '
 function offeredEntryFor(name, offered) {
   const k = keyOf(name);
   if (!k) return null;
-  return (offered || []).find(l => keyOf(l?.name) === k || keyOf(l?.query) === k) || null;
+  const exact = (offered || []).find(l => keyOf(l?.name) === k || keyOf(l?.query) === k);
+  if (exact) return exact;
+  // Listed names carry Wikipedia qualifiers ("Lindenhof (Zürcher Hügelzug)", "Rathaus (Zürich)") that a writer drops:
+  // agent stand-in arcs wrote "Lindenhof" in 2 of 2 cases (2026-10-12). The bare name counts only when ONE listed entry has it.
+  const bare = (s) => keyOf(String(s || '').replace(/\s*\([^)]*\)\s*$/, ''));
+  const hits = (offered || []).filter(l => bare(l?.name) === k || bare(l?.query) === k);
+  return hits.length === 1 ? hits[0] : null;
 }
 
 /**
