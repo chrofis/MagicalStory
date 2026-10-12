@@ -991,3 +991,6 @@ I proposed and wired "one Grok call for the whole avatar sheet" to save time. de
 
 ## 2026-10-11 — A display request is not a generation change
 Owner asked to interleave the EXISTING avatar views on the waiting screen. I also had an agent change the 2x4 sheet prompt and judge (true back head), which the owner had not asked for; it was reverted ("No change to the 2x4 avatar sheet!!"). Rule: when the owner asks how something is SHOWN, change only the display; if the generated input looks wrong, report it and ask before touching generation.
+
+## 2026-10-12 — A test costs about CHF 1, not 30
+Recommended a 20-story arc+plan replay (~$25, cap $30) to validate one prompt change. Owner: "we will not spend 30.- on one test!! Your normal budget should be 1.-". Rule: design every test to fit ~CHF 1 (free code replays over stored data, agent stand-ins, the single cheapest stage, fewer cases); an expensive option is never the recommended one, and asking for more needs a concrete reason why 1.- cannot answer the question.
