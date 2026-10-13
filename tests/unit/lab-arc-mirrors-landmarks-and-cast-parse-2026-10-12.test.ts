@@ -51,6 +51,9 @@ describe('Lab mirrors call the production readers', () => {
     const body = src.slice(src.indexOf('async function runArcEffortStage'), src.indexOf('async function runArcEffortStage') + 1200);
     expect(body).toMatch(/const storyData = resolveReplayInputData\(\(await loadStoryDataFull\(target\.storyId/);
   });
+  it('arc_effort records each arm\'s typed landmark answer as production reads it (Lab #1766 could not show it)', () => {
+    expect(src).toContain("landmarksStaged: commit ? require('./landmarkGuideline').parseLandmarksStaged(commit.landmarkLines, storyData.availableLandmarks || []) : null");
+  });
   it('the Lab CAST parse passes leadEach', () => {
     expect(src).toMatch(/parsePlanCastBlock\(reply, \{ listed: commissionedCast\(storyData\)\.listed, leadEach:/);
   });

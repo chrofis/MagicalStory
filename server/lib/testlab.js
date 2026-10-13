@@ -8382,6 +8382,9 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
           logic: commit?.logic?.text || null,
           critique: commit?.critique || null,
           counts: commit ? arcShapeCounts({ sentences: commit.sentences, logic: commit.logic, inputData: storyData, pageCount }) : null,
+          // The typed "Landmarks staged:" answer and how production reads it (null lines = no block written).
+          landmarkLines: commit?.landmarkLines ?? null,
+          landmarksStaged: commit ? require('./landmarkGuideline').parseLandmarksStaged(commit.landmarkLines, storyData.availableLandmarks || []) : null,
         },
         commit,
       };
