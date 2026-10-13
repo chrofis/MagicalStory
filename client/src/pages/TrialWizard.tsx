@@ -1,3 +1,4 @@
+import { ideaInputKey, reconcileIdeasWithInput } from '../utils/trialIdeas';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { BookOpen, ArrowRight } from 'lucide-react';
@@ -457,11 +458,35 @@ export default function TrialWizard() {
 
   // 1 = the first pair shown, >1 = after "Generate New Ideas".
   const ideaAttemptRef = useRef(0);
+  // The story kind the held ideas / title page were produced for. When the visitor
+  // changes category, topic, theme or language afterwards, they are dropped so the
+  // ideas step regenerates through its normal auto-generate path.
+  const [ideasKey, setIdeasKey] = useState<string | null>(null);
+  const storyInputRef = useRef(storyInput);
+  storyInputRef.current = storyInput;
   const handleIdeasGenerated = useCallback((ideas: GeneratedIdea[]) => {
     ideaAttemptRef.current += 1;
+    setIdeasKey(ideaInputKey(storyInputRef.current));
     setGeneratedIdeas(ideas);
     setSelectedIdeaIndex(null);
   }, []);
+
+  const handleTitlePageReady = useCallback((data: { costumeType: string | null; avatarSlides?: string[] }) => {
+    setIdeasKey(ideaInputKey(storyInputRef.current));
+    setTitlePageData(data);
+  }, []);
+
+  useEffect(() => {
+    const held = { ideas: generatedIdeas, selectedIndex: selectedIdeaIndex, titlePageData, ideasKey, attempt: ideaAttemptRef.current };
+    const next = reconcileIdeasWithInput(held, storyInput);
+    if (next === held) return;
+    setGeneratedIdeas(next.ideas);
+    setSelectedIdeaIndex(next.selectedIndex);
+    setTitlePageData(next.titlePageData);
+    setIdeasKey(next.ideasKey);
+    ideaAttemptRef.current = next.attempt;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyInput]);
 
   // An edit keeps the selection: the ideas step's hint invites a click into the
   // text of the picked card, and until 2026-10-07 the first keystroke went
@@ -768,7 +793,7 @@ export default function TrialWizard() {
                 onCreate={handleCreate}
                 onSessionExpired={handleSessionExpired}
                 sessionToken={sessionToken}
-                onTitlePageReady={setTitlePageData}
+                onTitlePageReady={handleTitlePageReady}
                 userLocation={userLocation}
                 onLocationChange={setUserLocation}
               />

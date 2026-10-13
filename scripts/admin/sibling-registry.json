@@ -1273,6 +1273,16 @@
           }
         ]
       }
+    },
+    {
+      "id": "ideas-reset-on-story-kind-change",
+      "axis": "trial wizard vs full wizard",
+      "reason": "story ideas belong to the category/topic/theme they were generated for; both wizards must drop them (and whatever is derived: selection, title page) when the visitor changes the kind (prod trial job_1791902238992_1otf3def4: unicorn ideas created as storyTheme mermaid). Trial: client/src/utils/trialIdeas.ts via TrialWizard.tsx; full: the category/topic/theme effect in StoryWizard.tsx.",
+      "members": [
+        "client/src/pages/TrialWizard.tsx",
+        "client/src/pages/StoryWizard.tsx"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [

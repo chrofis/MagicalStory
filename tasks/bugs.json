@@ -4207,7 +4207,9 @@
       "title": "Trial story generated with a different theme than the visitor chose: unicorn picked, unicorn ideas shown, story created as storyTheme \"mermaid\" (mermaid costume on every page)",
       "reportedAt": "2026-10-13",
       "source": "Owner, 2026-10-13, with stored evidence: production trial job_1791902238992_1otf3def4. trial_events topic_selected 16:35:19 CH meta.theme=\"unicorn\"; idea_events idea_generated 16:35:26 theme=\"unicorn\" (both offered ideas are Einhorn ideas); idea_events idea_picked 16:37:19 theme=\"mermaid\"; users.trial_data.storyInput.storyTheme=\"mermaid\" with storyDetails = the unicorn idea text; clothingRequirements costume=\"mermaid\". The create-story request itself carried mermaid. Root cause (client state vs. a re-pick not recorded because trial steps are deduped per visit) under investigation.",
-      "status": "open"
+      "rootCause": "TrialWizard held generatedIdeas / selectedIdeaIndex / titlePageData across steps; nothing cleared them when category, topic, theme or language changed, so the remounted ideas step skipped auto-generate (hasFinalIdeas) and handleCreate spread the NEW storyInput over the OLD idea.",
+      "fix": "client/src/utils/trialIdeas.ts records the input key the ideas were produced for; TrialWizard drops ideas, selection, attempt counter and titlePageData when the key no longer matches, so the ideas step regenerates through its existing auto-generate path. tests/unit/trial-ideas-reset-on-story-kind-change.test.ts",
+      "status": "fixed"
     }
   ]
 }
