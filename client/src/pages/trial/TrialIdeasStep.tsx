@@ -7,6 +7,7 @@ import { trackTrialStep } from '@/utils/trialFunnel';
 import { splitIdeaRoles, joinIdeaRoles } from '@/utils/ideaRoles';
 import { isTrialSessionDead } from '@/utils/trialSession';
 import { localizedApiError } from '@/utils/apiErrors';
+import { LoadingSpinner } from '@/components/common';
 
 // ─── Auto-height textarea ────────────────────────────────────────────────────
 
@@ -684,14 +685,12 @@ export default function TrialIdeasStep({
                   ) : (
                     // The idea is still being written: the spinner stays until THIS card is complete, then the whole idea
                     // appears at once (owner 2026-10-09: showing it as it streams made the box jump).
-                    <div className="flex items-center gap-2 py-8 justify-center flex-1">
-                      <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
-                    </div>
+                    <div className="flex flex-1 items-center justify-center py-8"><LoadingSpinner size="sm" message={t.generating} /></div>
                   )
                 ) : (
-                  <div className="flex items-center gap-2 py-8 justify-center flex-1">
-                    <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
-                  </div>
+                  // The page-wide spinner above hides at the first streamed word (~1.5 s); each card keeps a visible one
+                  // until it is complete (owner 2026-10-13: a faint grey spinner read as "no spinner").
+                  <div className="flex flex-1 items-center justify-center py-8"><LoadingSpinner size="sm" message={t.generating} /></div>
                 )}
 
                 {/* Cast list — the casting block, out of the blurb. Same

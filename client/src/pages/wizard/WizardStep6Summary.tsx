@@ -5,6 +5,7 @@ import { useRotatingMessage } from '@/hooks/useRotatingMessage';
 import { storyTypes, lifeChallenges, educationalTopics, historicalEvents, realisticSetting } from '@/constants/storyTypes';
 import { artStyles } from '@/constants/artStyles';
 import { splitIdeaRoles, joinIdeaRoles } from '@/utils/ideaRoles';
+import { LoadingSpinner } from '@/components/common';
 import type { Character } from '@/types/character';
 import type { StoryLanguageCode, IdeaWorld, IdeaWorldMode } from '@/types/story';
 import type { LayoutOverride } from '@/hooks/useDeveloperMode';
@@ -553,6 +554,8 @@ export function WizardStep6Summary({
                   {isLoading ? (
                     <div className="flex items-center justify-center h-64 bg-gray-50 px-8">
                       <div className="text-center text-gray-500 w-full max-w-xs">
+                        {/* The same visible spinner as the trial cards, until this idea is complete (owner 2026-10-13). */}
+                        <div className="mb-4"><LoadingSpinner size="sm" /></div>
                         {/* Progress bar */}
                         <div className="mb-4">
                           <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
