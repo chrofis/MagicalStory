@@ -4194,6 +4194,13 @@
       "source": "production showcase job_1791748539342_ikyl88w1h (Dubois/FR mermaid, watercolour) failed at 58% after ~68 min: \"The costume sheet for Léa could not be created\"; build dfc9591a",
       "status": "fixed",
       "fixedIn": "bb22a1930"
+    },
+    {
+      "id": "trial-page-unrequested-caption-shipped",
+      "title": "Trial page shipped with an unrequested English caption painted into the image (\"ARIA AVA / THE BROKEN REIN\" on a German story); nothing caught it",
+      "reportedAt": "2026-10-13",
+      "source": "Owner, 2026-10-13, with stored evidence: production trial job_1791902238992_1otf3def4 (\"Aria Ava und das mutige Lied am Grossmünster\", de-ch) scene p4 v0 (only version, https://images.magicalstory.ch/stories/job_1791902238992_1otf3def4/scene/p4/v0.jpg) letters \"ARIA AVA / THE BROKEN REIN\" across the bottom. The p4 image prompt carries the standard \"No lettering on any surface\" preamble and no REQUIRED TEXT block. imageVersions is empty, so no repair ran.",
+      "status": "open"
     }
   ]
 }
