@@ -8241,7 +8241,9 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   const { TEXT_MODELS, MODEL_DEFAULTS, priceUsage } = require('../config/models');
   const sc = require('./storyScorecard');
 
-  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  // The run's inputData, as production's arc call gets it: the stored offered landmarks (replayInputs) drive the
+  // "Landmarks staged:" block and its minimum (2026-10-12). Without them the create arm silently drops the block.
+  const storyData = resolveReplayInputData((await loadStoryDataFull(target.storyId, { rehydrate: false })).storyData);
   const pageCount = (storyData.sceneImages || []).length || storyData.pages || 10;
   // Every level Opus 5 takes. xhigh and max cost MORE than the current default
   // (`high`), so the sweep prices both directions: what medium/low save, and

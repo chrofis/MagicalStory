@@ -47,6 +47,10 @@ describe('Lab mirrors call the production readers', () => {
     expect(calls.length).toBeGreaterThanOrEqual(2);
     for (const c of calls) expect(c).toContain('codeFindings: require(\'./landmarkGuideline\').arcLandmarkCodeFindings');
   });
+  it('the arc_effort create arm builds from the replay inputs (the stored offered landmarks), as production does', () => {
+    const body = src.slice(src.indexOf('async function runArcEffortStage'), src.indexOf('async function runArcEffortStage') + 1200);
+    expect(body).toMatch(/const storyData = resolveReplayInputData\(\(await loadStoryDataFull\(target\.storyId/);
+  });
   it('the Lab CAST parse passes leadEach', () => {
     expect(src).toMatch(/parsePlanCastBlock\(reply, \{ listed: commissionedCast\(storyData\)\.listed, leadEach:/);
   });
