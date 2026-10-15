@@ -4203,7 +4203,7 @@
       "rootCause": "The image model's reflex to title or sign a picture (the character's name plus the page's key prop phrase from its own brief; a plot word signed bottom-right; on the full path ~2% of pages carry an overlay caption) survives the preamble 'No lettering on any surface'. The trial skips image checks by design (decisions.md 2026-10-09 'Trial page check ... measured, NOT built'), so nothing catches it there.",
       "fix": "Prompt wording only (owner 2026-10-15): one sentence in the shared prompts/image-generation.txt, so trial pages, full pages and covers carry it: 'That includes a title or caption for the picture, a character's name, a phrase describing the moment, and an artist's signature: the picture carries no label of its own.' Test tests/unit/image-prompt-no-label-sentence.test.ts. Replay evidence in docs/decisions.md 2026-10-15 (0/3 captions on re-rendered positives, 0/9 new artefacts on negatives). RESIDUAL RISK ACCEPTED under the 2026-10-09 decision: no check is added on the trial path, so an occasional caption can still ship there.",
       "status": "fixed",
-      "fixedIn": "PENDING"
+      "fixedIn": "ee5f18f77"
     },
     {
       "id": "trial-theme-swapped-unicorn-to-mermaid",
