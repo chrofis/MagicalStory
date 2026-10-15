@@ -109,7 +109,7 @@
     {
       "id": "vb-authoring-sites",
       "axis": "Art Director VB authoring vs writer VB authoring",
-      "reason": "the Visual Bible is authored at two LIVE sites — the all-pages Art Director on the beats path (every full story) and the trial writer — and a rule about what a VB entry must state has to exist at both. The two pre-beats unified writers were members until 2026-09-15, when they were deleted as unreachable (docs/decisions.md).",
+      "reason": "since 2026-10-15 both sites are given ONE_SIDED_FEATURE_RULE and BODY_CONDITION_MARKER_RULE (promptBuilders) - a one-sided feature is written relationally, a plot-relevant body condition carries a visible marker - and the VB cell gates plus the three page judges read the same ONE_SIDED_FEATURE_RULE. The Visual Bible is authored at two LIVE sites — the all-pages Art Director on the beats path (every full story) and the trial writer — and a rule about what a VB entry must state has to exist at both. The two pre-beats unified writers were members until 2026-09-15, when they were deleted as unreachable (docs/decisions.md).",
       "members": [
         "prompts/visual-bible.txt",
         "prompts/story-trial-arc.txt"
@@ -493,7 +493,7 @@
     {
       "id": "plan-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "plan-check.txt checks the page plan story-beats.txt produces; a constraint the checker counts must be a constraint the planner was told to satisfy. Since 2026-10-09 plan-check questions 10 (heights, TWO_HEIGHTS_DEF) and 17 (whole cast, WHOLE_CAST_DEF) are asked of Jev by server/lib/jevPlanCheck.js, which quotes the same constants the planner is given: it is a critic of this pair like the prompt. Since 2026-10-12 question 19 (LANDMARK_CHECK, built by buildPlanCheckPrompt only when the arc staged a landmark) holds the plan lines to the arc's typed landmark list: the planner's divider section (buildDividerLandmarksSection) and the check read the SAME LANDMARK_STAGED_PAGES_RULE and the same inputData.landmarksStaged; a Q19 finding is must-fix (REPLAN_MUST_FIX_CHECKS).",
+      "reason": "plan-check.txt checks the page plan story-beats.txt produces; a constraint the checker counts must be a constraint the planner was told to satisfy. Since 2026-10-09 plan-check questions 10 (heights, TWO_HEIGHTS_DEF) and 17 (whole cast, WHOLE_CAST_DEF) are asked of Jev by server/lib/jevPlanCheck.js, which quotes the same constants the planner is given: it is a critic of this pair like the prompt. Since 2026-10-12 question 19 (LANDMARK_CHECK, built by buildPlanCheckPrompt only when the arc staged a landmark) holds the plan lines to the arc's typed landmark list: the planner's divider section (buildDividerLandmarksSection) and the check read the SAME LANDMARK_STAGED_PAGES_RULE and the same inputData.landmarksStaged; a Q19 finding is must-fix (REPLAN_MUST_FIX_CHECKS). Since 2026-10-15 question 20 (a page staging a figure doing what the story declares it cannot do) reads DECLARED_CONDITION_DEF, the same constant the planner is given in story-beats.txt, and is must-fix too.",
       "generators": [
         "prompts/story-beats.txt"
       ],

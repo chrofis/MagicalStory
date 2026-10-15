@@ -49,6 +49,7 @@ Style, on every page:
 {UNNAMED_FIGURE}.
 {PAGE_CONTINUITY}
 {MOTIVE_AT_THE_ACT}.
+{BODY_CONDITION_MARKER}
 {WHO_DOES_WHAT}
 {NEIGHBOUR_PHRASE}
 A sentence never gives one thing two states (a thing caught or held is not said to lie somewhere in the same breath), and a property stated for one part of a subject is not restated for another with "also" or "too": say it once.

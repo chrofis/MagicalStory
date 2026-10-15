@@ -982,6 +982,8 @@ function buildEvaluationPrompt(opts = {}) {
     // declares no readable lettering: D-23's plain no-lettering rule then
     // applies unchanged, which is the behaviour every page had before.
     TEXT_RULES: opts.textRules || '',
+    // Side-blind one-sided features (owner 2026-10-15): the same sentence the VB writers and cell gates read.
+    ONE_SIDED_FEATURE: require('../lib/promptBuilders').ONE_SIDED_FEATURE_RULE,
     // NO TEXT_NOT_A_CHECKLIST here, deliberately (owner, 2026-09-18). That rule
     // goes to every template that judges a page against its TEXT; this judge is
     // handed no page text on any path — all three call sites pass a brief as

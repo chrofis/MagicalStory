@@ -935,6 +935,8 @@ function buildSemanticPrompt(template, { storyText, sceneHint, imagePrompt, inte
     // the paragraph now fills from the constant, so the two halves cannot
     // drift from the copies the other eight templates carry.
     TEXT_NOT_A_CHECKLIST: require('./promptBuilders').TEXT_NOT_A_CHECKLIST_RULE,
+    // Side-blind one-sided features (owner 2026-10-15), the sentence the VB writers and cell gates read.
+    ONE_SIDED_FEATURE: require('./promptBuilders').ONE_SIDED_FEATURE_RULE,
   });
 }
 

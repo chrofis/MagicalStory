@@ -138,21 +138,21 @@ describe('the checker prompt no longer asks 10 and 17, and keeps the other numbe
   const planText = pages.map(p => `Page ${p.pageNumber}: ${p.planLine}`).join('\n');
   const nums = (p: string) => [...p.split('# YOUR TASK')[1].split('# OUTPUT FORMAT')[0].matchAll(/^(\d+)\.\s+\S/gm)].map(m => Number(m[1]));
 
-  it('numbers 1-9, 11-13, 15, 16, 18 (14 retired with the shot word, 10 and 17 with this change)', () => {
+  it('numbers 1-9, 11-13, 15, 16, 18, 20 (14 retired with the shot word, 10 and 17 with this change)', () => {
     const prompt = PB.buildPlanCheckPrompt(inputData, pages, 'An arc.', planText);
-    expect(nums(prompt)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 15, 16, 18]);
-    expect(prompt).toMatch(/only on the fifteen points below/);
-    expect(prompt).toMatch(/Answer only these fifteen:/);
+    expect(nums(prompt)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 15, 16, 18, 20]);
+    expect(prompt).toMatch(/only on the sixteen points below/);
+    expect(prompt).toMatch(/Answer only these sixteen:/);
     expect(prompt).not.toContain(PB.TWO_HEIGHTS_DEF);
     expect(prompt).not.toContain(PB.WHOLE_CAST_DEF);
     expect(prompt).not.toMatch(/^10\. Heights/m);
     expect(prompt).not.toMatch(/^17\. The whole cast/m);
   });
 
-  it('the backup (legacy shots) prompt asks sixteen', () => {
+  it('the backup (legacy shots) prompt asks seventeen', () => {
     const prompt = PB.buildPlanCheckPrompt(inputData, pages, 'An arc.', planText, { legacyShots: true });
-    expect(nums(prompt)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 18]);
-    expect(prompt).toMatch(/Answer only these sixteen:/);
+    expect(nums(prompt)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 18, 20]);
+    expect(prompt).toMatch(/Answer only these seventeen:/);
   });
 });
 

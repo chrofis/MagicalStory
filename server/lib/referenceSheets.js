@@ -789,6 +789,13 @@ Fix exactly that; everything else stays as described above.`
   return sanitised;
 }
 
+// The side-blind rule the VB writers are given (promptBuilders.ONE_SIDED_FEATURE_RULE, owner 2026-10-15): the cell is
+// judged against a description that never names a side, so a one-sided feature on either side of the figure matches it.
+// Lazy require: promptBuilders pulls in services/prompts at load.
+function oneSidedFeatureRule() {
+  return require('./promptBuilders').ONE_SIDED_FEATURE_RULE;
+}
+
 /**
  * The one question the character-cell gate asks. Pure, so it can be tested.
  *
@@ -827,7 +834,7 @@ function cellGatePrompt(styleDescription = '', age = null, build = null, descrip
   const colourClause = descText
     ? `(1) Colouring: do the figure's colouring and material match what the description states?`
     : `(1) Colouring: no description was given, so nothing is checked here.`;
-  return `You are checking one cell cut from a character reference sheet for an illustrated children's book. The book's declared art style: "${styleDescription}".${descClause} Judge strictly: ${colourClause} (2) Is the cell actually rendered in the declared art style, not a different one (for example flat comic-book or graphic-novel shading when the declared style is painterly watercolor)?${ageClause}${sexClause} If any check fails, natural is false. Reply as JSON: {"natural": true or false, "reason": "one short sentence"}`;
+  return `You are checking one cell cut from a character reference sheet for an illustrated children's book. The book's declared art style: "${styleDescription}".${descClause} Judge strictly: ${colourClause} (2) Is the cell actually rendered in the declared art style, not a different one (for example flat comic-book or graphic-novel shading when the declared style is painterly watercolor)?${ageClause}${sexClause} ${oneSidedFeatureRule()} If any check fails, natural is false. Reply as JSON: {"natural": true or false, "reason": "one short sentence"}`;
 }
 
 // ── Character-cell render gate ──────────────────────────────────────────────
@@ -911,7 +918,7 @@ function elementCellGatePrompt(el, styleDescription = '') {
   const desc = String(el?.description || '').trim();
   const text = String(el?.text || '').trim();
   const textClause = text ? ` (4) Lettering: the words "${text}" are readable and spelled exactly so; any other lettering fails.` : '';
-  return `You are checking one cell cut from a reference sheet for an illustrated children's book. The cell is meant to show ${article(kind)} ${kind}, described as: "${desc}". The book's declared art style: "${styleDescription}". Judge strictly: (1) Kind: does the depicted thing read as ${article(kind)} ${kind} — not a different kind of object that merely shares its shape, colour or size — and is it the only thing in the cell, with no person or creature other than the described thing (not even a silhouette, shadow or faint outline) and no second copy of it? (2) Match: do its colour and main parts follow the description, and is it made of the material the description names and nothing else (an object built only of leaves, snow or sand that shows twigs, straw, wicker, a rim or a woven frame the description does not name fails), and does its age or build match the one the description states (a creature described as grown, adult or old has a mature body — long limbs, neck and tail, a head small for the body — not a young one's big head, round belly and short limbs)? (3) Style: is it rendered in the declared art style?${textClause} If any check fails, ok is false. Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
+  return `You are checking one cell cut from a reference sheet for an illustrated children's book. The cell is meant to show ${article(kind)} ${kind}, described as: "${desc}". The book's declared art style: "${styleDescription}". Judge strictly: (1) Kind: does the depicted thing read as ${article(kind)} ${kind} — not a different kind of object that merely shares its shape, colour or size — and is it the only thing in the cell, with no person or creature other than the described thing (not even a silhouette, shadow or faint outline) and no second copy of it? (2) Match: do its colour and main parts follow the description, and is it made of the material the description names and nothing else (an object built only of leaves, snow or sand that shows twigs, straw, wicker, a rim or a woven frame the description does not name fails), and does its age or build match the one the description states (a creature described as grown, adult or old has a mature body — long limbs, neck and tail, a head small for the body — not a young one's big head, round belly and short limbs)? (3) Style: is it rendered in the declared art style?${textClause} ${oneSidedFeatureRule()} If any check fails, ok is false. Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
 }
 
 /**

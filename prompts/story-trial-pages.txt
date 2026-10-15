@@ -19,6 +19,7 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - {UNNAMED_FIGURE}
 {STYLE_RULEBOOK}
 - {MOTIVE_AT_THE_ACT}
+- {BODY_CONDITION_MARKER}
 - {WHO_DOES_WHAT}
 - A figure's first scene brings them in, by arriving or by a name someone present says, before they speak or act
 - {PICTURE_COUNT}

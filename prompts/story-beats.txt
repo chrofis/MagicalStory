@@ -71,6 +71,7 @@ Requirements:
 - The emotional low point — a loss, a setback, the goal looking lost — gets a page of its own; the loss and its recovery never share a page.
 - A race or deadline the story runs on is scored mid-book at least twice — a page shows who is ahead or how much remains.
 - The stake the arc has a character say aloud lands on an early page, shown as a visible act, never as the words said.
+- {DECLARED_CONDITION_DEF}
 - A character's first page stages their {NAMING_DEF} A character in frame before anyone says who they are is unplaced.
 - A prop, pet or skill that solves a problem appears on an earlier page with its owner before it does the work, and nothing a page plants is left without a later page that pays it off.
 - {NO_COMMISSIONED_DEF}

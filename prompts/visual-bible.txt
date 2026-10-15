@@ -69,7 +69,7 @@ Work from the plan lines: an element a plan line only implies still needs an ent
 - Empty categories are `[]`.
 - One entry per secondary character, no matter how the plan lines refer to them; a person named both by relation and by attribute is one entry. Never reuse an id. Every character the story names is declared exactly once: a name that is neither in {CHARACTER_NAMES} nor a `secondaryCharacters` entry is a fault, and so are two entries for the same person under different names.
 
-Every entry needs specific colours, one signature element, and a description that works without seeing the other scenes.
+Every entry needs specific colours, one signature element, and a description that works without seeing the other scenes. {ONE_SIDED_FEATURE} {BODY_CONDITION_MARKER}
 
 Two or more beings of one kind — two cats, two horses, a grown creature and its young — are written against each other: each entry names the dimensions they share and the dimensions that tell them apart. Unrelated ones differ in at least two a child reads at a glance: colour, markings, coat or scale texture, build, ear or horn or tail shape. Ones the story makes kin share the family look — palette, markings, eye colour, head and snout shape — and part only on age and size.
 

@@ -164,7 +164,7 @@ A character present in `QUALITY_FIGURES.matches[]` is never "missing" — appear
 **One defect, one entry, one code.** Each finding names exactly one problem and carries the code for that problem. Never restate a second defect inside a finding about something else — a hair finding describes hair and nothing else, even when the same figure is also dressed wrongly. The wardrobe is its own entry under its own code. Charging a defect a second time inside another finding double-counts it, because the pipeline scores every entry.
 
 **NEVER CRITICAL — these are never a CRITICAL, and usually not a deduction at all. Check every finding against this list BEFORE tagging it CRITICAL:**
-- Left vs right anything — which hand grips, which arm reaches, which side a figure stands, which hand holds what. Mirror. Ignore entirely.
+- Left vs right anything — which hand grips, which arm reaches, which side a figure stands, which hand holds what. Mirror. Ignore entirely. {ONE_SIDED_FEATURE}
 - Motion verbs — running, walking, approaching, striding, leaping, reaching. A still image cannot show motion; a frozen pose satisfies "runs out", "walks toward", "reaches". Do NOT deduct.
 - Expression, gaze direction, head tilt, smiling-vs-serious — at most MODERATE, never CRITICAL.
 - Background or setting detail — a fence's type or material, path surface, an added tree, a building's placement, wall colour, lighting, sky, or a missing background prop.

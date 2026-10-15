@@ -83,7 +83,8 @@ describe('the plan check asks every question it says it asks', () => {
   // across time (the Jev re-plan guard is measured on CHECK[17]). Q14 (over-the-
   // shoulder on contact) retired 2026-09-27 with the planner's shot word.
   // Q10 (heights) and Q17 (whole cast) are Jev's since 2026-10-09 (server/lib/jevPlanCheck.js): not asked here.
-  const RETIRED = [10, 14, 17];
+  // 19 (landmarks) is asked only when the arc staged one; this fixture stages none. 20 (declared condition) is always asked.
+  const RETIRED = [10, 14, 17, 19];
   it('numbers its questions 1..N with no gap but a retired number, and no repeat', () => {
     const nums = questionNumbers(prompt);
     expect(nums.length).toBeGreaterThan(0);

@@ -1152,6 +1152,8 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
       // owner's other half — a text naming three actions where the frame
       // stages one.
       TEXT_NOT_A_CHECKLIST: require('./promptBuilders').TEXT_NOT_A_CHECKLIST_RULE,
+      // Side-blind one-sided features (owner 2026-10-15), the sentence the VB writers and cell gates read.
+      ONE_SIDED_FEATURE: require('./promptBuilders').ONE_SIDED_FEATURE_RULE,
     });
 
     const { callTextModel } = require('./textModels');

@@ -50,7 +50,7 @@ Check every candidate finding against this list BEFORE reporting it. These are n
   **(b) Is the page DRAWN IN that style's medium?** Already answered — you filled `style_gate` at the top of this prompt before reading any of these rules. Do not re-decide it here.
 
   (a) and (b) are opposites: (a) protects the elements the style asks for, the GATE catches a page that threw the style away. A page can pass (a) and fail the gate — photoreal people in a "graphic novel illustration" book satisfy nothing about the style except its subject matter.
-- **N-02 Left/right, everywhere.** Horizontal placement in the frame, body facing left vs right, and which limb or pocket performs an action are mirror-equivalent. Never deduct, on any axis, even against a declared interaction's direction. (A limb contacting a different OBJECT or SURFACE than declared is not a mirror — that is D-16.)
+- **N-02 Left/right, everywhere.** Horizontal placement in the frame, body facing left vs right, and which limb or pocket performs an action are mirror-equivalent. Never deduct, on any axis, even against a declared interaction's direction. (A limb contacting a different OBJECT or SURFACE than declared is not a mirror — that is D-16.) {ONE_SIDED_FEATURE}
 - **N-03 Expressions.** A specific expression not matching ("calm surprise" vs "curious"). Any expression that reads at all satisfies the beat.
 - **N-04 Hand and limb position.** Precise hand positions, gestures, and a correctly-formed limb that simply rests differently than the prose described.
 - **N-05 Prose pose detail.** Pose details in prose but NOT in DECLARED INTERACTIONS — "hands drawn in tight", "fingers curled", "chin tucked", "jaw set".

@@ -123,6 +123,7 @@ Each background describes a scene with no people, no human figures. Include: loc
 - {GARMENT_BACK}
 - {WORN_SLOT}
 - {CREATURE_FEATURES}
+- {ONE_SIDED_FEATURE} {BODY_CONDITION_MARKER}
 - A name the story gives an element lives in `properName` and nowhere else — never in `label`, `name`, `description` or the page prose. One `properName` belongs to one id: two entries never share a name. An object that transforms later in the story and the creature it becomes are separate ids, and only one of them carries the name.
 - max **2 artifacts** (only props that actually drive the action across multiple scenes — not background dressing)
 - max **2 secondary characters**, and only a person who is drawn on 2 or more pages. A person who is in one page only gets no entry and no name; the prose calls them "a friend" or "a neighbour"

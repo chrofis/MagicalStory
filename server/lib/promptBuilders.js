@@ -3390,6 +3390,9 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     // What counts as one location (2026-09-24).
     PLACE_SEPARATE: PLACE_SEPARATE_RULE,
     PLACE_INSIDE_OUTSIDE: PLACE_INSIDE_OUTSIDE_RULE,
+    // A one-sided feature is written relationally and carries a visible marker (2026-10-15).
+    ONE_SIDED_FEATURE: ONE_SIDED_FEATURE_RULE,
+    BODY_CONDITION_MARKER: BODY_CONDITION_MARKER_RULE,
     // The shot rules per path: on the Jev path a story page's shot is fixed
     // (owner, 2026-09-28) and no rule sets or widens it.
     ...shotRuleFills({ fixedShot: !jevBackup }),
@@ -8039,7 +8042,9 @@ function buildChallengeIdeasSection(inputData, count = 25) {
 // like Q5. docs/decisions.md 2026-10-08 "Plan order is must-fix".
 // Q19 (a landmark the arc staged that no plan line stages) joined 2026-10-12 with the question itself: it names a
 // picture the book owes, like Q4/Q8, and an 'also noted' line can never spend a re-plan round.
-const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 13, 14, 15, 16, 17, 19]);
+// Q20 (a page staging a figure doing what the story declared it cannot do) joined 2026-10-15 with the question itself: it
+// names a picture that contradicts the story, like Q13, and a noted finding can be refused by reviewPlanChanges (see Q13).
+const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 13, 14, 15, 16, 17, 19, 20]);
 
 /**
  * THE CHEAP-RELABEL BLOCK, declared ONCE (2026-09-20; shot codes removed 2026-09-27).
@@ -9015,7 +9020,7 @@ function plannerTypedFills(targets, mainName = null) {
   };
 }
 
-const CHECK_COUNT_WORDS = ['fifteen', 'sixteen', 'seventeen', 'eighteen'];
+const CHECK_COUNT_WORDS = ['sixteen', 'seventeen', 'eighteen', 'nineteen'];
 function checkerShotFills(legacyShots = false, extra = 0) {
   return legacyShots ? {
     PLAN_LINE_HEAD: 'One line per page: shot — who is in frame — the instant the picture shows — what is true after this page that was not before.',
@@ -9124,6 +9129,7 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // re-plan section carries none, so its template keeps it.
     WHOLE_CAST_RULE: String(replan || '').trim() && !typedPlan ? '' : ` ${WHOLE_CAST_DEF}`,
     NAMING_DEF,
+    DECLARED_CONDITION_DEF,
     WHO_DOES_WHAT: WHO_DOES_WHAT_RULE,
     ENDING_EVENT_DEF,
     EXCITING_START_DEF,
@@ -9791,6 +9797,31 @@ const MULTI_PICTURE_PROP_RULE = "An object that shows a different picture on dif
  */
 const PLACE_SEPARATE_RULE = 'Places the plan lines name separately — two different doors, two rooms, a yard and the hall behind it — are separate locations, or separate vantages of one location when they are parts of one building.';
 const PLACE_INSIDE_OUTSIDE_RULE = 'A page whose plan line puts its figures inside — in a room, on a floor, on a stair — never shares a plate with a page set outdoors, and the reverse: a building seen from both sides is an exterior vantage and an interior one, and an indoor page cites the interior.';
+
+/**
+ * A HURT CONDITION IS SHOWN BY A MARKER, NEVER BY A SIDE (owner, 2026-10-15; docs/decisions.md
+ * "Hurt condition: visible marker, no left/right in specs"). Prod job_1792078014622_uh8tj6ht1: the
+ * plot turned on a hurt wing, the Visual Bible said "the left wing hangs limp", the reference cell
+ * drew the droop on the other wing, the cell gate failed it twice by side and the page judges
+ * chased "wings swapped" across four pages.
+ *
+ * ONE_SIDED_FEATURE_RULE is ONE sentence read by the writers (visual-bible.txt, story-trial-arc.txt)
+ * and by every judge that grades against their description (the two VB cell gates and the three page
+ * judges): the writer states a one-sided feature relationally, the judges never charge the side.
+ * It extends the standing "positions are relational, a left/right mirror is no defect" rule
+ * (image-evaluation N-02, image-semantic, scene-iteration-free) from placement and handedness to
+ * a feature that belongs to one of a pair.
+ *
+ * BODY_CONDITION_MARKER_RULE is read by the arc (its Facts line), the two text writers and the two
+ * VB writers, so text and picture name the same marker.
+ *
+ * DECLARED_CONDITION_DEF is the planner's imperative and plan-check question 20 (must-fix,
+ * REPLAN_MUST_FIX_CHECKS): the same fact the STORY LOGIC "cannot" facts state, held by a question
+ * that is not noted-only like Q18.
+ */
+const ONE_SIDED_FEATURE_RULE = 'Which of a pair carries a one-sided feature (one limb, ear or eye that hangs, is marked or differs from its twin) is never stated as left or right and never judged by side: the specification is relational ("one hangs limp, the other is folded neatly"), and the same figure drawn with the feature on the other side matches it.';
+const BODY_CONDITION_MARKER_RULE = "A body condition the plot turns on (an injury, a hurt limb, a sign of illness) carries a visible marker a picture can show from any angle (a bandage, a splint, a sling, a plaster): the sentence that introduces the condition names the marker, the page text that first tells it names the marker, and the figure's Visual Bible description (where it has an entry) states the marker, so text and picture agree. How a limb hangs or moves is never the whole condition.";
+const DECLARED_CONDITION_DEF = 'A figure the story declares unable to do something (hurt, bound, asleep, too small, missing the means) is never staged doing it: a page whose instant has that figure doing what its declared condition rules out contradicts the story, whatever the page is for.';
 
 /**
  * ONE concealment contract for every stage that writes a page brief -- both Art
@@ -10521,7 +10552,7 @@ const OWED_FACT_DEF = 'a fact the plot uses (a figure\'s one ability or limit, a
  * it is OWED (OWED_FACT_DEF), the same line the owed list draws. Filled into
  * arc-create and arc-retell as {ARC_SENTENCE_RULE}.
  */
-const ARC_SENTENCE_RULE = `Each arc sentence tells what a figure does and what changes by it. Its why stays in the STORY LOGIC: a sentence states a reason only where it is ${OWED_FACT_DEF}.`;
+const ARC_SENTENCE_RULE = `Each arc sentence tells what a figure does and what changes by it. Its why stays in the STORY LOGIC: a sentence states a reason only where it is ${OWED_FACT_DEF}. ${BODY_CONDITION_MARKER_RULE}`;
 
 
 const LOAD_BEARING_RULE = `Only the OWED list (${OWED_FACT_DEF}) is owed. An owed fact is shown on the page where the story tests it: a figure meeting its limit in the moment (one who cannot follow stays behind, one too big sticks fast) or using its ability. Where no act can show it, one character says it, once in the book, in one short line at the moment it is needed, and that line carries no second fact, no reason behind it and no place or person the book has not shown. The narrator never tells an owed fact as a reason, and no figure describes itself. A fact is never applied against the story's own turn: where a figure holds out until the event that breaks it, the page before shows the holding out, and the fact gives way on the page of the event. Past an owed limit nothing the fact rules out happens on any page: no sound, sight or reach crosses it that the fact says cannot. Everything else in the arc (motives, causes, stakes, feelings, background) is the arc\'s reasoning, and a page that leaves it out drops nothing. A size, an age or a look is owed only where something is lifted, hidden, held or fitted because of it.`;
@@ -11946,6 +11977,7 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     // The roster's UNLISTED line reads the same sentence the planner's who column is held to.
     FIGURE_PART_IN_FRAME_RULE,
     NAMING_DEF,
+    DECLARED_CONDITION_DEF,
     WHO_DOES_WHAT: WHO_DOES_WHAT_RULE,
     ENDING_EVENT_DEF,
     EXCITING_START_DEF,
@@ -12771,6 +12803,8 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     WHO_DOES_WHAT: WHO_DOES_WHAT_RULE,
     STYLE_RULEBOOK: styleRulebook(inputData?.language),
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
+    // A plot-relevant body condition carries a visible marker the text names (2026-10-15).
+    BODY_CONDITION_MARKER: BODY_CONDITION_MARKER_RULE,
     PICTURE_COUNT: PICTURE_COUNT_RULE,
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
     PERIL_CEILING: PERIL_CEILING_RULE,
@@ -13106,6 +13140,10 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       WHO_DOES_WHAT: WHO_DOES_WHAT_RULE,
       STYLE_RULEBOOK: styleRulebook(language),
       MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
+      // A plot-relevant body condition carries a visible marker the text names (2026-10-15).
+      BODY_CONDITION_MARKER: BODY_CONDITION_MARKER_RULE,
+      // The trial writer's Visual Bible entries state a one-sided feature relationally (sibling of visual-bible.txt).
+      ONE_SIDED_FEATURE: ONE_SIDED_FEATURE_RULE,
       PICTURE_COUNT: PICTURE_COUNT_RULE,
       CLOSING_MOMENT: CLOSING_MOMENT_RULE,
       // Trial has no Art Director either: the scene-hint composition rules
@@ -13969,6 +14007,9 @@ module.exports = {
   PLAN_LINE_CAST_RULE,
   PLACE_SEPARATE_RULE,
   PLACE_INSIDE_OUTSIDE_RULE,
+  ONE_SIDED_FEATURE_RULE,
+  BODY_CONDITION_MARKER_RULE,
+  DECLARED_CONDITION_DEF,
   PLAN_LINE_FIELD_CONTRACT,
   FIGURE_PART_IN_FRAME_RULE,
   PAGE_CHANGE_DEF,

@@ -61,6 +61,7 @@ Answer only these {CHECK_COUNT}:
 16. The ending's cast. {HAPPY_ENDING_DEF} Say whether it does. A commissioned character missing from the last page's who column while the story keeps them with the others is a finding.
 18. The story logic. Name every page that breaks a fact THE STORY LOGIC states, and the fact it breaks. When no story logic is given, write no line for this check.
 {LANDMARK_CHECK}
+20. A declared condition. {DECLARED_CONDITION_DEF} Name every page whose instant, or whose who column, stages a figure doing what a sentence of THE STORY or a STORY LOGIC fact says that figure cannot do, and quote that sentence or fact. A page that stages the figure before the condition begins, or after the story ends it, is not a finding.
 
 # OUTPUT FORMAT
 
