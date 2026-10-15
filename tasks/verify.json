@@ -10152,6 +10152,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "reader-major-regen-2026-10-15",
+      "commits": [],
+      "addedAt": "2026-10-15",
+      "claim": "A page whose shipping version carries a MAJOR-or-worse book-audit reader finding is admitted to repair even when its score clears the threshold (and a final-audit MAJOR buys the extra round); a wrong_action finding (a different action drawn than the brief states) is repaired by page redo (iterate), never inpaint; facing, gaze and pose findings stay action_interaction and stay on inpaint.",
+      "runShape": [
+        "full-story",
+        "iterate-repair"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In the story's generationLog / repairRounds find a page with a reader finding of severity MAJOR or CRITICAL whose finalScore is at or above the repair threshold: a [FIND-BAD] 'reader rescue' line names it and a repair attempt exists for it; where the reader filed type wrong_action the attempt's method is iterate (source iterate-round-N), never inpaint. Audit record: bookAuditRounds[].imgFaults carries the type verbatim."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

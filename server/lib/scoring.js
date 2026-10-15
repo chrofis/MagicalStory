@@ -196,6 +196,10 @@ const MAX_SEVERITY_TYPES = {
   // footing as an undersized structure (D-31). The cap keeps an evaluator's
   // escalation from outranking a missing or wrong character.
   creature_scale: 'major',
+  // wrong_action capped at MAJOR (2026-10-15): a different action drawn than
+  // the brief states (flying for hopping) is a MAJOR by the semantic judge and
+  // the reader's weights; it must not outrank a missing or wrong character.
+  wrong_action: 'major',
   // garment_facing capped at MAJOR (owner-approved, 2026-10-04): image-evaluation
   // D-05e — a garment's front features drawn on a figure seen from behind (or
   // the reverse). A full-length zip on a back is plain to a reader, so it may

@@ -73,7 +73,20 @@ function findBadPages(evalPages, options = {}) {
       log.info(`[FIND-BAD] page ${pageNum}: score ${score} clears threshold ${scoreThreshold} but carries a ${rescue.severity.toUpperCase()} ${rescue.type} finding (${rescue.pool}) — type rescue, marking bad for repair`);
     }
 
-    if (score < scoreThreshold || issueCount >= issueThreshold || critical || rescue) {
+    // READER RESCUE (owner, 2026-10-15). A page whose current version carries a
+    // MAJOR-or-worse finding the book-audit READER filed is admitted whatever its
+    // score. Reader findings are charged after a round's selection
+    // (repairPipeline.rescoreWithReaderFindings), so a page can ship at 83 with a
+    // MAJOR wrong-action finding no per-page gate ever admits (prod
+    // job_1792078014622_uh8tj6ht1 p5). Structured fields only: severity and the
+    // `sources` provenance stamp. docs/decisions.md 2026-10-15.
+    const readerRescue = !critical && !rescue && score >= scoreThreshold && issueCount < issueThreshold
+      ? findReaderMajorFinding(result) : null;
+    if (readerRescue) {
+      log.info(`[FIND-BAD] page ${pageNum}: score ${score} clears threshold ${scoreThreshold} but carries a ${readerRescue.severity.toUpperCase()} reader finding (${readerRescue.type || 'untyped'}) — reader rescue, marking bad for repair`);
+    }
+
+    if (score < scoreThreshold || issueCount >= issueThreshold || critical || rescue || readerRescue) {
       bad.push({ pageNum, critical, score });
     }
   }
@@ -85,6 +98,26 @@ function findBadPages(evalPages, options = {}) {
     || ((a.score ?? 0) - (b.score ?? 0))
     || (a.pageNum - b.pageNum));
   return bad.map(b => b.pageNum);
+}
+
+/**
+ * The first MAJOR-or-worse finding the book-audit READER filed on this eval, or
+ * null. Reader findings live in the consolidated list stamped
+ * `sources: ['reader']` (findingSources.FINDING_SOURCES.READER); a finding two
+ * judges agreed on carries the reader among its sources and counts. Any type.
+ */
+function findReaderMajorFinding(result) {
+  const fs_ = require('./findingSources');
+  for (const [pool, list] of scoredFindingPools(result)) {
+    if (!Array.isArray(list)) continue;
+    for (const i of list) {
+      const severity = String(i?.severity || '').toLowerCase();
+      if (!/^(major|critical|catastrophic)$/.test(severity)) continue;
+      if (!fs_.sourcesOf(i).includes(fs_.FINDING_SOURCES.READER)) continue;
+      return { type: String(i?.type || i?.category || '').toLowerCase() || null, severity, pool };
+    }
+  }
+  return null;
 }
 
 /**
@@ -161,7 +194,9 @@ function planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed, 
 }
 
 /** Severities that may re-admit a page to repair. Admission ONLY — never a fix. */
-const AUDIT_ADMIT_SEVERITIES = new Set(['CRITICAL', 'CATASTROPHIC']);
+// MAJOR joined 2026-10-15 (owner): a MAJOR reader finding on the shipping book
+// earns a repair round like a CRITICAL one (decisions.md 2026-10-15).
+const AUDIT_ADMIT_SEVERITIES = new Set(['MAJOR', 'CRITICAL', 'CATASTROPHIC']);
 
 /**
  * How many audit-admitted pages one round may repair OVER its normal cap
@@ -1338,7 +1373,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
         const desc = require('./scoring').findingText(creature).slice(0, 80);
         return {
           method: 'iterate',
-          reason: `${what} — a creature drawn below its size is a page redo (no reference to char-fix from, not inpaintable): ${desc}`,
+          reason: `${what} — a page-redo type (${[...ITERATE_ROUTED_TYPES].join('/')}): no reference to char-fix from and not inpaintable: ${desc}`,
         };
       }
     }
@@ -1584,6 +1619,11 @@ const NOT_INPAINTABLE_TYPES = new Set([
   // setting 15/22; inpaint 12/18, 4/6, 2/3. Routed by ITERATE_ROUTED_TYPES /
   // gate 2d. docs/decisions.md 2026-10-07 "Re-staging defects go to iterate".
   'extra_character', 'missing_character', 'setting',
+  // wrong_action (owner, 2026-10-15): a different action drawn than the brief
+  // states. A pose is re-drawn, not edited; inpaint fixed MAJOR
+  // action_interaction 56 of 241 times (23%). Its own type so the facing / gaze /
+  // pose findings (action_interaction, SETTLED: inpaint) stay on inpaint.
+  'wrong_action',
   // cutout_artifact: see CROP_ARTIFACT_TYPES — the page has no such defect.
   'cutout_artifact',
 ]);
@@ -1596,7 +1636,7 @@ const NOT_INPAINTABLE_TYPES = new Set([
  * the p16 drop on staging job_1790373080139_vnx5l8iy7 told the log a
  * character repair would handle a dragon, and nothing ever did.
  */
-const ITERATE_ROUTED_TYPES = new Set(['creature_scale', 'extra_character', 'missing_character', 'setting']);
+const ITERATE_ROUTED_TYPES = new Set(['creature_scale', 'extra_character', 'missing_character', 'setting', 'wrong_action']);
 
 /**
  * Types that describe OUR entity-grid crop, not the page: a hard white gap or a
@@ -2072,4 +2112,4 @@ function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = n
 
 module.exports = {
   expressionEditBlocked, describeFigureForRepair, repairGarmentPhrase, buildRepairNameMap, buildPageRepairNameMap, nameRepairText, resolveRepairIds,
-  repairAttemptFromResult, describeCharFixFailure, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, pagesWherePickMoved, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, charFixEntityFindings, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX, scoredFindingPools };
+  repairAttemptFromResult, describeCharFixFailure, detectionForRetryEntry, findBadPages, findReaderMajorFinding, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, pagesWherePickMoved, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, charFixEntityFindings, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX, scoredFindingPools };

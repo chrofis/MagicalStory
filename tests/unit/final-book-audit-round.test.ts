@@ -66,13 +66,13 @@ describe('admitPagesFromAudit', () => {
     expect(pages).toEqual([3, 6]);
   });
 
-  it('does NOT admit a MAJOR or MINOR fault', () => {
+  it('admits a MAJOR fault (owner, 2026-10-15) but NOT a MINOR or unsevered one', () => {
     const pages = admitPagesFromAudit([
       { page: 4, severity: 'MAJOR', line: 'a detail disagrees' },
       { page: 5, severity: 'MINOR', line: 'a smaller detail disagrees' },
       { page: 9, severity: null, line: 'unsevered' },
     ]);
-    expect(pages).toEqual([]);
+    expect(pages).toEqual([4]);
   });
 
   it('ignores faults with no page — a fix target is always per page', () => {
@@ -92,7 +92,7 @@ describe('admitPagesFromAudit', () => {
   });
 
   it('severity is the ONLY thing code reads — admission, never a fix instruction', () => {
-    expect([...AUDIT_ADMIT_SEVERITIES].sort()).toEqual(['CATASTROPHIC', 'CRITICAL']);
+    expect([...AUDIT_ADMIT_SEVERITIES].sort()).toEqual(['CATASTROPHIC', 'CRITICAL', 'MAJOR']);
   });
 });
 

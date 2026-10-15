@@ -10860,6 +10860,7 @@ module.exports = {
   groupIdeasByPremise,
   ideaPremiseSkeleton,
   ideaSubjectWords,
+  STAGE_RUNNERS,
   STAGES: [...Object.keys(STAGE_RUNNERS), ...Object.keys(AVATAR_STAGES), ...Object.keys(STORY_STAGES)],
   STORY_STAGES: Object.keys(STORY_STAGES),
   AVATAR_STAGE_NAMES: Object.keys(AVATAR_STAGES),

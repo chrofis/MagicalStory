@@ -2120,10 +2120,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               roundLimit = Math.min(round + 1, maxRegenAttempts);
               record.extraRoundGranted = true;
               record.extraRoundAdmittedPages = admitted;
-              log.warn(`📖 [BOOK-AUDIT] Final audit of the shipping book found CRITICAL/CATASTROPHIC IMG fault(s) on page(s) ${admitted.join(', ')} — granting ONE extra repair round (round ${roundLimit})`);
+              log.warn(`📖 [BOOK-AUDIT] Final audit of the shipping book found MAJOR-or-worse IMG fault(s) on page(s) ${admitted.join(', ')} — granting ONE extra repair round (round ${roundLimit})`);
             } else {
               record.extraRoundGranted = false;
-              log.info(`📖 [BOOK-AUDIT] Final audit: no CRITICAL/CATASTROPHIC IMG fault — book ships as audited`);
+              log.info(`📖 [BOOK-AUDIT] Final audit: no MAJOR-or-worse IMG fault — book ships as audited`);
             }
           }
 

@@ -20,6 +20,12 @@ Two separate orchestrators share the same repair primitives:
 2. **Manual repair workflow** — `useRepairWorkflow.ts → runFullWorkflow()` (~1154), triggered
    from `RepairWorkflowPanel`. Orchestrates the HTTP endpoints in `server/routes/regeneration.js`.
 
+**Admission and routing additions (2026-10-15)** — `findBadPages` also admits a page whose current version carries a MAJOR-or-worse
+finding the book-audit READER filed (`findReaderMajorFinding`: structured `severity` + `sources`, any type, still under `applyRoundCap`);
+`AUDIT_ADMIT_SEVERITIES` is MAJOR/CRITICAL/CATASTROPHIC, so a late reader finding gets the extra round. `wrong_action` (a different action
+than the brief states) is in `ITERATE_ROUTED_TYPES`: gate 2d sends it to iterate; facing/gaze/pose stay `action_interaction` on inpaint
+(SETTLED). Replay: `scripts/analysis/replay-reader-major-admission.js`; stored-page redo check: `scripts/analysis/validate-wrong-action-iterate.js`.
+
 **Scoring model** — canonical scores live in `server/lib/scoring.js` (`computeFinalScore`,
 `applyScore`, `setVersionScores`, `capEntityPenalty`):
 ```

@@ -25,6 +25,7 @@ Last full sweep: **2026-09-06**.
 ## P0 — gating the production promotion
 
 - [ ] Showcase fixes 2026-10-07 plan (open items: render count after repair fixes, cost ledger, round-2 convergence verify) → tasks/showcase-fixes-2026-10-07.md
+- [ ] Reader MAJOR admitted to repair + wrong_action routed to page redo (2026-10-15; open: staging story-run proof, verify.json `reader-major-regen`) → tasks/repair-reader-major-regen-2026-10-15.md
 - [ ] Hurt condition visible, never by side (VB relational wording, visible marker, plan-check Q20 declared condition; prod job_1792078014622_uh8tj6ht1) → tasks/hurt-condition-visible-2026-10-15.md
 - [ ] tests/unit/public-pages-a11y.test.ts "no page or component nests a second <main>" fails on staging HEAD (fails without the 2026-10-08 changes too; not investigated) → tests/unit/public-pages-a11y.test.ts:88
 - [ ] Showcase harness 2026-10-12: with DEMO_REUSE_ACCOUNT=1 on prod, a full story job (job_1791786057698_79n8x82wd, adminDraft, idea card picked) was created ~08:21 CH while the spec was only at Step 0c (`/create?new=true`); Step 1 then failed because the generation overlay hid the character headings. Find what submitted it (wizard auto-resume of a server draft from the memory-killed run, or another session) before the next reuse-account showcase → tests/demo-story.spec.ts:1069
