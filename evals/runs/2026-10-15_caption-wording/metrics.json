@@ -1,0 +1,5 @@
+{"note":"Images and prompts stay local (gitignored): evals/runs/2026-10-15_caption-wording/*_after.jpg, *_prompt.txt",
+ "model":"grok-imagine-image-2.0","cost_usd":0.48,
+ "positives":[{"story":"job_1791902238992_1otf3def4","page":4,"caption_after":false},{"story":"job_1790373080139_vnx5l8iy7","page":18,"caption_after":false},{"story":"job_1788432259135_fr3egn0tn","page":5,"caption_after":false,"note":"legacy preamble + new sentence"}],
+ "negatives":[["job_1792077066620_xxesr9qd4",1],["job_1792077066620_xxesr9qd4",4],["job_1792077066620_xxesr9qd4",6],["job_1792054285478_wo6hyxox1",2],["job_1792054285478_wo6hyxox1",5],["job_1792053923007_a0f3ccfcp",1],["job_1792053923007_a0f3ccfcp",4],["job_1792041406330_mxoqmhu6k",3],["job_1792041406330_mxoqmhu6k",6]],
+ "negatives_new_artefact":0}
