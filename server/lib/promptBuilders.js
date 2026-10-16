@@ -3390,6 +3390,8 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     // What counts as one location (2026-09-24).
     PLACE_SEPARATE: PLACE_SEPARATE_RULE,
     PLACE_INSIDE_OUTSIDE: PLACE_INSIDE_OUTSIDE_RULE,
+    // A declared condition holds in the brief (owner 2026-10-16), the same sentence the planner and plan-check Q20 read.
+    DECLARED_CONDITION_DEF,
     // A one-sided feature is written relationally and carries a visible marker (2026-10-15).
     ONE_SIDED_FEATURE: ONE_SIDED_FEATURE_RULE,
     BODY_CONDITION_MARKER: BODY_CONDITION_MARKER_RULE,
@@ -3805,6 +3807,8 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // The per-page fallback cites a location the bible already holds; only the
     // inside/outside half of the one-place rule applies (PLACE_INSIDE_OUTSIDE_RULE).
     PLACE_INSIDE_OUTSIDE: PLACE_INSIDE_OUTSIDE_RULE,
+    // A declared condition holds in the brief (owner 2026-10-16); the all-pages fills carry it too.
+    DECLARED_CONDITION_DEF,
     // ONE counting rule for both Art Director templates — see COUNTING_RULE.
     COUNTING_RULE,
     // 8f, filled here too: the per-page template DECLARES {TRUE_RELATIVE_SIZE}
@@ -8042,9 +8046,9 @@ function buildChallengeIdeasSection(inputData, count = 25) {
 // like Q5. docs/decisions.md 2026-10-08 "Plan order is must-fix".
 // Q19 (a landmark the arc staged that no plan line stages) joined 2026-10-12 with the question itself: it names a
 // picture the book owes, like Q4/Q8, and an 'also noted' line can never spend a re-plan round.
-// Q20 (a page staging a figure doing what the story declared it cannot do) joined 2026-10-15 with the question itself: it
-// names a picture that contradicts the story, like Q13, and a noted finding can be refused by reviewPlanChanges (see Q13).
-const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 13, 14, 15, 16, 17, 19, 20]);
+// Q20 (a page staging a figure doing what the story declared it cannot do) is deliberately NOT here: owner 2026-10-16 made it a
+// noted finding (docs/decisions.md 2026-10-16), replacing the must-fix call of 2026-10-15.
+const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 13, 14, 15, 16, 17, 19]);
 
 /**
  * THE CHEAP-RELABEL BLOCK, declared ONCE (2026-09-20; shot codes removed 2026-09-27).
@@ -10703,6 +10707,7 @@ const MECHANISM_FIX_RULE = 'A fault about how something physically works (how a 
  */
 const AD_COMPOSITION_RULE = [
   '- One moment, one focal point. One main action draws the eye, drawn at its peak of motion — mid-leap, mid-swing, mid-throw — not the static pose that follows.',
+  '- A declared condition holds. ' + DECLARED_CONDITION_DEF,
   '- One instant, no history. ' + ONE_INSTANT_RULE,
   '- At most two height levels per frame. ' + HEIGHT_LEVELS_RULE,
   '- No partial immersion. ' + FOOTING_RULE,

@@ -92,8 +92,18 @@ describe('3. plan check Q20: a figure staged doing what the story says it cannot
     expect(PB.buildBeatsPrompt(input(), 4, { finalArc: '1. A story.' })).toContain(PB.DECLARED_CONDITION_DEF);
   });
 
-  it('Q20 is must-fix: the re-plan is obliged to answer it', () => {
-    expect(PB.replanRank({ check: 20 })).toBe('must');
-    expect(PB.replanRank({ check: 18 })).not.toBe('must');
+  it('Q20 is a noted finding (owner 2026-10-16): the re-plan is not obliged to answer it', () => {
+    expect(PB.replanRank({ check: 20 })).toBe('also');
+  });
+
+  it('the scene brief writers (all-pages, per-page, trial composition rule) hold the same declared-condition sentence', () => {
+    const beats = [{ pageNumber: 1, planLine: 'medium — Levin — waits — nothing', fixed: { timeOfDay: 'dusk', indoor: false } }];
+    const opts = { maxCharactersPerScene: 6, finalArc: '1.' };
+    expect(PB.buildSceneBriefsAllPrompt(input(), beats, opts)).toContain(PB.DECLARED_CONDITION_DEF);
+    const perPage = PB.buildSceneExpansionPrompt(1, 'Levin waits.', chars, 'en', null, '', null, { story: input() });
+    expect(perPage).toContain(PB.DECLARED_CONDITION_DEF);
+    expect(perPage).not.toContain('{DECLARED_CONDITION_DEF}');
+    expect(PB.AD_COMPOSITION_RULE).toContain(PB.DECLARED_CONDITION_DEF);
+    expect(PB.buildTrialPagesPrompt(input(), 4, 'arc')).toContain(PB.DECLARED_CONDITION_DEF);
   });
 });

@@ -10142,13 +10142,13 @@
       "id": "hurt-condition-visible-2026-10-15",
       "commits": [],
       "addedAt": "2026-10-15",
-      "claim": "On a story whose plot turns on a hurt limb, the arc sentence introducing it names a visible marker (bandage, splint, sling), the page text that first tells it names the same marker, and the Visual Bible description states it without left or right; the VB cell gate does not fail a cell for which side carries the feature; the plan check asks question 20 and no page stages a figure doing what the story declares it cannot do.",
+      "claim": "On a story whose plot turns on a hurt limb, the arc sentence introducing it names a visible marker (bandage, splint, sling), the page text that first tells it names the same marker, and the Visual Bible description states it without left or right; the VB cell gate does not fail a cell for which side carries the feature; the plan check asks question 20 and no page stages a figure doing what the story declares it cannot do. A scene brief for a figure the story declares unable to do something does not stage it (hop stays a hop, no mid-air leap).",
       "runShape": [
         "full-story"
       ],
       "check": {
         "kind": "human",
-        "what": "In the story's arc find the sentence introducing the condition and its marker; in storyText the first page telling it names that marker; in visualBible the figure's description states the marker and contains no 'left' or 'right'; in the generationLog the plan_check prompt contains question 20 and no CHECK[20] stays open in the shipped plan; vb cell gate reasons mention no side."
+        "what": "In the story's arc find the sentence introducing the condition and its marker; in storyText the first page telling it names that marker; in visualBible the figure's description states the marker and contains no 'left' or 'right'; in the generationLog the plan_check prompt contains question 20 and no CHECK[20] stays open in the shipped plan; vb cell gate reasons mention no side. In sceneDescriptions find the page staging that figure's action: the brief's verb is the plan line's verb, not an escalation."
       },
       "status": "pending",
       "evidence": []
