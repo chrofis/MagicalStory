@@ -4223,7 +4223,7 @@
       "rootCause": "promptBuilders.foldForQuote kept apostrophes, so a quote wrapped in single quotes folded to \"'tschüss spaghetti'\" and could not match the arc; and quoteFoundIn required three words, so the two-word dialogue line could never verify even when exact.",
       "fix": "foldForQuote folds every single-quote form to one apostrophe and drops apostrophes that are not inside a word; quoteFoundIn accepts a shorter-than-three-word quote only as a whole span the arc itself puts in quotation marks (quotedSpansOf). One matcher serves panel and critique (parseArcIssues). tests/unit/arc-logic-first.test.ts",
       "status": "fixed",
-      "fixedIn": "PENDING"
+      "fixedIn": "09077ad79"
     }
   ]
 }
