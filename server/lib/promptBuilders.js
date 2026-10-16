@@ -10879,6 +10879,20 @@ const ARC_SENSE_RULE = 'Every turn holds against what the story has already made
 const ARC_PLACE_RULE = 'Every place the story stages is inside or outside, and a move between them goes through a way the place has: a door inside a building is reached from inside it, and a thing dropped, spilled or tipped lands where it happens — never on ground on the other side of a wall.';
 
 /**
+ * THE WORLD FRAME (owner, 2026-10-16). Prod job_1792078014622_uh8tj6ht1: a story
+ * set at a real town and its real landmarks had a ship with a crew simply lying
+ * among the leaf piles, "woken by the fog" - nobody asked how it came to be
+ * there. Owner: "Is this a fairy tale, or does it start realistically and they
+ * get pulled into a magic world? If it is a fairy world, there is a ship and
+ * crew there. If it starts in real life, this must be explained." ONE string:
+ * the creator's TELLING_RULES (so the re-teller too), the creator's critique,
+ * the panel's FRAME lens and the trial arc writer. It works with both ways a
+ * story's world enters the commission (a real home town and its landmarks, or
+ * a theme's make-believe world): the arc picks the frame.
+ */
+const WORLD_FRAME_RULE = 'The arc decides its world frame and keeps it: (1) a make-believe world from the first page, where its wonders are ordinary and need no explaining; (2) the real world throughout, where nothing impossible happens; or (3) the real world first, then a crossing into the magical - the crossing is a staged moment with a cause the reader sees, an act or an event that turns the ordinary place magical, after which the magic is ordinary, and the story usually returns at the end. A story that opens at real places (a real town, real landmarks) opens in the real world, so it is frame 2 or 3 unless the commission itself puts it in a make-believe world. In the real world (frame 2, or frame 3 before the crossing) anything impossible that appears - a creature, a vehicle, a crew, a power - is a fault unless it arrives through the crossing.';
+
+/**
  * EVERY CHILD ACTS (owner, 2026-09-23): every commissioned child does something
  * of their own that matters to the plot. It replaced "Everyone else — … — is
  * simply there alongside the main character. No moment of their own, no arc."
@@ -11035,6 +11049,7 @@ function buildTellingRulesSection(inputData = {}) {
     `- ${ARC_GIVEN_RULE}`,
     `- ${ARC_SENSE_RULE}`,
     `- ${ARC_PLACE_RULE}`,
+    `- ${WORLD_FRAME_RULE}`,
     '- Names the commission gives stand as written.',
     '- When the deadline is a time of day, the story starts at an hour the book\'s length can cross to reach it.',
     `- The commission's central figure — ${CENTRAL_FIGURE_DEF} — acts: chooses, moves, speaks, changes something; never cargo another figure carries. One that cannot act yet acts through what it does to the others — it stirs, warms, calls, gives a sign.`,
@@ -11153,7 +11168,7 @@ function arcLogicSpec(inputData = {}, pageCount = 10) {
 // (MAJOR/CRITICAL only) filtered it out, it rode into the pages, and the text
 // repair invented hardware to close it. The generator half is ARC_SENSE_RULE
 // ("that could not happen").
-const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line, a main character with no turn, a figure on the character list with no act of their own, a want or quarrel given and never answered, and an action at the turn or the climax that could not happen as the arc states it always are; or [MINOR] — a blemish.';
+const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line, a main character with no turn, a figure on the character list with no act of their own, a want or quarrel given and never answered, an action at the turn or the climax that could not happen as the arc states it always are, and so are something impossible simply there in the real world and a crossing into the magical with no cause the reader sees; or [MINOR] — a blemish.';
 
 /**
  * THE ARC CRITIQUE SPEC — ONE source, both arc templates (owner, 2026-09-19).
@@ -11178,7 +11193,7 @@ const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real
 function arcCritiqueSpec({ retell = false, inputData = {} } = {}) {
   const remain = retell ? ' that remain' : '';
   return [
-    `"Faults:" then the arc's three worst faults${remain}, one per numbered line, or the single word "none". ${ARC_ISSUE_RULE} A fault is one of these: ${ARC_LOGIC_CHECK} Or one of these: ${ARC_PART_CHECK} Or a break of one of these rules: ${[...arcStakesRules(inputData), EVERY_CHILD_ACTS_RULE].join(' ')} Each line: ${arcIssueLine()} ${ARC_FINDING_RULE} Tag each ${ARC_SEVERITY_DEF} A fault is never a count, a page number or a sourced measurement.`,
+    `"Faults:" then the arc's three worst faults${remain}, one per numbered line, or the single word "none". ${ARC_ISSUE_RULE} A fault is one of these: ${ARC_LOGIC_CHECK} Or one of these: ${ARC_PART_CHECK} Or a break of one of these rules: ${[...arcStakesRules(inputData), EVERY_CHILD_ACTS_RULE, WORLD_FRAME_RULE].join(' ')} Each line: ${arcIssueLine()} ${ARC_FINDING_RULE} Tag each ${ARC_SEVERITY_DEF} A fault is never a count, a page number or a sourced measurement.`,
     '',
     '"Commission honored:" one line — "yes", or the commission\'s own words the arc drops or inverts, quoted; a TOPIC PROMISE, where one is given, counts among the commission\'s words.',
   ].join('\n');
@@ -11248,6 +11263,7 @@ function buildArcPanelPrompt(inputData, committedBlock) {
     ARC_GIVEN_RULE,
     ARC_SENSE_RULE,
     ARC_PLACE_RULE,
+    WORLD_FRAME_RULE,
     // The ENDING lens reads the creator's own TELLING_RULES line (2026-09-27).
     ARC_CLOSING_MOMENT_RULE: CLOSING_MOMENT_RULE,
     // The STAKES lens reads the rules the creator's TELLING_RULES carry, for
@@ -13199,6 +13215,8 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // The trial writer is its own arc creator: the stakes rule the arc
       // creator, critique and panel read (arcStakesRules) is a writer rule here.
       ARC_QUESTIONS_ANSWERED: ARC_QUESTIONS_ANSWERED_RULE,
+      // Same string the arc creator is given in TELLING_RULES (owner, 2026-10-16).
+      WORLD_FRAME: WORLD_FRAME_RULE,
       NO_DASH: NO_DASH_RULE,
       PAGE_CONTINUITY: PAGE_CONTINUITY_RULE,
       NEIGHBOUR_PHRASE: NEIGHBOUR_PHRASE_RULE,
@@ -14060,6 +14078,7 @@ module.exports = {
   WHO_DOES_WHAT_RULE,
   ARC_SENSE_RULE,
   ARC_PLACE_RULE,
+  WORLD_FRAME_RULE,
   SIZE_LOOK_RULE,
   CENTRAL_FIGURE_DEF,
   EVERY_CHILD_ACTS_RULE,

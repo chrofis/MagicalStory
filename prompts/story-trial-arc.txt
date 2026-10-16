@@ -17,6 +17,7 @@ SHORT story — {PAGES} scenes. Keep it focused:
 {RISK_FRAMING}
 - {PERIL_CEILING}
 - {ARC_QUESTIONS_ANSWERED}
+- {WORLD_FRAME}
 
 # Story Parameters
 

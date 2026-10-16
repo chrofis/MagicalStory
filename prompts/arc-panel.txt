@@ -26,6 +26,7 @@ The critique above lists what the creator already sees; find what the creator MI
 - REPLACEABLE — a turn that takes, breaks or blocks something the characters need, where the arc never says what stops them simply getting another, going round it, or doing without.
 - SENSE — the rule: {ARC_SENSE_RULE}
 - PLACE — the rule: {ARC_PLACE_RULE} An action that moves between inside and outside in a way the places forbid breaks it.
+- FRAME — the rule: {WORLD_FRAME_RULE} An arc that opens at real places with something impossible simply there, or that crosses into the magical with no cause the reader sees, breaks it. That issue quotes the sentence where the impossible thing appears.
 - STAKES — the rules: {ARC_STAKES_RULES}
 - ENDING — the rule: {ARC_CLOSING_MOMENT_RULE} An arc whose last sentences give the main relationship no such moment breaks it.
 - CAST — the rule: {ARC_CAST_RULE} A figure on the character list who only stands by, an adult whose only part is a permission, a warning or watching, or a want or quarrel given before the middle that the ending never answers in that figure's own act or line, breaks it. That issue names the figure and quotes the sentence where they only watch, or the sentence that gives the want.
