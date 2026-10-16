@@ -11363,7 +11363,9 @@ function parseArcHints(raw) {
  * Mechanical, never a reading of meaning: a quote is a span between double
  * quotes, guillemets or curly quotes; it verifies when a piece of it of three
  * or more words (split at an ellipsis) appears in the reviewed block, compared
- * lowercased with punctuation folded to spaces. Quotes inside "Smallest
+ * lowercased with punctuation and quote marks (single, double, guillemets,
+ * curly or straight) folded away; a shorter quote verifies only as a whole span
+ * the reviewed block itself puts in quotation marks. Quotes inside "Smallest
  * change: …" are the proposed repair, not evidence, and are not read.
  *
  * Every failure is loud (log.warn) and reported, never defaulted:
@@ -11386,15 +11388,31 @@ const ARC_ISSUE_LENS_RE = /^(?:\*\*)?([A-Z]{3,})(?:\*\*)?\s*:/;
 // The severities the re-telling repairs; a MINOR is never handed to it.
 const ARC_REPAIR_SEVERITIES = new Set(['CRITICAL', 'MAJOR']);
 
+// Quote marks never decide whether evidence is found: every curly/straight
+// single mark (including the low and angle forms) folds to one apostrophe,
+// then an apostrophe that does not sit INSIDE a word ("it's") is dropped, so a
+// panelist's 'Tschüss, Spaghetti' matches the arc's "Tschüss, Spaghetti".
 function foldForQuote(t) {
-  return ` ${String(t || '').toLowerCase().replace(/[’‘`]/g, "'").replace(/[^\p{L}\p{N}']+/gu, ' ').trim()} `;
+  const folded = String(t || '').toLowerCase()
+    .replace(/[’‘‚‛ʼ`´‹›]/g, "'")
+    .replace(/[^\p{L}\p{N}']+/gu, ' ')
+    .replace(/(^|\s)'+|'+(?=\s|$)/g, '$1')
+    .replace(/\s+/g, ' ').trim();
+  return ` ${folded} `;
 }
 
-function quoteFoundIn(quote, haystack) {
-  const pieces = String(quote).split(/…|\.\.\./)
-    .map(p => foldForQuote(p).trim())
-    .filter(p => p.split(' ').length >= 3);
-  return pieces.length > 0 && pieces.some(p => haystack.includes(` ${p} `));
+// The folded spans the reviewed block itself puts in quotation marks (its
+// dialogue). A quote of fewer than three words verifies only as one of these
+// WHOLE spans: short fragments of ordinary prose stay unverifiable.
+function quotedSpansOf(block) {
+  return new Set([...String(block || '').matchAll(PANEL_QUOTE_RE)].map(m => foldForQuote(m[1]).trim()).filter(Boolean));
+}
+
+function quoteFoundIn(quote, haystack, arcSpans = new Set()) {
+  const raw = String(quote);
+  const pieces = raw.split(/…|\.\.\./).map(p => foldForQuote(p).trim()).filter(Boolean);
+  if (pieces.length === 1 && arcSpans.has(pieces[0])) return true;
+  return pieces.some(p => p.split(' ').length >= 3 && haystack.includes(` ${p} `));
 }
 
 /** "(s4, s9-10)" → [4, 9, 10]; sorted, unique. */
@@ -11411,6 +11429,7 @@ function citedSentences(group) {
 
 function parseArcIssues(text, reviewedBlock, { source = 'panel' } = {}) {
   const haystack = foldForQuote(reviewedBlock);
+  const arcSpans = quotedSpansOf(reviewedBlock);
   const issues = [];
   const dropped = [];
   const malformed = [];
@@ -11428,7 +11447,7 @@ function parseArcIssues(text, reviewedBlock, { source = 'panel' } = {}) {
     }
     const body = m[4].split(/smallest change\s*:/i)[0];
     const quotes = [...body.matchAll(PANEL_QUOTE_RE)].map(q => q[1]);
-    const verified = quotes.filter(q => quoteFoundIn(q, haystack));
+    const verified = quotes.filter(q => quoteFoundIn(q, haystack, arcSpans));
     const unverified = quotes.filter(q => !verified.includes(q));
     if (!verified.length) {
       dropped.push(line);

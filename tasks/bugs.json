@@ -4214,6 +4214,16 @@
       "fix": "client/src/utils/trialIdeas.ts records the input key the ideas were produced for; TrialWizard drops ideas, selection, attempt counter and titlePageData when the key no longer matches, so the ideas step regenerates through its existing auto-generate path. tests/unit/trial-ideas-reset-on-story-kind-change.test.ts",
       "status": "fixed",
       "fixedIn": "7a96a2e85"
+    },
+    {
+      "id": "arc-panel-quote-style-drops-valid-finding",
+      "title": "A CRITICAL arc-panel finding was dropped as unquoted because the panelist wrote the arc's double-quoted dialogue in single quotes",
+      "reportedAt": "2026-10-16",
+      "source": "Prod job_1792078014622_uh8tj6ht1, generationLog arc_panel_unquoted: '1. [CRITICAL] (s19) ENDING: ... \"'Tschüss, Spaghetti'\" ...' dropped; the arc says: Eliah says \"Tschüss, Spaghetti\".",
+      "rootCause": "promptBuilders.foldForQuote kept apostrophes, so a quote wrapped in single quotes folded to \"'tschüss spaghetti'\" and could not match the arc; and quoteFoundIn required three words, so the two-word dialogue line could never verify even when exact.",
+      "fix": "foldForQuote folds every single-quote form to one apostrophe and drops apostrophes that are not inside a word; quoteFoundIn accepts a shorter-than-three-word quote only as a whole span the arc itself puts in quotation marks (quotedSpansOf). One matcher serves panel and critique (parseArcIssues). tests/unit/arc-logic-first.test.ts",
+      "status": "fixed",
+      "fixedIn": "PENDING"
     }
   ]
 }

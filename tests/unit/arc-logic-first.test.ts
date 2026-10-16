@@ -457,6 +457,27 @@ describe('parseArcIssues — the three worst issues, each quoting the arc (owner
     expect(PB.filterPanelFindings('1. [MAJOR] (s2) LOGIC: x — "takes it"', block).kept).toHaveLength(0);
   });
 
+  // Regression: prod job_1792078014622_uh8tj6ht1 — a CRITICAL ending finding was
+  // dropped as "unquoted" because the panelist wrapped the arc's double-quoted
+  // dialogue in single quotes (and the line is two words).
+  it('quote style does not decide the match: single, guillemet, curly quotes find the arc\'s own dialogue', () => {
+    const arc = 'Eliah waves from the plank; Eliah says "Tschüss, Spaghetti", she hops down into her flock.';
+    const line = (q: string) => `1. [CRITICAL] (s19) ENDING: closed with only a quick goodbye — ${q} — no warmth.`;
+    for (const q of [`"'Tschüss, Spaghetti'"`, `"Tschüss, Spaghetti"`, `«Tschüss, Spaghetti»`, `„‚Tschüss, Spaghetti‘“`, `“‘Tschüss, Spaghetti’”`, `"’Tschüss, Spaghetti’"`]) {
+      expect(PB.filterPanelFindings(line(q), arc).kept, q).toHaveLength(1);
+    }
+    // Three-plus words behind single quotes inside prose still match.
+    expect(PB.filterPanelFindings('1. [MAJOR] (s2) LOGIC: x — "\'nebla TAKES it\'"', block).kept).toHaveLength(1);
+  });
+
+  it('a short quote verifies only as a whole quoted span of the arc; misquoted or prose fragments stay dropped', () => {
+    const arc = 'Eliah says "Tschüss, Spaghetti", she hops down into her flock.';
+    const line = (q: string) => `1. [CRITICAL] (s19) ENDING: x — ${q} — y`;
+    expect(PB.filterPanelFindings(line(`"'Tschüss, Möwe'"`), arc).dropped).toHaveLength(1);
+    expect(PB.filterPanelFindings(line(`"hops down"`), arc).dropped).toHaveLength(1);
+    expect(PB.filterPanelFindings(line(`"Tschüss"`), arc).dropped).toHaveLength(1);
+  });
+
   it('the panel reports three worst, by the creator critique\'s own issue rule, line and severity scale', async () => {
     await loadPromptTemplates();
     const panel = PB.buildArcPanelPrompt(input(5), block);
