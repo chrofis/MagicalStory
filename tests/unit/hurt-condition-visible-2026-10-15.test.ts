@@ -104,6 +104,13 @@ describe('3. plan check Q20: a figure staged doing what the story says it cannot
     expect(perPage).toContain(PB.DECLARED_CONDITION_DEF);
     expect(perPage).not.toContain('{DECLARED_CONDITION_DEF}');
     expect(PB.AD_COMPOSITION_RULE).toContain(PB.DECLARED_CONDITION_DEF);
+    // rule 5: one peak-of-action sentence at every site, no 'mid-leap' escalation example (regression: the old wording pushed a hop to a leap)
+    expect(PB.PEAK_OF_ACTION_RULE).not.toMatch(/mid-leap|peak of motion/);
+    for (const p of [PB.buildSceneBriefsAllPrompt(input(), beats, opts), perPage, PB.buildTrialPagesPrompt(input(), 4, 'arc')]) {
+      expect(p).toContain(PB.PEAK_OF_ACTION_RULE);
+      expect(p).not.toMatch(/peak of motion|mid-leap/);
+      expect(p).not.toContain('{PEAK_OF_ACTION}');
+    }
     expect(PB.buildTrialPagesPrompt(input(), 4, 'arc')).toContain(PB.DECLARED_CONDITION_DEF);
   });
 });

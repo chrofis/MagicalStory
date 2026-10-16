@@ -3392,6 +3392,7 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     PLACE_INSIDE_OUTSIDE: PLACE_INSIDE_OUTSIDE_RULE,
     // A declared condition holds in the brief (owner 2026-10-16), the same sentence the planner and plan-check Q20 read.
     DECLARED_CONDITION_DEF,
+    PEAK_OF_ACTION: PEAK_OF_ACTION_RULE,
     // A one-sided feature is written relationally and carries a visible marker (2026-10-15).
     ONE_SIDED_FEATURE: ONE_SIDED_FEATURE_RULE,
     BODY_CONDITION_MARKER: BODY_CONDITION_MARKER_RULE,
@@ -3809,6 +3810,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     PLACE_INSIDE_OUTSIDE: PLACE_INSIDE_OUTSIDE_RULE,
     // A declared condition holds in the brief (owner 2026-10-16); the all-pages fills carry it too.
     DECLARED_CONDITION_DEF,
+    PEAK_OF_ACTION: PEAK_OF_ACTION_RULE,
     // ONE counting rule for both Art Director templates — see COUNTING_RULE.
     COUNTING_RULE,
     // 8f, filled here too: the per-page template DECLARES {TRUE_RELATIVE_SIZE}
@@ -9825,6 +9827,10 @@ const PLACE_INSIDE_OUTSIDE_RULE = 'A page whose plan line puts its figures insid
  */
 const ONE_SIDED_FEATURE_RULE = 'Which of a pair carries a one-sided feature (one limb, ear or eye that hangs, is marked or differs from its twin) is never stated as left or right and never judged by side: the specification is relational ("one hangs limp, the other is folded neatly"), and the same figure drawn with the feature on the other side matches it.';
 const BODY_CONDITION_MARKER_RULE = "A body condition the plot turns on (an injury, a hurt limb, a sign of illness) carries a visible marker a picture can show from any angle (a bandage, a splint, a sling, a plaster): the sentence that introduces the condition names the marker, the page text that first tells it names the marker, and the figure's Visual Bible description (where it has an entry) states the marker, so text and picture agree. How a limb hangs or moves is never the whole condition.";
+// The peak-of-motion instruction, anchored to the plan's own action (owner 2026-10-16, docs/decisions.md): the old wording
+// ("at its peak of motion - mid-leap, mid-swing, mid-throw") pushed a hop to a leap. ONE sentence for both Art Director
+// templates and the trial composition rule.
+const PEAK_OF_ACTION_RULE = 'One main action draws the eye, drawn at the liveliest instant of the action the plan line names, never a bigger action (a hop stays a hop, a walk stays a walk) and never the static pose that follows.';
 const DECLARED_CONDITION_DEF = 'A figure the story declares unable to do something (hurt, bound, asleep, too small, missing the means) is never staged doing it: a page whose instant has that figure doing what its declared condition rules out contradicts the story, whatever the page is for.';
 
 /**
@@ -10706,7 +10712,7 @@ const MECHANISM_FIX_RULE = 'A fault about how something physically works (how a 
  * Director does.
  */
 const AD_COMPOSITION_RULE = [
-  '- One moment, one focal point. One main action draws the eye, drawn at its peak of motion — mid-leap, mid-swing, mid-throw — not the static pose that follows.',
+  '- One moment, one focal point. ' + PEAK_OF_ACTION_RULE,
   '- A declared condition holds. ' + DECLARED_CONDITION_DEF,
   '- One instant, no history. ' + ONE_INSTANT_RULE,
   '- At most two height levels per frame. ' + HEIGHT_LEVELS_RULE,
@@ -14015,6 +14021,7 @@ module.exports = {
   ONE_SIDED_FEATURE_RULE,
   BODY_CONDITION_MARKER_RULE,
   DECLARED_CONDITION_DEF,
+  PEAK_OF_ACTION_RULE,
   PLAN_LINE_FIELD_CONTRACT,
   FIGURE_PART_IN_FRAME_RULE,
   PAGE_CHANGE_DEF,
