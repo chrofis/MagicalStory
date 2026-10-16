@@ -10160,7 +10160,7 @@
       "claim": "A page whose shipping version carries a MAJOR-or-worse book-audit reader finding is admitted to repair even when its score clears the threshold (and a final-audit MAJOR buys the extra round); a wrong_action finding (a different action drawn than the brief states) is repaired by page redo (iterate), never inpaint; facing, gaze and pose findings stay action_interaction and stay on inpaint.",
       "runShape": [
         "full-story",
-        "iterate-repair"
+        "needs-iterate-repair"
       ],
       "check": {
         "kind": "human",
