@@ -44,23 +44,40 @@ function requiredObjects(p: string): string {
   return p.slice(i, end < 0 ? undefined : end);
 }
 
+/**
+ * The fixture is a prompt that was SENT, so it carries the preamble paragraph
+ * ("Generate a SINGLE illustration ...") as worded that day. The cut order
+ * drops that paragraph by exact text match against the CURRENT template
+ * (images.js templateParagraph), as it does for every prompt built today. Swap
+ * the stored paragraph for the current one so a rewording of the preamble does
+ * not silently turn the drop into a no-op in this test (decisions.md 2026-10-16).
+ */
+const PREAMBLE_START = 'Generate a SINGLE illustration';
+function withCurrentPreamble(stored: string): string {
+  const para = (t: string) => t.split(/\n{2,}/).map((x: string) => x.trim()).find((x: string) => x.startsWith(PREAMBLE_START));
+  const old = para(stored);
+  if (!old) throw new Error('fixture prompt has no preamble paragraph');
+  return stored.split(old).join(para(PROMPT_TEMPLATES.imageGeneration) as string);
+}
+
 describe.each(FX.prompts.map((x: any) => [x.id, x]))('run 9 %s', (_id, fx: any) => {
   it('fits the cap on block drops alone: size kept, no scene shortening, no failure', async () => {
+    const prompt = withCurrentPreamble(fx.prompt);
     shorten.shortenSceneOnce = async () => { llmCalls++; throw new Error('the scene must not need shortening'); };
     llmCalls = 0;
-    expect(fx.prompt.length).toBeGreaterThan(fx.cap);
-    expect(images.promptFloor(fx.prompt)).toBeLessThanOrEqual(fx.cap);
+    expect(prompt.length).toBeGreaterThan(fx.cap);
+    expect(images.promptFloor(prompt)).toBeLessThanOrEqual(fx.cap);
     const meta: any = {};
-    const sent: string = await images.shrinkPromptForModel(fx.prompt, fx.cap, `TEST run9 ${fx.id}`, null, meta);
+    const sent: string = await images.shrinkPromptForModel(prompt, fx.cap, `TEST run9 ${fx.id}`, null, meta);
     expect(llmCalls).toBe(0);
     expect(sent.length).toBeLessThanOrEqual(fx.cap);
     expect(sent).toContain(PB.COMPOSITION_SIZE_BULLET);
     expect(sent).toContain(DEPTH);
-    const ro = requiredObjects(fx.prompt);
+    const ro = requiredObjects(prompt);
     expect(ro.length).toBeGreaterThan(0);
     expect(sent).toContain(ro);
     // The scene went out as built: the head the judges read is the built head minus ranked blocks only.
-    for (const para of fx.prompt.split(/\n{2,}/).filter((p: string) => p.trim() && !shorten.isLabelledBlock(p))) {
+    for (const para of prompt.split(/\n{2,}/).filter((p: string) => p.trim() && !shorten.isLabelledBlock(p))) {
       expect(sent, para.slice(0, 60)).toContain(para.trim());
     }
   });

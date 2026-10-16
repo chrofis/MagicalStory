@@ -4,20 +4,22 @@ import path from 'path';
 
 // Regression for tasks/bugs.json `trial-page-unrequested-caption-shipped`: pages
 // came back with a painted title/caption/name/signature although the preamble
-// already banned lettering. The fix is ONE sentence in the shared page template
+// already banned lettering. The fix is the label words inside the lettering ban of the shared page template
 // (docs/decisions.md 2026-10-15), so trial pages, full pages and covers (all
 // built by buildImagePrompt from image-generation.txt) carry it together.
 const { loadPromptTemplates } = require('../../server/services/prompts');
 const PB = require('../../server/lib/promptBuilders');
 
-const SENTENCE = "That includes a title or caption for the picture, a character's name, a phrase describing the moment, and an artist's signature: the picture carries no label of its own.";
+const SENTENCE = 'No lettering on any surface: no words, names, letters, title, caption, label or signature. The only exception is a REQUIRED TEXT block below; with no such block, nothing is lettered.';
 
 beforeAll(async () => { await loadPromptTemplates(); });
 
 describe('page image prompt carries the no-label sentence', () => {
-  it('is in the shared template file, right after the lettering exception', () => {
+  it('is in the shared template file, folded into the lettering ban', () => {
     const t = fs.readFileSync(path.join(__dirname, '..', '..', 'prompts', 'image-generation.txt'), 'utf8');
-    expect(t).toContain('nothing in the image is lettered. ' + SENTENCE);
+    expect(t).toContain(SENTENCE);
+    // wording folded into the ban, not appended (decisions.md 2026-10-16): the ban stays no longer than before ee5f18f77 (184 chars)
+    expect(SENTENCE.length).toBeLessThanOrEqual(184);
   });
 
   it('reaches the built prompt (the one builder every page path calls)', () => {
