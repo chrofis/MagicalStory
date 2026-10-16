@@ -77,8 +77,9 @@ describe('Art Director composition rules reach every writer that authors scene h
     expect(built[name]).toContain(AD_COMPOSITION_RULE);
   });
 
-  it('is one block of six bullets', () => {
-    expect(AD_COMPOSITION_RULE.split('\n').filter((l: string) => l.startsWith('- '))).toHaveLength(6);
+  // 7 since 2026-10-16: the declared-condition bullet (DECLARED_CONDITION_DEF, docs/decisions.md 2026-10-16) joined the block.
+  it('is one block of seven bullets', () => {
+    expect(AD_COMPOSITION_RULE.split('\n').filter((l: string) => l.startsWith('- '))).toHaveLength(7);
   });
 
   it('does not reach the beats text writer, which stages nothing', () => {
