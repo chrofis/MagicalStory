@@ -6547,6 +6547,10 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     PERIL_CEILING: PERIL_CEILING_RULE,
     PAYOFF_KEEP: PAYOFF_KEEP_RULE,
     MECHANISM_FIX: MECHANISM_FIX_RULE,
+    TEXT_VS_PICTURE: TEXT_VS_PICTURE_RULE,
+    NO_CONTENT_LOSS: NO_CONTENT_LOSS_RULE,
+    NO_PLAN_STAGING: NO_PLAN_STAGING_RULE,
+    YOUNG_CHILD_SPEECH: YOUNG_CHILD_SPEECH_RULE,
     LOAD_BEARING: LOAD_BEARING_RULE,
     OWED_FACTS: buildOwedFacts(storyLogic),
     EDIT_CAP_PERCENT: Math.round(MODEL_DEFAULTS.textRefineMaxChangedRatio * 100),
@@ -10467,6 +10471,43 @@ const NEIGHBOUR_PHRASE_RULE = 'No phrase is repeated from a neighbouring sentenc
 const NO_ABBREVIATION_RULE = 'No abbreviation or acronym reaches the page; write the thing the way a child says it.';
 
 /**
+ * TEXT AND PICTURE (owner, 2026-10-16: "The text must not contradict the
+ * picture. But it can go further. Text should be picture and more."). ONE
+ * statement of the relation, filled into the text audit (its MISMATCH
+ * definition) and the text refine (what a MISMATCH fix may touch). Before this
+ * the refine moved the TEXT to fit every picture: 23 of 23 MISMATCH findings on
+ * the measured stories were closed by rewriting text, about 5 in 12 by cutting
+ * an act. See docs/decisions.md 2026-10-16.
+ */
+const TEXT_VS_PICTURE_RULE = 'The text must not contradict the picture, and it may go further: the text is the picture and more. A person, creature, object or action the picture does not show, but the story carries, is no fault. Only a real contradiction is one: the text says something the picture visibly contradicts (the opposite act, another colour, kind or number, a place or time the picture shows otherwise).';
+
+/**
+ * A plan line says what happens, not how to stage it (owner, 2026-10-16). The
+ * full writer's header said the text "matches" the plan lines "page for page"
+ * and a plan line carries "the move that gets them there", so the prose copied
+ * the picture's poses and placements (5 of 14 sampled pages). Shared by the
+ * beats writer, the trial writer and the text refine (story-prose-writers,
+ * text-refine-vs-text-critics).
+ */
+const NO_PLAN_STAGING_RULE = "A plan line, a scene hint and an ILLUSTRATION line say what happens in the picture; they are not a script for the sentences. The page tells what happens, what is said and felt, and why, in the characters' acts and words. It does not copy the picture's poses or placements: who kneels, stands or sits, where a chain, rope or path runs, who is beside whom, how far apart things are.";
+
+/**
+ * How very young characters talk (owner, 2026-10-16). The writer got only
+ * "Age: 2" and a two-year-old said an infinitive command copied from the arc's
+ * wording; the other toddlers got one- and two-word lines. Generic: no
+ * example speech, which would be copied into every story.
+ */
+const YOUNG_CHILD_SPEECH_RULE = "A character of about three or younger talks the way a small child in a picture book talks: short, natural child speech, a word or a few words about what they see, want or feel right now, in the voice of that one child. Never an infinitive command, a grown-up's phrase, or wording lifted from the arc or a plan line put into their mouth. This is their speech only; the narration keeps the reading level, and there is no baby-talk spelling or sound-effect word.";
+
+/**
+ * NO CONTENT LOSS (owner, 2026-10-16). A finding that is not a logic fault
+ * (STYLE and the like) rewords; it never removes story. On the measured stories
+ * the refine deleted 2 to 5 story facts per story to close STYLE findings
+ * (a simile that explains a name; a rhyme a later page calls back to).
+ */
+const NO_CONTENT_LOSS_RULE = "A STYLE finding, or any finding that is not a logic fault, only REWORDS. Closing it never removes a story fact, an event, the meaning of a spoken line, the explanation of a name, or a phrase or rhyme the story repeats or refers back to on another page: a line a later page calls back to is the story's own and is never slop. If the only way to close such a finding is to cut story, the ledger line reads `<id> STANDS: <what the cut would lose>`.";
+
+/**
  * What makes a title the one to ship, in judging order — the same criteria for
  * the beats writer's pick among its candidates and the trial writer's single
  * title. `age` is the reader age (readerAge), the "can a child say it" yardstick.
@@ -10611,7 +10652,7 @@ function buildOwedFacts(storyLogic) {
  */
 const STYLE_RULEBOOK = [
   'Every sentence is complete and finishes: no sentence broken off for effect, no bare fragment standing as a sentence, no caption-style line describing the scene like a stage direction. The story is told aloud.',
-  'No rhetorical set-pieces: no paired negations ("Nobody answered. Nobody argued."), no coined sayings or incantations, no one-sentence paragraph for drama. Plain narration carries the story.',
+  'No rhetorical set-pieces: no paired negations ("Nobody answered. Nobody argued."), no coined sayings or incantations (a rhyme, saying or call the story repeats or refers back to on another page belongs to the story, not coined), no one-sentence paragraph for drama. Plain narration carries the story.',
   'No sentence tells what an event meant or sums up who the characters have become ("they had become something else", "he had done his part"). The telling shows the event and moves on.',
   'The narrator never justifies, excuses or explains an action to the reader ("he had given his share, so now he could eat too"): only a because-clause or purpose clause that gives a character\'s reason or excuse for an act is a fault; a physical cause stated as what happened ("the rope broke because the knot slipped") is an event. A reason the story needs comes through what a character does or says in the moment.',
   'A feeling is shown by what a character does or says. The narrator names one only where no act can show it, and never beside an act that already shows it.',
@@ -10813,7 +10854,7 @@ function arcIssueLine({ lens = false } = {}) {
  * and into the panel lens that reads for it.
  */
 const ARC_ENTRANCE_RULE = 'Every figure is where a stated cause put them — never simply already there, never arriving exactly where they are needed. Figures who do not know each other meet on the page and learn each other\'s names before they act together.';
-const ARC_GIVEN_RULE = 'Nothing is used that the arc has not given: a name is exchanged before it is used, a place shown before it is relied on, an ability or a possession established — with how they came by it — before it does work, and knowledge is held only by someone who could hold it. A plan, promise or appointment for after the ending is named only where the story set it up.';
+const ARC_GIVEN_RULE = 'Nothing is used that the arc has not given: a name is exchanged before it is used, a place shown before it is relied on, an ability or a possession established — with how they came by it — before it does work, and knowledge is held only by someone who could hold it. A figure who knows a place, a route or a fact, or who promises an act, a journey or a means, has a way of knowing it or doing it that the story shows, even where the premise implies it: a premise fact is never exempt. A plan, promise or appointment for after the ending is named only where the story set it up.';
 
 /**
  * WHO DOES WHAT STAYS AS THE STORY STATES IT (Fiona rerun 2026-10-08, group D #18).
@@ -12318,10 +12359,12 @@ function buildTextDiffPrompt(inputData, pairs = []) {
     : 'the language of the pages';
   const body = pairs
     .map(p => {
-      const answered = (p.findings || [])
-        .map(f => `- p${f.pageNumber} [${f.category || 'UNTAGGED'}] ${String(f.text || '').trim()}`)
-        .join('\n');
-      return `--- Page ${p.pageNumber} ---\nFINDINGS THE REWRITE ANSWERED:\n${answered || '(none)'}\n\nBEFORE:\n${numberedSentences(p.before, 'B')}\n\nAFTER:\n${numberedSentences(p.after, 'A')}`;
+      const line = f => `- p${f.pageNumber} [${f.category || 'UNTAGGED'}] ${String(f.text || '').trim()}`;
+      const answered = (p.findings || []).filter(f => !f.standing).map(line).join('\n');
+      // Findings the rewrite ruled STANDS: the sentence they name was kept on purpose.
+      const standing = (p.findings || []).filter(f => f.standing).map(line).join('\n');
+      const standingBlock = standing ? `FINDINGS THE REWRITE RULED STANDS (the sentence each names was kept on purpose; never apply, fix or restore around them):\n${standing}\n\n` : '';
+      return `--- Page ${p.pageNumber} ---\nFINDINGS THE REWRITE ANSWERED:\n${answered || '(none)'}\n\n${standingBlock}BEFORE:\n${numberedSentences(p.before, 'B')}\n\nAFTER:\n${numberedSentences(p.after, 'A')}`;
     })
     .join('\n\n');
   return fillTemplate(template, { LANGUAGE: lang, PAGES: body, STYLE_RULEBOOK: styleRulebook(inputData?.language), PAYOFF_KEEP: PAYOFF_KEEP_RULE });
@@ -12427,6 +12470,7 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '', { arcHints = '', 
     // The ENDING question reads the writer's own strings (2026-09-27).
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
     SHOWN_CALLBACK: SHOWN_CALLBACK_RULE,
+    TEXT_VS_PICTURE: TEXT_VS_PICTURE_RULE,
     LOAD_BEARING: LOAD_BEARING_RULE,
     OWED_FACTS: buildOwedFacts(storyLogic),
     PAGES: body,
@@ -12843,6 +12887,8 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     PAGE_CONTINUITY: PAGE_CONTINUITY_RULE,
     NEIGHBOUR_PHRASE: NEIGHBOUR_PHRASE_RULE,
     NO_ABBREVIATION: NO_ABBREVIATION_RULE,
+    NO_PLAN_STAGING: NO_PLAN_STAGING_RULE,
+    YOUNG_CHILD_SPEECH: YOUNG_CHILD_SPEECH_RULE,
     LOAD_BEARING: LOAD_BEARING_RULE,
     OWED_FACTS: buildOwedFacts(storyLogic),
   });
@@ -13157,6 +13203,8 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       PAGE_CONTINUITY: PAGE_CONTINUITY_RULE,
       NEIGHBOUR_PHRASE: NEIGHBOUR_PHRASE_RULE,
       NO_ABBREVIATION: NO_ABBREVIATION_RULE,
+      NO_PLAN_STAGING: NO_PLAN_STAGING_RULE,
+      YOUNG_CHILD_SPEECH: YOUNG_CHILD_SPEECH_RULE,
       TITLE_RULE: buildTitleRule(inputData),
       TITLE_CRITERIA: titleCriteria(readerAge(inputData)),
       // Scene arithmetic follows the page count (trial.js sets 6; the template
@@ -14031,6 +14079,10 @@ module.exports = {
   PAGE_CONTINUITY_RULE,
   NEIGHBOUR_PHRASE_RULE,
   NO_ABBREVIATION_RULE,
+  TEXT_VS_PICTURE_RULE,
+  NO_PLAN_STAGING_RULE,
+  YOUNG_CHILD_SPEECH_RULE,
+  NO_CONTENT_LOSS_RULE,
   titleCriteria,
   ANIMAL_FATE_RULE,
   COUNTING_RULE,

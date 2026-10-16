@@ -6,6 +6,8 @@ You may make two kinds of edit and no other:
 
 {PAYOFF_KEEP} Such a sentence the rewrite lost is restored.
 
+A FIX corrects grammar and nothing else: it never removes or replaces a simile, a name, a rhyme or a call the story repeats elsewhere, or any word that carries the story's meaning, and a finding under FINDINGS THE REWRITE RULED STANDS is never carried out by a FIX.
+
 Never write a sentence that neither BEFORE nor AFTER has, never join or split sentences, and never bring back what a listed finding asked to remove or change. A fix never breaks a rule below.
 
 {STYLE_RULEBOOK}

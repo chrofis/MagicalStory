@@ -1,27 +1,31 @@
 /**
- * MISMATCH precedence in the text refine (2026-10-09, job_1791497309909_6quecrr9t
- * audit T4 p4): the picture lacked Julian and the raven; refine fixed the raven
- * half, kept "Julian laughed and patted the little dragon" as "the story's own
- * event" and marked T4 fixed. The "detail the story turns on / ending's own act"
- * clause must never cover a MISMATCH gap, and the audit must file the same shape.
+ * MISMATCH in the text refine and the text audit. 2026-10-09 the refine was told
+ * a figure the picture lacks is never kept doing a visible act (PRECEDENCE).
+ * Owner 2026-10-16 reversed it: "The text must not contradict the picture. But
+ * it can go further. Text should be picture and more." (docs/decisions.md
+ * 2026-10-16 "Text may go beyond the picture"). A MISMATCH is a real
+ * contradiction; text that names what the picture does not show is no fault.
  */
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'module';
 const cjs = createRequire(import.meta.url);
 const fs = cjs('fs');
 
-describe('refine vs audit: a figure not in the picture', () => {
+describe('refine vs audit: a figure or act the picture does not show', () => {
   const refine = fs.readFileSync('prompts/text-refine.txt', 'utf8');
   const audit = fs.readFileSync('prompts/story-text-audit.txt', 'utf8');
-  it('refine states the precedence and the all-gaps ledger rule, with no story names', () => {
-    expect(refine).toMatch(/PRECEDENCE: a figure the picture does not show is never kept doing a visible act/);
-    expect(refine).toMatch(/never covers a MISMATCH gap/);
-    expect(refine).toMatch(/says fixed only when every gap of its finding has its own closed line/);
-    expect(refine).toMatch(/A passage moved onto a page names only figures that page's picture shows/);
+  it('refine: only a contradiction is closed, nothing is cut for fidelity, a multi-gap finding keeps one ledger line per gap', () => {
+    expect(refine).toContain('{TEXT_VS_PICTURE}');
+    expect(refine).toMatch(/STANDS: the text goes beyond the picture, which is allowed/);
+    expect(refine).toMatch(/never cut an act to close a MISMATCH/);
+    expect(refine).toMatch(/each gets its own ledger line/);
+    expect(refine).not.toMatch(/PRECEDENCE: a figure the picture does not show/);
+    expect(refine).not.toMatch(/the TEXT moves/);
     expect(refine).not.toMatch(/Julian|raven|Kiaan/);
   });
-  it('the audit files a figure out of frame doing a visible act as a MISMATCH, in the same words', () => {
-    expect(audit).toMatch(/leaves the figure out of frame, is a MISMATCH too/);
-    expect(audit).toMatch(/a page that was given a passage naming a figure its picture lacks/);
+  it('the audit files a MISMATCH for a contradiction only, in the same words as the refine', () => {
+    expect(audit).toContain('{TEXT_VS_PICTURE}');
+    expect(audit).toMatch(/A text that names a figure, object or action its picture does not show is not a MISMATCH/);
+    expect(audit).not.toMatch(/leaves the figure out of frame, is a MISMATCH too/);
   });
 });

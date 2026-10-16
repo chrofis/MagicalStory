@@ -2088,7 +2088,11 @@ ${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
         after: p.text,
         findings: answered
           .filter(f => f.pageNumber != null && Math.abs(f.pageNumber - p.pageNumber) <= 1)
-          .map(f => ({ pageNumber: f.pageNumber, category: f.category, text: f.text })),
+          // A finding the repair ruled STANDS is carried too, marked: the pass
+          // kept the sentence it names, and the grammar check must not apply the
+          // finding after all (gull story, 2026-10-16: T1 STYLE STANDS kept a
+          // simile, then the diff pass "fixed" it away). docs/decisions.md 2026-10-16.
+          .map(f => ({ pageNumber: f.pageNumber, category: f.category, text: f.text, standing: f.outcome === FINDING_OUTCOME.DECLINED })),
       }));
     const diffPrompt = pairs.length ? buildTextDiffPrompt(storyData, pairs) : null;
     diffPromptSent = diffPrompt || '';

@@ -55,8 +55,7 @@ describe('text chain 2026-10-08', () => {
   });
 
   it('a MISMATCH naming two gaps is closed on both, and a spoken ending line is recast, never declined', () => {
-    expect(refine).toContain('Each gap gets its own ledger line');
-    expect(refine).toContain('closes half');
+    expect(refine).toContain('each gets its own ledger line');
     expect(refine).toContain('never declined for the line being the story\'s');
     expect(refine).not.toContain("or the ending's own act or spoken line");
   });

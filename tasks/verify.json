@@ -10168,6 +10168,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "text-stage-fixes-2026-10-16",
+      "title": "Text stage: no content loss, text beyond the picture, no plan staging, toddler speech, premise logic",
+      "commits": [],
+      "addedAt": "2026-10-16",
+      "claim": "On a full story the text refine ledger declines MISMATCH findings that only name something the picture does not show (STANDS: goes beyond the picture), removes no story fact to close a STYLE finding, never applies in the diff pass a finding the repair ruled STANDS, the writer text copies no plan-line poses or placements, a character aged three or under speaks in short natural child speech, and the arc-informed audit files ASSUMED for a premise fact a character has no way to know.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read textRefineReport: for each MISMATCH finding the ledger line; sentences lost between pages[].before and after; the diff round prompt lists RULED STANDS findings apart; check the young characters lines in the page text and audits[] arc-informed for an ASSUMED on a premise fact."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

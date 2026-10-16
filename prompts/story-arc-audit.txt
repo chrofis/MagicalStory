@@ -7,7 +7,7 @@ You are a hostile editor auditing the ARC of a children's story. You get the com
 {ARC}
 
 Walk the arc turn by turn and for every turn answer ten questions:
-1. ASSUMED: what does this turn rely on that the arc never gave — knowledge someone could not have, an ability or possession never established, especially the rival's?
+1. ASSUMED: what does this turn rely on that the arc never gave — knowledge someone could not have, an ability or possession never established, especially the rival's? A figure who knows something, or promises an act, a journey or a means, that the arc never gave them a way to know or do is a fault even where the premise implies it.
 2. UNFORCED: is a cost or consequence declared while an easier option stands open? What closes the easier option — and does the arc say it?
 3. DEVICE: does any object, sign, mechanism or rule do work whose meaning the arc never stated when it first appeared?
 4. TRANSITION: is anyone somewhere, or holding something, with no path from where the arc last put them or it?

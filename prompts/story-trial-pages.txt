@@ -24,10 +24,11 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - A figure's first scene brings them in, by arriving or by a name someone present says, before they speak or act
 - {PICTURE_COUNT}
 - {CLOSING_MOMENT}
-- The text never asserts a position, an action or an object the scene hint does not stage: a figure the hint leaves out of frame does nothing visible on that page, and an action the hint stages as its aftermath is told as its aftermath
+- The text never contradicts the scene hint: an action the hint stages as its aftermath is told as its aftermath, and the text may go further than the picture. {NO_PLAN_STAGING}
 - Show character personality through actions
 - {PAGE_CONTINUITY}
 - {NEIGHBOUR_PHRASE}
+- {YOUNG_CHILD_SPEECH}
 - A sentence never gives one thing two states (a thing caught or held is not said to lie somewhere in the same breath), and a property stated for one part of a subject is not restated for another with "also" or "too": say it once.
 - Where a figure looks, faces or turns their head is the picture's business: write no look away, turn of the head or change of facing the scene hint does not stage.
 - {NO_DASH}

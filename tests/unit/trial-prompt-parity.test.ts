@@ -49,8 +49,9 @@ describe('page-opening variety reaches the trial writer', () => {
     expect(prompts[6]).not.toMatch(/^- Start with action, not weather/m);
   });
 
-  it('forbids prose asserting what the scene hint does not stage', () => {
-    expect(prompts[6]).toMatch(/never asserts a position, an action or an object/);
+  it('forbids prose contradicting the scene hint, and lets it go beyond the picture (decisions 2026-10-16)', () => {
+    expect(prompts[6]).toMatch(/never contradicts the scene hint/);
+    expect(prompts[6]).not.toMatch(/never asserts a position, an action or an object/);
   });
 });
 
