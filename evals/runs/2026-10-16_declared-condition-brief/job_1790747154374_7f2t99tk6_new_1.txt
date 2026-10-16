@@ -1,0 +1,242 @@
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Nonna",
+      "pages": [10],
+      "scaleClass": "adult-height",
+      "age": 68,
+      "peer": "no",
+      "build": "an older woman, short and stout with rounded shoulders",
+      "hair": "silver-grey, straight, pinned in a low neat bun at the nape",
+      "face": "warm brown eyes, crinkling smile lines around the eyes, soft rounded cheeks, no facial hair",
+      "signatureLook": "embroidered white linen apron tied over a dark wool dress",
+      "clothing": "dark navy wool long-sleeved dress with a high round collar, crisp white linen apron with floral cross-stitch border along the hem, thick dark grey wool stockings, black leather sturdy slip-on shoes"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Nuvola",
+      "pages": [2, 3, 9, 10],
+      "scaleClass": "knee-high",
+      "species": "Alpine goat",
+      "coloring": "pure white short dense coat with a cream-white soft beard",
+      "features": "small rounded soft muzzle, large dark round friendly eyes, two short blunt-tipped amber horns, worn brass bell hanging from a flat brown leather collar"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "wooden milk bucket",
+      "name": "small wooden milk bucket",
+      "pages": [1, 2, 4, 5, 7, 10],
+      "scaleClass": "melon-sized",
+      "type": "container",
+      "description": "coopered pale pine pail with two dark iron hoops and a curved wrought-iron swing handle attached to upright staves"
+    },
+    {
+      "id": "ART002",
+      "label": "wooden milk ladle",
+      "name": "carved wooden milk ladle",
+      "pages": [1],
+      "scaleClass": "forearm-sized",
+      "type": "hand tool",
+      "description": "deep hemispherical scoop carved from pale ash wood with a straight tapered handle ending in a hooked peg"
+    },
+    {
+      "id": "ART003",
+      "label": "broad red autumn leaf",
+      "name": "broad red hazel leaf",
+      "pages": [3, 6, 7, 8, 9, 10],
+      "scaleClass": "hand-sized",
+      "type": "foliage",
+      "states": [
+        {"name": "unaltered", "delta": "dry broad scarlet hazel leaf with serrated edges and a short brown stem", "pages": [3, 6]},
+        {"name": "milky", "delta": "scarlet leaf coated in fresh white milk droplets with a glistening wet tip", "pages": [7, 8, 9, 10]}
+      ],
+      "description": "broad heart-shaped scarlet autumn hazel leaf with finely serrated edges and a prominent pale vein network"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "label": "alpine pasture above Maienfeld",
+      "name": "Schloss Brandis (Maienfeld)",
+      "pages": [1],
+      "scaleClass": "landmark",
+      "setting": "outdoor, alpine slope",
+      "colors": "golden-yellow dry grass, deep green pine trees, ochre stone masonry, hazy blue sky",
+      "features": "steep terraced meadow overlooking a valley with a crenellated stone castle tower and residential wing visible down the mountain slope",
+      "signatureElement": "stone castle tower of Schloss Brandis framed against the terraced lower slopes",
+      "isRealLandmark": true,
+      "landmarkQuery": "Schloss Brandis (Maienfeld)",
+      "emptyScenePrompt": "A high alpine terraced pasture with golden autumn grass slopes downward from left to right toward a wide mountain valley. In the middle distance down the slope stands the crenellated stone tower and residential wing of Schloss Brandis surrounded by terraced vineyards. Warm early afternoon autumn sunlight bathes the grassy hillside under a clear pale blue sky."
+    },
+    {
+      "id": "LOC002",
+      "label": "Amanduskirche valley view path",
+      "name": "Amanduskirche (Maienfeld)",
+      "pages": [5],
+      "scaleClass": "landmark",
+      "setting": "outdoor, alpine path",
+      "colors": "dusty brown gravel, amber scrub, pale white church spire, misty violet valley floor",
+      "features": "narrow mountain trail along a rocky ridge looking far down into the valley where the distinct tall onion-dome bell tower of Amanduskirche Maienfeld stands pale against the village rooftops",
+      "signatureElement": "pale onion-dome church tower of Amanduskirche Maienfeld visible in the deep valley basin",
+      "isRealLandmark": true,
+      "landmarkQuery": "Amanduskirche (Maienfeld)",
+      "emptyScenePrompt": "A stony dirt path curves along a high mountain ridge in the foreground, dropping steeply on the left toward the distant Rhine valley floor. Far below in the valley basin, the white rendered walls and prominent tall onion-dome bell tower of Amanduskirche Maienfeld are visible among village roofs. Low late-afternoon autumn sunlight slants across the ridge, casting long golden shadows along the gravel."
+    },
+    {
+      "id": "LOC003",
+      "label": "mountain trail and hazel grove",
+      "name": "Alpine Mountain Trail",
+      "pages": [2, 3, 4, 6, 7, 8, 9],
+      "scaleClass": "landmark",
+      "setting": "outdoor, mountain path",
+      "colors": "amber grasses, crimson foliage, grey limestone rocks, russet hazel bushes",
+      "features": "winding dirt and pebble trail bordered by rough drystone borders, low hazelnut bushes in blazing autumn red and yellow, and scattered grey limestone boulders",
+      "signatureElement": "dense tangled thicket of low-arching hazel branches bearing crimson leaves beside the stony track",
+      "isRealLandmark": false,
+      "landmarkQuery": null,
+      "vantages": [
+        {
+          "id": "LOC003.1",
+          "name": "Open mountain path",
+          "shot": "medium",
+          "description": "A well-trodden stony dirt path winds gently between golden autumn grasses and low limestone rocks under afternoon sunlight.",
+          "emptyScenePrompt": "A stony dirt trail extends from the foreground toward the midground between patches of golden autumn alpine turf and low grey stones. Scattered dwarf bushes with orange and bronze leaves border the right edge of the track under warm afternoon sunlight.",
+          "pages": [2, 3, 4]
+        },
+        {
+          "id": "LOC003.2",
+          "name": "Hazel thicket beside trail",
+          "shot": "medium",
+          "description": "A dense screen of low-arching hazel branches covered in bright red leaves overhangs a bend in the stony mountain path.",
+          "emptyScenePrompt": "A low, dense thicket of tangled hazel branches laden with broad crimson and gold leaves arches over a recess beside the gravel mountain trail. The ground beneath the branches is carpeted with dry russet leaves, lit by golden late-afternoon sunlight.",
+          "pages": [6, 7, 8, 9]
+        }
+      ]
+    },
+    {
+      "id": "LOC004",
+      "label": "Nonna alpine log hut",
+      "name": "Nonna's Alpine Hut",
+      "pages": [10],
+      "scaleClass": "house-height",
+      "setting": "outdoor/interior threshold, rustic mountain cabin",
+      "colors": "weathered dark brown timber, pale granite stone step, golden interior lamplight, dusky orange sky",
+      "features": "heavy rough-hewn timber cottage with an open wooden front door revealing a rustic warm interior with a scrubbed pine table and a loaf of bread",
+      "signatureElement": "sturdy dark timber doorframe resting on a wide grey granite doorstep at the entrance of the alpine hut",
+      "isRealLandmark": false,
+      "landmarkQuery": null,
+      "emptyScenePrompt": "The rustic timber facade of an alpine log cottage features a wide open dark wood doorway framing an interior with a scrubbed wooden table. The large flat granite doorstep in the foreground sits before the threshold under the last rich orange glow of sunset, with the dark mountain ridge rising behind the eaves."
+    }
+  ],
+  "vehicles": [],
+  "clothing": [
+    {
+      "id": "CLO001",
+      "label": "Noam alpine shepherd outfit",
+      "name": "Noam alpine shepherd outfit",
+      "pages": [1, 2, 3, 7, 8, 9, 10],
+      "wornBy": "Noam",
+      "description": "red wool knit pullover with a round neck and long sleeves, brown linen lederhosen with a wide bib panel and shoulder straps, grey wool knee socks, and brown leather low ankle boots",
+      "howWorn": "pullover worn under lederhosen bib straps, socks pulled up to knees"
+    },
+    {
+      "id": "CLO002",
+      "label": "Lio alpine shepherd outfit",
+      "name": "Lio alpine shepherd outfit",
+      "pages": [1, 2, 4, 5, 7, 8, 9, 10],
+      "wornBy": "Lio",
+      "description": "blue cotton button-down long-sleeved shirt with pointed collar, green wool V-neck knitted vest, grey linen lederhosen, brown wool knee socks, and black leather low ankle boots",
+      "howWorn": "vest worn over button-down shirt tucked into waistband, socks pulled to knees"
+    }
+  ]
+}
+```
+
+---COVER SCENE HINTS---
+**Title Page**
+Mood: warm brotherly adventure
+Objects: LOC001, ART001, ANI001
+Characters:
+- Noam (left): costumed:alpine shepherd, holds: nothing, priority: essential
+- Lio (right): costumed:alpine shepherd, holds: ART001, priority: essential
+
+**Initial Page**
+Mood: cheerful mountain journey
+Objects: LOC003.1, ART001
+Characters:
+- Lio (left): costumed:alpine shepherd, holds: ART001, priority: essential
+- Noam (right): costumed:alpine shepherd, holds: nothing, priority: essential
+
+**Back Cover**
+Mood: triumphant cozy arrival
+Objects: LOC004, ART001
+Characters:
+- Lio (center left): costumed:alpine shepherd, holds: ART001, priority: essential
+- Noam (center right): costumed:alpine shepherd, holds: nothing, priority: normal
+
+## Page 1
+On the golden autumn meadow above Maienfeld, Noam — a toddler with four-head-tall proportions, rounded belly, tousled ear-length curly blonde hair, and grey eyes, wearing a red wool knit pullover, brown linen bib lederhosen, grey wool knee socks, and brown leather ankle boots — kneels on the dry grass in the center foreground and carefully dips a carved ash wood milk ladle into a large resting vat, transferring warm goat milk into a small pine milk bucket with dark iron hoops resting on the turf beside him. Just to his right in the midground, Lio — a preschooler with four-and-a-half-head-tall proportions, short wavy light brown hair, and brown eyes, wearing a blue button-down shirt under a green wool V-neck vest, grey linen lederhosen, brown wool knee socks, and black leather ankle boots — stands facing left with his hands resting at his sides, watching his brother's careful work with wide, focused eyes. Down the sweeping terraced slope behind them in the wide landscape, the crenellated stone tower and residential wing of Schloss Brandis Maienfeld rise among amber vineyard rows under the bright early afternoon sun, while distant grey mountain crests border the clear autumn sky.
+
+---METADATA---
+{"sceneIntent": "Noam kneels in the alpine meadow and ladles warm milk into the small pine bucket. Lio stands beside him and watches the milk fill the pail. Bright early afternoon light bathes the high pasture above Schloss Brandis.", "characters": [{"name": "Noam", "clothing": "costumed:alpine shepherd", "position": "center foreground", "depth": "foreground", "looksAt": "ART001", "expression": "brows raised, focused grey eyes, small parted lips"}, {"name": "Lio", "clothing": "costumed:alpine shepherd", "position": "right midground", "depth": "midground", "looksAt": "ART001", "expression": "soft straight brows, attentive brown eyes, calm mouth"}], "shot": "wide", "population": "cast_only", "landmarkView": "distant", "era": "present day", "objects": ["LOC001", "ART001", "ART002"], "interactions": [{"character": "Noam", "object": "wooden milk ladle", "where": "holds the wooden milk ladle", "action": "ladling milk into the bucket", "hands": true, "storyRelevant": true, "priority": "essential"}, {"character": "Lio", "object": "wooden milk bucket", "where": "watches the wooden milk bucket", "action": "watching", "hands": false, "storyRelevant": false, "priority": "normal"}], "wornItems": [{"id": "CLO001", "owner": "Noam", "state": "worn"}, {"id": "CLO002", "owner": "Lio", "state": "worn"}]}
+
+## Page 2
+Lio — a preschooler with short wavy light brown hair, brown eyes, blue button-down shirt under a green knitted vest, grey linen lederhosen, brown knee socks, and black leather ankle boots — walks along the stony dirt mountain path in the left foreground, both hands firmly gripping the curved wrought-iron swing handle of the small coopered pine bucket filled with milk, his body leaning slightly back to steady the load as he turns his head toward his brother. Beside him in the center foreground, Noam — a toddler with tousled curly blonde hair, grey eyes, red wool pullover, brown bib lederhosen, grey knee socks, and brown ankle boots — walks in a steady step, his hands swinging naturally at his sides as he looks back over his shoulder toward the rear of the line. Following closely behind them in the right midground, Nuvola — a knee-high white Alpine goat with soft round features, dark friendly eyes, short blunt amber horns, and a small brass bell on her brown collar — trots forward along the trail, her neck arched in a gentle step as the bell swings, amidst golden autumn grasses and warm afternoon sunlight.
+
+---METADATA---
+{"sceneIntent": "Lio carries the full milk bucket in both hands along the trail while talking to Noam. Noam walks beside him and glances back at Nuvola following behind. Warm afternoon sunlight on the mountain path with golden grasses.", "characters": [{"name": "Lio", "clothing": "costumed:alpine shepherd", "position": "left foreground", "depth": "foreground", "looksAt": "Noam", "expression": "raised brows, steady focused brown eyes, firm mouth"}, {"name": "Noam", "clothing": "costumed:alpine shepherd", "position": "center foreground", "depth": "foreground", "looksAt": "ANI001", "expression": "bright grey eyes, cheerful open smile, relaxed brows"}], "shot": "medium", "population": "cast_only", "era": "present day", "objects": ["LOC003.1", "ART001", "ANI001"], "interactions": [{"character": "Lio", "object": "wooden milk bucket", "where": "holds the wooden milk bucket", "action": "carrying the bucket", "hands": true, "storyRelevant": true, "priority": "essential"}, {"character": "Noam", "object": "Nuvola", "where": "watches Nuvola", "action": "watching", "hands": false, "storyRelevant": false, "priority": "normal"}, {"character": "ANI001", "object": "the trail", "where": "trots along the trail", "action": "walking", "hands": false, "storyRelevant": false, "priority": "low"}], "wornItems": [{"id": "CLO001", "owner": "Noam", "state": "worn"}, {"id": "CLO002", "owner": "Lio", "state": "worn"}]}
+
+## Page 3
+Framed from an over-the-shoulder perspective behind Noam — a toddler seen from behind on the left with his tousled curly blonde hair, red wool pullover, and brown linen bib lederhosen filling the left foreground — Noam turns his head slightly toward the right midground where Nuvola, a knee-high pure white goat with soft dark round eyes and short blunt horns, stretches her neck upward to grip a broad scarlet hazel leaf in her mouth, plucking it cleanly from a low leafy autumn bush beside the stony path. The small brass bell on her brown leather collar tilts sideways with the pull, catching the rich golden afternoon light as crimson and amber leaves rustle along the dry trail border.
+
+---METADATA---
+{"sceneIntent": "Noam watches over his shoulder as Nuvola pulls a broad red leaf from a bush with her mouth. Nuvola chews the leaf happily beside the stony trail. Golden afternoon light illuminates the bright red autumn foliage.", "characters": [{"name": "Noam", "clothing": "costumed:alpine shepherd", "position": "left foreground", "perspective": "back view, head turned toward right shoulder", "depth": "foreground", "looksAt": "ANI001", "expression": "one bright grey eye visible, lifted cheek, amused smile"}], "shot": "over-the-shoulder", "population": "cast_only", "era": "present day", "objects": ["LOC003.1", "ANI001", "ART003.1"], "interactions": [{"character": "Noam", "object": "Nuvola", "where": "watches Nuvola", "action": "watching", "hands": false, "storyRelevant": false, "priority": "normal"}, {"character": "ANI001", "object": "broad red hazel leaf", "where": "bites the broad red hazel leaf", "action": "chewing the leaf", "hands": false, "storyRelevant": true, "priority": "essential"}], "wornItems": [{"id": "CLO001", "owner": "Noam", "state": "worn"}]}
+
+## Page 4
+In a tight close-up frame ending at the waist, Lio — a preschooler with short wavy light brown hair, brown eyes, wearing a blue button-down shirt under a green wool V-neck vest and grey linen lederhosen — stands facing the camera with his left arm wrapped securely around the small wooden milk bucket against his chest, while his right hand is held up at chest level with his thumb and three fingers extended as he counts. His dark brown eyes widen in startled realization, his brows pulled together in a tight crease of worry, and his lips press together into a thin anxious line as golden late-afternoon sunlight illuminates his face against the soft background blur of autumn mountain grass.
+
+---METADATA---
+{"sceneIntent": "Lio clutches the milk bucket against his chest and counts his fingers with a worried face. He stares ahead realizing a goat is missing. Warm late-afternoon light on his anxious expression.", "characters": [{"name": "Lio", "clothing": "costumed:alpine shepherd", "position": "center foreground", "depth": "foreground", "looksAt": "away", "expression": "brows furrowed tight, wide anxious brown eyes, pressed lips"}], "shot": "close-up", "population": "cast_only", "era": "present day", "objects": ["LOC003.1", "ART001"], "interactions": [{"character": "Lio", "object": "wooden milk bucket", "where": "holds the wooden milk bucket", "action": "gripping the bucket", "hands": true, "storyRelevant": true, "priority": "essential"}], "wornItems": [{"id": "CLO002", "owner": "Lio", "state": "worn"}]}
+
+## Page 5
+Across a vast alpine ridge under the sinking autumn sun, Lio — a preschooler with short wavy light brown hair, blue button-down shirt, green wool vest, grey linen lederhosen, brown knee socks, and black ankle boots — stands facing left in the center midground on the narrow gravel path, lowering the small wooden milk bucket toward the ground with both hands. A cluster of several white and tan goats crowd closely around his boots and the rim of the pail, their muzzles extended toward the fresh milk scent. Far below in the deep valley basin, the white tower and distinctive onion dome of Amanduskirche Maienfeld gleam as a tiny pale structure among distant village roofs, while long purple shadows stretch across the golden grass as the glowing orange sun sinks toward the jagged western mountain ridge.
+
+---METADATA---
+{"sceneIntent": "Lio holds the milk bucket low on the ridge path as the herd of goats clusters around him. The pale onion dome of Amanduskirche is visible far below in the valley under the sinking sun. Dramatic late-afternoon mountain landscape with long golden shadows.", "characters": [{"name": "Lio", "clothing": "costumed:alpine shepherd", "position": "center midground", "depth": "midground", "looksAt": "ART001", "expression": "tense brows, alert wide brown eyes, firmly set lips"}], "shot": "ultra-wide", "population": "cast_only", "landmarkView": "distant", "era": "present day", "objects": ["LOC002", "ART001"], "interactions": [{"character": "Lio", "object": "wooden milk bucket", "where": "holds the wooden milk bucket", "action": "holding the bucket low", "hands": true, "storyRelevant": true, "priority": "essential"}], "wornItems": [{"id": "CLO002", "owner": "Lio", "state": "worn"}]}
+
+## Page 6
+From directly above looking down through a dense canopy of tangled autumn branches, a thicket of hazelnut bushes forms an intricate web of woody twigs laden with broad crimson and gold leaves beside the grey gravel trail. Down in the sheltered hollow beneath the overhanging foliage, a small patch of pure white goat fleece rests motionless on a thick carpet of dry brown leaves, where a small brass bell is wedged snugly among packed dry leaves, and a single palm-sized, heart-shaped bright scarlet leaf lies draped flat over the forehead and eyes of the hidden goat like a small red cap.
+
+---METADATA---
+{"sceneIntent": "An overhead view looks down into the hazel thicket where Nuvola lies quietly hidden under leaves. A broad red leaf covers her eyes while dry foliage muffles her brass bell. Rich autumn colours in the dense foliage under soft late-afternoon light.", "characters": [], "shot": "aerial", "population": "cast_only", "era": "present day", "objects": ["LOC003.2", "ART003.1"], "interactions": [], "wornItems": []}
+
+## Page 7
+In a close-up framing ending at their waists, Lio and Noam lean closely toward each other in the center foreground over the small pine milk bucket held in Lio's left hand. Lio — a preschooler with short wavy light brown hair, brown eyes, blue button-down shirt under a green knitted vest, and grey lederhosen — uses his right fingers to dip the stem of a broad scarlet hazel leaf into the warm white milk inside the bucket, holding the glistening wet leaf out toward his brother. Facing right, Noam — a toddler with tousled curly blonde hair, grey eyes, red wool pullover, and brown bib lederhosen — reaches his small right hand forward with open fingers toward the dripping leaf, his soft face alight with understanding and focused intent under the warm amber dusk light.
+
+---METADATA---
+{"sceneIntent": "Lio dips the red hazel leaf into the milk bucket and holds it out to Noam. Noam reaches for the milky leaf with an eager face. Warm amber late-afternoon light on their shared plan.", "characters": [{"name": "Lio", "clothing": "costumed:alpine shepherd", "position": "left foreground", "depth": "foreground", "looksAt": "Noam", "expression": "intense focused brown eyes, slight determined brow, parted lips"}, {"name": "Noam", "clothing": "costumed:alpine shepherd", "position": "right foreground", "depth": "foreground", "looksAt": "ART003.2", "expression": "wide curious grey eyes, raised soft brows, enthusiastic smile"}], "shot": "close-up", "population": "cast_only", "era": "present day", "objects": ["LOC003.2", "ART001", "ART003.2"], "interactions": [{"character": "Lio", "object": "broad red autumn leaf", "where": "dips the broad red hazel leaf into the bucket", "action": "holding out the leaf", "hands": true, "storyRelevant": true, "priority": "essential"}, {"character": "Noam", "object": "broad red autumn leaf", "where": "reaches for the broad red hazel leaf", "action": "reaching for the leaf", "hands": true, "storyRelevant": true, "priority": "normal"}], "wornItems": [{"id": "CLO001", "owner": "Noam", "state": "worn"}, {"id": "CLO002", "owner": "Lio", "state": "worn"}]}
+
+## Page 8
+Noam — a toddler with tousled curly blonde hair, grey eyes, red wool pullover, brown bib lederhosen, grey knee socks, and brown leather ankle boots — kneels on the path in the center foreground with his boots planted firmly on the gravel, leaning his upper body forward to slide his right arm deep beneath the low-arching hazel branches, his fingers holding the milk-dripping red leaf into the shadowed thicket. Standing right beside him on the left, Lio — a preschooler with short wavy light brown hair, brown eyes, blue shirt, green vest, grey lederhosen, and black boots — cups one hand beside his mouth, calling into the bushes with his eyes fixed on the gap, while the low orange sun casts long dramatic shadows across the stony ground.
+
+---METADATA---
+{"sceneIntent": "Noam reaches his arm into the low hazel thicket holding the milky leaf while keeping his boots on the path. Lio stands beside him calling Nuvola's name. Low orange sunset light rakes across the stony mountain trail.", "characters": [{"name": "Noam", "clothing": "costumed:alpine shepherd", "position": "center foreground", "depth": "foreground", "looksAt": "ART003.2", "expression": "concentrated grey eyes, slightly pursed lips, steady brows"}, {"name": "Lio", "clothing": "costumed:alpine shepherd", "position": "left midground", "depth": "foreground", "looksAt": "Noam", "expression": "wide calling mouth, raised anxious brows, alert brown eyes"}], "shot": "medium", "population": "cast_only", "era": "present day", "objects": ["LOC003.2", "ART003.2"], "interactions": [{"character": "Noam", "object": "broad red autumn leaf", "where": "holds the broad red hazel leaf into the thicket", "action": "reaching into bushes", "hands": true, "storyRelevant": true, "priority": "essential"}, {"character": "Lio", "object": "Noam", "where": "calls toward Noam", "action": "calling aloud", "hands": true, "storyRelevant": false, "priority": "normal"}], "wornItems": [{"id": "CLO001", "owner": "Noam", "state": "worn"}, {"id": "CLO002", "owner": "Lio", "state": "worn"}]}
+
+## Page 9
+Nuvola — a knee-high pure white goat with soft round features, dark round eyes, and a small brass bell on her collar — steps eagerly out from the dark hazel opening in the center foreground, extending her pink nose toward the glistening milky red leaf held in Noam's hand. As she emerges, the broad scarlet leaf from inside the bush slides back off her forehead and rests across the top of her neck like a tilted red cap. On the right, Noam — a toddler with tousled curly blonde hair, red pullover, and brown bib lederhosen — crouches backward on the path, holding the leaf steady with a beaming grin, while Lio — a preschooler in blue shirt, green vest, and grey lederhosen — stands just behind them in the left midground, his hands clapping together in relief as the rich crimson dusk light warms the trail.
+
+---METADATA---
+{"sceneIntent": "Nuvola emerges from the hazel bush following the milky leaf in Noam's hand with the broad leaf resting on her neck like a hat. Noam leads her backward with a smile while Lio claps in relief. Warm crimson sunset glows across the mountain path.", "characters": [{"name": "Noam", "clothing": "costumed:alpine shepherd", "position": "right foreground", "depth": "foreground", "looksAt": "ANI001", "expression": "wide delighted smile, bright twinkling grey eyes, raised joyful brows"}, {"name": "Lio", "clothing": "costumed:alpine shepherd", "position": "left midground", "depth": "midground", "looksAt": "ANI001", "expression": "relieved open smile, crinkled brown eyes, relaxed brows"}], "shot": "medium", "population": "cast_only", "era": "present day", "objects": ["LOC003.2", "ANI001", "ART003.2"], "interactions": [{"character": "Noam", "object": "broad red autumn leaf", "where": "holds the broad red hazel leaf", "action": "luring the goat", "hands": true, "storyRelevant": true, "priority": "essential"}, {"character": "ANI001", "object": "broad red autumn leaf", "where": "sniffs the broad red hazel leaf", "action": "following the leaf", "hands": false, "storyRelevant": true, "priority": "essential"}, {"character": "Lio", "object": "Nuvola", "where": "watches Nuvola", "action": "watching", "hands": false, "storyRelevant": false, "priority": "low"}], "wornItems": [{"id": "CLO001", "owner": "Noam", "state": "worn"}, {"id": "CLO002", "owner": "Lio", "state": "worn"}]}
+
+## Page 10
+At the wide open doorway of the weathered timber alpine hut, Nonna — an older woman with silver-grey hair in a neat low bun, warm brown eyes, wearing a dark navy wool dress and an embroidered white linen apron — stands in the right midground on the flat granite step, leaning forward with laughing crinkled eyes and hands resting warmly on her apron. In the center foreground, Lio — a preschooler with short wavy light brown hair, blue shirt, green vest, grey lederhosen, and black boots — stands tall facing right, proudly lifting the small pine milk bucket in both hands toward Nonna, his chest puffed with pride. Beside him on the left, Noam — a toddler in a red pullover and brown bib lederhosen — points his chin upward in a happy giggle as Nuvola, standing at Lio's boots, happily nibbles the crumpled red leaf hat off the stone step, under the last fiery orange slant of autumn sunset framing the cozy cabin threshold.
+
+---METADATA---
+{"sceneIntent": "Lio proudly presents the milk bucket to Nonna at her cabin door while Nonna laughs warmly. Nuvola chews the red leaf on the step beside Noam. Cozy fiery sunset light at the mountain hut threshold.", "characters": [{"name": "Lio", "clothing": "costumed:alpine shepherd", "position": "center foreground", "depth": "foreground", "looksAt": "CHR001", "expression": "proud beaming smile, lifted brows, bright confident brown eyes"}, {"name": "Noam", "clothing": "costumed:alpine shepherd", "position": "left foreground", "depth": "foreground", "looksAt": "CHR001", "expression": "cheerful open-mouthed laugh, joyful crinkled grey eyes, raised brows"}], "shot": "wide", "population": "cast_only", "era": "present day", "objects": ["LOC004", "CHR001", "ART001", "ANI001", "ART003.2"], "interactions": [{"character": "Lio", "object": "wooden milk bucket", "where": "holds up the wooden milk bucket toward Nonna", "action": "presenting the bucket", "hands": true, "storyRelevant": true, "priority": "essential"}, {"character": "Noam", "object": "Nonna", "where": "watches Nonna", "action": "watching", "hands": false, "storyRelevant": false, "priority": "normal"}, {"character": "ANI001", "object": "broad red autumn leaf", "where": "chews the broad red hazel leaf", "action": "chewing the leaf", "hands": false, "storyRelevant": true, "priority": "normal"}], "wornItems": [{"id": "CLO001", "owner": "Noam", "state": "worn"}, {"id": "CLO002", "owner": "Lio", "state": "worn"}]}

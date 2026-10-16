@@ -1,0 +1,243 @@
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "garden toad",
+      "pages": [6],
+      "scaleClass": "palm-sized",
+      "species": "common garden toad",
+      "coloring": "mottled olive-brown with soft cream belly and warm tan spots",
+      "features": "rounded plump body, large friendly dark round eyes, smooth rounded snout, calm smiling mouth with no visible teeth"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "red toy car",
+      "name": "red toy car",
+      "pages": [1, 13, 14, 15],
+      "scaleClass": "palm-sized",
+      "type": "hand tool",
+      "states": [
+        {
+          "name": "unaltered",
+          "delta": "clean dry painted red surface with rounded roof and four small black wheels",
+          "pages": [1, 13]
+        },
+        {
+          "name": "dripping wet",
+          "delta": "wet glossy surface coated with shining water drops",
+          "pages": [14, 15]
+        }
+      ],
+      "description": "A small moulded red plastic toy racing car with four smooth black wheels, rounded aerodynamic roof, and bright yellow side stripes."
+    },
+    {
+      "id": "ART002",
+      "label": "berry basket",
+      "name": "woven berry basket",
+      "pages": [4, 7, 10, 15],
+      "scaleClass": "melon-sized",
+      "type": "sea chest",
+      "description": "A shallow oval woven willow basket with a curved overhead arch handle, natural light tan reed colour, filled with ripe red strawberries."
+    },
+    {
+      "id": "ART003",
+      "label": "green garden bucket",
+      "name": "green plastic garden bucket",
+      "pages": [6, 14],
+      "scaleClass": "knee-high",
+      "type": "hand tool",
+      "description": "A sturdy cylindrical bright green plastic bucket with a reinforced rolled top rim and a curved metal wire bail handle."
+    },
+    {
+      "id": "ART004",
+      "label": "wooden sandbox lid",
+      "name": "wooden sandbox lid",
+      "pages": [4],
+      "scaleClass": "chest-high",
+      "type": "sea chest",
+      "description": "A heavy flat rectangular pine board cover built from four thick weathered cedar planks joined by cross battens, fitted with two thick jute rope loop handles."
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "label": "backyard play lawn",
+      "name": "backyard play lawn",
+      "pages": [1, 3, 4, 5, 6, 8, 9, 11, 12, 13, 14],
+      "scaleClass": "house-height",
+      "setting": "outdoor, suburban backyard lawn",
+      "colors": "lush emerald green grass, sunny yellow dandelion patches, natural cedar wood, bright blue sky",
+      "features": "open green lawn bordered by a white wooden fence, a yellow plastic slide, a square timber sandbox, a taut rope clothesline, and a stone birdbath",
+      "signatureElement": "a carved grey stone pedestal birdbath standing in the sunny corner of the lawn",
+      "isRealLandmark": false,
+      "landmarkQuery": null,
+      "emptyScenePrompt": "Lush green mown lawn stretches under a bright cloudless summer sky, bordered at the rear by a clean white picket fence and leafy deciduous bushes. A yellow moulded plastic slide and a low square cedar sandbox stand at the midground lawn edge under full, direct sunlight. The grass continues evenly across the foreground and midground with smooth ground footing throughout."
+    },
+    {
+      "id": "LOC002",
+      "label": "backyard garden patch",
+      "name": "backyard vegetable and berry garden",
+      "pages": [2, 7, 10],
+      "scaleClass": "house-height",
+      "setting": "outdoor, backyard garden plot",
+      "colors": "rich dark brown soil, vibrant green leafy strawberry plants, bright red ripe berries, weathered cedar mulch",
+      "features": "neat parallel garden rows with raised timber beds, leafy strawberry mounds, a green garden hose reel, and an iron garden wheelbarrow",
+      "signatureElement": "neat rows of dark green strawberry plants dotted with bright red berries along a woodchip path",
+      "isRealLandmark": false,
+      "landmarkQuery": null,
+      "emptyScenePrompt": "Neat parallel raised garden beds filled with bushy dark green strawberry plants run along a weathered woodchip path under bright sunny skies. A wooden garden wheelbarrow and green hose coil rest beside the garden plot, with the green open lawn visible beyond the timber border. The woodchip garden walkway provides solid flat footing across the foreground and midground."
+    },
+    {
+      "id": "LOC003",
+      "label": "wooden back porch",
+      "name": "wooden residential back porch",
+      "pages": [15],
+      "scaleClass": "house-height",
+      "setting": "outdoor, covered wooden deck",
+      "colors": "warm honey-toned cedar decking, white painted porch railings, soft beige exterior house siding",
+      "features": "a wide elevated timber deck with three broad steps leading down to the lawn, sturdy white railings, and a wide wooden porch bench",
+      "signatureElement": "wide cedar plank decking bordered by white painted balusters overlooking the sunny green yard",
+      "isRealLandmark": false,
+      "landmarkQuery": null,
+      "emptyScenePrompt": "A wide cedar plank deck with honey-toned floorboards is framed by white painted wooden balustrades and the clapboard wall of the house under warm afternoon sunlight. A broad wooden bench with a comfortable backrest sits against the house wall, overlooking the sunlit green garden below. The level wooden floorboards extend unbroken across the foreground and midground."
+    }
+  ],
+  "vehicles": [],
+  "clothing": [
+    {
+      "id": "CLO001",
+      "label": "superhero romper and cape",
+      "name": "superhero romper costume with cape",
+      "pages": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+      "wornBy": "Chris",
+      "description": "A red cotton short-sleeve romper-style bodysuit with a round neckline and integrated navy blue shorts; a large yellow car emblem printed on the chest; brown leather aviator goggles with brass frames worn on the forehead above the eyes; a red satin knee-length cape tied at the throat with a brass hook-and-eye fastening, the straight hem trimmed with small brass rivets; a brown leather utility belt with a round brass buckle and a small canvas pouch, worn at the waist; brown leather lace-up ankle boots with brass eyelets.",
+      "howWorn": "worn snugly as a play costume with the cape flowing down to knee length behind"
+    },
+    {
+      "id": "CLO002",
+      "label": "linen blouse and cropped trousers",
+      "name": "green linen blouse and brown cropped trousers",
+      "pages": [2, 4, 7, 10, 14, 15],
+      "wornBy": "Emma",
+      "description": "A green linen short-sleeve blouse with a small pointed collar and three brass press-stud buttons at the throat; brown cotton wide-leg cropped trousers with a wide waistband secured by a single broad leather belt with a round brass buckle; tan canvas lace-up ankle boots with brass eyelets.",
+      "howWorn": "worn loosely and comfortably for summer outdoor gardening"
+    }
+  ]
+}
+```
+
+---COVER SCENE HINTS---
+**Title Page**
+Mood: bright cheerful summer morning
+Objects: LOC001, ART001
+Characters:
+- Chris (center foreground): costumed:superhero, holds: ART001, priority: essential
+
+**Initial Page**
+Mood: lively playful sunny morning
+Objects: LOC001, ART001
+Characters:
+- Chris (left foreground): costumed:superhero, holds: ART001, priority: essential
+- Emma (right midground): standard, holds: nothing, priority: normal
+
+**Back Cover**
+Mood: warm gentle afternoon comfort
+Objects: LOC003, ART001
+Characters:
+- Chris (center foreground): costumed:superhero, holds: ART001, priority: essential
+- Emma (center foreground): standard, holds: nothing, priority: essential
+
+## Page 1
+Chris — a toddler little boy with average build, toddler proportions about four heads tall, a large head relative to his body, soft rounded features, a rounded belly, light brown straight ear-length hair with bangs at eyebrows, brown eyes, a rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, and medium lips — stands in the centre foreground of the lush green backyard lawn and hurls his small red toy car upward into the clear blue summer sky, his body leaning back with both feet firmly planted on the grass as his arm reaches high at full extension. He wears a red cotton short-sleeve romper-style bodysuit with a round neckline and integrated navy blue shorts, a large yellow car emblem printed on the chest, brown leather aviator goggles with brass frames on his forehead above his eyes, a red satin knee-length cape tied at his throat with a brass hook-and-eye fastening and trimmed at the straight hem with small brass rivets, a brown leather utility belt with a round brass buckle and small canvas pouch at his waist, and brown leather lace-up ankle boots with brass eyelets. His red cape billows outward behind his shoulders in the warm breeze as the palm-sized red plastic toy car flies upward above him against the bright morning sunlight. Low-angle shot looking up from lawn level, capturing the cheerful energy of a sunny summer morning in the open yard.
+
+---METADATA---
+{"sceneIntent":"Chris leans back on the lawn and hurls his red toy car upward into the summer sky. Chris releases the car high above his head as his eyes track its upward flight. Bright morning sunlight washes over the open green lawn with enthusiastic toddler energy.","characters":[{"name":"Chris","clothing":"costumed:superhero","position":"center foreground","depth":"foreground","looksAt":"ART001.1","expression":"wide eyes, raised brows, open excited grin"}],"shot":"low-angle","population":"cast_only","era":"present day","objects":["LOC001","ART001.1"],"interactions":[{"character":"Chris","object":"ART001.1","where":"hurls the red toy car upward into the sky","action":"throwing the toy car","hands":true,"storyRelevant":true,"priority":"essential"}]}
+
+## Page 2
+Chris — a toddler little boy with average build, toddler proportions about four heads tall, light brown straight ear-length hair with bangs at eyebrows, brown eyes, and soft rounded facial features, wearing a red cotton short-sleeve romper-style bodysuit with navy blue shorts, a large yellow car emblem on the chest, brown leather aviator goggles on his forehead, a red satin knee-length cape, a brown leather utility belt with brass buckle, and brown leather lace-up ankle boots — stands in the left foreground seen from behind, his back turned to the camera as he pivots his shoulders toward the wide open lawn. In the right midground, up on the cedar porch steps five paces away, Emma — a young adult young woman with average build, adult proportions about eight heads tall, blonde straight shoulder-length loose hair with a left side part, green eyes, soft jawline, straight nose with rounded tip, medium cheekbones, and medium lips, wearing a green linen short-sleeve blouse with a small pointed collar and three brass press-stud buttons at the throat, brown cotton wide-leg cropped trousers with a broad leather belt, and tan canvas lace-up ankle boots — stands on the bottom porch step facing left toward Chris, calling out to him with one hand cupped near her cheek. Over-the-shoulder framing from behind Chris looking across the sunny green grass toward the porch under bright mid-morning summer light.
+
+---METADATA---
+{"sceneIntent":"Emma calls to Chris from the porch steps while Chris pauses on the grass and turns toward the yard. Chris stands on the lawn while Emma gestures from the porch steps, Chris looking toward the lawn ahead. Bright late morning sunlight fills the yard with purposeful energy.","characters":[{"name":"Chris","clothing":"costumed:superhero","position":"left foreground","perspective":"back view","depth":"foreground","looksAt":"away","expression":"head turned slightly left, brows raised, mouth parted"},{"name":"Emma","clothing":"standard","position":"right midground","depth":"midground","looksAt":"Chris","expression":"open mouth calling, lifted brows, warm attentive eyes"}],"shot":"over-the-shoulder","population":"cast_only","era":"present day","objects":["LOC002"],"interactions":[{"character":"Emma","object":"the porch","where":"calls out across the garden path","action":"calling across the yard","hands":false,"storyRelevant":true,"priority":"essential"},{"character":"Chris","object":"the lawn","where":"turns to face the open yard","action":"standing","hands":false,"storyRelevant":false,"priority":"low"}]}
+
+## Page 3
+Chris — a toddler little boy with average build, toddler proportions about four heads tall, light brown straight ear-length hair with bangs at eyebrows, brown eyes, rounded jawline, and straight nose with rounded tip — crouches low in the centre foreground at the base of the bright yellow plastic slide on the sunny lawn, facing right in profile with his knees bent deep and his boots pressed against the soft turf. He wears his red cotton short-sleeve romper-style bodysuit with integrated navy blue shorts, yellow car chest emblem, brown leather aviator goggles on his forehead, red satin knee-length cape draped down his back to the grass, brown leather utility belt at his waist, and brown leather lace-up ankle boots. His right hand reaches flat inside the curved plastic chute of the slide, fingers spread as he feels the smooth yellow surface for his missing car, while his left hand rests firmly on his knee for balance. The yellow slide rises twice his height into the clear sky, its empty plastic chute glowing in the warm mid-morning sunlight. Medium shot focusing on the determined inspection at the foot of the slide, surrounded by neat summer grass.
+
+---METADATA---
+{"sceneIntent":"Chris crouches at the bottom of the slide and feels inside the empty chute with his hand. Chris reaches his right hand inside the yellow slide while his eyes search the smooth plastic interior. Bright sunny morning light illuminates the colourful play area with focused determination.","characters":[{"name":"Chris","clothing":"costumed:superhero","position":"center foreground","perspective":"facing right","depth":"foreground","looksAt":"LOC001","expression":"furrowed brows, focused narrowed eyes, set lips"}],"shot":"medium","population":"cast_only","era":"present day","objects":["LOC001"],"interactions":[{"character":"Chris","object":"the slide chute","where":"reaches inside the curved slide chute","action":"searching the slide","hands":true,"storyRelevant":true,"priority":"essential"}]}
+
+## Page 4
+Emma — a young adult young woman of average build with blonde straight shoulder-length loose hair parted on the left, green eyes, soft jawline, and straight nose with rounded tip, wearing her green linen short-sleeve blouse, brown cotton wide-leg cropped trousers with broad leather belt, and tan canvas lace-up ankle boots — kneels on the grass in the right foreground and heaves upward on the rope handle of the heavy wooden sandbox lid, her arms taking the weight as the thick pine cover tilts open. Beside her on the left, Chris — a toddler little boy with toddler proportions about four heads tall, light brown straight ear-length hair with bangs at eyebrows, brown eyes, and soft rounded features, dressed in his red cotton short-sleeve romper with navy shorts, yellow car chest emblem, forehead aviator goggles, red satin cape, brown utility belt, and brown leather lace-up ankle boots — stands close beside the wooden sandbox frame, leaning forward with his hands braced on the outer timber edge as he peers into the smooth flat sand inside. A woven willow berry basket rests on the grass near Emma's knee. Close-up framing capturing both siblings at the sandbox edge under the brilliant late-morning summer sun, showing the empty golden sand within.
+
+---METADATA---
+{"sceneIntent":"Emma lifts the heavy wooden sandbox lid while Chris watches eagerly beside her. Emma grips the rope handle of the lid while Chris leans on the sandbox rim, both looking into the sand. Bright late-morning sun reveals the flat untouched sand inside the timber box.","characters":[{"name":"Emma","clothing":"standard","position":"right foreground","depth":"foreground","looksAt":"ART004","expression":"effort in brows, focused eyes, tight parted lips"},{"name":"Chris","clothing":"costumed:superhero","position":"left foreground","depth":"foreground","looksAt":"ART004","expression":"wide curious eyes, raised eyebrows, expectant parted mouth"}],"shot":"close-up","population":"cast_only","era":"present day","objects":["LOC001","ART004","ART002"],"interactions":[{"character":"Emma","object":"ART004","where":"lifts the heavy wooden sandbox lid by its rope handle","action":"lifting the sandbox lid","hands":true,"storyRelevant":true,"priority":"essential"},{"character":"Chris","object":"ART004","where":"rests hands on the outer timber frame","action":"watching","hands":true,"storyRelevant":false,"priority":"normal"}]}
+
+## Page 5
+Chris — a toddler little boy with average build, toddler proportions about four heads tall, light brown straight ear-length hair with bangs at eyebrows, brown eyes, rounded jawline, and straight nose with rounded tip — stands in the centre foreground facing the camera, using both hands to push apart two large white cotton towels hanging from the taut rope clothesline. He wears his red cotton short-sleeve romper-style bodysuit with navy shorts, yellow car chest emblem, brown leather aviator goggles on his forehead, red satin knee-length cape falling over his shoulders, brown leather utility belt with brass buckle, and brown leather lace-up ankle boots. His small hands grip the thick cotton hem of each towel, parting them wide to reveal only empty blue summer sky and distant tree branches behind the line. The breeze gently ripples the edges of the white fabric on either side of his shoulders as bright midday sunlight streams through the opening. Medium shot focused on his growing worry as the laundry line reveals nothing, set against the green suburban backyard.
+
+---METADATA---
+{"sceneIntent":"Chris pushes apart two hanging white towels on the clothesline to peer through. Chris holds the edges of both towels apart while looking through the gap at the open sky. Bright midday light filters through the white fabric, highlighting his worried search.","characters":[{"name":"Chris","clothing":"costumed:superhero","position":"center foreground","depth":"foreground","looksAt":"away","expression":"worried downturned brows, wide searching eyes, slightly parted lips"}],"shot":"medium","population":"cast_only","era":"present day","objects":["LOC001"],"interactions":[{"character":"Chris","object":"the clothesline towels","where":"pushes apart the hanging white towels","action":"parting the towels","hands":true,"storyRelevant":true,"priority":"essential"}]}
+
+## Page 6
+Chris — a toddler little boy with average build, toddler proportions about four heads tall, light brown straight ear-length hair with bangs at eyebrows, brown eyes, and soft rounded features, wearing his red cotton short-sleeve romper with navy shorts, yellow car emblem, forehead goggles, red satin cape, brown utility belt, and brown leather ankle boots — takes a startled step backward on the green grass in the right foreground, his arms raised slightly for balance as his boots touch the turf. On the lawn in the left foreground beside a coiled garden hose, a plump olive-brown garden toad with friendly rounded dark eyes and a soft cream belly hops out from beneath an upright bright green plastic garden bucket, landing softly on the grass. The green bucket stands upright beside the metal hose reel, while the small toad leaps toward the edge of the leafy flowerbed under the hot midday sun. Low-angle shot from near ground level, capturing the sudden encounter on the sunlit lawn.
+
+---METADATA---
+{"sceneIntent":"Chris steps back on the grass as a friendly toad hops out from beside the green bucket. Chris steadies his feet while watching the hopping toad near the upright bucket. Strong midday sunlight warms the green lawn and garden hose reel with lively surprise.","characters":[{"name":"Chris","clothing":"costumed:superhero","position":"right foreground","depth":"foreground","looksAt":"ANI001","expression":"wide startled eyes, raised eyebrows, small round open mouth"}],"shot":"low-angle","population":"cast_only","era":"present day","objects":["LOC001","ANI001","ART003"],"interactions":[{"character":"Chris","object":"ANI001","where":"steps back while watching the garden toad","action":"stepping back","hands":false,"storyRelevant":true,"priority":"essential"}]}
+
+## Page 7
+Chris — a toddler little boy with toddler proportions about four heads tall, light brown straight ear-length hair with bangs at eyebrows, brown eyes, and average build, dressed in his red cotton short-sleeve romper, navy shorts, yellow car emblem, forehead goggles, red satin cape, brown utility belt, and brown leather lace-up ankle boots — stands in the left foreground beside a dark iron garden wheelbarrow, leaning his chest against the metal rim as his hands dig through a heap of brown pinecones inside the tray. In the right midground, four paces away along the woodchip path, Emma — a young adult young woman of average build with blonde straight shoulder-length hair, green eyes, wearing her green linen short-sleeve blouse, brown wide-leg cropped trousers, and tan canvas boots — stands beside the lush green strawberry rows holding her woven wicker berry basket in one hand, turning back toward Chris to call his name. High-angle aerial shot looking down on the garden beds and wheelbarrow from above, bathed in the full heat of midday summer sun.
+
+---METADATA---
+{"sceneIntent":"Chris searches through pinecones in the wheelbarrow while Emma calls to him from the strawberry patch. Chris sifts pinecones in the wheelbarrow tray while Emma holds her berry basket and looks toward him. Hot overhead midday sunlight casts short crisp shadows across the woodchip paths.","characters":[{"name":"Chris","clothing":"costumed:superhero","position":"left foreground","depth":"foreground","looksAt":"LOC002","expression":"focused knit brows, intent searching eyes, pressed lips"},{"name":"Emma","clothing":"standard","position":"right midground","depth":"midground","looksAt":"Chris","expression":"calling open mouth, arched brows, warm attentive gaze"}],"shot":"aerial","population":"cast_only","era":"present day","objects":["LOC002","ART002"],"interactions":[{"character":"Chris","object":"the wheelbarrow","where":"pats through pinecones inside the wheelbarrow tray","action":"searching through pinecones","hands":true,"storyRelevant":true,"priority":"essential"},{"character":"Emma","object":"ART002","where":"holds the woven berry basket by its handle","action":"calling across the yard","hands":true,"storyRelevant":false,"priority":"normal"}]}
+
+## Page 8
+Chris — a toddler little boy with average build, toddler proportions about four heads tall, light brown straight ear-length hair with bangs at eyebrows, brown eyes, rounded jawline, and straight nose with rounded tip — kneels on his hands and knees on the lawn in the centre foreground, facing left in profile as he lowers his head to look underneath a green webbing folding lawn chair. He wears his red cotton short-sleeve romper-style bodysuit with navy shorts, yellow car chest emblem, brown leather aviator goggles on his forehead, red satin knee-length cape trailing across the grass behind him, brown utility belt, and brown leather lace-up ankle boots. His hands are placed flat on the soft grass, chest lowered near the turf, as his brown eyes peer into the cool patch of shade beneath the chair seat where only a single brittle brown oak leaf rests on the ground. The white tubular metal legs of the chair frame the shaded square of turf under the brilliant midday summer sky. Medium shot focusing on his crouched search beneath the lawn furniture.
+
+---METADATA---
+{"sceneIntent":"Chris peers under the folding lawn chair at the shaded patch of grass beneath it. Chris rests on hands and knees while looking directly at the single leaf under the chair. Bright midday sun casts deep contrast between the open lawn and the chair's dark shadow.","characters":[{"name":"Chris","clothing":"costumed:superhero","position":"center foreground","perspective":"facing left","depth":"foreground","looksAt":"LOC001","expression":"lowered brows, wide searching eyes, quiet downturned mouth"}],"shot":"medium","population":"cast_only","era":"present day","objects":["LOC001"],"interactions":[{"character":"Chris","object":"the lawn chair","where":"peers beneath the folding lawn chair","action":"searching under chair","hands":true,"storyRelevant":true,"priority":"essential"}]}
+
+## Page 9
+Chris — a toddler little boy with average build, toddler proportions about four heads tall, light brown straight ear-length hair with bangs at eyebrows, brown eyes, rounded jawline, and soft facial features, wearing his red cotton short-sleeve romper with navy shorts, yellow car chest emblem, forehead goggles, red satin cape, brown utility belt, and brown leather ankle boots — crouches low in the centre foreground, facing the camera as he gently lowers a flat grey stone stepping stone back into place on the ground. His small hands grip the rough outer rim of the round slate stone with careful precision, hovering just above the soil where a thin line of tiny black garden ants marches undisturbed across the dark earth. His brow is furrowed in tender concentration, his boots tucked neatly under his knees as he rests on the sunlit garden path. Close-up shot framed tightly on his hands and the stone at path level under the clear midday summer sunlight.
+
+---METADATA---
+{"sceneIntent":"Chris gently sets a loose grey stepping stone back down over a line of marching ants. Chris grips both sides of the slate stone with careful hands, his eyes fixed on the ants below. Direct midday sunlight highlights the textured stone and dark garden soil with gentle care.","characters":[{"name":"Chris","clothing":"costumed:superhero","position":"center foreground","depth":"foreground","looksAt":"LOC001","expression":"soft knit brows, focused gentle eyes, slightly pursed lips"}],"shot":"close-up","population":"cast_only","era":"present day","objects":["LOC001"],"interactions":[{"character":"Chris","object":"the stepping stone","where":"lowers the loose slate stone gently to the ground","action":"placing the stone","hands":true,"storyRelevant":true,"priority":"essential"}]}
+
+## Page 10
+Chris — a toddler little boy with toddler proportions about four heads tall, light brown straight ear-length hair with bangs at eyebrows, brown eyes, and average build, wearing his red cotton short-sleeve romper, navy shorts, yellow car emblem, forehead goggles, red satin cape, brown utility belt, and brown leather lace-up ankle boots — kneels on the woodchip path in the left foreground, lifting the dark green leaves of a bushy strawberry plant with both hands to inspect the underside, finding only a tiny unripe green berry. Just two paces behind him in the right midground, Emma — a young adult young woman of average build with blonde straight shoulder-length hair, green eyes, wearing her green linen blouse, brown cropped trousers, and tan canvas boots — stands over the strawberry row, gently dropping a handful of plump red strawberries into the woven willow basket hooked over her forearm while looking down at Chris. Medium shot showing the two siblings working along the lush strawberry patch under the intense midday summer sun.
+
+---METADATA---
+{"sceneIntent":"Chris turns over strawberry leaves while Emma drops ripe berries into her basket nearby. Chris holds up leafy strawberry vines while Emma places berries in her basket, Emma looking down at Chris. Warm midday summer light illuminates the vibrant green garden rows and rich red fruit.","characters":[{"name":"Chris","clothing":"costumed:superhero","position":"left foreground","depth":"foreground","looksAt":"LOC002","expression":"disappointed brows, searching eyes, drooping mouth"},{"name":"Emma","clothing":"standard","position":"right midground","depth":"midground","looksAt":"Chris","expression":"gentle arched brows, sympathetic warm eyes, soft understanding smile"}],"shot":"medium","population":"cast_only","era":"present day","objects":["LOC002","ART002"],"interactions":[{"character":"Chris","object":"the strawberry plant","where":"lifts the leafy strawberry vine to look underneath","action":"searching strawberry plants","hands":true,"storyRelevant":true,"priority":"essential"},{"character":"Emma","object":"ART002","where":"drops fresh strawberries into the woven basket","action":"picking berries","hands":true,"storyRelevant":false,"priority":"normal"}]}
+
+## Page 11
+Chris — a toddler little boy with average build, toddler proportions about four heads tall, light brown straight ear-length hair with bangs at eyebrows, brown eyes, rounded jawline, and straight nose with rounded tip — sits flat on the green lawn in the centre foreground, facing the camera with his legs spread outward on the grass, having just tipped over a large blue plastic toy bin. He wears his red cotton short-sleeve romper-style bodysuit with navy shorts, yellow car chest emblem, brown leather aviator goggles on his forehead, red satin knee-length cape spread out behind him on the turf, brown leather utility belt, and brown leather lace-up ankle boots. The overturned blue bin rests on its side beside his knee, spilling colourful plastic balls, yellow shovels, and green buckets across the bright lawn, but no red car. Chris rests his hands limp on his knees, his rounded shoulders slumping with fatigue under the hot early afternoon summer sun. Medium shot capturing the colourful clutter of toys on the grass and his tired posture.
+
+---METADATA---
+{"sceneIntent":"Chris sits exhausted on the grass beside an overturned toy bin that spilled balls and shovels. Chris rests his hands on his knees while looking down at the scattered toys on the lawn. Bright early afternoon sunlight beats down on the colourful pile of backyard toys.","characters":[{"name":"Chris","clothing":"costumed:superhero","position":"center foreground","depth":"foreground","looksAt":"LOC001","expression":"weary drooping eyelids, sad furrowed brows, sagging mouth"}],"shot":"medium","population":"cast_only","era":"present day","objects":["LOC001"],"interactions":[{"character":"Chris","object":"the toy bin","where":"rests hands on knees beside the spilled toy bin","action":"sitting tiredly","hands":true,"storyRelevant":true,"priority":"essential"}]}
+
+## Page 12
+Chris — a toddler little boy with average build, toddler proportions about four heads tall, light brown straight ear-length hair with bangs at eyebrows, brown eyes, rounded jawline, neutral chin, straight nose with rounded tip, and soft rounded cheeks — sits on the sunny lawn in the centre foreground, clutching the gathered folds of his red satin cape tightly against his chest with both small hands. He wears his red cotton short-sleeve romper-style bodysuit with integrated navy blue shorts, yellow car emblem on the chest, brown leather aviator goggles pushed up onto his forehead, red satin cape fastened at his throat, brown leather utility belt with brass buckle, and brown leather lace-up ankle boots. His chin rests low against the bunched red satin fabric, his heavy eyelids drooping with exhaustion and worry as he murmurs quietly to himself. Close-up framing focused closely on his weary face and bunched satin cape under the hot, direct early afternoon summer sunlight, with the blurred green yard behind him.
+
+---METADATA---
+{"sceneIntent":"Chris sits on the lawn clutching his red cape to his chest as his eyes grow heavy with sleepiness. Chris grips the bunched fabric of his cape against his chest while looking down at his lap. Warm early afternoon light highlights his tired expression and tight hold on his cape.","characters":[{"name":"Chris","clothing":"costumed:superhero","position":"center foreground","depth":"foreground","looksAt":"away","expression":"heavy half-closed eyes, drooping sad brows, small quivering mouth"}],"shot":"close-up","population":"cast_only","era":"present day","objects":["LOC001"],"interactions":[{"character":"Chris","object":"his cape","where":"clutches the gathered red satin cape to his chest","action":"holding cape","hands":true,"storyRelevant":true,"priority":"essential"}]}
+
+## Page 13
+Chris — a toddler little boy with average build, toddler proportions about four heads tall, light brown straight ear-length hair with bangs at eyebrows, brown eyes, and soft rounded facial features, dressed in his red cotton short-sleeve romper, navy shorts, yellow car chest emblem, forehead goggles, red satin cape, brown utility belt, and brown leather lace-up ankle boots — sits in the left foreground seen from behind, his back turned to the camera as he raises the straight hem of his red cape with both hands to shade his eyes like a sun visor. Down the diagonal in the right midground, six paces away across the bright sunlit lawn, stands a carved grey stone pedestal birdbath. Above the rounded stone rim of the water basin, a distinct glint of bright red plastic — the small red toy car — perches visible against the shimmering water surface in the hot afternoon glare. Over-the-shoulder framing positioned just behind Chris's shoulder looking across the green lawn toward the distant stone birdbath under the brilliant summer sky.
+
+---METADATA---
+{"sceneIntent":"Chris uses the edge of his cape as a visor against the bright sun and spots his red car in the birdbath. Chris holds his red cape above his eyes while gazing across the lawn at the stone birdbath. Blazing early afternoon sun washes across the yard, making the red car stand out.","characters":[{"name":"Chris","clothing":"costumed:superhero","position":"left foreground","perspective":"back view","depth":"foreground","looksAt":"ART001.1","expression":"head tilted up, one wide eye visible past brow, mouth open in gasp"}],"shot":"over-the-shoulder","population":"cast_only","era":"present day","objects":["LOC001","ART001.1"],"interactions":[{"character":"Chris","object":"his cape","where":"holds the cape hem above his eyes as a sun visor","action":"shading eyes with cape","hands":true,"storyRelevant":true,"priority":"essential"}]}
+
+## Page 14
+Emma — a young adult young woman of average build with blonde straight shoulder-length hair, green eyes, wearing her green linen short-sleeve blouse, brown wide-leg cropped trousers, and tan canvas boots — kneels firmly on the grass in the centre midground, gripping both sides of an upturned green plastic garden bucket with both hands to brace it steady on the turf. Standing upright on the flat bottom of the bucket, Chris — a toddler little boy with toddler proportions about four heads tall, light brown straight ear-length hair, brown eyes, in his red cotton romper, navy shorts, yellow car emblem, forehead goggles, red satin cape, brown utility belt, and brown leather lace-up boots — reaches both hands over the wide curved rim of the grey stone birdbath, his small fingers closing tightly around his dripping wet red toy car to lift it from the shallow water. Water droplets splash and sparkle in the hot afternoon sunlight as his boots remain balanced on the bucket. Medium shot capturing Emma's steadying grip and Chris's triumphant reach at the garden birdbath.
+
+---METADATA---
+{"sceneIntent":"Emma holds the green bucket steady while Chris stands on it and lifts his dripping red car from the birdbath. Emma grips the bucket firmly while Chris reaches into the stone basin, both focused on the red car. Warm bright afternoon sunlight makes water droplets sparkle around the birdbath.","characters":[{"name":"Emma","clothing":"standard","position":"center midground","depth":"midground","looksAt":"Chris","expression":"encouraging lifted brows, focused watchful eyes, gentle supportive smile"},{"name":"Chris","clothing":"costumed:superhero","position":"center midground","depth":"midground","looksAt":"ART001.2","expression":"wide triumphant eyes, high raised brows, joyful open grin"}],"shot":"medium","population":"cast_only","era":"present day","objects":["LOC001","ART001.2","ART003"],"interactions":[{"character":"Emma","object":"ART003","where":"grips the upturned green bucket with both hands","action":"holding the bucket steady","hands":true,"storyRelevant":true,"priority":"essential"},{"character":"Chris","object":"ART001.2","where":"lifts the dripping red toy car from the birdbath water","action":"lifting the wet car","hands":true,"storyRelevant":true,"priority":"essential"}]}
+
+## Page 15
+Emma — a young adult young woman of average build with blonde straight shoulder-length hair parted on the left, green eyes, wearing her green linen blouse, brown cropped trousers, and tan canvas boots — sits comfortably on the cedar bench of the shaded wooden back porch, looking down with a peaceful smile as she cradles Chris in her lap beside a small plate of soft cheese and her woven willow basket filled with sliced red strawberries. In her lap, Chris — a toddler little boy with toddler proportions about four heads tall, light brown straight ear-length hair with bangs at eyebrows, brown eyes, rounded jawline, and soft cheeks, wearing his red cotton short-sleeve romper, navy shorts, yellow car chest emblem, forehead goggles, red satin cape, brown utility belt, and brown leather lace-up boots — rests his head against Emma's chest, his eyes peacefully narrowed as he drifts into sleep, his small right fist clamped shut tight around his wet red toy car. Close-up shot framed on the two siblings resting on the porch bench under soft, warm afternoon summer sunlight.
+
+---METADATA---
+{"sceneIntent":"Chris falls asleep peacefully in Emma's lap on the porch, his fist clamped tight around his wet red car. Emma cradles Chris while Chris holds his red car against his chest, Emma looking down at him. Gentle warm afternoon light settles over the wooden porch with calm cozy satisfaction.","characters":[{"name":"Emma","clothing":"standard","position":"center foreground","depth":"foreground","looksAt":"Chris","expression":"soft loving brows, gentle downcast eyes, warm tender smile"},{"name":"Chris","clothing":"costumed:superhero","position":"center foreground","depth":"foreground","looksAt":"away","expression":"peacefully narrowed heavy eyes, relaxed smooth brows, gentle contented smile"}],"shot":"close-up","population":"cast_only","era":"present day","objects":["LOC003","ART001.2","ART002"],"interactions":[{"character":"Chris","object":"ART001.2","where":"holds the wet red toy car tightly in his closed fist","action":"holding toy car asleep","hands":true,"storyRelevant":true,"priority":"essential"},{"character":"Emma","object":"Chris","where":"cradles Chris in her lap on the porch bench","action":"watching","hands":true,"storyRelevant":false,"priority":"normal"}]}
