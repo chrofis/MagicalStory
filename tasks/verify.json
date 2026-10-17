@@ -10230,13 +10230,26 @@
       "addedAt": "2026-10-17",
       "claim": "Regenerating a page of a square-layout (1:1) story from the customer button returns a 1:1 image; an edited-scene regen stores a prose + METADATA description with no {\"previewMismatches\":[ prefix; a request whose characterIds match nothing answers 400.",
       "runShape": [
-        "page-regenerate"
+        "full-story"
       ],
       "check": {
         "kind": "human",
         "what": "On a staging beats story: regenerate one page via the button (image dims 1:1), edit the scene and regenerate (sceneDescriptions[p].description starts with prose, not '{').",
         "paid": true
-      }
+      },
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1792226018737_lb65hzkqs",
+          "env": "staging",
+          "build": "074d682f91d075ddde5aebf1c5f58d7fd7e6c09a",
+          "runDate": "2026-10-17 15:47:00 CH",
+          "checkedAt": "2026-10-17 16:20:00 CH",
+          "result": "HUMAN-CONFIRMED",
+          "by": "claude",
+          "note": "staging job_1792226018737_lb65hzkqs, 2026-10-17: edited-scene redos of p6, p15, p16, p17 on build 074d682f9 came back 1024x1024 (layout 1:1) and stored descriptions start with prose (\"Lotti — a young herring gull…\"), no {\"previewMismatches\":[ prefix; the edit-scene clothing crash (ec05d6f23) no longer fires. Checked by claude."
+        }
+      ]
     },
     {
       "id": "object-description-no-support-2026-10-17",
@@ -10251,7 +10264,9 @@
         "kind": "human",
         "what": "Open the Visual Bible of a staging beats story: read the artifact/vehicle descriptions and the reference cells; a plank-like object is drawn alone, not on a stump or rail.",
         "paid": true
-      }
+      },
+      "status": "pending",
+      "evidence": []
     },
     {
       "id": "aboard-vehicle-not-a-required-object-2026-10-17",
@@ -10267,7 +10282,8 @@
         "kind": "human",
         "what": "On a staging ship story: open the page prompts of the pages aboard (no '* **<ship>**' line, the 'camera stands on board' line present) and look at the pictures: deck and rail only. Then edit-scene + redo one aboard page and confirm sceneMetadata.aboard is still set.",
         "paid": true
-      }
+      },
+      "evidence": []
     }
   ],
   "runs": [

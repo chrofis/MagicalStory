@@ -318,9 +318,15 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   // Owner ruling 2026-09-11, on the cells rendered for Lab experiments
   // 1191/1192 (staging job_1789147573901_m3uam0nxi): naming what the object
   // attaches to is what makes it recognisable, and drew the mounting as well.
-  it('says the attachment named for recognition is never drawn', () => {
-    expect(templates['visualBible'])
-      .toMatch(/Naming that thing identifies the object and never puts it in the picture/);
+  // Superseded 2026-10-17 (docs/decisions.md, OBJECT_NOT_PLACED_RULE): the sentence
+  // "Naming that thing identifies the object and never puts it in the picture" was false
+  // (a plank described as resting on a rail drew the rail). The description now names no
+  // separate support at all, and a cell that adds one fails the gate.
+  it('says the description names no separate support and the cell draws the object alone', () => {
+    expect(templates['visualBible']).toContain('{OBJECT_NOT_PLACED}');
+    const { OBJECT_NOT_PLACED_RULE } = require('../../server/lib/promptBuilders');
+    expect(OBJECT_NOT_PLACED_RULE).toContain('never where it is: it names no separate thing the object rests on');
+    expect(OBJECT_NOT_PLACED_RULE).toContain('a reference cell draws the object alone');
   });
 
   // Owner ruling 2026-09-11: two cells for the same object under different
