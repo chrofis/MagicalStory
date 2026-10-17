@@ -4284,7 +4284,7 @@
       "rootCause": "8eff73710 made repair/iterate read the page shape only from storyData.layout (resolveStoryPageAspect, no default). The pipeline hands repair an in-memory storyData (pipelineStoryData) that never carried layout; only the saved story has it. Unit tests covered the resolver and the route, not the pipeline object.",
       "fix": "pipelineStoryData carries layout: inputData.layout. tests/unit/regen-route-bugs.test.ts",
       "status": "fixed",
-      "fixedIn": "pending"
+      "fixedIn": "4e666e296"
     }
   ]
 }
