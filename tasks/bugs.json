@@ -4233,7 +4233,7 @@
       "rootCause": "The beats pipeline never stamps a per-scene imageAspect; the source of truth is storyData.layout.imageAspect. regeneration.js (plate, render, scale-repair, composite) and repairPipeline.js (inpaint, iterate, post-repair text) read the empty per-scene field and defaulted.",
       "fix": "layout.resolveStoryPageAspect(storyData) reads the story layout and throws when missing (no default); used at every site, plus the iteratePageCore fallback. tests/unit/regen-route-bugs.test.ts",
       "status": "fixed",
-      "fixedIn": "PENDING"
+      "fixedIn": "8eff73710"
     },
     {
       "id": "regen-route-prefill-corrupts-scene-description",
@@ -4243,7 +4243,7 @@
       "rootCause": "Stale JSON-era prefill on two regen call sites (and the Test Lab mirror); the iterate path had moved on (no prefill, brief guard, resolveSceneIterationModel). An expansion error was caught and the raw summary rendered.",
       "fix": "images.callIterateBrief is the one rewrite call (model, no prefill, iterateBriefGuard + retry, throws); iteratePageCore, both regen routes and the Lab mirror use it; regen passes the plan line, story and textInImage like iterate. Also: characterIds compared as strings (400 when none match) and buildCharacterRestriction refuses an empty selection. tests/unit/regen-route-bugs.test.ts",
       "status": "fixed",
-      "fixedIn": "PENDING"
+      "fixedIn": "8eff73710"
     }
   ]
 }
