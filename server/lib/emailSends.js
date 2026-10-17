@@ -75,7 +75,13 @@ function _trim(value, max) {
   return s ? s.slice(0, max) : null;
 }
 
+// Standalone scripts (scripts/email/send.js) have no app-initialised pool; they
+// inject theirs here so the insert path stays this one implementation.
+let _injectedPool = null;
+function setEmailSendsPool(pool) { _injectedPool = pool; }
+
 function _pool() {
+  if (_injectedPool) return _injectedPool;
   const { getPool } = require('../services/database');
   return (getPool && getPool()) || null;
 }
@@ -202,7 +208,9 @@ async function sendTracked(resend, emailType, payload, meta = {}) {
       errorMessage: typeof error === 'string' ? error : (error.message || JSON.stringify(error)),
     });
   } else {
-    await recordEmailSend({ ...base, status: 'sent', resendMessageId: data && data.id });
+    const rowId = await recordEmailSend({ ...base, status: 'sent', resendMessageId: data && data.id });
+    // Lets a one-shot caller (send.js) learn that the record failed; app callers ignore it.
+    if (typeof meta.onRecorded === 'function') meta.onRecorded(rowId);
   }
   return result;
 }
@@ -303,6 +311,7 @@ async function applyRollup(pool, eventType, messageId, occurredAt) {
 module.exports = {
   sendTracked,
   recordEmailSend,
+  setEmailSendsPool,
   recordEmailEvent,
   buildTags,
   sanitizeTagValue,

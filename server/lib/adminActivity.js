@@ -182,6 +182,25 @@ async function buildActivityFeed(dbPool, hours = 24) {
     }
   }
 
+  // Support emails Claude sent to customers (scripts/email/send.js records them
+  // as email_type 'support-*'). They are NOT feed events: they get their own
+  // block in the daily recap, so a customer-facing mail is never lost among logins.
+  // sent_at is TIMESTAMPTZ, so node-pg returns a correct instant (no fromPgNaive).
+  const supportRows = await dbPool.query(`
+    SELECT sent_at, recipient, subject, status, email_type, open_count
+    FROM email_sends
+    WHERE email_type LIKE 'support-%'
+      AND sent_at > NOW() - ($1 * INTERVAL '1 hour')
+    ORDER BY sent_at`, [h]);
+  const support = supportRows.rows.map(r => ({
+    ts: r.sent_at,
+    recipient: r.recipient,
+    subject: r.subject,
+    status: r.status,
+    type: r.email_type,
+    opened: Number(r.open_count) > 0,
+  }));
+
   events.sort((a, b) => new Date(b.ts) - new Date(a.ts));
 
   const count = (t) => events.filter(e => e.type === t).length;
@@ -225,6 +244,7 @@ async function buildActivityFeed(dbPool, hours = 24) {
     },
     failures,
     health,
+    support,
     events,
   };
 }

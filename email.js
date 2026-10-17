@@ -1169,6 +1169,29 @@ async function sendAdminDailySummary(feed, dateLabel) {
             ${fInternal.length ? `<div style="font-size:12px; color:#6b7280; margin-top:10px; font-weight:bold;">INTERN</div>${fInternal.slice(0, 8).map(fRow).join('')}${fInternal.length > 8 ? `<div style="font-size:11px; color:#9ca3af; margin-top:4px;">… und ${fInternal.length - 8} weitere Arten</div>` : ''}` : ''}
           </div>` : '';
 
+  // SUPPORT (email_sends, email_type 'support-*'): every support mail Claude sent
+  // to a customer in the window. Shown only when there is one.
+  const support = feed.support || [];
+  const supportRow = (r) => `
+            <tr>
+              <td style="padding:4px 8px; white-space:nowrap;">${fmtTime(r.ts)}</td>
+              <td style="padding:4px 8px;">${esc(r.recipient)}</td>
+              <td style="padding:4px 8px;">${esc(r.subject)}</td>
+              <td style="padding:4px 8px; white-space:nowrap;">${esc(r.status)}</td>
+              <td style="padding:4px 8px; white-space:nowrap;">${r.opened ? 'ja' : 'nein'}</td>
+            </tr>`;
+  const supportBlock = support.length ? `
+          <div style="margin-top:14px; padding:12px 14px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px;">
+            <div style="font-weight:bold; color:#1d4ed8;">Support-Mails (24h): ${support.length}</div>
+            <table style="border-collapse:collapse; width:100%; margin-top:6px; font-size:13px;">
+              <tr style="text-align:left; color:#6b7280;">
+                <th style="padding:4px 8px;">Zeit</th><th style="padding:4px 8px;">An</th><th style="padding:4px 8px;">Betreff</th>
+                <th style="padding:4px 8px;">Status</th><th style="padding:4px 8px;">Geöffnet</th>
+              </tr>
+              ${support.map(supportRow).join('')}
+            </table>
+          </div>` : '';
+
   try {
     const { data, error } = await sendTracked(resend, 'admin-daily-summary', {
       from: EMAIL_FROM,
@@ -1190,6 +1213,7 @@ async function sendAdminDailySummary(feed, dateLabel) {
           ${revenueNote}
           ${healthBanner}
           ${failureBlock}
+          ${supportBlock}
           ${rows ? `
           <table style="border-collapse:collapse; width:100%; margin-top:16px; font-size:13px;">
             <tr style="background:#f1f5f9; text-align:left;">
