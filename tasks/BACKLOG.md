@@ -26,6 +26,7 @@ Last full sweep: **2026-09-06**.
 
 - [ ] Showcase fixes 2026-10-07 plan (open items: render count after repair fixes, cost ledger, round-2 convergence verify) → tasks/showcase-fixes-2026-10-07.md
 - [ ] Reader MAJOR admitted to repair + wrong_action routed to page redo (2026-10-15; open: staging story-run proof, verify.json `reader-major-regen`) → tasks/repair-reader-major-regen-2026-10-15.md
+- [ ] Gull rerun findings 2026-10-17: briefs drop page-text cast (p1/p4/p5/p17), ship drawn twice when aboard (p14/p18), gangplank look-book entry bakes in a position so p6/p15/p16 draw a board on a rail stump, p19 harsh score, ending return → tasks/gull-rerun-findings-2026-10-17.md
 - [ ] Hurt condition visible, never by side (VB relational wording, visible marker, plan-check Q20 declared condition; prod job_1792078014622_uh8tj6ht1) → tasks/hurt-condition-visible-2026-10-15.md
 - [ ] tests/unit/public-pages-a11y.test.ts "no page or component nests a second <main>" fails on staging HEAD (fails without the 2026-10-08 changes too; not investigated) → tests/unit/public-pages-a11y.test.ts:88
 - [ ] Showcase harness 2026-10-12: with DEMO_REUSE_ACCOUNT=1 on prod, a full story job (job_1791786057698_79n8x82wd, adminDraft, idea card picked) was created ~08:21 CH while the spec was only at Step 0c (`/create?new=true`); Step 1 then failed because the generation overlay hid the character headings. Find what submitted it (wizard auto-resume of a server draft from the memory-killed run, or another session) before the next reuse-account showcase → tests/demo-story.spec.ts:1069
@@ -492,7 +493,7 @@ measurement, is lost).
 - [ ] Ads quality score: 16 remaining items — A6 re-measure, B1–B4 keyword and ad-group hygiene,
       C1–C8 asset audit, D1–D3 weekly tracking. All Google-Ads-account-side, not repo-verifiable
       → `tasks/ads-quality-score.md:21-61`
-- [ ] Support bot for short trial books printed mostly blank: send order #100 email (credits
+- [ ] Support bot for short trial books printed mostly blank: (order #100 email SENT 2026-10-17) (credits
       >= 250 first), template + sender + detection + owner-approved drafts + digest section;
       root-cause checkout decision → `tasks/support-bot-2026-10-17.md`
 - [ ] Sentry error alerting; Plausible/Umami analytics → `docs/compliance-and-todo.html:87`

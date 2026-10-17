@@ -35,7 +35,7 @@ customer confirmed nothing (no checkbox in prod); max story 25 pages, a 25-page 
 marketing-sounding; no delivery-date promise.
 
 ## Build plan
-- [ ] Send the order #100 email once its credits are confirmed >= 250 (balance read blocked in
+- [x] (2026-10-17, Resend 01a149f9) Send the order #100 email (owner confirmed credits; v4 adds "combine both stories"). Was: once credits >= 250 (balance read blocked in
       session; owner tops up or allows the read) and the owner approves the final text.
 - [ ] `emails-src/templates/SupportShortTrialBook.tsx` + i18n copy (en/de/fr/it), built by
       `npm run build:emails`; layout = card + logo footer, no headline/cover.
