@@ -496,6 +496,19 @@ measurement, is lost).
 - [ ] Support bot for short trial books printed mostly blank (order #100 email SENT 2026-10-17):
       template + sender + detection + owner-approved drafts + digest section;
       root-cause checkout decision → `tasks/support-bot-2026-10-17.md`
+- [ ] (2026-10-17) Push to staging, then master on approval: support-email logging + recap
+      "Support-Mails" block (e6ddffca1), send.js. Check the recap renders on staging
+      → `tasks/support-bot-2026-10-17.md`
+- [ ] (2026-10-17) Owner: connect GitHub to claude.ai (/web-setup), then add the story-health
+      part to routine trig_01V91iK85qgydUYfFxjzuX2q and RECREATE the DB housekeeping routines
+      (daily 06:30 + weekly Sunday 03:30 CH; old triggers 404) → `docs/routines/daily-check.md`,
+      memory reference_db_housekeeping_routines
+- [ ] (2026-10-17) Owner: Postmark free DMARC digest signup (email mag.mail.hub@gmail.com), then
+      add its rua address to `_dmarc.magicalstory.ch` KEEPING p=quarantine
+- [ ] (2026-10-17) Blank-page acknowledgement checkbox (f8940c187) is staging-only; master needs it
+      so no new mostly-blank trial books are sold unconfirmed → `tasks/support-bot-2026-10-17.md`
+- [ ] (2026-10-17, deferred by owner) kvfit.ch is added in Resend but its 4 DNS records are not
+      entered at IONOS (records: Resend dashboard → Domains → kvfit.ch)
 - [ ] Sentry error alerting; Plausible/Umami analytics → `docs/compliance-and-todo.html:87`
 - [ ] Promote the referral programme on the **marketing site**. The in-app surface is NOT hidden:
       `AccountPage.tsx:12-18` renders code, balance and referral count, and `BookBuilder.tsx` +
