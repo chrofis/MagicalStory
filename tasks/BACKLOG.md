@@ -492,6 +492,9 @@ measurement, is lost).
 - [ ] Ads quality score: 16 remaining items — A6 re-measure, B1–B4 keyword and ad-group hygiene,
       C1–C8 asset audit, D1–D3 weekly tracking. All Google-Ads-account-side, not repo-verifiable
       → `tasks/ads-quality-score.md:21-61`
+- [ ] Support bot for short trial books printed mostly blank: send order #100 email (credits
+      >= 250 first), template + sender + detection + owner-approved drafts + digest section;
+      root-cause checkout decision → `tasks/support-bot-2026-10-17.md`
 - [ ] Sentry error alerting; Plausible/Umami analytics → `docs/compliance-and-todo.html:87`
 - [ ] Promote the referral programme on the **marketing site**. The in-app surface is NOT hidden:
       `AccountPage.tsx:12-18` renders code, balance and referral count, and `BookBuilder.tsx` +
