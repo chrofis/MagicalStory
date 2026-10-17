@@ -9,6 +9,8 @@ Not to be confused with the **daily recap email** (Tagesbericht: signups, trials
 mails sent), which the shop server itself sends every morning (`server/lib/dailySummary.js`).
 That one needs no routine.
 
+**Live since 2026-10-17:** `trig_01V91iK85qgydUYfFxjzuX2q` (env `env_01EMwh9Up4DxUQzaWtkE92Wx`, cron `40 5 * * *` UTC, Gmail connector, inbox part ONLY: GitHub is not connected to the claude.ai account, so Part A is pending). Test run 2026-10-17 succeeded (report delivered). Manage with RemoteTrigger get/update/run/get_run_log.
+
 ## Setup (claude.ai/code/routines → New routine)
 - Name: `MagicalStory daily check`
 - Repository: `chrofis/MagicalStory`, branch `staging`
