@@ -4244,6 +4244,16 @@
       "fix": "images.callIterateBrief is the one rewrite call (model, no prefill, iterateBriefGuard + retry, throws); iteratePageCore, both regen routes and the Lab mirror use it; regen passes the plan line, story and textInImage like iterate. Also: characterIds compared as strings (400 when none match) and buildCharacterRestriction refuses an empty selection. tests/unit/regen-route-bugs.test.ts",
       "status": "fixed",
       "fixedIn": "8eff73710"
+    },
+    {
+      "id": "regen-edited-scene-clothing-table-crash",
+      "title": "Edit scene then redo crashed with \"(clothingLabel || \"\").trim is not a function\" whenever the scene had characters",
+      "reportedAt": "2026-10-17",
+      "source": "staging redo of job_1792226018737_lb65hzkqs p17 returned HTTP 500 at 0 s; production has the same call.",
+      "rootCause": "The edited-scene expansion passed storyData.clothingRequirements (per-character objects) into buildSceneDescriptionPrompt's page-clothing slot; resolveClothingForPage then called .trim on an object.",
+      "fix": "Pass the page clothing (pageClothing.pageClothing[page] || primaryClothing), as the scene-description route and iterate do. tests/unit/regen-route-bugs.test.ts",
+      "status": "fixed",
+      "fixedIn": "pending"
     }
   ]
 }

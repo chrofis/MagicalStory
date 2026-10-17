@@ -650,7 +650,10 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
         language,
         visualBible,
         previousScenes,
-        clothingData,
+        // The PAGE's clothing ({Name: category} or a category), as the scene-description
+        // route and iterate pass it — never the story's clothingRequirements table, whose
+        // per-character objects crashed resolveClothingForPage (".trim is not a function").
+        storyData.pageClothing?.pageClothing?.[pageNumber] || storyData.pageClothing?.primaryClothing,
         correctionNotes,
         availableAvatars,
         // rawOutlineContext: the page's plan line, as iterate passes it (null would fill the

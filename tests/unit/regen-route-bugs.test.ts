@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 const nodeRequire = createRequire(import.meta.url);
@@ -58,5 +58,26 @@ describe('regenerate route - characterIds guard', () => {
     expect(() => buildCharacterRestriction([], ['A', 'B'])).toThrow(/empty selection/);
     expect(buildCharacterRestriction(['A'], ['B'])).toContain('Do NOT include: B');
     expect(buildCharacterRestriction(['A'], [])).toBe('');
+  });
+});
+
+describe('regenerate route - edited-scene expansion gets the PAGE clothing, not the clothingRequirements table', () => {
+  const PB = nodeRequire('../../server/lib/promptBuilders.js');
+  beforeAll(async () => { await nodeRequire('../../server/services/prompts.js').loadPromptTemplates(); });
+  const chars = [{ id: 1, name: 'Ada', physical: { hairColor: 'blonde', eyeColor: 'blue' }, avatars: {} }];
+  const clothingRequirements = { Ada: { standard: { used: true, garments: [{ name: 'jacket', slot: 'top', colour: 'red' }] }, costumed: { used: false } } };
+  const build = (clothing: unknown) => PB.buildSceneDescriptionPrompt(3, 'Ada waves.', chars, 'Ada waves at the boat.', 'en', null, [], clothing, '', '', { planLine: 'Ada waves.' }, null, { clothingRequirements });
+
+  it('the table in the clothing slot crashes the builder (the 2026-10-17 staging 500)', () => {
+    expect(() => build(clothingRequirements)).toThrow(/trim is not a function/);
+  });
+  it('the page clothing map builds a prompt with the character', () => {
+    expect(build({ Ada: 'standard' })).toContain('Ada');
+  });
+  it('the edited-scene expansion call passes the page clothing', () => {
+    const src = read('server/routes/regeneration.js');
+    const call = src.slice(src.indexOf('const expansionPrompt = buildSceneDescriptionPrompt('), src.indexOf('const expansionPrompt = buildSceneDescriptionPrompt(') + 1200);
+    expect(call).toContain('storyData.pageClothing?.pageClothing?.[pageNumber] || storyData.pageClothing?.primaryClothing');
+    expect(call).not.toMatch(/previousScenes,\s*clothingData,/);
   });
 });
