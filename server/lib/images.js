@@ -4443,6 +4443,7 @@ function pageTextInImage(storyData, pageNumber) {
  * @returns {Promise<{sceneResult: object, text: string}>}
  */
 async function callIterateBrief(scenePrompt, { pageNumber, usageTracker = null, model = null } = {}) {
+  const { callClaudeAPI } = require('./textModels');
   const effectiveSceneModel = model || require('../config/models').resolveSceneIterationModel();
   log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 18 validation checks with ${effectiveSceneModel}...`);
   let sceneResult = await callClaudeAPI(scenePrompt, null, effectiveSceneModel, { usageLabel: 'scene_iterate' });
@@ -5073,6 +5074,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         if (usageTracker && r.usage) {
           usageTracker('anthropic', r.usage, 'scene_iterate', r.modelId || correctionModel);
         }
+        const { assessIterateBrief, describeIterateBrief } = require('./iterateBriefGuard');
         const g = assessIterateBrief(r.text, { truncation: r.truncation });
         correctionResult = r;
         return { text: r.text, usable: g.usable, usage: r.usage, reason: g.usable ? null : describeIterateBrief(g) };
