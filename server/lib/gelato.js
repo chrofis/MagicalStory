@@ -95,6 +95,56 @@ function countBookContentPages(storyDatas) {
 }
 
 /**
+ * From this many blank (filler) pages up, the book builder shows the printed-book
+ * preview and the customer must tick the acknowledgement before checkout; the
+ * checkout endpoint enforces the same threshold. Up to 3 stay silent (owner 2026-10-04).
+ */
+const BLANK_PAGES_ACK_FROM = 4;
+
+/**
+ * Checkout guard: a book with BLANK_PAGES_ACK_FROM or more blank pages may only
+ * be paid for when the customer ticked the acknowledgement (client sends
+ * blankPagesAcknowledged: true). Pure, so the route and tests share it.
+ */
+function isBlankPagesAckMissing(blankPages, acknowledged) {
+  return blankPages >= BLANK_PAGES_ACK_FROM && acknowledged !== true;
+}
+
+/**
+ * The printed book page by page, in the order generatePrintPdf /
+ * generateCombinedBookPdf lay it out: cover, inside front blank, dedication,
+ * [per story 2+: title, dedication], story pages, [per story 2+ with a back
+ * cover: back cover, separator blank unless last], filler blanks up to
+ * `printedPages`, inside back blank. Kinds `insideFront`, `separator`,
+ * `insideBack` and `filler` are drawn white; only `filler` counts as a blank
+ * page in the Gelato page count (blankPages).
+ *
+ * @param {Object[]} storyDatas - stories.data objects, in book order
+ * @param {number} printedPages - Gelato page count (from computeBookPageInfo)
+ * @returns {{kind:string, storyIndex?:number, pageNumber?:number}[]}
+ */
+function buildPrintedPageSequence(storyDatas, printedPages) {
+  const { parseStoryPages } = require('./pdf');
+  const seq = [{ kind: 'cover' }, { kind: 'insideFront' }, { kind: 'dedication' }];
+  for (let si = 0; si < storyDatas.length; si++) {
+    if (si > 0) {
+      seq.push({ kind: 'title', storyIndex: si }, { kind: 'dedication', storyIndex: si });
+    }
+    const n = parseStoryPages(storyDatas[si]).length;
+    for (let p = 1; p <= n; p++) seq.push({ kind: 'story', storyIndex: si, pageNumber: p });
+    if (si > 0 && storyDatas[si]?.coverImages?.backCover) {
+      seq.push({ kind: 'backCover', storyIndex: si });
+      if (si < storyDatas.length - 1) seq.push({ kind: 'separator', storyIndex: si });
+    }
+  }
+  // Gelato pageCount excludes cover, inside front and inside back (3 PDF pages).
+  let gelatoPages = seq.length - 2;
+  while (gelatoPages < printedPages) { seq.push({ kind: 'filler' }); gelatoPages++; }
+  seq.push({ kind: 'insideBack' });
+  return seq;
+}
+
+/**
  * Single source of truth for "how many pages will this book be printed with,
  * and how many of them are blank". Used by the order flow (PDF padding) and
  * by the pre-payment preview in the book builder.
@@ -125,7 +175,8 @@ async function computeBookPageInfo(dbPool, storyDatas, coverType, bookFormat) {
   ) || productsResult.rows[0] || null; // any active SKU; snap lifts below min
   if (!product) {
     return { contentPages, estimatedPageCount, printedPages: estimatedPageCount,
-      blankPages: estimatedPageCount - contentPages, productUid: null, product: null };
+      blankPages: estimatedPageCount - contentPages, productUid: null, product: null,
+      sequence: buildPrintedPageSequence(storyDatas, estimatedPageCount) };
   }
   let printedPages;
   try {
@@ -139,7 +190,8 @@ async function computeBookPageInfo(dbPool, storyDatas, coverType, bookFormat) {
     );
   }
   return { contentPages, estimatedPageCount, printedPages,
-    blankPages: Math.max(0, printedPages - contentPages), productUid: product.product_uid, product };
+    blankPages: Math.max(0, printedPages - contentPages), productUid: product.product_uid, product,
+    sequence: buildPrintedPageSequence(storyDatas, printedPages) };
 }
 
 /**
@@ -686,6 +738,9 @@ module.exports = {
   processBookOrder,
   getCoverDimensions,
   snapToValidPageCount,
+  buildPrintedPageSequence,
+  isBlankPagesAckMissing,
+  BLANK_PAGES_ACK_FROM,
   countBookContentPages,
   computeBookPageInfo,
 };

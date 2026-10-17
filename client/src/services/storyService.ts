@@ -1,4 +1,12 @@
 import api from './api';
+
+/** One printed page of a book, as laid out by buildPrintedPageSequence (server/lib/gelato.js). */
+export interface PrintedPage {
+  kind: 'cover' | 'insideFront' | 'dedication' | 'title' | 'story' | 'backCover' | 'separator' | 'filler' | 'insideBack';
+  storyIndex?: number;
+  pageNumber?: number;
+}
+
 import type {
   Character,
   RelationshipMap,
@@ -2245,7 +2253,7 @@ export const storyService = {
   // Stripe checkout for book purchase (supports single story or multiple stories).
   // useBalanceCents: optional, spends from the user's referral balance (in addition
   // to any referralCode discount). Held server-side until session completes/expires.
-  async createCheckoutSession(storyIds: string | string[], coverType?: 'softcover' | 'hardcover', bookFormat?: 'square' | 'A4', quantity?: number, referralCode?: string, useBalanceCents?: number): Promise<{ url: string }> {
+  async createCheckoutSession(storyIds: string | string[], coverType?: 'softcover' | 'hardcover', bookFormat?: 'square' | 'A4', quantity?: number, referralCode?: string, useBalanceCents?: number, blankPagesAcknowledged?: boolean): Promise<{ url: string }> {
     const ids = Array.isArray(storyIds) ? storyIds : [storyIds];
     const body: Record<string, unknown> = {
       storyIds: ids,
@@ -2255,13 +2263,14 @@ export const storyService = {
     };
     if (referralCode) body.referralCode = referralCode;
     if (useBalanceCents && useBalanceCents > 0) body.useBalanceCents = useBalanceCents;
+    if (blankPagesAcknowledged) body.blankPagesAcknowledged = true;
     const response = await api.post<{ url: string }>('/api/stripe/create-checkout-session', body);
     return response;
   },
 
   // Pre-payment preview: printed page count and blank pages, computed by the
   // same server function that pads the print PDF.
-  async getBookPageInfo(storyIds: string[], coverType: 'softcover' | 'hardcover', bookFormat: 'square' | 'A4'): Promise<{ contentPages: number; printedPages: number; blankPages: number }> {
+  async getBookPageInfo(storyIds: string[], coverType: 'softcover' | 'hardcover', bookFormat: 'square' | 'A4'): Promise<{ contentPages: number; printedPages: number; blankPages: number; blankAckFrom: number; sequence: PrintedPage[] }> {
     return api.post('/api/book-page-info', { storyIds, coverType, bookFormat });
   },
 

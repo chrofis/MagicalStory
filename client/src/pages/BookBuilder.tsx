@@ -5,6 +5,8 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Navigation, LoadingSpinner } from '@/components/common';
+import BlankPagesPreview from '@/components/book/BlankPagesPreview';
+import type { PrintedPage } from '@/services/storyService';
 import { storyService } from '@/services';
 import { getPriceForPages, MAX_BOOK_PAGES, SHIPPING_COST_CHF, type PricingTier } from '@/utils/bookPricing';
 import { createLogger } from '@/services/logger';
@@ -150,6 +152,11 @@ export default function BookBuilder() {
       blankPagesTitle: 'Blank pages in your book',
       blankPagesDesc: (printed: number, content: number, blank: number) => `Your book has ${printed} pages. Your story fills ${content} of them – ${blank} ${blank === 1 ? 'page' : 'pages'} will be blank.`,
       blankPagesHint: 'Consider a longer story, or combine several stories into one book.',
+      blankPreviewTitle: 'Your printed book',
+      blankPreviewSummary: (f: number, p: number, b: number) => `${f} of ${p} pages filled, ${b} blank`,
+      blankLegendFilled: 'Page with content',
+      blankLegendBlank: 'Blank page',
+      blankAck: (b: number) => `I understand that my book has ${b} blank ${b === 1 ? 'page' : 'pages'}`,
       processing: 'Processing...',
       printPdf: 'Print PDF (Test)',
       generatingPdf: 'Generating PDF...',
@@ -200,6 +207,11 @@ export default function BookBuilder() {
       blankPagesTitle: 'Leere Seiten in deinem Buch',
       blankPagesDesc: (printed: number, content: number, blank: number) => `Dein Buch hat ${printed} Seiten. Deine Geschichte füllt ${content} davon – ${blank} ${blank === 1 ? 'Seite' : 'Seiten'} bleiben leer.`,
       blankPagesHint: 'Erwäge eine längere Geschichte oder kombiniere mehrere Geschichten zu einem Buch.',
+      blankPreviewTitle: 'Dein gedrucktes Buch',
+      blankPreviewSummary: (f: number, p: number, b: number) => `${f} von ${p} Seiten gefüllt, ${b} leer`,
+      blankLegendFilled: 'Seite mit Inhalt',
+      blankLegendBlank: 'Leere Seite',
+      blankAck: (b: number) => `Ich verstehe, dass mein Buch ${b} leere ${b === 1 ? 'Seite' : 'Seiten'} hat`,
       processing: 'Wird verarbeitet...',
       printPdf: 'Druck-PDF (Test)',
       generatingPdf: 'PDF wird erstellt...',
@@ -250,6 +262,11 @@ export default function BookBuilder() {
       blankPagesTitle: 'Pages vierges dans votre livre',
       blankPagesDesc: (printed: number, content: number, blank: number) => `Votre livre compte ${printed} pages. Votre histoire en remplit ${content} – ${blank} ${blank === 1 ? 'page' : 'pages'} resteront vierges.`,
       blankPagesHint: 'Pensez à une histoire plus longue ou combinez plusieurs histoires dans un seul livre.',
+      blankPreviewTitle: 'Votre livre imprimé',
+      blankPreviewSummary: (f: number, p: number, b: number) => `${f} pages sur ${p} remplies, ${b} ${b === 1 ? 'vierge' : 'vierges'}`,
+      blankLegendFilled: 'Page avec contenu',
+      blankLegendBlank: 'Page vierge',
+      blankAck: (b: number) => `Je comprends que mon livre contient ${b} ${b === 1 ? 'page vierge' : 'pages vierges'}`,
       processing: 'Traitement en cours…',
       printPdf: 'PDF impression (test)',
       generatingPdf: 'Génération du PDF…',
@@ -300,6 +317,11 @@ export default function BookBuilder() {
       blankPagesTitle: 'Pagine vuote nel tuo libro',
       blankPagesDesc: (printed: number, content: number, blank: number) => `Il tuo libro ha ${printed} pagine. La tua storia ne riempie ${content} – ${blank} ${blank === 1 ? 'pagina' : 'pagine'} resteranno vuote.`,
       blankPagesHint: 'Valuta una storia più lunga oppure combina più storie in un unico libro.',
+      blankPreviewTitle: 'Il tuo libro stampato',
+      blankPreviewSummary: (f: number, p: number, b: number) => `${f} pagine su ${p} riempite, ${b} ${b === 1 ? 'vuota' : 'vuote'}`,
+      blankLegendFilled: 'Pagina con contenuto',
+      blankLegendBlank: 'Pagina vuota',
+      blankAck: (b: number) => `Ho capito che il mio libro ha ${b} ${b === 1 ? 'pagina vuota' : 'pagine vuote'}`,
       processing: 'Elaborazione...',
       printPdf: 'Stampa PDF (Test)',
       generatingPdf: 'Generazione PDF...',
@@ -350,7 +372,9 @@ export default function BookBuilder() {
   // computeBookPageInfo the order flow pads the PDF with. `contentPages` is the
   // count the checkout picks the price tier from (countBookContentPages), so the
   // quote below is derived from it, never from the client-side scene sum.
-  const [pageInfo, setPageInfo] = useState<{ contentPages: number; printedPages: number; blankPages: number } | null>(null);
+  const [pageInfo, setPageInfo] = useState<{ contentPages: number; printedPages: number; blankPages: number; blankAckFrom: number; sequence: PrintedPage[] } | null>(null);
+  // Required acknowledgement of the blank pages before checkout is enabled.
+  const [blankAck, setBlankAck] = useState(false);
   const storyIdsKey = stories.map(s => s.id).join(',');
   useEffect(() => {
     if (!storyIdsKey || isOverLimit) { setPageInfo(null); return; }
@@ -372,9 +396,11 @@ export default function BookBuilder() {
   const price = useMemo(() => {
     return billedPages === null ? null : getPriceForPages(billedPages, coverType === 'hardcover', pricingTiers);
   }, [billedPages, coverType, pricingTiers]);
-  // Owner 2026-10-04: up to 3 blank pages are fine and stay silent; from 4 on,
-  // warn and suggest a longer story / combining stories.
-  const BLANK_PAGES_WARN_FROM = 4;
+  // Owner 2026-10-04: up to 3 blank pages are fine and stay silent; from the
+  // server's blankAckFrom (BLANK_PAGES_ACK_FROM) on: warn, show the printed-book
+  // preview and require the acknowledgement. The checkout endpoint enforces it too.
+  const needsBlankAck = !!pageInfo && !isOverLimit && pageInfo.blankPages >= pageInfo.blankAckFrom;
+  useEffect(() => { setBlankAck(false); }, [pageInfo?.blankPages, storyIdsKey]);
 
   // Move story up/down
   const moveStory = (index: number, direction: 'up' | 'down') => {
@@ -388,7 +414,7 @@ export default function BookBuilder() {
 
   // Handle checkout
   const handleCheckout = async () => {
-    if (isOverLimit || !price) return;
+    if (isOverLimit || !price || (needsBlankAck && !blankAck)) return;
 
     setIsCheckingOut(true);
     try {
@@ -400,6 +426,7 @@ export default function BookBuilder() {
         storyIds, coverType, bookFormat, quantity,
         promoValid ? promoCode.trim() : undefined,
         balanceSpend,
+        needsBlankAck ? true : undefined,
       );
       // Stay disabled while the browser navigates to Stripe: re-enabling here let a
       // second click create a second checkout session. Only a failure re-enables.
@@ -618,7 +645,7 @@ export default function BookBuilder() {
                   <span className="text-sm">{t.tooManyPagesDesc}</span>
                 </div>
               )}
-              {pageInfo && pageInfo.blankPages >= BLANK_PAGES_WARN_FROM && !isOverLimit && (
+              {needsBlankAck && pageInfo && (
                 <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <div className="flex items-start gap-2 text-amber-700">
                     <Info size={18} className="flex-shrink-0 mt-0.5" />
@@ -628,6 +655,26 @@ export default function BookBuilder() {
                       <span className="text-sm block mt-1">{t.blankPagesHint}</span>
                     </div>
                   </div>
+                  <BlankPagesPreview
+                    sequence={pageInfo.sequence}
+                    storyIds={stories.map(st => st.id)}
+                    filledPages={pageInfo.contentPages}
+                    printedPages={pageInfo.printedPages}
+                    blankPages={pageInfo.blankPages}
+                    title={t.blankPreviewTitle}
+                    summary={t.blankPreviewSummary}
+                    legendFilled={t.blankLegendFilled}
+                    legendBlank={t.blankLegendBlank}
+                  />
+                  <label className="mt-3 flex items-start gap-2 text-sm font-medium text-gray-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={blankAck}
+                      onChange={e => setBlankAck(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 flex-shrink-0 accent-indigo-600"
+                    />
+                    <span>{t.blankAck(pageInfo.blankPages)}</span>
+                  </label>
                 </div>
               )}
             </div>
@@ -848,7 +895,7 @@ export default function BookBuilder() {
             {/* Order button */}
             <button
               onClick={handleCheckout}
-              disabled={isOverLimit || isCheckingOut}
+              disabled={isOverLimit || isCheckingOut || (needsBlankAck && !blankAck)}
               className="w-full py-4 bg-gradient-to-r from-indigo-600 to-indigo-600 text-white rounded-xl font-bold text-lg hover:from-indigo-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isCheckingOut ? (

@@ -23,7 +23,7 @@ const { getPool, rehydrateStoryImages, logActivity } = require('../services/data
 
 // Lib modules
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf, pdfContentDisposition } = require('../lib/pdf');
-const { processBookOrder, resumeBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo, shippingFromSession } = require('../lib/gelato');
+const { processBookOrder, resumeBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo, isBlankPagesAckMissing, BLANK_PAGES_ACK_FROM, shippingFromSession } = require('../lib/gelato');
 const { stripDataUriPrefix } = require('../lib/r2');
 const email = require('../../email');
 
@@ -1585,6 +1585,8 @@ router.post('/book-page-info', authenticateToken, async (req, res) => {
       contentPages: info.contentPages,
       printedPages: info.printedPages,
       blankPages: info.blankPages,
+      blankAckFrom: BLANK_PAGES_ACK_FROM,
+      sequence: info.sequence,
     });
   } catch (err) {
     log.error('Error computing book page info:', err);
@@ -1635,6 +1637,18 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     // Same counter the print PDF and the book-builder preview use
     // (dedication + story pages + per-extra-story title/dedication/back cover).
     const totalPages = countBookContentPages(stories.map(s => s.data));
+
+    // Blank-page guard: the customer must have ticked the acknowledgement in the
+    // book builder (docs/decisions.md, blank-page preview). Not bypassable by
+    // calling this endpoint directly.
+    const pageInfo = await computeBookPageInfo(getDbPool(), stories.map(s => s.data), coverType, bookFormat);
+    if (isBlankPagesAckMissing(pageInfo.blankPages, req.body.blankPagesAcknowledged)) {
+      return res.status(400).json({
+        error: `This book has ${pageInfo.blankPages} blank pages; the blank pages must be acknowledged before checkout.`,
+        code: 'BLANK_PAGES_NOT_ACKNOWLEDGED',
+        blankPages: pageInfo.blankPages,
+      });
+    }
 
     // Calculate price based on pages and cover type (using database pricing)
     // Pricing tiers store the BOOK price only — shipping is added once per order.
@@ -1718,6 +1732,8 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         storyIds: JSON.stringify(allStoryIds),
         storyCount: stories.length.toString(),
         totalPages: totalPages.toString(),
+        // Blank pages the customer acknowledged (0 when none); no orders column needed.
+        blankPagesAcknowledged: pageInfo.blankPages.toString(),
         coverType: coverType,
         bookFormat: bookFormat,
         quantity: quantity.toString(),

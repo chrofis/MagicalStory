@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { snapToValidPageCount, countBookContentPages, computeBookPageInfo } = require('./gelato');
+const { snapToValidPageCount, countBookContentPages, computeBookPageInfo, buildPrintedPageSequence, isBlankPagesAckMissing, BLANK_PAGES_ACK_FROM } = require('./gelato');
 
 // Discrete page-count list takes priority. Smallest entry >= estimated.
 test('discrete list: snaps up to next entry', () => {
@@ -203,4 +203,50 @@ test('computeBookPageInfo: no matching SKU reports only the parity blank', async
   assert.strictEqual(info.product, null);
   assert.strictEqual(info.printedPages, 12);
   assert.strictEqual(info.blankPages, 1);
+});
+
+// Printed-book preview sequence: same layout as generatePrintPdf, same count as computeBookPageInfo.
+const countKind = (seq, k) => seq.filter(s => s.kind === k).length;
+
+test('buildPrintedPageSequence: 6-page trial story on a 30-page SKU has 23 blank filler pages', async () => {
+  const stories = [storyOf(6)];
+  const info = await computeBookPageInfo(poolWith([HARDCOVER_A4]), stories, 'hardcover', 'A4');
+  assert.strictEqual(info.printedPages, 30);
+  assert.strictEqual(info.blankPages, 23);
+  const seq = info.sequence;
+  assert.deepStrictEqual(seq.slice(0, 3).map(s => s.kind), ['cover', 'insideFront', 'dedication']);
+  assert.strictEqual(countKind(seq, 'story'), 6);
+  assert.deepStrictEqual(seq.filter(s => s.kind === 'story').map(s => s.pageNumber), [1, 2, 3, 4, 5, 6]);
+  assert.strictEqual(countKind(seq, 'filler'), 23);
+  assert.strictEqual(seq[seq.length - 1].kind, 'insideBack');
+  assert.strictEqual(seq.length, 30 + 3); // Gelato pages + cover + inside front + inside back
+});
+
+test('buildPrintedPageSequence: filler count always equals computeBookPageInfo.blankPages', async () => {
+  for (const stories of [[storyOf(10)], [storyOf(29)], [storyOf(30)],
+    [storyOf(10), storyOf(10, { backCover: true }), storyOf(10)]]) {
+    const info = await computeBookPageInfo(poolWith([HARDCOVER_A4]), stories, 'hardcover', 'A4');
+    assert.strictEqual(countKind(info.sequence, 'filler'), info.blankPages);
+    assert.strictEqual(info.sequence.length, info.printedPages + 3);
+  }
+});
+
+test('buildPrintedPageSequence: multi-story book lays out title, dedication, back cover and separator', () => {
+  const seq = buildPrintedPageSequence([storyOf(2), storyOf(2, { backCover: true }), storyOf(2)], 13);
+  assert.deepStrictEqual(seq.map(s => s.kind), [
+    'cover', 'insideFront', 'dedication',
+    'story', 'story',
+    'title', 'dedication', 'story', 'story', 'backCover', 'separator',
+    'title', 'dedication', 'story', 'story',
+    'insideBack',
+  ]);
+});
+
+test('isBlankPagesAckMissing: requires explicit true from BLANK_PAGES_ACK_FROM blank pages up', () => {
+  assert.strictEqual(isBlankPagesAckMissing(0, undefined), false);
+  assert.strictEqual(isBlankPagesAckMissing(BLANK_PAGES_ACK_FROM - 1, undefined), false);
+  assert.strictEqual(isBlankPagesAckMissing(23, undefined), true);
+  assert.strictEqual(isBlankPagesAckMissing(23, false), true);
+  assert.strictEqual(isBlankPagesAckMissing(23, 'true'), true, 'only boolean true counts');
+  assert.strictEqual(isBlankPagesAckMissing(23, true), false);
 });
