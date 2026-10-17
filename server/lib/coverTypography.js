@@ -415,8 +415,12 @@ function buildBottomGroup(lines, colors, place, W, H, fontFam, weight, style) {
   const FS = H * 0.05, gap = FS * 1.28;
   const cx = (place.x0 + place.x1) / 2 * W, top = place.y0 * H;
   let inner = '';
+  // An empty line is a paragraph break (dedicationLines): half a line of space, no text.
+  let y = top + FS * 0.9;
   lines.forEach((ln, k) => {
-    const y = top + FS * 0.9 + k * gap, t = esc(ln);
+    if (k > 0) y += ln === '' ? gap * 0.5 : gap; // a break adds half a line on top of the next line's own advance
+    if (ln === '') return;
+    const t = esc(ln);
     inner += `<text x="${cx}" y="${y}" text-anchor="middle" font-family="${fontFam}" font-weight="${weight}" font-style="${style || 'normal'}" font-size="${FS}" `
       + `fill="${face}" stroke="${outline}" stroke-width="${FS * 0.10}" paint-order="stroke" stroke-linejoin="round">${t}</text>`;
   });
@@ -516,6 +520,27 @@ async function composeFrontTitle(artBuffer, title, figures, seed, style, lockSpe
   return { buffer, spec: { kind: 'front', fontId, layout, face: colors.face, lines, rect, ...(styleOv ? { style: styleOv } : {}) } };
 }
 
+/**
+ * The dedication as display lines, keeping the writer's own breaks: each line they typed
+ * is balance-wrapped on its own, and a blank line between paragraphs becomes '' (a
+ * paragraph break buildBottomGroup renders as half a line of space). The old layout
+ * collapsed all whitespace, so a dedication typed as "Dear X", blank line, "You are ..."
+ * printed as one block (prod job_1792078014622_uh8tj6ht1, owner 2026-10-17).
+ */
+function dedicationLines(dedication) {
+  const out = [];
+  let pendingBreak = false;
+  for (const raw of String(dedication || '').replace(/\r\n?/g, '\n').split('\n')) {
+    const line = raw.replace(/\s+/g, ' ').trim();
+    if (!line) { pendingBreak = out.length > 0; continue; }
+    if (pendingBreak) out.push('');
+    pendingBreak = false;
+    const words = line.split(' ').length;
+    out.push(...(words <= 8 ? [line] : splitLinesN(line, Math.min(6, Math.max(2, Math.round(words / 7))))));
+  }
+  return out;
+}
+
 async function composeDedication(artBuffer, dedication, figures, seed, style) {
   if (!dedication || !String(dedication).trim()) return { buffer: artBuffer, spec: { kind: 'initial', skipped: 'no-dedication' } };
   const meta = await sharp(artBuffer).metadata(); const W = meta.width, H = meta.height;
@@ -525,24 +550,23 @@ async function composeDedication(artBuffer, dedication, figures, seed, style) {
     || WFONTS[hash(seed || dedication, 33) % WFONTS.length];
   const text = String(dedication).trim();
   const words = text.split(/\s+/).length;
-  let place, colors, lines;
+  let place, colors;
+  const lines = dedicationLines(text);
+  const textRows = lines.filter(l => l !== '').length + (lines.length - lines.filter(l => l !== '').length) * 0.5;
   if (styleOv?.align) {
     // User pinned the horizontal position — fixed lower band instead of the
     // occupancy-driven pocket (which drifts wherever the figures aren't).
     // Band height tracks the line count so fitRender can't balloon the text.
-    lines = words <= 8 ? [text] : splitLinesN(text, Math.min(6, Math.max(2, Math.round(words / 6))));
     const X = { left: [0.06, 0.58], center: [0.16, 0.84], right: [0.42, 0.94] }[styleOv.align];
-    const y1 = 0.94, y0 = Math.max(0.55, y1 - lines.length * 0.065 - 0.02);
+    const y1 = 0.94, y0 = Math.max(0.55, y1 - textRows * 0.065 - 0.02);
     place = { x0: X[0], x1: X[1], y0, y1 };
-  } else if (words <= 8) {
-    // short dedication → clearest bottom pocket
+  } else if (words <= 8 && lines.length === 1) {
+    // short one-line dedication → clearest bottom pocket
     const br = bottomRect(occ.grid, occ.gw, occ.gh, W, H, text.length, 0.5, 1, 0.12);
     place = { x0: br.x0, x1: br.x1, y0: br.y0, y1: br.y1 };
-    lines = [text];
   } else {
-    // long dedication → fixed generous lower band
-    place = { x0: 0.08, x1: 0.92, y0: 0.62, y1: 0.96 };
-    lines = splitLinesN(text, Math.min(6, Math.max(2, Math.round(words / 6))));
+    // long or multi-line dedication → generous lower band, taller when it has more rows
+    place = { x0: 0.08, x1: 0.92, y0: Math.max(0.5, Math.min(0.62, 0.96 - textRows * 0.045)), y1: 0.96 };
   }
   const bg = await boxDominant(artBuffer, place.x0, place.y0, place.x1, Math.min(0.97, place.y1));
   if (styleOv?.color) {
@@ -1111,7 +1135,7 @@ async function stampRepaintedCover(storyData, coverKey, imageResult, { force = f
 
 module.exports = {
   stampRepaintedCover,
-  composeCover, composeFrontTitle, composeDedication, composeBrand, applyCoverTypography, bakeCoverTypographyPostPersist,
+  composeCover, composeFrontTitle, composeDedication, dedicationLines, composeBrand, applyCoverTypography, bakeCoverTypographyPostPersist,
   resolveCoverTitleMode,
   resolveCoverTextContract,
   restampCover, restampServedCover, paintServedCoverTitle, sanitizeTitleStyle, sanitizeDedicationStyle,

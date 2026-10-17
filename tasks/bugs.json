@@ -4265,6 +4265,16 @@
       "status": "fixed",
       "fixedAt": "2026-10-17",
       "fixedIn": "f1f28efb5"
+    },
+    {
+      "id": "dedication-paragraphs-collapsed",
+      "title": "Dedication page printed the customer's dedication as one block, dropping their line and paragraph breaks",
+      "reportedAt": "2026-10-17",
+      "source": "prod job_1792078014622_uh8tj6ht1 (customer dedication with blank lines) and its staging rerun: initialPage shows \"Lieber Eliah Du bist …\" run together.",
+      "rootCause": "composeDedication balanced the whole text with splitLinesN, which splits on every whitespace run, so newlines were lost.",
+      "fix": "coverTypography.dedicationLines wraps each typed line on its own and turns a blank line into a paragraph break (half a line of space in buildBottomGroup); the lower band grows with the row count. tests/unit/dedication-keeps-paragraphs-2026-10-17.test.ts",
+      "status": "fixed",
+      "fixedIn": "pending"
     }
   ]
 }
