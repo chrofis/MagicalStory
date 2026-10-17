@@ -2729,6 +2729,10 @@ function buildRelativeHeightDescription(characters) {
  */
 function buildCharacterRestriction(selectedNames, excludedNames) {
   if (!Array.isArray(excludedNames) || excludedNames.length === 0) return '';
+  // An empty selection would read "show nobody, exclude everyone" - refuse loudly.
+  if (!Array.isArray(selectedNames) || selectedNames.length === 0) {
+    throw new Error('buildCharacterRestriction: empty selection - refusing to exclude the whole cast');
+  }
   return `\n\n**CRITICAL CHARACTER RESTRICTION:**\nONLY show these characters: ${(selectedNames || []).join(', ')}\nDo NOT include: ${excludedNames.join(', ')}\nIf the scene description mentions excluded characters, IGNORE those mentions and show ONLY the specified characters.`;
 }
 

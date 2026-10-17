@@ -6,7 +6,7 @@
  */
 
 const express = require('express');
-const { buildCastIndex, resolveEntity, canonicalName } = require('../lib/castResolver');
+const { buildCastIndex, resolveEntity, canonicalName, charactersByIds } = require('../lib/castResolver');
 const router = express.Router();
 const crypto = require('crypto');
 const { getPlausiblePhysical } = require('../lib/characterPhysical');
@@ -26,6 +26,7 @@ const { log } = require('../utils/logger');
 const { saveStoryData, saveScenePageData, saveCoverData, saveFinalChecksReport, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getNextVersionIndex, getPool, dbQuery, saveStyleLabImage, getStyleLabThumbnails, getStyleLabRunImages, imgBytesAsync } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate, assertPromptFilled } = require('../services/prompts');
 const { chargeCredits } = require('../lib/jobCredits');
+const { resolveStoryPageAspect } = require('../lib/layout');
 
 // Shared repair logic
 const { findBadPages, selectCharRepairTasks } = require('../lib/repairLogic');
@@ -152,7 +153,9 @@ const {
   IMAGE_QUALITY_THRESHOLD,
   compressImageToJPEG,
   runVisualInventory,
-  ensureStoryPagePlate
+  ensureStoryPagePlate,
+  callIterateBrief,
+  pageTextInImage
 } = require('../lib/images');
 const { pageNeedsPlate, pageLandmarkScene } = require('../lib/landmarkScene');
 const { buildEmptySceneVbGrid } = require('../lib/referenceSheets');
@@ -392,9 +395,9 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
     if (!planLine) {
       log.warn(`⚠️ [REGEN SCENE ${pageNumber}] no stored plan line (outlineExtract) — the rewrite runs on the previous brief alone`);
     }
-    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars, planLine ? { planLine } : null, null, { clothingRequirements: storyData.clothingRequirements || null });
-    const sceneResult = await callClaudeAPI(scenePrompt, null, MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[', usageLabel: 'regen_scene' });
-    const newSceneDescription = sceneResult.text;
+    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars, planLine ? { planLine } : null, null, { clothingRequirements: storyData.clothingRequirements || null, story: storyData, textInImage: pageTextInImage(storyData, pageNumber) });
+    // The ONE brief-rewrite call iterate uses (model, no prefill, brief guard + retry; throws when unusable).
+    const { text: newSceneDescription } = await callIterateBrief(scenePrompt, { pageNumber });
 
     // Update the scene description in story data (sceneDescriptions already loaded above)
     const existingIndex = sceneDescriptions.findIndex(s => s.pageNumber === pageNumber);
@@ -551,7 +554,11 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     let sceneCharacters;
     if (characterIds && Array.isArray(characterIds) && characterIds.length > 0) {
       // Use explicit character selection from UI
-      sceneCharacters = (storyData.characters || []).filter(c => characterIds.includes(c.id));
+      // Stored ids are numbers; compare as strings so a client sending "7" matches 7.
+      sceneCharacters = charactersByIds(storyData.characters, characterIds);
+      if (sceneCharacters.length === 0) {
+        return res.status(400).json({ error: 'None of the supplied characterIds match a character in this story' });
+      }
       log.debug(`👥 [REGEN] Using ${sceneCharacters.length} explicitly selected characters: ${sceneCharacters.map(c => c.name).join(', ')}`);
     } else {
       // Fall back to text detection
@@ -634,6 +641,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       const clothingData = storyData.clothingRequirements || {};
       // Build available avatars - only show clothing categories used in this story
       const availableAvatars = buildAvailableAvatarsForPrompt(storyData.characters || [], clothingData);
+      const planLineForExpansion = require('../lib/iterateBeat').resolvePlanLine(sceneDesc, (storyData.sceneImages || []).find(si => si.pageNumber === pageNumber));
       const expansionPrompt = buildSceneDescriptionPrompt(
         pageNumber,
         pageText || inputDescription,  // Fallback to description if no page text
@@ -645,20 +653,17 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
         clothingData,
         correctionNotes,
         availableAvatars,
-        null,  // rawOutlineContext
+        // rawOutlineContext: the page's plan line, as iterate passes it (null would fill the
+        // authoritative summary slot from the very brief being rewritten).
+        planLineForExpansion ? { planLine: planLineForExpansion } : null,
         null,  // previewFeedback
-        { clothingRequirements: storyData.clothingRequirements || null }
+        { clothingRequirements: storyData.clothingRequirements || null, story: storyData, textInImage: pageTextInImage(storyData, pageNumber) }
       );
 
-      try {
-        const expansionResult = await callClaudeAPI(expansionPrompt, null, MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[', usageLabel: 'regen_expansion' });
-        expandedDescription = expansionResult.text;
-        log.debug(`✅ [REGEN] Scene expanded to ${expandedDescription.length} chars`);
-        log.debug(`📝 [REGEN] Expanded scene preview: ${expandedDescription.substring(0, 300)}...`);
-      } catch (expansionError) {
-        log.error(`⚠️  [REGEN] Scene expansion failed, using original summary:`, expansionError.message);
-        // Continue with short summary if expansion fails
-      }
+      // The same brief-rewrite call iterate uses; an unusable brief throws and fails the request (no raw-summary render).
+      ({ text: expandedDescription } = await callIterateBrief(expansionPrompt, { pageNumber }));
+      log.debug(`[REGEN] Scene expanded to ${expandedDescription.length} chars`);
+      log.debug(`[REGEN] Expanded scene preview: ${expandedDescription.substring(0, 300)}...`);
     }
 
     // Get clothing category - prefer outline pageClothing, then parse from description
@@ -746,17 +751,17 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     // edit/inpaint tier (MODEL_DEFAULTS.pageImage). A redo must not switch
     // model mid-page.
     const imageModelId = MODEL_DEFAULTS.pageRenderImage;
-    // Preserve the page's saved aspect (e.g. 1:1 for advanced/Jugendbuch);
-    // without this, regen falls through to the global 3:4 default and crops
-    // square pages to portrait.
-    const sceneAspect = currentImage?.imageAspect || null;
+    // The story's layout aspect (1:1 square-below / 3:4 overlay). Beats stories
+    // never stamp a per-scene imageAspect, so this reads the layout and throws
+    // when it is missing - no global-default fallback.
+    const sceneAspect = resolveStoryPageAspect(storyData);
     // PLATE OR FAIL (server/lib/landmarkScene.js): a landmark page is redone
     // on its stored plate (rendered first when it has none), never on the raw
     // photo; a cast-0 page keeps its exemption.
     const regenScene = await ensureStoryPagePlate({
       storyId: id, storyData, visualBible, pageNumber, sceneMetadata, sceneCharacters,
       landmarkPhotos: pageLandmarkPhotos, textPosition: currentImage?.textPosition || null,
-      aspectRatio: sceneAspect || MODEL_DEFAULTS.pageAspect,
+      aspectRatio: sceneAspect,
       save: (pn, plate) => saveStoryImage(id, 'empty_scene', pn, plate), logTag: 'REGEN',
     });
     // The grid and the prompt go through pageRenderCall — the ONE construction the
@@ -810,7 +815,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       pageNumber,
       artStyle: storyData.artStyle || null,
       skipCache: true,
-      aspectRatio: sceneAspect || MODEL_DEFAULTS.pageAspect,
+      aspectRatio: sceneAspect,
       captureLabel: 'image_scene',
     });
 
@@ -1435,7 +1440,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
               artStyle: inputData.artStyle,
             },
             cast,
-            aspectRatio: storyData.layout?.imageAspect || DEFAULTS.pageAspect || '3:4',
+            aspectRatio: resolveStoryPageAspect(storyData),
             visualBibleGridImage: vbGridUri,
             phantomPoseRender,
             compositeStrategy,
@@ -1749,7 +1754,7 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
       backgroundCharacterRefs: [],  // intentionally empty — see comment above
       backgroundCharacterDescriptions: bgDescriptions,
       artStyleDescription: helpers.resolveArtStyle(storyData.artStyle, 'grok') || null,
-      aspectRatio: scene.imageAspect || null,
+      aspectRatio: resolveStoryPageAspect(storyData),
     });
     if (!result?.imageData) {
       return res.status(500).json({ error: 'Scale-repair returned no image' });
@@ -2728,7 +2733,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     // page comes back as 3:4 and looks wrong sitting above the text strip sized
     // for a 1:1 image. Falls back to the global default for legacy stories that
     // pre-date the per-scene field.
-    const sceneAspect = currentImage.imageAspect || null;
+    const sceneAspect = resolveStoryPageAspect(storyData);
 
     // Call the shared core function
     const iterResult = await iteratePageCore(currentImage.imageData, pageNumber, storyData, {

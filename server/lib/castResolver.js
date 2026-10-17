@@ -386,11 +386,21 @@ function flushResolverStats(index, log, pageLabel = '') {
   log.info(`[CAST-RESOLVE] ${pageLabel}${refs} refs, ${unresolved.length} unresolved (${uList}), ${ambiguous.length} ambiguous (${aList})`);
 }
 
+/**
+ * Characters whose id is in `ids`, compared as strings (stored ids are numbers;
+ * a request may carry "7" for 7). Ids are metadata, not prose.
+ */
+function charactersByIds(characters, ids) {
+  const wanted = new Set((ids || []).map(String));
+  return (characters || []).filter(c => wanted.has(String(c.id)));
+}
+
 module.exports = {
   canonicalName,
   buildCastIndex,
   resolveEntity,
   sameEntity,
+  charactersByIds,
   dedupeByEntity,
   displayName,
   isNonHuman,

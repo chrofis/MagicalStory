@@ -6250,9 +6250,8 @@ async function runSceneDescriptionStage(ctx, { experimentId, promptOverride, par
   }
 
   const t0 = Date.now();
-  const result = await callClaudeAPI(prompt, null, resolveSceneIterationModel(), {
-    prefill: '{"previewMismatches":[', usageLabel: 'testlab_scene_description',
-  });
+  // Route mirror: the endpoint rewrites through callIterateBrief (no prefill, brief guard).
+  const result = (({ sceneResult, text }) => ({ ...sceneResult, text }))(await require('./images').callIterateBrief(prompt, { pageNumber: ctx.pageNumber }));
   const elapsedMs = Date.now() - t0;
   return {
     elapsedMs, modelId: result.modelId || null, promptUsed: prompt,

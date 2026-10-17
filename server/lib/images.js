@@ -4422,6 +4422,63 @@ function resolveIterateScene(storyData, pageNumber, coverRecord = null) {
   return currentScene;
 }
 
+/** Does this page carry its text in the image? Per-scene stamp, else the story layout, else false. Shared by every scene-brief rewrite. */
+function pageTextInImage(storyData, pageNumber) {
+  return (
+    storyData?.sceneImages?.find(s => s.pageNumber === pageNumber)?.textInImage
+    ?? storyData?.layout?.textInImage
+    ?? false
+  ) === true;
+}
+
+/**
+ * THE ONE scene-brief rewrite call, shared by iteratePageCore and the customer
+ * regenerate route (routes/regeneration.js) so the two cannot drift: the
+ * scene-iteration model (resolveSceneIterationModel unless overridden), NO JSON
+ * prefill (the template answers prose + ---METADATA--- + JSON; a prefill of
+ * '{"previewMismatches":[' was prepended to every stored regen description), the
+ * eval-call record, usage tracking, and the iterateBriefGuard contract with one
+ * retry. An unusable brief after the retry THROWS - never persisted, never
+ * swallowed.
+ * @returns {Promise<{sceneResult: object, text: string}>}
+ */
+async function callIterateBrief(scenePrompt, { pageNumber, usageTracker = null, model = null } = {}) {
+  const effectiveSceneModel = model || require('../config/models').resolveSceneIterationModel();
+  log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 18 validation checks with ${effectiveSceneModel}...`);
+  let sceneResult = await callClaudeAPI(scenePrompt, null, effectiveSceneModel, { usageLabel: 'scene_iterate' });
+  let newSceneDescription = sceneResult.text;
+  require('./evalCallLog').recordEvalCall({
+    kind: 'iterate_rebrief', pageNumber, model: sceneResult.modelId || effectiveSceneModel, prompt: scenePrompt, rawResponse: sceneResult.text,
+  });
+  if (usageTracker && sceneResult.usage) {
+    usageTracker('anthropic', sceneResult.usage, 'scene_iterate', sceneResult.modelId || effectiveSceneModel);
+  }
+  const { assessIterateBrief, describeIterateBrief } = require('./iterateBriefGuard');
+  const briefCheck = assessIterateBrief(newSceneDescription, { truncation: sceneResult.truncation });
+  if (!briefCheck.usable) {
+    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: scene iteration returned an unusable brief (${describeIterateBrief(briefCheck)}) — retrying once`);
+    const retryPrompt = `${scenePrompt}
+
+Your previous answer was incomplete: it must be the full prose brief followed by a ---METADATA--- block whose JSON includes the mandatory "sceneIntent" field. Return the whole thing.`;
+    const retry = await callClaudeAPI(retryPrompt, null, effectiveSceneModel, { usageLabel: 'scene_iterate_retry' });
+    if (usageTracker && retry.usage) {
+      usageTracker('anthropic', retry.usage, 'scene_iterate', retry.modelId || effectiveSceneModel);
+    }
+    require('./evalCallLog').recordEvalCall({
+      kind: 'iterate_rebrief', label: 'retry', pageNumber, model: retry.modelId || effectiveSceneModel,
+      prompt: retryPrompt, rawResponse: retry.text,
+    });
+    const retryCheck = assessIterateBrief(retry.text, { truncation: retry.truncation });
+    if (!retryCheck.usable) {
+      log.error(`❌ [ITERATE] Page ${pageNumber}: unusable brief after retry (first: ${describeIterateBrief(briefCheck)}; retry: ${describeIterateBrief(retryCheck)}) — REFUSING to overwrite the existing brief; this iterate round fails for this page`);
+      throw new Error(`iterate brief unusable for page ${pageNumber}: ${describeIterateBrief(retryCheck)}`);
+    }
+    sceneResult = retry;
+    newSceneDescription = retry.text;
+  }
+  return { sceneResult, text: newSceneDescription };
+}
+
 /**
  * Core iterate function — shared by the pipeline (executeIterateAction) and the
  * UI route (POST /:id/iterate/:pageNum).  Analyzes the current image, re-expands
@@ -4500,7 +4557,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     throw new Error(`[ITERATE] ${coverKey}: a trial cover iterates through iterateCover, never the page path`);
   }
   const coverRecord = coverKey ? storyData.coverImages[coverKey] : null;
-  const sceneAspect = aspectRatioIn || (coverKey ? CONFIG_DEFAULTS.coverAspect : CONFIG_DEFAULTS.pageAspect);
+  const sceneAspect = aspectRatioIn || (coverKey ? CONFIG_DEFAULTS.coverAspect : require('./layout').resolveStoryPageAspect(storyData));
 
   const {
     analyzeGeneratedImage
@@ -4798,11 +4855,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // layout. Defaults false so non-overlay stories never carry calm-zone
   // instructions through iterate.
   // A cover always carries its text in the image.
-  const iterateTextInImage = coverKey ? true : (
-    storyData?.sceneImages?.find(s => s.pageNumber === pageNumber)?.textInImage
-    ?? storyData?.layout?.textInImage
-    ?? false
-  ) === true;
+  const iterateTextInImage = coverKey ? true : pageTextInImage(storyData, pageNumber);
   const scenePrompt = buildSceneDescriptionPrompt(
     pageNumber,
     pageText,
@@ -4859,55 +4912,8 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // with the prose directly.
   // Default (CONFIG_DEFAULTS.sceneIteration = qwen-plus) is key-guarded to
   // sonnet when OPENROUTER_API_KEY is unset; explicit overrides pass through.
-  const effectiveSceneModel = modelOverrides?.sceneIterationModel || modelOverrides?.sceneModel || require('../config/models').resolveSceneIterationModel();
-  log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 18 validation checks with ${effectiveSceneModel}...`);
-  let sceneResult = await callClaudeAPI(scenePrompt, null, effectiveSceneModel, { usageLabel: 'scene_iterate' });
-  let newSceneDescription = sceneResult.text;
-  require('./evalCallLog').recordEvalCall({
-    kind: 'iterate_rebrief', pageNumber, model: sceneResult.modelId || effectiveSceneModel, prompt: scenePrompt, rawResponse: sceneResult.text,
-  });
-
-  // Track usage (Claude Haiku scene re-expansion)
-  if (usageTracker && sceneResult.usage) {
-    usageTracker('anthropic', sceneResult.usage, 'scene_iterate', sceneResult.modelId || effectiveSceneModel);
-  }
-
-  // ENFORCE THE BRIEF CONTRACT: prose plus scene metadata that PARSES and
-  // carries sceneIntent (the marker, a ```json fence and bare JSON are all
-  // accepted — see iterateBriefGuard.js, all three shapes are real in stored
-  // rows). A reply that fails it is a CUT reply, not a shorter one — and a
-  // cut brief used to be persisted silently: job_1789207854566_l43qgl34w p7
-  // stored 1884 characters ending mid-word inside a character description with
-  // no metadata block at all, so the page's cast, objects, positions and text
-  // placement were all empty downstream and the roster shipped wrong. The
-  // generic truncation guard cannot see it (~500 output tokens against
-  // qwen-plus's 32,768 ceiling), so the detection is structural
-  // (iterateBriefGuard.js) and the guard's verdict is consulted alongside it.
-  // One retry; still unusable → THROW, so the round is recorded as failed and
-  // the previous good brief and image stand. Never overwrite good with cut.
-  const { assessIterateBrief, describeIterateBrief } = require('./iterateBriefGuard');
-  let briefCheck = assessIterateBrief(newSceneDescription, { truncation: sceneResult.truncation });
-  if (!briefCheck.usable) {
-    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: scene iteration returned an unusable brief (${describeIterateBrief(briefCheck)}) — retrying once`);
-    const retryPrompt = `${scenePrompt}\n\nYour previous answer was incomplete: it must be the full prose brief followed by a ---METADATA--- block whose JSON includes the mandatory "sceneIntent" field. Return the whole thing.`;
-    const retry = await callClaudeAPI(retryPrompt, null, effectiveSceneModel, { usageLabel: 'scene_iterate_retry' });
-    if (usageTracker && retry.usage) {
-      usageTracker('anthropic', retry.usage, 'scene_iterate', retry.modelId || effectiveSceneModel);
-    }
-    require('./evalCallLog').recordEvalCall({
-      kind: 'iterate_rebrief', label: 'retry', pageNumber, model: retry.modelId || effectiveSceneModel,
-      prompt: retryPrompt, rawResponse: retry.text,
-    });
-    const retryCheck = assessIterateBrief(retry.text, { truncation: retry.truncation });
-    if (retryCheck.usable) {
-      sceneResult = retry;
-      newSceneDescription = retry.text;
-      briefCheck = retryCheck;
-    } else {
-      log.error(`❌ [ITERATE] Page ${pageNumber}: unusable brief after retry (first: ${describeIterateBrief(briefCheck)}; retry: ${describeIterateBrief(retryCheck)}) — REFUSING to overwrite the existing brief; this iterate round fails for this page`);
-      throw new Error(`iterate brief unusable for page ${pageNumber}: ${describeIterateBrief(retryCheck)}`);
-    }
-  }
+  const effectiveSceneModel = modelOverrides?.sceneIterationModel || modelOverrides?.sceneModel || undefined;
+  let { sceneResult, text: newSceneDescription } = await callIterateBrief(scenePrompt, { pageNumber, usageTracker, model: effectiveSceneModel });
 
   // THE REINSTATEMENT BACKSTOP (owner, 2026-09-14). The rewriter now receives
   // the page's beat, so it can bring back a figure the previous brief had
@@ -6535,6 +6541,8 @@ module.exports = {
 
   // Active repair primitives
   iteratePageCore,
+  callIterateBrief,
+  pageTextInImage,
   resolveIterateScene,
   iteratePage,
   repairCharacterMismatch,

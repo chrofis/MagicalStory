@@ -4224,6 +4224,26 @@
       "fix": "foldForQuote folds every single-quote form to one apostrophe and drops apostrophes that are not inside a word; quoteFoundIn accepts a shorter-than-three-word quote only as a whole span the arc itself puts in quotation marks (quotedSpansOf). One matcher serves panel and critique (parseArcIssues). tests/unit/arc-logic-first.test.ts",
       "status": "fixed",
       "fixedIn": "09077ad79"
+    },
+    {
+      "id": "regen-route-ignores-story-layout-aspect",
+      "title": "The customer regenerate-image button redrew every square-layout story page at 3:4 portrait",
+      "reportedAt": "2026-10-17",
+      "source": "Staging job_1792226018737_lb65hzkqs: 0 of 20 sceneImages carry imageAspect; regeneration.js read currentImage.imageAspect and fell back to MODEL_DEFAULTS.pageAspect (3:4).",
+      "rootCause": "The beats pipeline never stamps a per-scene imageAspect; the source of truth is storyData.layout.imageAspect. regeneration.js (plate, render, scale-repair, composite) and repairPipeline.js (inpaint, iterate, post-repair text) read the empty per-scene field and defaulted.",
+      "fix": "layout.resolveStoryPageAspect(storyData) reads the story layout and throws when missing (no default); used at every site, plus the iteratePageCore fallback. tests/unit/regen-route-bugs.test.ts",
+      "status": "fixed",
+      "fixedIn": "PENDING"
+    },
+    {
+      "id": "regen-route-prefill-corrupts-scene-description",
+      "title": "Edited-scene regeneration stored a description starting with {\"previewMismatches\":[ and swallowed expansion failures",
+      "reportedAt": "2026-10-17",
+      "source": "regeneration.js called callClaudeAPI with prefill '{\"previewMismatches\":['; textModels.js prepends the prefill, while the scene-iteration template answers prose + ---METADATA--- + JSON.",
+      "rootCause": "Stale JSON-era prefill on two regen call sites (and the Test Lab mirror); the iterate path had moved on (no prefill, brief guard, resolveSceneIterationModel). An expansion error was caught and the raw summary rendered.",
+      "fix": "images.callIterateBrief is the one rewrite call (model, no prefill, iterateBriefGuard + retry, throws); iteratePageCore, both regen routes and the Lab mirror use it; regen passes the plan line, story and textInImage like iterate. Also: characterIds compared as strings (400 when none match) and buildCharacterRestriction refuses an empty selection. tests/unit/regen-route-bugs.test.ts",
+      "status": "fixed",
+      "fixedIn": "PENDING"
     }
   ]
 }

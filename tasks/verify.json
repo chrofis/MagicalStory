@@ -10222,6 +10222,21 @@
         "result": "HUMAN",
         "note": "human check | LOOK: Read textRefineReport: for each MISMATCH finding the ledger line; sentences lost between pages[].before and after; the diff round prompt lists RULED STANDS findings apart; check the young characters lines in the page text and audits[] arc-informed for an ASSUMED on a premise fact."
       }
+    },
+    {
+      "id": "regen-route-aspect-and-brief-2026-10-17",
+      "title": "Customer regenerate: story layout aspect, iterate brief call, characterIds guard",
+      "commits": [],
+      "addedAt": "2026-10-17",
+      "claim": "Regenerating a page of a square-layout (1:1) story from the customer button returns a 1:1 image; an edited-scene regen stores a prose + METADATA description with no {\"previewMismatches\":[ prefix; a request whose characterIds match nothing answers 400.",
+      "runShape": [
+        "page-regenerate"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "On a staging beats story: regenerate one page via the button (image dims 1:1), edit the scene and regenerate (sceneDescriptions[p].description starts with prose, not '{').",
+        "paid": true
+      }
     }
   ],
   "runs": [

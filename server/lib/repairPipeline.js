@@ -447,12 +447,11 @@ function buildInpaintCall({ img, latestEval, bestSoFar = null, roundNum = null, 
   // reference for the current costume/style.
   const { parseCharacterClothing } = getStoryHelpers();
   const pageCharacterClothing = parseCharacterClothing(img.sceneDescription || img.description || '') || {};
-  // Same aspect resolution as iteratePage above — the page's stored
-  // imageAspect is the source of truth. Without this, inpaint silently
+  // Same aspect resolution as iteratePage above — the story's layout
+  // (resolveStoryPageAspect) is the source of truth. Without this, inpaint silently
   // crops square (advanced/Jugendbuch) pages to 3:4 on round 1.
-  const sceneAspect = img.imageAspect
-    || storyData?.sceneImages?.find(s => s.pageNumber === img.pageNumber)?.imageAspect
-    || null;
+  // A cover (pageNumber < 0) keeps its own aspect.
+  const sceneAspect = img.pageNumber < 0 ? null : require('./layout').resolveStoryPageAspect(storyData);
   // Look up the page's locked text-overlay corner so inpaint can warn
   // Grok not to paint high-contrast detail in that zone. textPosition is
   // only persisted on overlay layouts (gated at the persistence site in
@@ -1324,14 +1323,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const bestSoFar = selectBestVersion(versions);
       const inputImage = bestSoFar?.imageData || img.imageData;
       // Read the per-scene aspect from saved metadata so a 1:1 advanced page
-      // doesn't get redone as 3:4. img.imageAspect (preserved in pipelineStoryData)
-      // is the source of truth; null falls back to global default in iteratePageCore.
+      // doesn't get redone as 3:4. the story layout (resolveStoryPageAspect)
+      // is the source of truth; there is no global-default fallback.
       // A cover keeps the cover aspect whatever the page layout is.
       const sceneAspect = img.pageNumber < 0
         ? null
-        : (img.imageAspect
-          || storyData?.sceneImages?.find(s => s.pageNumber === img.pageNumber)?.imageAspect
-          || null);
+        : require('./layout').resolveStoryPageAspect(storyData);
       result = await images().iteratePage(inputImage, img.pageNumber, storyData, {
         aspectRatio: sceneAspect,
         modelOverrides,
@@ -3319,9 +3316,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const preferred = (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition
         || img.sceneMetadata?.textPosition
         || 'top-left';
-      const aspectRatio = img.imageAspect
-        || (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.imageAspect
-        || null;
+      const aspectRatio = require('./layout').resolveStoryPageAspect(storyData);
 
       // PLATE OR FAIL: a landmark page's repair re-render carries its stored plate, never the raw photo (server/lib/landmarkScene.js).
       const generateImage = async (repairPrompt, opts) => {

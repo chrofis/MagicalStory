@@ -73,8 +73,29 @@ function isLegacy2Page(layout) {
   return layout?.mode === 'legacy-square-2page';
 }
 
+/**
+ * The page aspect of a SAVED story: the layout the story was generated with
+ * (storyData.layout.imageAspect, persisted at storyJobPipeline.js `layout:
+ * inputData.layout`). The beats pipeline never stamps sceneImages[].imageAspect,
+ * so a per-scene read comes back empty and the caller used to fall through to the
+ * global 3:4 default, redrawing every square-layout story as portrait (staging
+ * job_1792226018737_lb65hzkqs: 0 of 20 pages stamped). No default here: a story
+ * with no layout cannot be redrawn at a known shape, so this throws and the
+ * request fails loudly.
+ * @param {object} storyData
+ * @returns {'1:1' | '3:4'}
+ */
+function resolveStoryPageAspect(storyData) {
+  const aspect = storyData?.layout?.imageAspect;
+  if (aspect !== '1:1' && aspect !== '3:4') {
+    throw new Error(`story has no usable layout.imageAspect (got ${JSON.stringify(aspect)}) - refusing to redraw a page at a guessed aspect`);
+  }
+  return aspect;
+}
+
 module.exports = {
   resolveLayout,
+  resolveStoryPageAspect,
   isLegacy2Page,
   LAYOUTS,
 };

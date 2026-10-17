@@ -279,7 +279,7 @@
   <td>Iterate / redo a page (user-triggered or auto-repair)</td>
   <td><code>POST /api/stories/:id/iterate/:pageNumber</code> → <code>iteratePageCore</code> → <code>generateImageOnly</code> + shared eval/detection (<code>skipEval</code> for pipeline rounds)</td>
   <td>Same as initial</td>
-  <td>Re-expands scene description, regenerates, replaces active version.</td>
+  <td>Re-expands scene description, regenerates, replaces active version. The brief rewrite is <code>images.callIterateBrief</code> for iterate, the customer regenerate routes (<code>routes/regeneration.js</code>) and the Lab mirror: no JSON prefill, brief guard + one retry, throws when unusable. The page aspect is <code>layout.resolveStoryPageAspect(storyData)</code> (story layout; throws when missing, no 3:4 default) at every redo site.</td>
 </tr>
 
 <tr>
