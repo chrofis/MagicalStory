@@ -4274,7 +4274,7 @@
       "rootCause": "composeDedication balanced the whole text with splitLinesN, which splits on every whitespace run, so newlines were lost.",
       "fix": "coverTypography.dedicationLines wraps each typed line on its own and turns a blank line into a paragraph break (half a line of space in buildBottomGroup); the lower band grows with the row count. tests/unit/dedication-keeps-paragraphs-2026-10-17.test.ts",
       "status": "fixed",
-      "fixedIn": "pending"
+      "fixedIn": "3f54859aa"
     }
   ]
 }
