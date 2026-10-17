@@ -31,6 +31,8 @@ pages to be redone by hand with corrected scenes (regenerate route, `editedScene
 - [ ] Eval passed p6 and p16 at 100: it checks picture vs brief, so a brief that is wrong passes.
 
 ## Other
+- [ ] Redo-route judge scored the good p16 redo 0: Lotti (ANI001) and Captain Fridolin (CHR001), both in the brief, called extra_character CRITICAL because the redo's required cast is only the characterIds; and 'Eliah is not laughing' on a laughing face. Check how the redo route builds the judge's expected cast vs the pipeline (VB creatures/secondaries the brief cites).
+- [x] Second ship on aboard pages fixed (f1f28efb5); p16 redone on deck with no second ship (staging, 2026-10-17).
 - [ ] p18 drew a fantasy castle instead of the LOC003 Schloss Unterseen house.
 - [ ] p19 scored 20 for a placement nit on a fine picture (eval severity).
 - [ ] Ending: the ship turns back to leaves at the Unterseen quay at night; the children never get home.
