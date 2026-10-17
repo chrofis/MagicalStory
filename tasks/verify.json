@@ -10237,6 +10237,21 @@
         "what": "On a staging beats story: regenerate one page via the button (image dims 1:1), edit the scene and regenerate (sceneDescriptions[p].description starts with prose, not '{').",
         "paid": true
       }
+    },
+    {
+      "id": "object-description-no-support-2026-10-17",
+      "title": "Visual Bible object descriptions name no support; cell gates never demand one",
+      "commits": [],
+      "addedAt": "2026-10-17",
+      "claim": "On a fresh story the Visual Bible artifact and vehicle descriptions say what the object looks like and name no separate thing it rests on, leans against, hangs from or points toward, and no element cell shows a support the object was not described with.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open the Visual Bible of a staging beats story: read the artifact/vehicle descriptions and the reference cells; a plank-like object is drawn alone, not on a stump or rail.",
+        "paid": true
+      }
     }
   ],
   "runs": [

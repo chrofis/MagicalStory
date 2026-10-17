@@ -131,6 +131,28 @@
       }
     },
     {
+      "id": "vb-object-description-vs-cell-gates",
+      "axis": "generator-vs-critic",
+      "reason": "OBJECT_NOT_PLACED_RULE (promptBuilders, 2026-10-17): the two Visual Bible writers leave the support an object rests on out of its description, and the element-cell and state-cell gates (referenceSheets) never fail a cell for lacking that support and fail one that draws it. Staging job_1792226018737_lb65hzkqs: a gate that demanded 'the described context of resting on a ship's rail' made the re-render add a rail stump to a boarding plank, and every page copied it. A rule on one side only reproduces that.",
+      "generators": [
+        "prompts/visual-bible.txt",
+        "prompts/story-trial-arc.txt"
+      ],
+      "critics": [
+        "server/lib/referenceSheets.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "ruleAnchors": [
+          {
+            "critic": "objectNotPlacedRule()",
+            "generator": "{OBJECT_NOT_PLACED}",
+            "note": "One constant, OBJECT_NOT_PLACED_RULE, filled into both writers and appended to elementCellGatePrompt and stateCellsGatePrompt. That it reaches every built prompt is pinned in tests/unit/object-not-placed-2026-10-17.test.ts."
+          }
+        ]
+      }
+    },
+    {
       "id": "repair-entrypoints",
       "axis": "production repair vs user regeneration vs entity char-fix",
       "reason": "repairPipeline.js, routes/regeneration.js and entityConsistency.js each invoke character repair by their own assembly; a guard or gate added to one leaves the other two entry points unguarded.",

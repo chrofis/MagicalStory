@@ -1,0 +1,16 @@
+[
+ {
+  "label": "old description",
+  "verdict": {
+   "ok": false,
+   "reason": "The cell includes a ship's rail, which is a separate support, but a reference cell should only show the described object alone."
+  }
+ },
+ {
+  "label": "no-support description",
+  "verdict": {
+   "ok": false,
+   "reason": "The cell depicts a separate boat-like object supporting the plank, but a reference cell must show the object alone without any support or surface."
+  }
+ }
+]

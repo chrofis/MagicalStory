@@ -796,6 +796,12 @@ function oneSidedFeatureRule() {
   return require('./promptBuilders').ONE_SIDED_FEATURE_RULE;
 }
 
+// The object-alone rule the VB writers are given (promptBuilders.OBJECT_NOT_PLACED_RULE, 2026-10-17): a cell is never
+// failed for lacking the support its description names, and one that draws a separate support fails.
+function objectNotPlacedRule() {
+  return require('./promptBuilders').OBJECT_NOT_PLACED_RULE;
+}
+
 /**
  * The one question the character-cell gate asks. Pure, so it can be tested.
  *
@@ -918,7 +924,7 @@ function elementCellGatePrompt(el, styleDescription = '') {
   const desc = String(el?.description || '').trim();
   const text = String(el?.text || '').trim();
   const textClause = text ? ` (4) Lettering: the words "${text}" are readable and spelled exactly so; any other lettering fails.` : '';
-  return `You are checking one cell cut from a reference sheet for an illustrated children's book. The cell is meant to show ${article(kind)} ${kind}, described as: "${desc}". The book's declared art style: "${styleDescription}". Judge strictly: (1) Kind: does the depicted thing read as ${article(kind)} ${kind} — not a different kind of object that merely shares its shape, colour or size — and is it the only thing in the cell, with no person or creature other than the described thing (not even a silhouette, shadow or faint outline) and no second copy of it? (2) Match: do its colour and main parts follow the description, and is it made of the material the description names and nothing else (an object built only of leaves, snow or sand that shows twigs, straw, wicker, a rim or a woven frame the description does not name fails), and does its age or build match the one the description states (a creature described as grown, adult or old has a mature body — long limbs, neck and tail, a head small for the body — not a young one's big head, round belly and short limbs)? (3) Style: is it rendered in the declared art style?${textClause} ${oneSidedFeatureRule()} If any check fails, ok is false. Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
+  return `You are checking one cell cut from a reference sheet for an illustrated children's book. The cell is meant to show ${article(kind)} ${kind}, described as: "${desc}". The book's declared art style: "${styleDescription}". Judge strictly: (1) Kind: does the depicted thing read as ${article(kind)} ${kind} — not a different kind of object that merely shares its shape, colour or size — and is it the only thing in the cell, with no person or creature other than the described thing (not even a silhouette, shadow or faint outline) and no second copy of it? (2) Match: do its colour and main parts follow the description, and is it made of the material the description names and nothing else (an object built only of leaves, snow or sand that shows twigs, straw, wicker, a rim or a woven frame the description does not name fails), and does its age or build match the one the description states (a creature described as grown, adult or old has a mature body — long limbs, neck and tail, a head small for the body — not a young one's big head, round belly and short limbs)? (3) Style: is it rendered in the declared art style?${textClause} ${oneSidedFeatureRule()} ${objectNotPlacedRule()} If any check fails, ok is false. Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
 }
 
 /**
@@ -939,7 +945,7 @@ function stateCellsGatePrompt(parent, cells) {
   // as a rule every cell must obey, so a state whose delta IS a colour change
   // failed for making it: staging job_1790539784661_6mjcny1c7, recheck "grey in
   // the second image … not described" against the delta "dull grey scales".
-  return `You are checking ${cells.length} cells cut from a reference sheet for an illustrated children's book. They are meant to show ONE object, ${article(kind)} ${kind}, described as: "${desc}", in ${cells.length} states, in this order: ${list} Each listed change is intended: whatever a state names — a colour, a surface, a glow, a part added, missing or broken — is expected in that cell, and where it differs from the description the state wins for that cell. Judge strictly: is it the same object in every cell — same shape, build and material, and the same colour except where a state names a colour change — differing only in what the states name? Two different objects, or a change no state names, fails. Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
+  return `You are checking ${cells.length} cells cut from a reference sheet for an illustrated children's book. They are meant to show ONE object, ${article(kind)} ${kind}, described as: "${desc}", in ${cells.length} states, in this order: ${list} Each listed change is intended: whatever a state names — a colour, a surface, a glow, a part added, missing or broken — is expected in that cell, and where it differs from the description the state wins for that cell. Judge strictly: is it the same object in every cell — same shape, build and material, and the same colour except where a state names a colour change — differing only in what the states name? Two different objects, or a change no state names, fails. ${objectNotPlacedRule()} Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
 }
 
 async function checkElementCellRender(cellBase64, el, styleDescription = '', modelKey = require('../config/models').MODEL_DEFAULTS.vbElementCellGate) {

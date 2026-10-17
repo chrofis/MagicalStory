@@ -1,0 +1,1314 @@
+[
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "old",
+  "id": "ART001",
+  "name": "parchment tracing sheet",
+  "jev": 0.04,
+  "description": "a parchment sheet used as a tracing copy of a coast chart, its skin creamy yellow and thin, faint brown stains along the edges, one corner worn and slightly ragged"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "old",
+  "id": "ART002",
+  "name": "oak water cask",
+  "jev": 0.03,
+  "description": "an oak water cask with iron hoops round its bulging staves and a wooden bung set in its top head for filling and drawing water, its wood pale honey-brown and its iron dark grey"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "old",
+  "id": "ART003",
+  "name": "hemp rope coil",
+  "jev": 0.04,
+  "description": "a thick-laid hemp rope, tan fibre with a twisted lay, one end tied off in a loop, the rest coiled in even turns when at rest"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "old",
+  "id": "ART004",
+  "name": "dressed stone slab",
+  "jev": 0.03,
+  "description": "a flat slab of grey granite, its broad faces squared by chisel, its edges chipped square and its underside roughened, a heavy block with level faces"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "old",
+  "id": "ART005",
+  "name": "iron-banded oak chest",
+  "jev": 0.02,
+  "description": "an oak chest with a domed lid, iron bands across the lid and around the sides, a heavy iron lock plate on the front, and two iron carrying handles set at its ends"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "old",
+  "id": "ART006",
+  "name": "gold coin heap",
+  "jev": 0.04,
+  "description": "a heap of old gold coins, dull yellow metal, rims worn smooth, faces stamped and rubbed, piled loosely together"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "old",
+  "id": "ART007",
+  "name": "iron lantern",
+  "jev": 0.05,
+  "description": "an iron lantern with a ring handle at its top, a conical cap over a frame of four glass panes, the flame held inside the glass chamber, and a flat iron base"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "old",
+  "id": "VEH001",
+  "name": "crew sailing ship",
+  "jev": 0.07,
+  "description": "a white-hulled two-masted sailing ship with gold trim along the rail and the stern, a gilded gull figurehead at the bow, and a pale canvas sail set on each mast. Signature: a gilded gull figurehead at the bow"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "old",
+  "id": "VEH002",
+  "name": "rival sailing ship",
+  "jev": 0.05,
+  "description": "a black-hulled two-masted sailing ship with a red stripe along the rail, iron bands across the bow, a carved crow-shaped ornament on the stern, and dark canvas sails on each mast. Signature: iron bands across the bow"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "old",
+  "id": "VEH003",
+  "name": "rowing boat",
+  "jev": 0.06,
+  "description": "an open boat with planks painted pale blue, a thwart across its middle, and two oars shipped along its sides. Signature: pale blue painted planks"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "new",
+  "id": "ART001",
+  "name": "sea chart",
+  "jev": 0.03,
+  "description": "a sea chart of thick parchment with furred, worn edges, dull cream-ochre colour, lettering illegible"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "new",
+  "id": "ART002",
+  "name": "redrawn tower sheet",
+  "jev": 0.04,
+  "description": "a sheet of pale laid paper with clean square edges, a tower drawn across it in brown ink, three of its lines in fainter, tentative ink, no lettering"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "new",
+  "id": "ART003",
+  "name": "stone slab",
+  "jev": 0.02,
+  "description": "a heavy slab of grey weathered stone, rectangular and thick, chipped edges, a cracked corner, dull grey-brown colour"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "new",
+  "id": "ART004",
+  "name": "brass lantern",
+  "jev": 0.04,
+  "description": "a brass lantern with a glass-paned hood, a ring bail on top and a wire guard, its glass panes set in a brass frame"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "new",
+  "id": "ART005",
+  "name": "treasure chest",
+  "jev": 0.02,
+  "description": "an oak chest of dark brown wood with iron bands across its lid and an iron lock plate on the front, lid closed"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "new",
+  "id": "ART006",
+  "name": "hemp rope",
+  "jev": 0.04,
+  "description": "a length of tarred hemp rope, three strands laid together, dark brown colour, a whipped cord binding at one end"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "new",
+  "id": "VEH001",
+  "name": "gull sloop",
+  "jev": 0.08,
+  "description": "a two-masted sloop with a cream-white hull, a gilded gull figurehead at the bow, gold leaf trim along the rail, two masts with furled tan sails and a pale wooden deck. Signature: a gilded gull figurehead at the bow"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "new",
+  "id": "VEH002",
+  "name": "black brigantine",
+  "jev": 0.06,
+  "description": "a black-hulled brigantine with two masts carrying square sails of dark canvas, a red stripe along the waterline, and a carved black stern rail. Signature: a red stripe along the waterline"
+ },
+ {
+  "story": "job_1788215224103_avu132n7je",
+  "arm": "new",
+  "id": "VEH003",
+  "name": "rowing boat",
+  "jev": 0.05,
+  "description": "an open rowing boat of dark tarred clinker planks, two wooden thwarts across its width, a pair of oars laid along the gunwales, a flat transom at the stern. Signature: dark tarred clinker planks"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "old",
+  "id": "ART001",
+  "name": "sea chart",
+  "jev": 0.93,
+  "description": "a sheet of thick cream paper with softly worn edges and darkened corners, lying flat on a table, its surface pale and dry"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "old",
+  "id": "ART002",
+  "name": "drawing pencil",
+  "jev": 0.02,
+  "description": "a drawing pencil with a hexagonal barrel of pale unvarnished wood and a graphite lead tip at one end, the other end blunt and unpainted"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "old",
+  "id": "ART003",
+  "name": "iron chest",
+  "jev": 0.02,
+  "description": "a squat iron chest with a domed lid, iron corner straps riveted to its box and a banded iron rim, its metal dark grey and pitted"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "old",
+  "id": "ART004",
+  "name": "wreck logbook",
+  "jev": 0.02,
+  "description": "a bound logbook with a thick dark brown leather cover, brass corner clasps and a closed spine, its boards worn soft at the edges"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "old",
+  "id": "ART005",
+  "name": "brass lantern",
+  "jev": 0.03,
+  "description": "a brass lantern with a glass chimney set in a brass frame, a wire carrying handle arched over its top and a squat brass base cup"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "old",
+  "id": "ART006",
+  "name": "shaft stone",
+  "jev": 0.62,
+  "description": "a round slab of rough grey stone with two flat faces and a roughly dressed rim, cut to cover a rock shaft"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "old",
+  "id": "VEH001",
+  "name": "gilt-hulled sailing ship",
+  "jev": 0.05,
+  "description": "a gilt-hulled sailing ship, two-masted, with a gilt-painted hull and dark trim, a dark wooden deck, two tall masts with furled sails, a wooden rail round the deck, a wheel aft, and gold lettering along the hull that is illegible. Signature: a carved gull figurehead at the bow"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "old",
+  "id": "VEH002",
+  "name": "black-hulled sailing ship",
+  "jev": 0.1,
+  "description": "a black-hulled sailing ship, single-masted, with a tar-black hull, a long narrow bow, a bare mast with no sails, and a dark wooden deck with a plain rail. Signature: a needle-thin bare mast rising from the deck"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "new",
+  "id": "ART001",
+  "name": "drawing pencil",
+  "jev": 0.03,
+  "description": "a slim round drawing pencil of pale unpainted wood with a grey graphite point at one end and a flat blunt end at the other"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "new",
+  "id": "ART002",
+  "name": "sea chart",
+  "jev": 0.03,
+  "description": "a folded paper sea chart of cream paper with soft worn edges and a dark brown fold crease, one face inked in fine lines"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "new",
+  "id": "ART003",
+  "name": "brass oil lantern",
+  "jev": 0.03,
+  "description": "a brass oil lantern with a ring handle at the top, a glass chimney around the wick, and a wire guard fixed around the glass"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "new",
+  "id": "ART004",
+  "name": "iron chest",
+  "jev": 0.02,
+  "description": "a small iron chest with a domed lid, iron straps across the lid and sides, and a heavy iron hasp at the front, dark grey metal with rust at the corners"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "new",
+  "id": "ART005",
+  "name": "coiled hauling rope",
+  "jev": 0.04,
+  "description": "a thick twisted hemp hauling rope of tan fibre, a loose loop at one end, its strands frayed at the ends"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "new",
+  "id": "ART006",
+  "name": "round cover stone",
+  "jev": 0.03,
+  "description": "a thick round slab of grey limestone with a flat face and a rough-hewn edge, weathered pale"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "new",
+  "id": "ART007",
+  "name": "spare canvas sail",
+  "jev": 0.04,
+  "description": "a folded spare sail of cream canvas with heavy reinforced corners and a thick roped edge along each side"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "new",
+  "id": "ART008",
+  "name": "ship's wheel",
+  "jev": 0.02,
+  "description": "a ship's steering wheel of dark varnished wood with eight spokes radiating from a brass hub, and a brass rim around the outer edge"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "new",
+  "id": "VEH001",
+  "name": "gold-hulled sailing ship",
+  "jev": 0.05,
+  "description": "a cream-painted hull with a broad gold band along its length, gold lettering on the stern that is illegible at this distance, two masts with furled cream canvas sails, dark wooden rails along the deck. Signature: a broad gold band along the cream hull"
+ },
+ {
+  "story": "job_1788295892348_l028ggiq7a",
+  "arm": "new",
+  "id": "VEH002",
+  "name": "black-hulled sailing ship",
+  "jev": 0.05,
+  "description": "a black-painted hull with a tall narrow bow, a single mast with a furled dark grey sail, dark wooden rails along the deck. Signature: a tall narrow black bow"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "old",
+  "id": "ART001",
+  "name": "sea chart",
+  "jev": 0.03,
+  "description": "sea chart, a flat unrolled parchment sheet with curled, worn edges and a stained surface in pale ochre, its paper weathered and creased by handling"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "old",
+  "id": "ART002",
+  "name": "swimming line",
+  "jev": 0.94,
+  "description": "swimming line, a hemp rope with a knotted loop at one end, tensioned between the ship's side and the shore, its fibres pale tan and tarred dark in patches"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "old",
+  "id": "ART003",
+  "name": "sailcloth bundle",
+  "jev": 0.03,
+  "description": "sailcloth bundle, a heavy roll of cream canvas with cut ragged edges, tied with lengths of tarred twine"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "old",
+  "id": "ART004",
+  "name": "wooden ladder",
+  "jev": 0.97,
+  "description": "wooden ladder, two long side rails of grey-brown timber with evenly spaced rungs, its upper end leaning against the cliff face below the rock shelf"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "old",
+  "id": "ART005",
+  "name": "sea chest",
+  "jev": 0.02,
+  "description": "sea chest, a dark oak box with iron corner straps and a hinged lid, its wood weathered to a grey-brown"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "old",
+  "id": "ART006",
+  "name": "ship logbook",
+  "jev": 0.02,
+  "description": "logbook, a bound ship's book with a dark brown leather cover and cream page edges, its spine stitched and its cover soft with wear"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "old",
+  "id": "ART007",
+  "name": "coin sack",
+  "jev": 0.03,
+  "description": "coin sack, a small brown canvas bag with a drawstring neck, heavy and full, its surface crusted with dark earth"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "old",
+  "id": "VEH001",
+  "name": "sailing sloop",
+  "jev": 0.07,
+  "description": "a single-masted sloop with a dark brown hull and a pale wooden rail along its deck; its mainsail is patched from many sewn panels of cloth in faded reds, blues and ochres; a wooden helm wheel stands on a pedestal at the stern. Signature: a mainsail patched from many mismatched sewn cloth panels"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "old",
+  "id": "VEH002",
+  "name": "rival brigantine",
+  "jev": 0.04,
+  "description": "a two-masted brigantine with a black hull and a red painted stripe along its side; square-rigged sails of grey canvas on both masts; a dark wooden deck rail. Signature: a red stripe along the black hull"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "new",
+  "id": "ART001",
+  "name": "sea chart",
+  "jev": 0.03,
+  "description": "a sea chart on thick cream paper, its edges darkened and softened by handling, its dominant colour cream with brown ink linework"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "new",
+  "id": "ART002",
+  "name": "ship's logbook",
+  "jev": 0.02,
+  "description": "a logbook bound in dark brown leather, its cover worn pale at the corners, its pages yellowed at the edges, a cord tie at its fore edge"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "new",
+  "id": "ART003",
+  "name": "sea chest",
+  "jev": 0.06,
+  "description": "a sea chest of dark oak with iron corner straps and a domed lid hinged at the back, the lid propped open, the interior bare wood"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "new",
+  "id": "ART004",
+  "name": "coin sack",
+  "jev": 0.03,
+  "description": "a coin sack of brown leather with a drawstring neck pulled shut, its sides bulging with coins"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "new",
+  "id": "ART005",
+  "name": "mainsail",
+  "jev": 0.94,
+  "description": "a mainsail, a four-sided sheet of cream canvas with dark cord-sewn edges, set on a mainmast and carrying a horizontal boom along its foot"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "new",
+  "id": "ART006",
+  "name": "canvas bundle",
+  "jev": 0.03,
+  "description": "a canvas bundle of cream sailcloth, folded over on itself, its cut edges ragged and unhemmed, tied with tarred twine"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "new",
+  "id": "ART007",
+  "name": "swimming line",
+  "jev": 0.12,
+  "description": "a swimming line of tarred hemp rope, three-strand laid, dark brown, its ends whipped with twine"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "new",
+  "id": "VEH001",
+  "name": "treasure sloop",
+  "jev": 0.08,
+  "description": "a two-masted wooden sloop with a dark red-brown hull, a carved gull figurehead on the bow, a ship's wheel at the stern, a mainmast carrying a cream canvas mainsail and a foremast. Signature: a gilded gull figurehead on the bow"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "new",
+  "id": "VEH002",
+  "name": "rival brigantine",
+  "jev": 0.08,
+  "description": "a two-masted brigantine with a black hull and a white stripe along its length, square-rigged foresail, a gaff mainsail, and a dark red pennant at the mainmast. Signature: a white stripe running along the black hull"
+ },
+ {
+  "story": "job_1788380714660_4p9mr11xszu",
+  "arm": "new",
+  "id": "VEH003",
+  "name": "rope ladder",
+  "jev": 0.88,
+  "description": "a rope ladder of tarred hemp, with two taut hemp rails and evenly spaced wooden rungs between them, hung down the cliff face. Signature: evenly spaced wooden rungs between two taut tarred rails"
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "old",
+  "id": "ART001",
+  "name": "writing quill",
+  "jev": 0.03,
+  "description": "A grey goose quill with its feather vane intact, a cut nib and an ink-darkened tip."
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "old",
+  "id": "ART002",
+  "name": "sea chart",
+  "jev": 0.03,
+  "description": "A sheet of cream paper with edges worn soft and creased from folding, a pale brown ink tint along the margins."
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "old",
+  "id": "ART003",
+  "name": "brass spyglass",
+  "jev": 0.02,
+  "description": "A brass spyglass with three sliding tube sections, a dark leather grip wrapped round the middle of its body and a brass eyepiece ring."
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "old",
+  "id": "ART004",
+  "name": "knotted anchor line",
+  "jev": 0.93,
+  "description": "A heap of thick tarred hemp anchor line, coils overlapping on the planks, several loops knotted into hard tangles."
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "old",
+  "id": "ART005",
+  "name": "frayed rope end",
+  "jev": 0.02,
+  "description": "A length of hemp rope, one end cut clean, the other end frayed into loose strands and short tufts."
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "old",
+  "id": "ART006",
+  "name": "oak sea chest",
+  "jev": 0.02,
+  "description": "An oak sea chest with iron-banded corners, a domed lid hinged at the back, a rope handle fixed on each end and an iron lock plate on the front."
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "old",
+  "id": "ART007",
+  "name": "iron hammer",
+  "jev": 0.02,
+  "description": "A hammer with a square iron head set on a wooden handle, the handle dark and smooth with use."
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "old",
+  "id": "ART008",
+  "name": "gold coins",
+  "jev": 0.02,
+  "description": "Round flat gold coins with plain faces, worn smooth at the edges."
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "old",
+  "id": "ART009",
+  "name": "old compass",
+  "jev": 0.04,
+  "description": "A round brass compass in a brass case, a glass face under a hinged brass cover, the rim scratched with worn marks that are illegible."
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "old",
+  "id": "VEH001",
+  "name": "gull-prowed racing ship",
+  "jev": 0.13,
+  "description": "two-masted racing ship with a white hull and a gold stripe along the upper side, a tall mainmast and foremast with cream sails bent to the yards, and a carved gilded gull figurehead on the bow. Signature: carved gilded gull figurehead on the bow"
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "old",
+  "id": "VEH002",
+  "name": "black-hulled racing ship",
+  "jev": 0.28,
+  "description": "two-masted racing ship with a black-painted hull and a red stripe along the upper side, tall black masts, dark red sails set on the yards, and a red pennant with a black needle point at the masthead. Signature: red pennant with a black needle point at the masthead"
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "old",
+  "id": "VEH003",
+  "name": "small rowing boat",
+  "jev": 0.23,
+  "description": "open wooden rowing boat with a pale wood hull, two thwarts and a pair of oars resting in rowlocks, a rope painter tied to a ring at the bow. Signature: rope painter tied to a ring at the bow"
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "new",
+  "id": "ART001",
+  "name": "rolled chart",
+  "jev": 0.03,
+  "description": "a rolled chart of parchment-coloured paper, its outer sheet soft and curled at the edges, a dull cream roll with a faint tan border along one long edge"
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "new",
+  "id": "ART002",
+  "name": "brass spyglass",
+  "jev": 0.03,
+  "description": "a brass spyglass with two sliding drawn tubes and a leather-wrapped grip at its middle, the tubes polished to a warm yellow metal, the objective end capped with a plain brass ring"
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "new",
+  "id": "ART003",
+  "name": "brass compass",
+  "jev": 0.03,
+  "description": "a round brass compass with a hinged lid, a dull worn brass case, a dark glass face under the lid, and the lid's outer surface scratched with worn, illegible marks"
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "new",
+  "id": "ART004",
+  "name": "gold coin",
+  "jev": 0.02,
+  "description": "a round gold coin, thick-rimmed, with a worn face and a dull yellow metal surface"
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "new",
+  "id": "ART005",
+  "name": "tangled anchor line",
+  "jev": 0.04,
+  "description": "a tangled anchor line, a heavy hemp cable thick as a wrist, knotted into one dense mass of loops and hitches in buff-coloured fibre"
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "new",
+  "id": "ART006",
+  "name": "frayed rope end",
+  "jev": 0.04,
+  "description": "a frayed rope end, a length of hemp mooring rope as thick as two fingers, its cut end broken into loose buff-coloured strands"
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "new",
+  "id": "ART007",
+  "name": "rock slab",
+  "jev": 0.02,
+  "description": "a rock slab, a thick flat piece of grey stone with rough broken edges and an uneven flat top, pale grey streaks across its face"
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "new",
+  "id": "ART008",
+  "name": "sea chest",
+  "jev": 0.02,
+  "description": "a sea chest of dark weathered oak planks with iron straps and corner brackets, a rounded lid, and a heavy iron hasp at the front"
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "new",
+  "id": "VEH001",
+  "name": "racing ketch",
+  "jev": 0.09,
+  "description": "two-masted racing ketch with a cream-white hull, a gold sheer stripe along the topsides, a gilded gull figurehead at the bow, tan sails on two masts, and a brown varnished deck. Signature: gilded gull figurehead at the bow"
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "new",
+  "id": "VEH002",
+  "name": "rival schooner",
+  "jev": 0.16,
+  "description": "three-masted schooner with a black hull, a thin red waterline stripe, a long iron-tipped bowsprit, a slender white pennant at the main masthead, and a dark brown deck. Signature: long iron-tipped bowsprit"
+ },
+ {
+  "story": "job_1788471969309_9cg9dqyirre",
+  "arm": "new",
+  "id": "VEH003",
+  "name": "rowing dinghy",
+  "jev": 0.04,
+  "description": "small clinker-built wooden rowing boat, white-painted, with a blue gunwale stripe, one thwart, and two oars. Signature: blue gunwale stripe"
+ },
+ {
+  "story": "job_1788590495460_d7472jys3",
+  "arm": "old",
+  "id": "ART001",
+  "name": "silver-star cape",
+  "jev": 0.23,
+  "description": "A silver-starred dark blue fabric superhero cape attached at both shoulders with two flat round snap fasteners draping to mid-thigh. Its fabric is dark blue with silver stars scattered over the outer face, and it is cut as a single wide panel with a straight lower edge."
+ },
+ {
+  "story": "job_1788590495460_d7472jys3",
+  "arm": "old",
+  "id": "ART002",
+  "name": "wall peg",
+  "jev": 0.9,
+  "description": "A wall peg of turned hardwood, its shaft projecting straight out horizontally from a flat backplate fixed to the corridor wall, its outer end rounded. The shaft is plain and unpainted, with a dark wood grain."
+ },
+ {
+  "story": "job_1788590495460_d7472jys3",
+  "arm": "old",
+  "id": "ART003",
+  "name": "brass lantern",
+  "jev": 0.02,
+  "description": "A brass lantern with an arched carrying handle over its top, a glass chamber with four panes set in a brass frame, and a wick holder at the centre of its base. The brass is polished and the frame is solid, with the glass set flush into the frame at each corner."
+ },
+ {
+  "story": "job_1788590495460_d7472jys3",
+  "arm": "old",
+  "id": "ART004",
+  "name": "tin wall lanterns",
+  "jev": 0.97,
+  "description": "Tin lanterns hung on iron hooks along the wall, each a cylindrical glass chamber in a dark tin frame topped with a ring handle. The lanterns are evenly spaced at head height and their glass is clear and empty."
+ },
+ {
+  "story": "job_1788590495460_d7472jys3",
+  "arm": "old",
+  "id": "ART005",
+  "name": "honour roll scroll",
+  "jev": 0.08,
+  "description": "A parchment scroll mounted between two dark wooden rods, its cream face with darkened, slightly frayed edges and a dark wood grain on its rods. The scroll is of thick, stiff parchment and its rods are capped in plain wood."
+ },
+ {
+  "story": "job_1788590495460_d7472jys3",
+  "arm": "old",
+  "id": "VEH001",
+  "name": "stone tower",
+  "jev": 0.17,
+  "description": "a grey rough-cut stone tower with a flat stone top and a wall of irregular stones set in pale mortar, with narrow slit windows spaced up its face. Signature: a shallow stone gutter channel running along the base of the tower wall at ground level"
+ },
+ {
+  "story": "job_1788590495460_d7472jys3",
+  "arm": "new",
+  "id": "ART001",
+  "name": "corridor wall peg",
+  "jev": 0.02,
+  "description": "a short turned wooden peg with a rounded knob end and a square flat base plate, dark oak with a smooth finish"
+ },
+ {
+  "story": "job_1788590495460_d7472jys3",
+  "arm": "new",
+  "id": "ART002",
+  "name": "canvas school bag",
+  "jev": 0.03,
+  "description": "a rectangular brown canvas school bag with a wide top opening, a fold-over flap at its back edge, and two carrying straps stitched to its back"
+ },
+ {
+  "story": "job_1788590495460_d7472jys3",
+  "arm": "new",
+  "id": "ART003",
+  "name": "honour roll scroll",
+  "jev": 0.15,
+  "description": "an open cream parchment scroll, its pale ivory sheet spread between two thin wooden rods, one at each end, its edges slightly curled"
+ },
+ {
+  "story": "job_1788590495460_d7472jys3",
+  "arm": "new",
+  "id": "ART004",
+  "name": "tin lantern",
+  "jev": 0.03,
+  "description": "a lantern with a square frame of black-painted tin, four tall clear glass panes, a pierced flat cap, and a ring handle rising from the cap"
+ },
+ {
+  "story": "job_1788590495460_d7472jys3",
+  "arm": "new",
+  "id": "ART005",
+  "name": "silver-star cape",
+  "jev": 0.49,
+  "description": "a silver-starred dark blue fabric superhero cape attached at both shoulders with two flat round snap fasteners draping to mid-thigh"
+ },
+ {
+  "story": "job_1788590495460_d7472jys3",
+  "arm": "new",
+  "id": "VEH001",
+  "name": "square stone tower",
+  "jev": 0.28,
+  "description": "a tall square tower of rough grey stone with narrow windows, a metal gutter running down one face to a drain at its foot. Signature: metal gutter running down its face to the drain at its foot"
+ },
+ {
+  "story": "job_1788641639919_mpjwlzkf1",
+  "arm": "old",
+  "id": "ART001",
+  "name": "red woollen hat",
+  "jev": 0.02,
+  "description": "a red chunky-knit woollen hat with a turned-back brim forming a deep band round the lower crown, plain knit throughout"
+ },
+ {
+  "story": "job_1788641639919_mpjwlzkf1",
+  "arm": "old",
+  "id": "ART002",
+  "name": "bridge log pile",
+  "jev": 0.93,
+  "description": "a stack of split logs built against the bridge mouth, its rows of pale birch and beech ends layered upward, with the lowest rows set apart to form a gap at its base"
+ },
+ {
+  "story": "job_1788641639919_mpjwlzkf1",
+  "arm": "old",
+  "id": "VEH001",
+  "name": "stone town tower",
+  "jev": 0.07,
+  "description": "a tall square stone town tower with a stepped stone base, small arched openings in its upper stage, and a pointed slate roof, grey stone throughout. Signature: a pointed slate spire crowning the square stone shaft"
+ },
+ {
+  "story": "job_1788641639919_mpjwlzkf1",
+  "arm": "old",
+  "id": "VEH002",
+  "name": "covered wooden bridge",
+  "jev": 0.06,
+  "description": "a long timber-clad footbridge with dark brown boarding and a steep grey shingle roof covering its whole length, an open timber portal at each end. Signature: a steep shingle roof running the full length of the bridge"
+ },
+ {
+  "story": "job_1788641639919_mpjwlzkf1",
+  "arm": "new",
+  "id": "ART001",
+  "name": "firewood pile",
+  "jev": 0.96,
+  "description": "a firewood pile of split logs, stacked crosswise in tiers against the bridge mouth to keep the wood dry for the bridge's hearth, with an open gap left at its base beneath the lower tier. Pale cut ends face outward, bark-brown sides, weathered grey-brown wood."
+ },
+ {
+  "story": "job_1788641639919_mpjwlzkf1",
+  "arm": "new",
+  "id": "VEH001",
+  "name": "town tower",
+  "jev": 0.04,
+  "description": "a square stone tower of pale ochre render with grey stone quoins at its corners, a steep pointed slate spire with four small corner turrets around its base, a small clock face set near the top of the walls, narrow windows in the upper storeys. Signature: steep pointed slate spire with four corner turrets"
+ },
+ {
+  "story": "job_1788641639919_mpjwlzkf1",
+  "arm": "new",
+  "id": "VEH002",
+  "name": "covered bridge",
+  "jev": 0.06,
+  "description": "a covered timber bridge with dark brown-red boarding, a steep shingled roof running its full length, and an open arched timber portal at each mouth, the portal's interior recessed and deep. Signature: open arched timber portal with a steep shingled roof overhead"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "old",
+  "id": "ART001",
+  "name": "treasure map",
+  "jev": 0.02,
+  "description": "a treasure map: a sheet of crumbling old cloth, frayed and cracked along its edges, dull cream colour worn to brown at the folds, its surface stiff with age"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "old",
+  "id": "ART002",
+  "name": "sailcloth map copy",
+  "jev": 0.03,
+  "description": "a sailcloth map copy: a rectangular sheet of off-white sailcloth with hemmed edges, the canvas weave visible across its pale cream surface"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "old",
+  "id": "ART003",
+  "name": "rival map copy",
+  "jev": 0.03,
+  "description": "a rectangular sheet of dark-stained sailcloth with hemmed edges, dominant colour dark tan, the canvas grain rough and uneven"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "old",
+  "id": "ART004",
+  "name": "sea chest",
+  "jev": 0.06,
+  "description": "an oak sea chest of honey-brown wood with iron corner straps, a flat top rim and a hinged lid standing open on its back edge"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "old",
+  "id": "ART005",
+  "name": "water casks",
+  "jev": 0.03,
+  "description": "oak water casks, each a squat round barrel with flat ends and iron hoops around its bulge, dark honey-brown wood"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "old",
+  "id": "ART006",
+  "name": "tin cup",
+  "jev": 0.02,
+  "description": "a plain tin drinking cup with a straight-sided body, dull silver-grey metal, and a short handle fixed at one side"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "old",
+  "id": "ART007",
+  "name": "hemp rope",
+  "jev": 0.03,
+  "description": "a length of hemp rope in natural tan fibres, its end frayed and cut square"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "old",
+  "id": "ART008",
+  "name": "mainsail line plait",
+  "jev": 0.03,
+  "description": "a thick plait of several tarred mainsail lines braided into one rope, dark brown-black with a tar sheen, a whipped end at each finish"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "old",
+  "id": "ART009",
+  "name": "charcoal stub",
+  "jev": 0.02,
+  "description": "a stub of compressed drawing charcoal, blunt at both ends, dull black with a matte surface"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "old",
+  "id": "ART010",
+  "name": "treasure chest",
+  "jev": 0.02,
+  "description": "a treasure chest of dark wood bound with iron bands, a domed lid, two iron carrying handles on its short ends and a central lock plate"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "old",
+  "id": "ART011",
+  "name": "painted portrait",
+  "jev": 0.1,
+  "description": "an oval miniature painted on an ivory panel within a thin gold frame, dominant colours ivory and gold"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "old",
+  "id": "VEH001",
+  "name": "gold-trimmed sloop",
+  "jev": 0.06,
+  "description": "fore-and-aft sailing sloop with a cream-painted hull edged in gold along the gunwale, a varnished wooden deck and rail, a single mainmast with a boom and a furled white mainsail, a jib forward, a carved gull figurehead painted gold at the bow. Signature: a gilded gull figurehead at the bow"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "old",
+  "id": "VEH002",
+  "name": "black-hulled sloop",
+  "jev": 0.05,
+  "description": "fore-and-aft sailing sloop with a black-painted hull and a thin white stripe at the waterline, a single mainmast with a boom, the mainsail bent to the boom and rigged for sailing, a jib forward, a stern board painted with a white thistle emblem. Signature: a white thistle emblem painted on the stern board"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "old",
+  "id": "VEH003",
+  "name": "stone cistern",
+  "jev": 0.07,
+  "description": "round stone cistern of dressed grey blocks laid in courses, a flat ring rim at the top, the inside walls lined with rough stone rising from the floor to the opening, an iron ring bolted into the rim at one side. Signature: an iron ring bolted into the rim"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "new",
+  "id": "ART001",
+  "name": "treasure map",
+  "jev": 0.03,
+  "description": "a map of heavy linen gone soft and crumbling at its folded edges, dyed a faded ochre, its cloth edges frayed brown and its folds worn thin."
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "new",
+  "id": "ART002",
+  "name": "sailcloth map copy",
+  "jev": 0.04,
+  "description": "a map copy on a square of off-white sailcloth, stiff and creased, its edges hemmed with plain thread and its cloth dulled to a pale tan."
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "new",
+  "id": "ART003",
+  "name": "torn sailcloth rag",
+  "jev": 0.03,
+  "description": "a map on a torn rag of off-white sailcloth, its edges ragged and uneven where it was ripped, its cloth dulled to a pale tan."
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "new",
+  "id": "ART004",
+  "name": "rival map copy",
+  "jev": 0.08,
+  "description": "a map copy on a square of ochre-dyed sailcloth, its edges frayed and its cloth stiff from handling, its corners weighted with plain cord."
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "new",
+  "id": "ART005",
+  "name": "water cask stack",
+  "jev": 0.05,
+  "description": "a stack of oak water casks bound with iron hoops, the top cask lying crosswise over the others, the stack built from plain unpainted staves."
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "new",
+  "id": "ART006",
+  "name": "sea chest",
+  "jev": 0.02,
+  "description": "a sea chest of dark oak planks with iron corner straps, a hinged lid and an iron lock plate on the front, its wood weathered grey at the edges."
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "new",
+  "id": "ART007",
+  "name": "treasure chest",
+  "jev": 0.02,
+  "description": "a treasure chest of dark oak planks banded with black iron straps, a domed lid, an iron lock plate on the front and a carrying handle fixed to each short end."
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "new",
+  "id": "ART008",
+  "name": "hemp rope",
+  "jev": 0.03,
+  "description": "a rope of twisted natural hemp, its thick strands worn fuzzy, ending in a frayed snapped end with the strands splayed apart."
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "new",
+  "id": "ART009",
+  "name": "mainsail line plait",
+  "jev": 0.04,
+  "description": "a plait of tarred hemp lines, several strands braided into one thick rope, the plait spliced end to end and coiled into a heavy bundle."
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "new",
+  "id": "ART010",
+  "name": "painted portrait miniature",
+  "jev": 0.03,
+  "description": "a portrait miniature painted on ivory, set in a thin tarnished silver frame, its ivory edge chipped at one corner and its reverse plain ivory."
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "new",
+  "id": "VEH001",
+  "name": "crew sloop",
+  "jev": 0.07,
+  "description": "a wooden sloop with a single mast and a gaff mainsail furled along its boom, hull painted cream above a dark waterline, a gilded transom scroll at the stern and a carved golden gull figurehead on the bow. Signature: a carved golden gull figurehead on the bow"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "new",
+  "id": "VEH002",
+  "name": "rival sloop",
+  "jev": 0.05,
+  "description": "a wooden sloop with a single mast, its hull painted black with a band of dark grey along the rail, a pale thistle painted on the stern, its mainsail set and rigged on the mast. Signature: a pale thistle painted on the black stern"
+ },
+ {
+  "story": "job_1788820396445_9erw6xc01",
+  "arm": "new",
+  "id": "VEH003",
+  "name": "stone cistern",
+  "jev": 0.04,
+  "description": "a cistern of dressed grey stone, its round walls laid in even courses, a flat coping forming the rim, its open top uncovered and its interior walls plastered a pale grey"
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "old",
+  "id": "ART001",
+  "name": "old sea chart",
+  "jev": 0.03,
+  "description": "a torn old sea chart on thick yellowed parchment, a long tear running down one edge, brown foxing and soft creases along the margins, dominant colour pale ochre-yellow with brown edge wear, a single flat sheet"
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "old",
+  "id": "ART002",
+  "name": "treasure chest",
+  "jev": 0.02,
+  "description": "a treasure chest of dark oak boards bound with iron straps across the lid and corners, a domed lid closed over the box, a heavy iron hasp at the front, dominant colour deep brown with black iron"
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "old",
+  "id": "ART003",
+  "name": "charcoal sailcloth chart",
+  "jev": 0.03,
+  "description": "a roughly square sheet of heavy unbleached sailcloth, its edges uneven and creased, covered in charcoal lines and smudged grey marks, dominant colour off-white with charcoal black"
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "old",
+  "id": "ART004",
+  "name": "brass compass",
+  "jev": 0.03,
+  "description": "a small round brass compass with a plain brass case, a glass-covered dial and a needle pivoted at its centre, dominant colour warm gold-brass"
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "old",
+  "id": "ART005",
+  "name": "crane hook",
+  "jev": 0.94,
+  "description": "an iron crane hook with a curved pointed tip and a thick shank, its top end hung through a heavy round iron ring that carries it from the crane's pulley block, dominant colour dark rust-brown iron with bright worn patches on the bend"
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "old",
+  "id": "VEH001",
+  "name": "pirate sailing ship",
+  "jev": 0.08,
+  "description": "a wooden sailing ship with a dark tarred hull and a pale wood rail, two tall masts with furled grey-cream sails, a bowsprit reaching forward from the bow, dominant colour dark tar-brown with pale wood. Signature: a carved wooden eagle figurehead on the bow"
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "old",
+  "id": "VEH002",
+  "name": "rowing boat",
+  "jev": 0.19,
+  "description": "a small open wooden rowing boat painted dark green, a seat thwart across the middle, two oars resting along its sides, dominant colour dark green with pale wood oars. Signature: a pair of long wooden oars resting along the gunwales"
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "old",
+  "id": "VEH003",
+  "name": "dockside crane",
+  "jev": 0.94,
+  "description": "a dockside crane on a squared stone base, a grey weathered timber mast rising from the base with a horizontal iron jib arm projecting out over the quay, dark iron fittings, dominant colour weathered grey with rust-brown iron. Signature: a pulley block hanging from the end of the jib arm, its iron hook suspended below it"
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "old",
+  "id": "VEH004",
+  "name": "harbour chain",
+  "jev": 0.96,
+  "description": "a heavy rusted iron chain, its links thick and orange-brown with crusted rust, strung taut across the water of the harbour mouth between two squat stone posts, its two ends wound round the posts, dominant colour rust-orange. Signature: a taut line of heavy rust-crusted links spanning the harbour mouth from post to post"
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "new",
+  "id": "ART001",
+  "name": "old sea chart",
+  "jev": 0.03,
+  "description": "a torn old sea chart for finding a sea route: a sheet of yellowed paper with a ragged torn edge along one side and a soft crease across its middle, cream and brown in colour, thin and brittle, with worn corners."
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "new",
+  "id": "ART002",
+  "name": "wooden wedge",
+  "jev": 0.12,
+  "description": "a driving wedge of pale ash hardwood, its wood smooth and unpainted, used to force a fitting tight into a socket."
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "new",
+  "id": "ART003",
+  "name": "iron crane hook",
+  "jev": 0.05,
+  "description": "a heavy iron crane hook: a curved hook at the end of a short thick iron shank, with a round iron ring fitted over the shank, black-grey and rusted at the edges."
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "new",
+  "id": "ART004",
+  "name": "oak sea chest",
+  "jev": 0.02,
+  "description": "an oak sea chest of dark planks with a domed lid, iron straps across the lid and iron corner brackets, a heavy iron lock plate on its front, the wood weathered grey-brown."
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "new",
+  "id": "ART005",
+  "name": "brass compass",
+  "jev": 0.03,
+  "description": "a small round brass compass with a hinged lid, a glass face over a card, and a magnetic needle inside; its brass case is worn smooth and dull gold."
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "new",
+  "id": "ART006",
+  "name": "charcoal sailcloth chart",
+  "jev": 0.03,
+  "description": "a square of heavy off-white sailcloth with hemmed edges and metal eyelets at the corners, its surface dusted with charcoal-grey smudges and rubbed marks."
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "new",
+  "id": "VEH001",
+  "name": "sailing ship",
+  "jev": 0.04,
+  "description": "a wooden sailing ship with a dark-varnished hull, a single tall pale mast, a sail furled along its boom, a planked deck and a wooden rail. Signature: a carved wooden bird figurehead at the bow"
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "new",
+  "id": "VEH002",
+  "name": "rowing boat",
+  "jev": 0.1,
+  "description": "a small open wooden rowing boat painted dark blue, with a pair of oars shipped inside along its length and a flat transom at the stern. Signature: a pair of oars shipped along the boat's length"
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "new",
+  "id": "VEH003",
+  "name": "harbour crane",
+  "jev": 0.88,
+  "description": "a tall iron lattice tower on a riveted footing, with a long jib arm angled out over the quay, its jib end ending in a bare hanging cable, rust-brown and grey. Signature: a long jib arm angled out over the quay with a bare hanging cable"
+ },
+ {
+  "story": "job_1788983823620_csjcyp1q9",
+  "arm": "new",
+  "id": "VEH004",
+  "name": "harbour chain",
+  "jev": 0.89,
+  "description": "a heavy rusted iron chain strung across the water as a barrier, its links thick and orange-brown with rust. Signature: thick orange-brown rusted links strung across the harbour mouth"
+ },
+ {
+  "story": "job_1789304198359_y3n0euk3z",
+  "arm": "old",
+  "id": "ART001",
+  "name": "model barque",
+  "jev": 0.9,
+  "description": "A wooden model of a sailing barque on a dark wooden stand, its dark-varnished hull with a low rail along the deck, a single mast standing up from the deck with cream rigging and furled cream sails."
+ },
+ {
+  "story": "job_1789304198359_y3n0euk3z",
+  "arm": "old",
+  "id": "ART002",
+  "name": "plush toy mouse",
+  "jev": 0.02,
+  "description": "A plush toy mouse, a soft comfort toy of grey fabric with a stitched pink nose, two round felt ears in pale pink, a long thin stitched tail, and one round black button eye on each side of the head."
+ },
+ {
+  "story": "job_1789304198359_y3n0euk3z",
+  "arm": "old",
+  "id": "ART003",
+  "name": "deck locker",
+  "jev": 0.94,
+  "description": "A deck locker, a wooden box built into the barque's deck beside the mast, with a hinged lid of swollen dark planks on two iron hinges, its planks grey-brown and waterlogged."
+ },
+ {
+  "story": "job_1789304198359_y3n0euk3z",
+  "arm": "old",
+  "id": "ART004",
+  "name": "shell bracelet",
+  "jev": 0.03,
+  "description": "A delicate bracelet of small pale shells strung on a fine cord, the shells cream-white and pearly, the cord knotted closed."
+ },
+ {
+  "story": "job_1789304198359_y3n0euk3z",
+  "arm": "old",
+  "id": "VEH001",
+  "name": "sailing barque",
+  "jev": 0.93,
+  "description": "a wooden sailing barque lying upright on its keel on the sand, its dark-brown hull planking silted and furred with pale growth, a low bulwark rail along the deck edges, its single mast rising from the deck. Signature: a single mast rising from the deck"
+ },
+ {
+  "story": "job_1789304198359_y3n0euk3z",
+  "arm": "new",
+  "id": "ART001",
+  "name": "model barque",
+  "jev": 0.06,
+  "description": "a museum ship model of a single-masted barque, its dark varnished hull of grey-brown planks, a raised deck with a row of small deck lockers, a tall central mast with a furled sail along its length"
+ },
+ {
+  "story": "job_1789304198359_y3n0euk3z",
+  "arm": "new",
+  "id": "ART002",
+  "name": "plush mouse toy",
+  "jev": 0.02,
+  "description": "a soft plush toy mouse of grey fabric, round ears, a long thin fabric tail, stitched black button eyes and a stitched closed mouth, its paws worn smooth"
+ },
+ {
+  "story": "job_1789304198359_y3n0euk3z",
+  "arm": "new",
+  "id": "ART003",
+  "name": "shell bracelet",
+  "jev": 0.03,
+  "description": "a delicate bracelet of small pale-cream shells threaded on a thin band, forming a close loop of shells"
+ },
+ {
+  "story": "job_1789304198359_y3n0euk3z",
+  "arm": "new",
+  "id": "ART004",
+  "name": "fish-bone comb",
+  "jev": 0.02,
+  "description": "a fish-bone comb, a flat slender strip of pale yellowed bone with a row of fine pointed tines along one edge and a smooth back edge"
+ },
+ {
+  "story": "job_1789304198359_y3n0euk3z",
+  "arm": "new",
+  "id": "ART005",
+  "name": "deck locker",
+  "jev": 0.04,
+  "description": "a wooden deck locker, a shallow boxed compartment of grey-brown planks with a hinged top lid and a small iron latch"
+ },
+ {
+  "story": "job_1789304198359_y3n0euk3z",
+  "arm": "new",
+  "id": "VEH001",
+  "name": "sunken barque",
+  "jev": 0.15,
+  "description": "a sailing barque of dark varnished planks with a grey-brown hull, a raised deck with a row of deck lockers along it, the wood furred with silt, its rigging slack. Signature: a single tall mast rising from the middle of the deck"
+ },
+ {
+  "story": "job_1792226018737_lb65hzkqs",
+  "arm": "old",
+  "id": "ART001",
+  "name": "wooden gangplank",
+  "jev": 0.88,
+  "description": "a long wooden gangplank of pale weathered planks joined edge to edge, with a low rope handrail strung along one side on upright posts, running from the ship's rail to a flat end that rests on whatever it reaches."
+ },
+ {
+  "story": "job_1792226018737_lb65hzkqs",
+  "arm": "old",
+  "id": "ART002",
+  "name": "plush unicorn toy",
+  "jev": 0.02,
+  "description": "a plush unicorn toy with a soft white body, a pale pink mane, one short blunt-tipped golden horn on the head, a soft rounded snout, and round dark button eyes."
+ },
+ {
+  "story": "job_1792226018737_lb65hzkqs",
+  "arm": "old",
+  "id": "ART003",
+  "name": "safety rope",
+  "jev": 0.04,
+  "description": "a length of thick tan hemp rope with a loose end, tied in a knotted loop."
+ },
+ {
+  "story": "job_1792226018737_lb65hzkqs",
+  "arm": "old",
+  "id": "VEH001",
+  "name": "pirate ship",
+  "jev": 0.78,
+  "description": "a pirate ship with a dark brown wooden hull sitting low on the water, a single tall mast carrying a torn black sail, a black pennant with a white skull at the mast top, and a low wooden rail along the deck. Signature: a black pennant with a white skull at the mast top"
+ },
+ {
+  "story": "job_1792226018737_lb65hzkqs",
+  "arm": "new",
+  "id": "ART001",
+  "name": "boarding plank",
+  "jev": 0.04,
+  "description": "a boarding plank, a long narrow board of pale weathered wood with two cross-battens fixed across its underside and a squared, flat far end"
+ },
+ {
+  "story": "job_1792226018737_lb65hzkqs",
+  "arm": "new",
+  "id": "ART002",
+  "name": "plush unicorn toy",
+  "jev": 0.02,
+  "description": "a plush unicorn toy, a soft stuffed unicorn with a white body, a pale lilac mane, a short curved horn of gold-yellow fabric, two round black button eyes and four stubby legs"
+ },
+ {
+  "story": "job_1792226018737_lb65hzkqs",
+  "arm": "new",
+  "id": "ART003",
+  "name": "hemp rope",
+  "jev": 0.03,
+  "description": "a hemp rope, a thick twisted length of tan fibre with one end knotted into a loop"
+ },
+ {
+  "story": "job_1792226018737_lb65hzkqs",
+  "arm": "new",
+  "id": "ART004",
+  "name": "helm wheel",
+  "jev": 0.03,
+  "description": "a ship's wheel, a wooden steering wheel of dark oak with eight spokes, a central hub and brass rim fittings on its outer ring"
+ },
+ {
+  "story": "job_1792226018737_lb65hzkqs",
+  "arm": "new",
+  "id": "VEH001",
+  "name": "pirate ship",
+  "jev": 0.55,
+  "description": "a wooden one-masted pirate ship with a dark brown planked hull, a pale weathered deck, a tall curved bow, a single mast with a furled grey sail, and a black flag hanging at the masthead. Signature: a black flag at the masthead"
+ }
+]

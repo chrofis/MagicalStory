@@ -3399,6 +3399,8 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     PEAK_OF_ACTION: PEAK_OF_ACTION_RULE,
     // A one-sided feature is written relationally and carries a visible marker (2026-10-15).
     ONE_SIDED_FEATURE: ONE_SIDED_FEATURE_RULE,
+    // An object's description never names the support it rests on (2026-10-17).
+    OBJECT_NOT_PLACED: OBJECT_NOT_PLACED_RULE,
     BODY_CONDITION_MARKER: BODY_CONDITION_MARKER_RULE,
     // The shot rules per path: on the Jev path a story page's shot is fixed
     // (owner, 2026-09-28) and no rule sets or widens it.
@@ -9834,6 +9836,17 @@ const PLACE_INSIDE_OUTSIDE_RULE = 'A page whose plan line puts its figures insid
  * that is not noted-only like Q18.
  */
 const ONE_SIDED_FEATURE_RULE = 'Which of a pair carries a one-sided feature (one limb, ear or eye that hangs, is marked or differs from its twin) is never stated as left or right and never judged by side: the specification is relational ("one hangs limp, the other is folded neatly"), and the same figure drawn with the feature on the other side matches it.';
+/**
+ * AN OBJECT IS DESCRIBED ALONE, NEVER WHERE IT IS (owner, 2026-10-17; docs/decisions.md "Object descriptions never
+ * name a support"). Staging job_1792226018737_lb65hzkqs: the Visual Bible described a boarding plank as "its inner end
+ * resting on the ship's rail", the reference cell drew a short board on a rail stump, the element-cell gate first
+ * failed a cell for "lacking the described context of resting on a ship's rail", and every page copied the stump.
+ *
+ * ONE sentence read by both Visual Bible writers (visual-bible.txt, story-trial-arc.txt) and by the three cell gates
+ * that grade a cell against a description (element, state-consistency): the writer leaves the support out, the judge
+ * never demands it and fails a cell that draws one.
+ */
+const OBJECT_NOT_PLACED_RULE = "An object's `description` says what it IS and looks like, never where it is: it names no separate thing the object rests on, leans against, hangs from, lies in, is fastened to or points toward (a surface, wall, post, rail, floor, ground, shelf, person). That is page staging, and a reference cell draws the object alone. A part the object is built with (its own hook, base, handle or post) is part of it. A cell that shows the object alone is correct even when its description names a support; a cell that adds a separate support or surface fails.";
 const BODY_CONDITION_MARKER_RULE = "A body condition the plot turns on (an injury, a hurt limb, a sign of illness) carries a visible marker a picture can show from any angle (a bandage, a splint, a sling, a plaster): the sentence that introduces the condition names the marker, the page text that first tells it names the marker, and the figure's Visual Bible description (where it has an entry) states the marker, so text and picture agree. How a limb hangs or moves is never the whole condition.";
 // The peak-of-motion instruction, anchored to the plan's own action (owner 2026-10-16, docs/decisions.md): the old wording
 // ("at its peak of motion - mid-leap, mid-swing, mid-throw") pushed a hop to a leap. ONE sentence for both Art Director
@@ -13244,6 +13257,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       BODY_CONDITION_MARKER: BODY_CONDITION_MARKER_RULE,
       // The trial writer's Visual Bible entries state a one-sided feature relationally (sibling of visual-bible.txt).
       ONE_SIDED_FEATURE: ONE_SIDED_FEATURE_RULE,
+      OBJECT_NOT_PLACED: OBJECT_NOT_PLACED_RULE,
       PICTURE_COUNT: PICTURE_COUNT_RULE,
       CLOSING_MOMENT: CLOSING_MOMENT_RULE,
       // Trial has no Art Director either: the scene-hint composition rules
@@ -14113,6 +14127,7 @@ module.exports = {
   PLACE_SEPARATE_RULE,
   PLACE_INSIDE_OUTSIDE_RULE,
   ONE_SIDED_FEATURE_RULE,
+  OBJECT_NOT_PLACED_RULE,
   BODY_CONDITION_MARKER_RULE,
   DECLARED_CONDITION_DEF,
   PEAK_OF_ACTION_RULE,
