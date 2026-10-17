@@ -4253,7 +4253,7 @@
       "rootCause": "The edited-scene expansion passed storyData.clothingRequirements (per-character objects) into buildSceneDescriptionPrompt's page-clothing slot; resolveClothingForPage then called .trim on an object.",
       "fix": "Pass the page clothing (pageClothing.pageClothing[page] || primaryClothing), as the scene-description route and iterate do. tests/unit/regen-route-bugs.test.ts",
       "status": "fixed",
-      "fixedIn": "pending"
+      "fixedIn": "ec05d6f23"
     }
   ]
 }
