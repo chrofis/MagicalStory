@@ -4264,7 +4264,7 @@
       "fix": "visualBible.ABOARD_CAMERA_RULE is the one on-board sentence for plate and page prompts; the aboard element is not a required object; expectedObjectIds feeds every expected-objects list; sceneMetadata.carryForwardPageContext(+InBrief) is the one carry-forward for iterate and both regenerate routes. tests/unit/aboard-vehicle-not-required.test.ts",
       "status": "fixed",
       "fixedAt": "2026-10-17",
-      "fixedIn": "COMMIT"
+      "fixedIn": "f1f28efb5"
     }
   ]
 }
