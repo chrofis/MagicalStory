@@ -33,7 +33,8 @@ pages to be redone by hand with corrected scenes (regenerate route, `editedScene
 ## Other
 - [ ] Redo-route judge scored the good p16 redo 0: Lotti (ANI001) and Captain Fridolin (CHR001), both in the brief, called extra_character CRITICAL because the redo's required cast is only the characterIds; and 'Eliah is not laughing' on a laughing face. Check how the redo route builds the judge's expected cast vs the pipeline (VB creatures/secondaries the brief cites).
 - [x] Second ship on aboard pages fixed (f1f28efb5); p16 redone on deck with no second ship (staging, 2026-10-17).
-- [ ] p18 drew a fantasy castle instead of the LOC003 Schloss Unterseen house.
+- [x] p18 fantasy castle: its vantage LOC003.2 (deck beside the quay) has landmarkPhoto "none" and frames only the quay wall, but the original brief and my first redo asked for the castle, so the model invented one. Redone with no castle in view (2026-10-17). Open: a brief that puts a landmark in frame on a vantage with no photo should not happen - check how often briefs name the landmark on photo-less vantages.
+- [x] p14 and p18 redone after the aboard fix: on deck, no second ship (2026-10-17).
 - [ ] p19 scored 20 for a placement nit on a fine picture (eval severity).
 - [ ] Ending: the ship turns back to leaves at the Unterseen quay at night; the children never get home.
 
