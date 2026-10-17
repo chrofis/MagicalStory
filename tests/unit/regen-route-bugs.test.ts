@@ -81,3 +81,14 @@ describe('regenerate route - edited-scene expansion gets the PAGE clothing, not 
     expect(call).not.toMatch(/previousScenes,\s*clothingData,/);
   });
 });
+
+describe('pipeline repair rounds carry the story layout', () => {
+  // prod showcase job_1792274214249_fsdtnb3u0 (2026-10-17) failed in repair round 1:
+  // resolveStoryPageAspect refuses without layout.imageAspect, and the pipeline's
+  // in-memory storyData for repair/iterate did not carry `layout`.
+  it('pipelineStoryData includes layout: inputData.layout', () => {
+    const src = read('storyJobPipeline.js');
+    const block = src.slice(src.indexOf('const pipelineStoryData = {'), src.indexOf('const pipelineStoryData = {') + 600);
+    expect(block).toMatch(/\n\s+layout: inputData\.layout,/);
+  });
+});

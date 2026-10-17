@@ -5921,6 +5921,11 @@ ${trialWriter.pagesPrompt}`;
         // Build storyData for iterate (needs scene descriptions, characters, visual bible)
         const pipelineStoryData = {
           characters: inputData.characters,
+          // The story's page shape: every repair/iterate redraw reads it via
+          // layout.resolveStoryPageAspect, which refuses to guess. Without it every
+          // repair round threw "no usable layout.imageAspect" (prod showcase
+          // job_1792274214249_fsdtnb3u0, 2026-10-17, after 8eff73710).
+          layout: inputData.layout,
           // Phase 7 cell-crop refs: iteratePageCore checks
           // storyData.characterAvatars to crop a single body cell per character
           // (matching the scene's pose) instead of attaching the full 2×4

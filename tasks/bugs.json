@@ -4275,6 +4275,16 @@
       "fix": "coverTypography.dedicationLines wraps each typed line on its own and turns a blank line into a paragraph break (half a line of space in buildBottomGroup); the lower band grows with the row count. tests/unit/dedication-keeps-paragraphs-2026-10-17.test.ts",
       "status": "fixed",
       "fixedIn": "3f54859aa"
+    },
+    {
+      "id": "repair-round-no-layout-throws",
+      "title": "Every story that reached a repair round failed: \"story has no usable layout.imageAspect\"",
+      "reportedAt": "2026-10-17",
+      "source": "prod showcase job_1792274214249_fsdtnb3u0 failed at 68% in repair round 1 on build 96d0e7a7; no customer job ran in the window.",
+      "rootCause": "8eff73710 made repair/iterate read the page shape only from storyData.layout (resolveStoryPageAspect, no default). The pipeline hands repair an in-memory storyData (pipelineStoryData) that never carried layout; only the saved story has it. Unit tests covered the resolver and the route, not the pipeline object.",
+      "fix": "pipelineStoryData carries layout: inputData.layout. tests/unit/regen-route-bugs.test.ts",
+      "status": "fixed",
+      "fixedIn": "pending"
     }
   ]
 }
