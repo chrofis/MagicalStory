@@ -68690,3 +68690,9 @@ Replaces: the 2026-10-11 back-head entry above (3bc5943be).
 **Decision:** both modes download every images-staging URL and upload it to the production bucket (local R2_* must be production; the script refuses otherwise) BEFORE the DB write, then rewrite URLs; a guard throws if any staging URL survives. `--as-new --user=<id>` inserts a new row with a fresh job id (story id rewritten inside keys/URLs), random share_token, is_shared false, admin_draft false, non-test image rows only, and NO story_jobs row (the library lists job-less stories as finished; no email path runs). Update mode now also skips is_test rows (it used to insert them as real images).
 **Rationale:** a story row must never reference objects that are not there; uploads are keyed immutably so a failed DB write leaves only orphans. Update mode re-uploads same-key objects, so versioned keys the staging copy re-rendered overwrite production's bytes before the commit (DB backup cannot restore those).
 **Touched files:** scripts/admin/promote-story-to-prod.js, scripts/lib/promoteStoryUrls.js, tests/unit/promote-story-urls.test.ts
+
+## 2026-10-17 - Repair rounds read the page shape from the story layout the pipeline now hands them
+**Context:** after 8eff73710 every page redraw takes its shape from `storyData.layout.imageAspect` (`resolveStoryPageAspect`, no default). The pipeline passes repair and iterate an in-memory `pipelineStoryData` that never carried `layout`, so the first repair round threw and the job failed (prod showcase job_1792274214249_fsdtnb3u0 at 68%, build 96d0e7a7; no customer job ran in the window).
+**Decision:** `pipelineStoryData` carries `layout: inputData.layout`, the same source the render, plate and cover steps already read. No default shape is added back.
+**Rationale:** one source of truth for the shape; a missing layout still fails loudly instead of drawing at a guessed shape.
+**Touched files:** storyJobPipeline.js, tests/unit/regen-route-bugs.test.ts.
