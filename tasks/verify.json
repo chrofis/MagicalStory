@@ -10252,6 +10252,22 @@
         "what": "Open the Visual Bible of a staging beats story: read the artifact/vehicle descriptions and the reference cells; a plank-like object is drawn alone, not on a stump or rail.",
         "paid": true
       }
+    },
+    {
+      "id": "aboard-vehicle-not-a-required-object-2026-10-17",
+      "title": "A page set aboard the story's vehicle does not draw a second copy of it",
+      "commits": [],
+      "addedAt": "2026-10-17",
+      "status": "pending",
+      "claim": "On a beats story with a vehicle the cast boards, every page whose brief sets aboard to that vehicle has an on-board line in its page prompt and no REQUIRED OBJECTS entry for the vehicle, and no page shows a second whole vehicle behind the cast; a customer redo of such a page keeps aboard.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "On a staging ship story: open the page prompts of the pages aboard (no '* **<ship>**' line, the 'camera stands on board' line present) and look at the pictures: deck and rail only. Then edit-scene + redo one aboard page and confirm sceneMetadata.aboard is still set.",
+        "paid": true
+      }
     }
   ],
   "runs": [

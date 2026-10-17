@@ -1421,9 +1421,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
       try {
         coverBboxDetection = await detectAllBoundingBoxes(genResult.imageData, {
           expectedCharacters: expectedCoverCharacters,
-          expectedObjects: Array.isArray(coverSceneMetadata?.objects)
-            ? coverSceneMetadata.objects.filter(o => typeof o === 'string')
-            : [],
+          expectedObjects: require('./visualBible').expectedObjectIds(coverSceneMetadata).filter(o => typeof o === 'string'),
           sceneContext: sceneDescription,
           pageContext: iterateLabel,
           artStyle: artStyleId,
@@ -1536,9 +1534,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
           // that sends bare names would overwrite a good detection with a blind
           // one, exactly as the round re-detect used to on the page paths.
           expectedCharacters: buildExpectedCoverCharacters(),
-          expectedObjects: Array.isArray(coverSceneMetadata?.objects)
-            ? coverSceneMetadata.objects.filter(o => typeof o === 'string')
-            : [],
+          expectedObjects: require('./visualBible').expectedObjectIds(coverSceneMetadata).filter(o => typeof o === 'string'),
           sceneContext: sceneDescription,
           pageContext: iterateLabel,
           artStyle: artStyleId,

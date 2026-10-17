@@ -3912,6 +3912,33 @@ function aboardWithheldId(aboardId) {
   return id && !/^ANI/i.test(id) ? id : null;
 }
 
+/**
+ * What the page and plate prompts say of the element the camera stands on (`aboard`): ONE sentence, filled
+ * into the plate's structure line (prompts.buildPlateStructuresText) and the page prompt's on-board line
+ * (promptBuilders.buildImagePrompt), so the two never contradict. The page prompt does NOT list that element
+ * as a REQUIRED OBJECT to draw: a checklist entry with a size ("several adults high") makes the model paint a
+ * second whole copy of it behind the cast (staging job_1792226018737_lb65hzkqs, the cast standing on a "jetty").
+ */
+const ABOARD_CAMERA_RULE = 'the camera stands on board this one — render the deck, rail, mast base and fittings around it, never its hull, bow or full silhouette, and never a second copy of it in the background.';
+
+/** Is this cited element (a VB id or handle) the one the camera stands on? Creatures (ANI) are drawn, so never. */
+function isAboardElementId(raw, aboardId) {
+  const withheld = aboardWithheldId(aboardId);
+  const id = typeof raw === 'string' ? raw : raw && raw.id;
+  return !!withheld && !!id && baseVbId(id) !== null && baseVbId(id) === baseVbId(withheld);
+}
+
+/**
+ * The page's cited objects[] the picture is judged and detected against: everything except the element the
+ * camera stands on (a deck-level page never shows its exterior). One filter for every expected-objects list
+ * (evaluator fallback, bbox detection).
+ */
+function expectedObjectIds(sceneMetadata) {
+  const objects = Array.isArray(sceneMetadata?.objects) ? sceneMetadata.objects : [];
+  const aboard = sceneMetadata?.aboard ?? sceneMetadata?.fullData?.aboard;
+  return objects.filter(o => !isAboardElementId(o, aboard));
+}
+
 /** Is this aboard id a creature the cast rides or sits inside? */
 function isCreatureAboard(aboardId) {
   return /^ANI/i.test(String(aboardId || '').trim());
@@ -3919,6 +3946,9 @@ function isCreatureAboard(aboardId) {
 
 module.exports = {
   aboardWithheldId,
+  ABOARD_CAMERA_RULE,
+  isAboardElementId,
+  expectedObjectIds,
   isCreatureAboard,
   recordElementCellGate,
   SCALE_CLASSES,

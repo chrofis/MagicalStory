@@ -66,6 +66,9 @@ describe('why the carry-forward matters: an undeclared item is drawn worn', () =
 describe('the iterate call site uses the one carry-forward rule', () => {
   const IMG = fs.readFileSync(path.join(process.cwd(), 'server/lib/images.js'), 'utf8');
   it('iteratePageCore builds wornItems through the helper', () => {
-    expect(IMG).toMatch(/wornItems: require\('\.\/wornItems'\)\.carryForwardWornItems\(newSceneMetadata, savedMeta\)/);
+    // The merge moved to sceneMetadata.carryForwardPageContext (shared with both regenerate routes).
+    const SM = fs.readFileSync(path.join(process.cwd(), 'server/lib/sceneMetadata.js'), 'utf8');
+    expect(IMG).toContain("require('./sceneMetadata').carryForwardPageContext(newSceneMetadata, parentSceneMetadata)");
+    expect(SM).toMatch(/wornItems: require\('\.\/wornItems'\)\.carryForwardWornItems\(fresh, savedMeta\)/);
   });
 });

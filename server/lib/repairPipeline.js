@@ -1786,7 +1786,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     });
     return images().detectAllBoundingBoxes(r.imageData, {
       expectedCharacters,
-      expectedObjects: Array.isArray(meta.objects) ? meta.objects.filter(x => typeof x === 'string') : [],
+      expectedObjects: require('./visualBible').expectedObjectIds(meta).filter(x => typeof x === 'string'),
       sceneContext: r.description || orig?.sceneDescription || null,
       pageContext: `PAGE ${r.pageNumber} ${roundLabel}`,
       artStyle,

@@ -249,9 +249,11 @@ describe('the rewrite emits the fields the brief it replaces carried', () => {
 
   it('every exempt field really is carried forward in iteratePageCore', () => {
     const src = read('server/lib/images.js');
-    const start = src.indexOf('const iterateSceneMetadata = {');
+    expect(src, 'iterate no longer calls the shared merge').toContain('carryForwardPageContext(newSceneMetadata, parentSceneMetadata)');
+    const smSrc = read('server/lib/sceneMetadata.js');
+    const start = smSrc.indexOf('function carryForwardPageContext(');
     expect(start, 'the iterate metadata merge is gone — the exemptions below are unbacked').toBeGreaterThan(-1);
-    const merge = src.slice(start, src.indexOf('\n  };', start));
+    const merge = smSrc.slice(start, smSrc.indexOf('\n}', start));
     const unbacked = Object.keys(CARRIED_IN_CODE).filter(f => !merge.includes(`${f}:`));
     // textPosition is carried by its own route (textPositionOverride), not the merge.
     expect(unbacked.filter(f => f !== 'textPosition'), 'an exempt field is neither asked for nor carried').toEqual([]);

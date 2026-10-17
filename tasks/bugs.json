@@ -4254,6 +4254,17 @@
       "fix": "Pass the page clothing (pageClothing.pageClothing[page] || primaryClothing), as the scene-description route and iterate do. tests/unit/regen-route-bugs.test.ts",
       "status": "fixed",
       "fixedIn": "ec05d6f23"
+    },
+    {
+      "id": "aboard-vehicle-drawn-twice",
+      "title": "Pages set aboard the story's vehicle show a second full vehicle in the background, so the cast stands on a jetty",
+      "reportedAt": "2026-10-17",
+      "source": "staging job_1792226018737_lb65hzkqs; 74 versions on 50 pages in 7 staging stories (30 days) have aboard + the vehicle in objects[].",
+      "rootCause": "A: buildImagePrompt listed the boarded vehicle under REQUIRED OBJECTS with a size, contradicting the plate prompt's on-board line. B: the customer regenerate routes did not carry aboard (and era, text zone, population, shot) forward the way iterate does, so the ship cell was sent and the plate was given the full hull.",
+      "fix": "visualBible.ABOARD_CAMERA_RULE is the one on-board sentence for plate and page prompts; the aboard element is not a required object; expectedObjectIds feeds every expected-objects list; sceneMetadata.carryForwardPageContext(+InBrief) is the one carry-forward for iterate and both regenerate routes. tests/unit/aboard-vehicle-not-required.test.ts",
+      "status": "fixed",
+      "fixedAt": "2026-10-17",
+      "fixedIn": "COMMIT"
     }
   ]
 }

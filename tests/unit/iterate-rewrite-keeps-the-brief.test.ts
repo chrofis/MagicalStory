@@ -136,7 +136,7 @@ describe('A1 — wornItems survive an iterate round', () => {
   it('…and iteratePageCore falls back to the page brief when that row has none', () => {
     const src = read('server/lib/images.js');
     expect(src).toContain('const parentSceneMetadata = savedScene?.sceneMetadata || sceneMetadata || {};');
-    expect(src).toContain('const savedMeta = parentSceneMetadata;');
+    expect(src).toContain('carryForwardPageContext(newSceneMetadata, parentSceneMetadata)');
     expect(src).not.toContain('const savedMeta = savedScene?.sceneMetadata || {};');
   });
 });

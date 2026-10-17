@@ -19,7 +19,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE } = require('./requiredText');
 const { GARMENT_BACK_RULE, WORN_SLOT_FIELD_RULE, GARMENT_LIST_RULE, WARDROBE_COLOURS, normaliseGarments } = require('./wornItems');
-const { SCALE_CLASS_SPEC, ANIMAL_ANATOMY_SPEC, GROWN_CREATURE_SCALE_CLASSES, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
+const { SCALE_CLASS_SPEC, ANIMAL_ANATOMY_SPEC, GROWN_CREATURE_SCALE_CLASSES, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote, ABOARD_CAMERA_RULE, isAboardElementId } = require('./visualBible');
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, CLOSEUP_KEPT_FIXED_SHOT_RULE, FOOTING_RULE, FOOTING_FIELD, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE, GROUP_STAGING_FIXED_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { SLOP_RULES } = require('./proseSlop');
@@ -5151,10 +5151,22 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     const citedEntryIds = new Set();
     const pageCastNames = [...(metadata.characters || []), ...(sceneCharacters || [])]
       .map(c => (typeof c === 'string' ? c : c && c.name)).filter(Boolean);
+    // THE ELEMENT THE CAMERA STANDS ON IS NOT AN OBJECT TO DRAW. A checklist entry with a size ("several
+    // adults high") made the model paint a second whole ship behind the cast (staging
+    // job_1792226018737_lb65hzkqs, 74 versions on 50 pages). It becomes the on-board line below, from the
+    // sentence the plate prompt carries (visualBible.ABOARD_CAMERA_RULE). `aboard` is set by the authoring
+    // path; not decided here.
+    let aboardRec = null;
     const pushRequired = (rec) => {
       const key = String(rec.id || rec.name || '').toUpperCase();
       if (key && citedEntryIds.has(key)) return;
       if (key) citedEntryIds.add(key);
+      if (isAboardElementId(rec.id, metadata?.aboard)) {
+        aboardRec = rec;
+        // The brief DID cite elements: the whole-bible fallback must not fire in this entry's place.
+        hasRequiredObjects = true;
+        return;
+      }
       requiredObjects.push(rec);
     };
     for (const objName of vbObjectCitations) {
@@ -5540,6 +5552,16 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       }
 
       log.debug(`[IMAGE PROMPT] Added ${promptObjects.length} required objects from metadata (skipped ${requiredObjects.length - promptObjects.length} location entries)`);
+    }
+    if (aboardRec) {
+      // Plain line (no "* **" prefix): parseVisualBibleObjects never reads it as an object, so the
+      // evaluators and the bbox detector are not asked for the exterior either.
+      requiredObjectsSection = (requiredObjectsSection || `
+**REQUIRED OBJECTS IN THIS SCENE (each where the scene description places it):**
+`)
+        + `${aboardRec.name}: ${ABOARD_CAMERA_RULE}
+`;
+      log.info(`[IMAGE PROMPT] Page ${pageNumber}: ${aboardRec.id} is the vessel the camera stands on — on-board line instead of a required object`);
     }
   }
 

@@ -425,8 +425,7 @@ async function detectPageForRepair({ storyData, sceneImage, imageData, character
   });
   const detection = await images().detectAllBoundingBoxes(imageData, {
     expectedCharacters,
-    expectedObjects: Array.isArray(sceneImage.sceneMetadata?.objects)
-      ? sceneImage.sceneMetadata.objects.filter(x => typeof x === 'string') : [],
+    expectedObjects: require('./visualBible').expectedObjectIds(sceneImage.sceneMetadata).filter(x => typeof x === 'string'),
     sceneContext: sceneImage.description || sceneImage.sceneDescription || null,
     pageContext: `PAGE ${pageNumber} ${label}`,
     artStyle,

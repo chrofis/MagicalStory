@@ -835,7 +835,7 @@ function buildPlateStructuresText(opts = {}) {
       // without it, and a genuine exterior shot still needs the construction).
       const aboardId = opts.aboardId || null;
       const lines = pageVehicles.map(v => (aboardId && v.id === aboardId)
-        ? `- ${v.name || v.type || 'structure'}: the camera stands on board this one — render the deck, rail, mast base and fittings around it, never its hull, bow or full silhouette, and never a second copy of it in the background.`
+        ? `- ${v.name || v.type || 'structure'}: ${require('../lib/visualBible').ABOARD_CAMERA_RULE}`
         : `- ${v.name || v.type || 'structure'}: ${v.description}`);
       // Render only the visible PART, not the whole vessel. The old wording
       // ("render it exactly to its description") demanded the full vehicle even

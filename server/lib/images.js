@@ -3098,7 +3098,7 @@ async function evaluateImageBatch(images, options = {}) {
         : null);
       const expectedCharacterPositions = sceneMetadata?.characterPositions || {};
       const expectedCharacterClothing = sceneMetadata?.characterClothing || {};
-      const expectedObjects = sceneMetadata?.objects || [];
+      const expectedObjects = require('./visualBible').expectedObjectIds(sceneMetadata);
 
       // Use rich character descriptions from full character objects when available
       let characterDescriptions;
@@ -5401,52 +5401,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   }
 
   // The rewrite's metadata is the working copy, but scene-iteration.txt does
-  // not emit `era` or `textZoneDescription` — context fields iterate has no
-  // business re-deciding. Read them from the rewrite when present, else from
-  // the saved scene, or the anachronism guard and text-zone hint go dark on
-  // every repaired page (same disease 6738d7dca fixed for beats pages).
-  const savedMeta = parentSceneMetadata;
-  const iterateSceneMetadata = {
-    ...newSceneMetadata,
-    era: newSceneMetadata?.era || savedMeta.era || savedMeta.fullData?.era || null,
-    textZoneDescription: newSceneMetadata?.textZoneDescription || savedMeta.textZoneDescription || null,
-    aboard: newSceneMetadata?.aboard || savedMeta.aboard || savedMeta.fullData?.aboard || null,
-    // Same class as era/textZoneDescription: scene-iteration.txt does not emit
-    // the crowd flag, so a repaired page would lose it and its background
-    // extras would come back as a derived extra_character.
-    // Three states since 2026-09-19 — `population` carries forward for the same
-    // reason, and `crowdExpected` stays derived from it so old readers agree.
-    population: (() => {
-      const { normalisePopulation } = require('./sceneMetadata');
-      const raw = newSceneMetadata?.population || savedMeta.population || savedMeta.fullData?.population || null;
-      const legacy = newSceneMetadata?.crowdExpected === true
-        || savedMeta.crowdExpected === true || savedMeta.fullData?.crowdExpected === true;
-      return normalisePopulation(raw, legacy);
-    })(),
-    crowdExpected: newSceneMetadata?.crowdExpected === true
-      || savedMeta.crowdExpected === true || savedMeta.fullData?.crowdExpected === true,
-    // Same class again: scene-iteration.txt does not emit `wornItems`, and the
-    // metadata parser turns an absent field into `[]`. An undeclared row makes
-    // resolveWornItemsForPage default the item to `worn`, so an iterated page
-    // that had taken an item OFF came back with the affirmative "IS wearing
-    // this" override in the prompt and the item painted back on. One rule, in
-    // wornItems.carryForwardWornItems.
-    wornItems: require('./wornItems').carryForwardWornItems(newSceneMetadata, savedMeta),
-    // Same class, two more fields the rewrite may legitimately re-decide and
-    // must never silently drop: `shot` drives the background plate's framing,
-    // the scale repair's foreground/background split and the reference mode.
-    // It was emitted by the Art Director on every page of both staging runs
-    // and by NONE of the 11 rewrites. A rewrite that states one wins; a
-    // rewrite that is silent keeps the page's own.
-    shot: newSceneMetadata?.shot || newSceneMetadata?.fullData?.shot
-      || savedMeta.shot || savedMeta.fullData?.shot || null,
-    // The page's OWN landmark photo citation: a rewrite that writes a fresh
-    // plate cites the photo that plate shows; one that keeps the plate cites
-    // none, and the page's vantage citation stands (landmarkPhotoCitation).
-    // Same carry-forward as `shot`: a page cited earlier keeps its citation.
-    landmarkPhoto: newSceneMetadata?.landmarkPhoto ?? newSceneMetadata?.fullData?.landmarkPhoto
-      ?? savedMeta.landmarkPhoto ?? savedMeta.fullData?.landmarkPhoto ?? null,
-  };
+  // not emit the page-context fields (era, textZoneDescription, aboard,
+  // population, wornItems, shot, landmarkPhoto): a silent rewrite keeps the
+  // saved page's own. ONE carry-forward, shared with both customer regenerate
+  // routes (sceneMetadata.carryForwardPageContext).
+  const iterateSceneMetadata = require('./sceneMetadata').carryForwardPageContext(newSceneMetadata, parentSceneMetadata);
 
   // Build landmark photos — from the MERGED metadata, not the raw rewrite.
   // getLandmarkPhotosForScene reads the page's citation (its own, else its
@@ -5689,9 +5648,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           { visualBible, pageLabel: `${iterLabel} ` });
         iterDetection = await detectAllBoundingBoxes(genResult.imageData, {
           expectedCharacters: iterReconciled.entries,
-          expectedObjects: Array.isArray(iterateSceneMetadata?.objects)
-            ? iterateSceneMetadata.objects.filter(o => typeof o === 'string')
-            : [],
+          expectedObjects: require('./visualBible').expectedObjectIds(iterateSceneMetadata).filter(o => typeof o === 'string'),
           sceneContext: newSceneDescription,
           pageContext: iterLabel,
           artStyle,

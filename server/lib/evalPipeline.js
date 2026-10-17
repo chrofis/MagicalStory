@@ -2108,7 +2108,7 @@ function buildEvalRequiredObjects({ pagePrompt = null, sceneMetadata = null, vis
       const fromPrompt = dedupe(parseVisualBibleObjects(pagePrompt));
       if (fromPrompt.length) return { block: fromPrompt.join(', '), source: 'prompt' };
     }
-    const ids = Array.isArray(sceneMetadata?.objects) ? sceneMetadata.objects : [];
+    const ids = require('./visualBible').expectedObjectIds(sceneMetadata);
     if (!ids.length) return { block: '', source: null };
     // Locations are not props: the checklist skips them and so does the
     // prompt parser, so the fallback must too or the judge is handed a place

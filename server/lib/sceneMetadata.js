@@ -2769,7 +2769,85 @@ function sceneDescriptionRecord(scene, scenePromptRefs = null) {
   };
 }
 
+/**
+ * PAGE CONTEXT A BRIEF REWRITE MUST NOT RE-DECIDE. scene-iteration.txt and the
+ * scene-rewrite template do not emit `era`, `textZoneDescription`, `aboard`,
+ * `population`, `crowdExpected`, `wornItems`, `shot` or `landmarkPhoto`; the
+ * metadata parser turns an absent field into a default. A rewrite that states
+ * one wins; a silent rewrite keeps the page's own (the saved scene's), or the
+ * anachronism guard, the text-zone hint, the aboard gate (the ship the camera
+ * stands on is drawn a second time as a jetty), the crowd rule and the plate
+ * framing all go dark on the repaired page.
+ *
+ * ONE implementation, used by the iterate pass (images.js) and both customer
+ * regenerate routes (regeneration.js): the working metadata of a rewrite.
+ *
+ * @param {Object|null} newSceneMetadata  - extractSceneMetadata of the rewrite
+ * @param {Object|null} savedSceneMetadata - the page's stored sceneMetadata
+ * @returns {Object} newSceneMetadata with the page-context fields carried forward
+ */
+function carryForwardPageContext(newSceneMetadata, savedSceneMetadata) {
+  const fresh = newSceneMetadata || {};
+  const savedMeta = savedSceneMetadata || {};
+  const legacy = fresh.crowdExpected === true
+    || savedMeta.crowdExpected === true || savedMeta.fullData?.crowdExpected === true;
+  return {
+    ...fresh,
+    era: fresh.era || savedMeta.era || savedMeta.fullData?.era || null,
+    textZoneDescription: fresh.textZoneDescription || savedMeta.textZoneDescription || null,
+    aboard: fresh.aboard || savedMeta.aboard || savedMeta.fullData?.aboard || null,
+    // Three states since 2026-09-19; `crowdExpected` stays derived from it so old readers agree.
+    population: normalisePopulation(
+      fresh.population || savedMeta.population || savedMeta.fullData?.population || null, legacy),
+    crowdExpected: legacy,
+    // Per id, a non-empty emission wins; an absent row inherits (wornItems.carryForwardWornItems).
+    wornItems: require('./wornItems').carryForwardWornItems(fresh, savedMeta),
+    // `shot` drives the plate's framing, the scale repair's split and the reference mode.
+    shot: fresh.shot || fresh.fullData?.shot || savedMeta.shot || savedMeta.fullData?.shot || null,
+    // A rewrite that writes a fresh plate cites its photo; one that keeps the plate cites none.
+    landmarkPhoto: fresh.landmarkPhoto ?? fresh.fullData?.landmarkPhoto
+      ?? savedMeta.landmarkPhoto ?? savedMeta.fullData?.landmarkPhoto ?? null,
+  };
+}
+
+/** The brief-text fields carryForwardPageContextInBrief writes back (stored raw in the METADATA block). */
+const PAGE_CONTEXT_BRIEF_FIELDS = ['aboard', 'era', 'textZoneDescription', 'population', 'shot', 'landmarkPhoto'];
+
+/**
+ * The same carry-forward for a route that STORES the rewritten brief text (the
+ * customer scene-description regenerate): the saved values are written into the
+ * brief's METADATA block, so the next render, the judges and the next rewrite
+ * read them. Only a field the rewrite left out and the saved scene declares is
+ * written; a stated value wins.
+ *
+ * @param {string} newBrief
+ * @param {Object|null} savedSceneMetadata - extractSceneMetadata shape
+ * @returns {{brief: string, carried: string[]}|null} null when nothing carried
+ */
+function carryForwardPageContextInBrief(newBrief, savedSceneMetadata) {
+  const after = parseProseMetadataFormat(String(newBrief || ''));
+  if (!after) return null;
+  const saved = savedSceneMetadata || {};
+  const has = (v) => v !== undefined && v !== null && v !== '';
+  const metadata = { ...after.metadata };
+  const carried = [];
+  for (const key of PAGE_CONTEXT_BRIEF_FIELDS) {
+    if (has(metadata[key])) continue;
+    const value = has(saved[key]) ? saved[key] : saved.fullData?.[key];
+    if (!has(value)) continue;
+    metadata[key] = value;
+    carried.push(key);
+  }
+  if (carried.length === 0) return null;
+  return { brief: `${after.prose}
+
+---METADATA---
+${JSON.stringify(metadata, null, 2)}`, carried };
+}
+
 module.exports = {
+  carryForwardPageContext,
+  carryForwardPageContextInBrief,
   parseCreatures,
   SHARED_GRIP_RULE,
   forbiddenSharedGrips,

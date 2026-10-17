@@ -397,7 +397,20 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
     }
     const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars, planLine ? { planLine } : null, null, { clothingRequirements: storyData.clothingRequirements || null, story: storyData, textInImage: pageTextInImage(storyData, pageNumber) });
     // The ONE brief-rewrite call iterate uses (model, no prefill, brief guard + retry; throws when unusable).
-    const { text: newSceneDescription } = await callIterateBrief(scenePrompt, { pageNumber });
+    let { text: newSceneDescription } = await callIterateBrief(scenePrompt, { pageNumber });
+
+    // The rewrite template does not re-decide the page's context (aboard, era, text zone, population,
+    // shot, landmark photo): a silent rewrite keeps the stored page's own, in the stored brief text
+    // (sceneMetadata.carryForwardPageContext — the iterate pass and the image route share it).
+    {
+      const { carryForwardPageContextInBrief, extractSceneMetadata: extractSaved } = require('../lib/sceneMetadata');
+      const savedMeta = storedImage?.sceneMetadata || extractSaved(storedScene?.description || '');
+      const carry = carryForwardPageContextInBrief(newSceneDescription, savedMeta);
+      if (carry) {
+        log.warn(`🔄 [REGEN SCENE ${pageNumber}] the rewrite dropped ${carry.carried.join(', ')} — carried forward from the stored brief`);
+        newSceneDescription = carry.brief;
+      }
+    }
 
     // Update the scene description in story data (sceneDescriptions already loaded above)
     const existingIndex = sceneDescriptions.findIndex(s => s.pageNumber === pageNumber);
@@ -715,7 +728,10 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
 
     // Build landmark photos and Visual Bible grid for this page
     // Extract scene metadata from expanded description to find which landmarks are needed
-    const sceneMetadata = extractSceneMetadata(expandedDescription);
+    // A rewrite keeps the stored page's context (aboard, era, ...): the same carry-forward as iterate.
+    const rewrittenMetadata = extractSceneMetadata(expandedDescription);
+    const sceneMetadata = rewrittenMetadata && require('../lib/sceneMetadata').carryForwardPageContext(
+      rewrittenMetadata, sceneEntry?.sceneMetadata || extractSceneMetadata(originalDescription));
     // Phase 7: cell-crop refs from story-scoped 2×4 sheets when present.
     {
       const sav = require('../lib/storyAvatars');
@@ -831,9 +847,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
           name: c.name || c,
           description: typeof c === 'object' ? (c.description || '') : '',
         })),
-        expectedObjects: Array.isArray(sceneMetadata?.objects)
-          ? sceneMetadata.objects.filter(o => typeof o === 'string')
-          : [],
+        expectedObjects: require('../lib/visualBible').expectedObjectIds(sceneMetadata).filter(o => typeof o === 'string'),
         sceneContext: expandedDescription,
         pageContext: `PAGE ${pageNumber}`,
         artStyle: storyData.artStyle || null,
@@ -4316,7 +4330,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, imageRegenera
           const sceneMetadata = scene.sceneMetadata || extractSceneMetadata(scene.description || '');
           const expectedPositions = sceneMetadata?.characterPositions || {};
           const expectedClothing = sceneMetadata?.characterClothing || {};
-          const expectedObjects = sceneMetadata?.objects || [];
+          const expectedObjects = require('../lib/visualBible').expectedObjectIds(sceneMetadata);
           // Includes Visual Bible secondaryCharacters/animals (e.g. CHR003 = Gessler)
           // so the detector can identify them too — primary-only descriptions
           // would force every secondary character to come back UNKNOWN.
@@ -4768,7 +4782,7 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
     const sceneMetadata = scene.sceneMetadata || extractSceneMetadata(scene.description || '');
     const expectedPositions = sceneMetadata?.characterPositions || {};
     const expectedClothing = sceneMetadata?.characterClothing || {};
-    const expectedObjects = sceneMetadata?.objects || [];
+    const expectedObjects = require('../lib/visualBible').expectedObjectIds(sceneMetadata);
 
     // Cover-specific fallback: covers don't get a populated sceneMetadata at
     // generation time (only scenes do via extractSceneMetadata(scene.description)).

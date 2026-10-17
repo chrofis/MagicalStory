@@ -5894,9 +5894,7 @@ ${trialWriter.pagesPrompt}`;
             const reconciled = reconcileDetectorCast(expectedCharacters, authoritativeCast,
               { visualBible, pageLabel: `PAGE ${img.pageNumber} `,
                 storyData: { characters: inputData.characters || [], visualBible } });
-            const expectedObjects = Array.isArray(sceneMetadata.objects)
-              ? sceneMetadata.objects.filter(o => typeof o === 'string')
-              : [];
+            const expectedObjects = require('./server/lib/visualBible').expectedObjectIds(sceneMetadata).filter(o => typeof o === 'string');
             img.sharedBboxDetection = await detectAllBoundingBoxes(img.imageData, {
               expectedCharacters: reconciled.entries,
               expectedObjects,
