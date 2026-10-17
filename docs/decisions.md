@@ -68661,3 +68661,10 @@ Replaces: the 2026-10-11 back-head entry above (3bc5943be).
 **Considered:** showing it for any blank page including the 1 added to make the count even (rejected: that would nag almost every book, and the owner's 2026-10-04 rule keeps up to 3 silent); blocking the order (owner chose warning only); a second client-side layout (drifts from pdf.js).
 **Revisit if:** customers still complain about blank pages after acknowledging (then block or pad differently), or a SKU with a smaller minimum is activated.
 **Touched files:** server/lib/gelato.js, server/lib/gelato.test.js, server/routes/print.js, client/src/pages/BookBuilder.tsx, client/src/components/book/BlankPagesPreview.tsx, client/src/services/storyService.ts.
+
+## 2026-10-17 - Page redo reads the book's page shape from the story; stories without one get an error
+**Context:** the customer redo route took the page shape from `sceneImages[].imageAspect`, which the beats pipeline never writes, so every redone page of a square book came back 3:4 (staging job_1792226018737_lb65hzkqs, 6/6 redos). Fixed in 8eff73710: `resolveStoryPageAspect` reads `layout.imageAspect` and throws when it is missing. 61 prod stories (55 from before April 2026, 6 later) and 20 staging stories have no `layout.imageAspect`.
+**Decision:** Owner: "Let them error". A redo on one of those stories fails with an error; no default shape, no backfill.
+**Considered:** a one-time backfill from the stored page images' real size (free; owner declined); keeping the 3:4 default (that default is the bug).
+**Revisit if:** a customer reports a failed redo on an old story.
+**Touched files:** server/lib/layout.js, server/routes/regeneration.js, server/lib/repairPipeline.js, server/lib/images.js.
