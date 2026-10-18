@@ -3919,7 +3919,7 @@ function aboardWithheldId(aboardId) {
  * as a REQUIRED OBJECT to draw: a checklist entry with a size ("several adults high") makes the model paint a
  * second whole copy of it behind the cast (staging job_1792226018737_lb65hzkqs, the cast standing on a "jetty").
  */
-const ABOARD_CAMERA_RULE = 'the camera stands on board this one — render the deck, rail, mast base and fittings around it, never its hull, bow or full silhouette, and never a second copy of it in the background.';
+const ABOARD_CAMERA_RULE = 'the camera stands on board this one — render its floor or deck, rails, walls and fittings around it, never its outer shell, front or full silhouette, and never a second copy of it in the background.';
 
 /** Is this cited element (a VB id or handle) the one the camera stands on? Creatures (ANI) are drawn, so never. */
 function isAboardElementId(raw, aboardId) {

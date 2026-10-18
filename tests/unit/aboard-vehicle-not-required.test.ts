@@ -103,3 +103,22 @@ describe('B — page context a rewrite does not re-decide is carried forward', (
     expect(SM.carryForwardPageContextInBrief(full, saved)).toBeNull();
   });
 });
+
+// The aboard rule runs on every boarded vehicle (a train, a bus, a balloon basket, a
+// spaceship), so it names no part that only a sailing ship has (owner audit 2026-10-18).
+describe('aboard rule is vehicle-neutral', () => {
+  const SHIP_ONLY = /mast|planking|figurehead|hull|quay|gangplank|ship's wheel/i;
+  it('the code constant names no ship part', () => {
+    expect(VB.ABOARD_CAMERA_RULE).not.toMatch(SHIP_ONLY);
+  });
+  it('the templates that state it name no ship part in the aboard paragraph', () => {
+    const fs = cjs('node:fs');
+    const path = cjs('node:path');
+    for (const f of ['scene-expansion.txt', 'scene-briefs-all.txt', 'visual-bible.txt', 'empty-scene.txt']) {
+      const text = fs.readFileSync(path.join(__dirname, '../../prompts', f), 'utf8');
+      const para = text.split(/\r?\n/).filter((l: string) => /aboard|camera stands on a vehicle/i.test(l)).join('\n');
+      expect(para.length, f).toBeGreaterThan(0);
+      expect(para, f).not.toMatch(SHIP_ONLY);
+    }
+  });
+});

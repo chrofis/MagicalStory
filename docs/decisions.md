@@ -68696,3 +68696,9 @@ Replaces: the 2026-10-11 back-head entry above (3bc5943be).
 **Decision:** `pipelineStoryData` carries `layout: inputData.layout`, the same source the render, plate and cover steps already read. No default shape is added back.
 **Rationale:** one source of truth for the shape; a missing layout still fails loudly instead of drawing at a guessed shape.
 **Touched files:** storyJobPipeline.js, tests/unit/regen-route-bugs.test.ts.
+
+## 2026-10-18 - The aboard rule names no sailing-ship part
+**Context:** owner audit of the last 100 commits (2026-10-18) flagged soft story-specific leaks from the pirate-ship test stories: the shared "Aboard is not alongside" paragraph (scene-expansion, scene-briefs-all, visual-bible, empty-scene) and `ABOARD_CAMERA_RULE` listed "deck, railing, mast base, planking", "hull, figurehead", "a quay, steps or a far bank"; the visual-bible recognition bullet used "a boarding plank" / "a ship's wheel" as its examples and restated the no-support clause that OBJECT_NOT_PLACED_RULE already owns.
+**Decision:** the aboard wording now says "its floor or deck, rails, walls and fittings", "outer shell, front, name, complete silhouette", "the place beyond"; the recognition examples are "a garden gate", "a bicycle bell" and the duplicate support clause is removed. Behaviour and structure are unchanged. A unit test keeps ship-only words out of these paragraphs.
+**Rationale:** aboard also covers trains, buses, balloon baskets and spaceships; ship parts in a rule every story reads pull non-ship vehicles toward a ship's deck. Removing the duplicate clause keeps one statement of the rule.
+**Touched files:** prompts/scene-expansion.txt, prompts/scene-briefs-all.txt, prompts/visual-bible.txt, prompts/empty-scene.txt, server/lib/visualBible.js, tests/unit/aboard-vehicle-not-required.test.ts.
