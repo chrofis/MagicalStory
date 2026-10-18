@@ -10306,7 +10306,9 @@
     {
       "id": "theme-costume-children-2026-10-18",
       "title": "The children of a costume-theme story wear the theme's costume",
-      "commits": [],
+      "commits": [
+        "ba4abdf76"
+      ],
       "addedAt": "2026-10-18",
       "status": "pending",
       "claim": "On a full story with a costume theme (pirate, knight, wizard, astronaut ...), the wardrobe contract has every child character in costumed:<the theme's costume>; an adult the story dresses for a role stays standard; a theme with no COSTUME line (dragon) is unchanged.",
