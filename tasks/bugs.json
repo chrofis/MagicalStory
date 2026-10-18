@@ -4285,6 +4285,16 @@
       "fix": "pipelineStoryData carries layout: inputData.layout. tests/unit/regen-route-bugs.test.ts",
       "status": "fixed",
       "fixedIn": "4e666e296"
+    },
+    {
+      "id": "theme-story-children-in-everyday-clothes",
+      "title": "A pirate-theme story shipped with its children in everyday clothes: the wardrobe step set costumed.used false although the theme is a costume theme",
+      "reportedAt": "2026-10-18",
+      "source": "Owner-reported. Delivered prod story job_1792251663990_rxjob5qlb (copy of staging rerun job_1792226018737_lb65hzkqs) has costumed.used false / standard clothing; the original prod run job_1792078014622_uh8tj6ht1 of the same story chose costumed:pirate with the same rule text. 15 of 16 recent costume-theme full stories were costumed; this is the miss (~6%).",
+      "rootCause": "The wardrobe step (prompts/story-bible-from-beats.txt) was only told to costume 'whenever the theme implies special clothing' and to leave it false for a present-day story; the guide's structured COSTUME field is stripped from the topic guide and never reached the wardrobe step, so the model judged the theme itself and sometimes read a present-day opening as exempting the children.",
+      "fix": "The guide's COSTUME field is read (guideCostume) and stated as one rule (themeCostumeRule) in the wardrobe writer and the wardrobe reviewer: the theme's children wear the costume, an adult already dressed for their role stays standard; no COSTUME field, no rule. tests/unit/theme-costume-rule.test.ts; replay evals/runs/2026-10-18_theme-costume.",
+      "status": "open",
+      "fixedIn": ""
     }
   ]
 }

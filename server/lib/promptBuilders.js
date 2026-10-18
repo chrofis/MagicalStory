@@ -7696,6 +7696,33 @@ function guidePromise(guideText) {
   return m ? m[1] : '';
 }
 
+/**
+ * The guide's structured `COSTUME: <id> (note)` field (adventure-guides.txt) as
+ * the costume id alone, or '' for a theme that needs none ("not needed - ...")
+ * or a guide without the line. The wardrobe step reads it (THEME_COSTUME_RULE);
+ * nothing else parses it.
+ */
+const COSTUME_LINE_RE = /^COSTUME:[ 	]*(.+?)[ 	]*$/m;
+function guideCostume(guideText) {
+  const m = String(guideText || '').match(COSTUME_LINE_RE);
+  if (!m || /^not needed/i.test(m[1])) return '';
+  return m[1].replace(/\s*\(.*$/, '').trim();
+}
+
+/**
+ * THE THEME COSTUME RULE (owner decision 2026-10-18, docs/decisions.md). A theme
+ * story's children wear the theme's costume; the wardrobe step used to infer it
+ * from "whenever the theme implies special clothing" and, in about 1 story in 16,
+ * left a pirate story's children in everyday clothes. One string, filled into the
+ * wardrobe writer ({THEME_COSTUME_RULE}) and the wardrobe reviewer, from the
+ * guide's structured COSTUME field. No COSTUME field, no rule: nothing is injected.
+ */
+function themeCostumeRule(guideText) {
+  const costume = guideCostume(guideText);
+  if (!costume) return '';
+  return `The theme's costume is \`${costume}\`. The child characters the theme is about use the \`costumed\` variant with \`costumed.costume: ${costume}\`, even when the story opens in the present day or finds the themed world from there. An adult the story already dresses for their role stays \`standard\`.`;
+}
+
 /** The guide without its PROMISE line — the promise is never "material". */
 function stripGuidePromise(guideText) {
   if (!guideText) return guideText;
@@ -7735,6 +7762,20 @@ function storyCharacterDetails(inputData) {
   }).join('\n\n') || '(no character details available)';
 }
 
+/** The key of the topic guide a story reads (adventure: the theme; the rest: the topic). */
+function topicGuideKey(inputData) {
+  return inputData.storyCategory === 'adventure'
+    ? (inputData.storyTheme || inputData.storyTopic)
+    : (inputData.storyTopic || inputData.storyTheme);
+}
+
+/** The wardrobe writer's bullet for the story's theme costume ('' when its guide names none). */
+function themeCostumeBullet(inputData) {
+  const rule = themeCostumeRule(getTeachingGuide(inputData.storyCategory, topicGuideKey(inputData)));
+  return rule ? `
+- ${rule}` : '';
+}
+
 function buildStoryContextFields(inputData) {
   const language = inputData.language || 'en';
   const brief = buildStoryBriefBody(inputData);
@@ -7748,9 +7789,7 @@ function buildStoryContextFields(inputData) {
   // check the beats against. Capped because some guides run long and this rides
   // on every beats call. `storyDetails` (which carries the ROLES casting) is
   // already in STORY_BRIEF above; this adds the facts behind it.
-  const guideKey = inputData.storyCategory === 'adventure'
-    ? (inputData.storyTheme || inputData.storyTopic)
-    : (inputData.storyTopic || inputData.storyTheme);
+  const guideKey = topicGuideKey(inputData);
   let guideSection = '';
   let topicPromise = '';
   try {
@@ -7770,8 +7809,9 @@ function buildStoryContextFields(inputData) {
     // "What turns" line went verbatim into an arc and on into the book as a
     // stated realisation (job_1790100385959_1nitlympp). Its settings give way
     // to a world the commission names ("mountain eyries" in a city story). The
-    // COSTUME line is an avatar-pipeline field, not story material — costumes
-    // reach the story through the wardrobe stages, never through this block.
+    // COSTUME line is a wardrobe field, not story material — it reaches the
+    // wardrobe writer and reviewer as THEME_COSTUME_RULE (themeCostumeRule),
+    // never through this block.
     // The PROMISE line binds and is stated apart (buildTopicPromiseSection).
     const guideBody = String(stripGuidePromise(guide) || '').split('\n').filter(l => !/^COSTUME:/.test(l)).join('\n').trim();
     topicPromise = buildTopicPromiseSection(guide);
@@ -12663,6 +12703,12 @@ const WARDROBE_RULES = {
 };
 const wardrobeSharedFills = () => ({ ...WARDROBE_RULES, GARMENT_LIST: GARMENT_LIST_RULE });
 
+/** The wardrobe reviewer's half of the theme costume rule: the same string the writer holds, as a coverage check. */
+function themeCostumeReviewText(inputData) {
+  const rule = themeCostumeRule(getTeachingGuide(inputData.storyCategory, topicGuideKey(inputData)));
+  return rule ? ` ${rule} A child the theme is about who has no \`costumed\` outfit under that costume is a missing entry: add it.` : '';
+}
+
 /**
  * Wardrobe review of the bible's clothing contract. Returns null when the
  * story has no dressed character to review — a bible that produced no usable
@@ -12700,6 +12746,7 @@ function buildClothingReviewPrompt(inputData, clothingRequirements, beats = []) 
     PLAN_LINES: planBlocks(beats) || '(page plan not available)',
     OUTFIT_APPEARANCE_RULE,
     GARMENT_ONE_OUTFIT_RULE,
+    THEME_COSTUME_CHECK: themeCostumeReviewText(inputData),
     ...wardrobeSharedFills(),
   });
 }
@@ -13039,6 +13086,9 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = [], { arc = '' } = {}
     // The `costumed:`-not-`standard` rule also rode on the unified writer's
     // CATEGORY_GUIDELINES. This is the one beats stage that decides the
     // clothing variant, so the rule lands here rather than in the arc chain.
+    // The theme's COSTUME field, stated as a rule (themeCostumeRule). Not a
+    // fallback: a theme without the field injects nothing.
+    THEME_COSTUME_RULE: themeCostumeBullet(inputData),
     ERA_CLOTHING_RULE: (inputData.storyCategory === 'historical' || inputData.storyCategory === 'swiss-stories')
       ? '\n- The story is set in a real period. Every character uses the `costumed` variant, named for that period (`medieval`, `1920s`, …). `standard` is not an option here.'
       : '',
@@ -14130,6 +14180,8 @@ module.exports = {
   GUIDE_USE_RULE,
   TOPIC_PROMISE_HEADING,
   guidePromise,
+  guideCostume,
+  themeCostumeRule,
   stripGuidePromise,
   buildTopicPromiseSection,
   RISK_FRAMING_RULE,

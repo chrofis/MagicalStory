@@ -10841,6 +10841,8 @@ async function checkRuleGenericity(ruleText, storyId) {
 }
 
 module.exports = {
+  // The wardrobe-writer replay, exported for scripts/admin/replay-theme-costume.js
+  runStoryBibleReplayStage,
   pinnedVersionIndex,
   storedEvalFromScene,
   gridRepairStoredPage,
