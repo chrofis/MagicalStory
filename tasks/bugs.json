@@ -4304,7 +4304,7 @@
       "rootCause": "The backstory ban, \"background drops nothing\" and the \"look at the place\" finding hid the world, and no rule or owed fact asked for it.",
       "fix": "OWED_FACT_DEF owes the world, the way in and the way back; WORLD_TELLING_RULE in the shared rulebook; STOCK_BAN, LOAD_BEARING and plan-check 15 make the exception; tests/unit/story-world-told.test.ts; agent-as-model replay evals/runs/2026-10-18_story-world.",
       "status": "fixed",
-      "fixedIn": "PENDING_A"
+      "fixedIn": "766498be5"
     },
     {
       "id": "station-interior-shows-earth-window-light",

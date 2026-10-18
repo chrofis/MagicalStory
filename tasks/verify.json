@@ -10325,7 +10325,9 @@
     {
       "id": "cover-landmark-gate-2026-10-18",
       "title": "A made-up-world story has no home-town landmark on a cover",
-      "commits": [],
+      "commits": [
+        "c3d84e464"
+      ],
       "addedAt": "2026-10-18",
       "status": "pending",
       "claim": "On a full story whose premise names its own world (premiseNamedWorld true) with landmarks offered, no cover stands on an offered landmark; covers use the story's own places and, when it has fewer wide vantages than covers, reuse one. A real-location story is unchanged.",
@@ -10345,7 +10347,9 @@
     {
       "id": "story-world-pictures-2026-10-18",
       "title": "The era line names the world; an interior with no daylit sky shows no Earth window light or season",
-      "commits": [],
+      "commits": [
+        "abb4016f0"
+      ],
       "addedAt": "2026-10-18",
       "status": "pending",
       "claim": "On a full story set in a world other than today's everyday one (a station in orbit, an undersea kingdom), the Visual Bible era names the world and every page/plate/cover STORY ERA line carries it; a location or vehicle with no daylit sky outside carries noDaylight, its interior pages show no daylit window or season through one, and a plate QC does not fail a plate of that world as anachronistic. An Earth story is unchanged.",
@@ -10366,7 +10370,9 @@
     {
       "id": "story-world-told-2026-10-18",
       "title": "Every story not set in today's world tells its world, the way in and the way back",
-      "commits": [],
+      "commits": [
+        "766498be5"
+      ],
       "addedAt": "2026-10-18",
       "status": "pending",
       "claim": "On a full story set in another world or time (a station in orbit, an undersea realm, a historical place), the arc's STORY LOGIC has Facts lines for the world, and for a crossing the way in and the way back; the page text names the world in its first pages inside the action (no opening backstory paragraph), tells the way in on the page of the crossing and the way back on the page of the return. A story set in today's everyday world gets none of these.",
