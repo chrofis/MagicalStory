@@ -1416,6 +1416,7 @@ function fixedBlock(page) {
   if (f.shot) lines.push(`- shot: ${f.shot}`);
   if (f.timeOfDay) lines.push(`- timeOfDay: ${f.timeOfDay}; ${fixedLightPlace(f)}`);
   if (f.lightSources && f.lightSources.length) lines.push(`- lightSources: ${f.lightSources.join('; ')} (lit and glowing: the light the page is lit by)`);
+  if (f.noDaylight) lines.push('- noDaylight: true (no daylit sky outside this place; a window or opening shows what lies outside this world, never an Earth sky)');
   const objects = [...(f.location ? [f.location] : []), ...(f.cites || [])];
   lines.push(`- objects: ${objects.length ? objects.map(label).join('; ') : 'none'}`);
   lines.push(`- aboard: ${f.aboard ? label(f.aboard) : 'none'}${f.aboard && f.aboardFromGround ? ' — the figures stand on its deck; the location line is the view they have from it' : ''}`);
@@ -1467,6 +1468,8 @@ function pinBrief(brief, fixed) {
   if (fixed.timeOfDay) set('timeOfDay', fixed.timeOfDay);
   // The names of the lit elements of a dark page (decideLightSources); [] clears a stale list.
   if (Array.isArray(fixed.lightSources)) set('lightSources', fixed.lightSources.length ? fixed.lightSources : null);
+  // A place with no daylit sky outside (VB `noDaylight`): true pins it, false clears a stale value.
+  if (typeof fixed.noDaylight === 'boolean') set('noDaylight', fixed.noDaylight ? true : null);
   // A cover's weather is code's (coverFacts); a story page's stays the Art Director's.
   if (fixed.weather) set('weather', fixed.weather);
   if (isSkyHidden(fixed)) set('weather', 'none');

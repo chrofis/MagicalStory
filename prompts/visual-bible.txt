@@ -124,7 +124,7 @@ Exactly this, nothing before the marker and nothing after the closing fence:
 ---VISUAL BIBLE---
 ```json
 {
-  "era": "[the story's time period in 2-4 words: medieval, 1920s, present day. One value for the whole book; the covers are drawn in it]",
+  "era": "[the story's time and world in 2-8 words: medieval, 1920s, near future aboard a station in orbit, long ago in an undersea kingdom. \"present day\" alone only when the story is set in today's everyday world; a story set in any other world names that world here. One value for the whole book; the covers are drawn in it]",
   "secondaryCharacters": [
     {
       "id": "CHR001",
@@ -183,6 +183,7 @@ Exactly this, nothing before the marker and nothing after the closing fence:
       "features": "[distinctive visual elements]",
       "signatureElement": "[one unique detail]",
       "submerged": "[OMIT unless the place lies beneath the surface of the water — a sea floor, a reef, a lake bed, the inside of a sunken wreck: true. Stated here once; code reads it for every page at this place]",
+      "noDaylight": "[OMIT unless the place has no daylit sky of an Earth day outside its walls — a station in orbit, a city inside a mountain, a cave home, a hidden bunker: true. Not for a place beneath water (that is `submerged`). Stated here once; code reads it for every page at this place]",
       "isRealLandmark": false,
       "landmarkQuery": null,
       "emptyScenePrompt": "[the backdrop plate for this place; OMIT when this entry has vantages[], which carry one each]",
@@ -202,7 +203,8 @@ Exactly this, nothing before the marker and nothing after the closing fence:
       "generic": "[OMIT unless generic — see the generic rule]",
       "colorAndDetails": "[appearance: shape, colour, material, distinctive features — no size]",
       "signatureElement": "[one unique detail]",
-      "submerged": "[OMIT unless the vehicle lies beneath the surface of the water — a sunken ship, a submarine: true. Stated here once; code reads it for every page aboard it]"
+      "submerged": "[OMIT unless the vehicle lies beneath the surface of the water — a sunken ship, a submarine: true. Stated here once; code reads it for every page aboard it]",
+      "noDaylight": "[OMIT unless the vehicle has no daylit sky of an Earth day outside it — a spacecraft, a station module: true. Stated here once; code reads it for every page aboard it]"
     }
   ],
   "clothing": [

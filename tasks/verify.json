@@ -10341,6 +10341,27 @@
         "paid": true
       },
       "evidence": []
+    },
+    {
+      "id": "story-world-pictures-2026-10-18",
+      "title": "The era line names the world; an interior with no daylit sky shows no Earth window light or season",
+      "commits": [],
+      "addedAt": "2026-10-18",
+      "status": "pending",
+      "claim": "On a full story set in a world other than today's everyday one (a station in orbit, an undersea kingdom), the Visual Bible era names the world and every page/plate/cover STORY ERA line carries it; a location or vehicle with no daylit sky outside carries noDaylight, its interior pages show no daylit window or season through one, and a plate QC does not fail a plate of that world as anachronistic. An Earth story is unchanged.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open visualBible.era (names the world), the noDaylight flag on the station or cave location, the interior pages of that place (windows show stars/outside of the world, no autumn or sunset Earth), and the plate-QC results for any false \"anachronism\" fail on a fantasy or space plate.",
+        "images": [
+          "pages",
+          "plates"
+        ],
+        "paid": true
+      },
+      "evidence": []
     }
   ],
   "runs": [

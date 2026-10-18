@@ -101,6 +101,8 @@ function buildSeasonNote(inputData = {}, opts = {}) {
   // job_1791267520938_essbvehs8's submerged pages with an autumn sky, and "foliage and ground cover are autumn's"
   // drew autumn leaves in the water of job_1791315635053_t0t8qpebu p4 and p6. The page prompt carries no SEASON line.
   if (opts && opts.skyless) return '';
+  // An interior in a place with no daylit sky outside (sceneLight NO_DAYLIGHT) has no window onto a season.
+  if (opts && opts.indoor && opts.noDaylight) return '';
   // An interior shows the season only through a window or a door.
   if (opts && opts.indoor) {
     return `**SEASON:** ${label}. What a window or door shows of the outdoors is ${label.toLowerCase()}'s, the same place alike from page to page; the room itself shows no season.`;

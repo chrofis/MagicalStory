@@ -5681,7 +5681,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // Season note, same shape as ERA_GUARD: a book-wide condition the
       // renderer must honour even when an attached landmark reference photo
       // was shot in a different season (decisions.md 2026-08-16).
-      SEASON_NOTE: buildSeasonNote(inputData || {}, { skyless: isSkylessLight(declaredLight(metadata).timeOfDay), indoor: declaredLight(metadata).weather === 'none' }),
+      SEASON_NOTE: buildSeasonNote(inputData || {}, { skyless: isSkylessLight(declaredLight(metadata).timeOfDay), indoor: declaredLight(metadata).weather === 'none', noDaylight: declaredLight(metadata).noDaylight === true }),
       // The page's declared time of day and weather (sceneLight.js), a fixed
       // line from the brief's two fields. In the protected tail
       // (images.js PROMPT_NEVER_CUT marker **LIGHT:**) and it wins over the

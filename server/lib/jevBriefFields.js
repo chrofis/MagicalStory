@@ -19,7 +19,7 @@ const jevDecisions = require('./jevDecisions');
 const { isNameMentioned } = require('./castResolver');
 const { JevDecisionError } = jevDecisions;
 const { resolveShotId } = require('./shotVocabulary');
-const { isDimLight, isSkyHidden } = require('./sceneLight');
+const { isDimLight, isSkyHidden, isSkylessLight } = require('./sceneLight');
 
 /**
  * The cited elements of one page as the light-source question asks about them (decideLightSources):
@@ -115,18 +115,24 @@ function aboardOnGroundVantage(visualBible, cite, aboard, vehicleIds = []) {
  * @param {Map<number,string|null>} aboardOf
  * @returns {Array<{pageNumber:number, place:string}>}
  */
-function submergedPages(visualBible, locOf, aboardOf) {
+function flaggedPlacePages(visualBible, locOf, aboardOf, field) {
   const vb = visualBible || {};
   const baseOf = id => String(id || '').trim().toUpperCase().split('.')[0];
   const isTrue = v => v === true || String(v).trim().toLowerCase() === 'true';
-  const submerged = new Set([...(vb.locations || []), ...(vb.vehicles || [])].filter(e => e && e.id && isTrue(e.submerged)).map(e => baseOf(e.id)));
+  const flagged = new Set([...(vb.locations || []), ...(vb.vehicles || [])].filter(e => e && e.id && isTrue(e[field])).map(e => baseOf(e.id)));
   const out = [];
   for (const n of new Set([...locOf.keys(), ...aboardOf.keys()])) {
-    const place = [locOf.get(n), aboardOf.get(n)].map(baseOf).find(id => id && submerged.has(id));
+    const place = [locOf.get(n), aboardOf.get(n)].map(baseOf).find(id => id && flagged.has(id));
     if (place) out.push({ pageNumber: Number(n), place });
   }
   return out.sort((a, b) => a.pageNumber - b.pageNumber);
 }
+const submergedPages = (visualBible, locOf, aboardOf) => flaggedPlacePages(visualBible, locOf, aboardOf, 'submerged');
+/**
+ * The pages at or aboard a place the Visual Bible marks `noDaylight: true` (owner, 2026-10-18): a station in
+ * orbit, a cave city, a place with no daylit sky outside its walls. Same reading as submergedPages.
+ */
+const noDaylightPages = (visualBible, locOf, aboardOf) => flaggedPlacePages(visualBible, locOf, aboardOf, 'noDaylight');
 
 /**
  * THE DECISION LAYER BEFORE THE PAGE BRIEFS (owner, 2026-09-28: "Jev first,
@@ -207,6 +213,9 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
       gl.info('beats_jev_light_submerged', `Submerged pages ${wet.map(w => `p${w.pageNumber} (${w.place})`).join(', ')}: light re-decided beneath the surface${submergedLight.changed.length ? ` — ${submergedLight.changed.map(c => `p${c.pageNumber} ${c.from}→${c.to}`).join(', ')}` : ' — no change'}`, null, { pages: wet, changed: submergedLight.changed, stats: submergedLight.stats });
     }
   }
+  // A page at or aboard a place with no daylit sky outside carries that fact, so its interior light names no
+  // daylit window (sceneLight NO_DAYLIGHT_PHRASE); a skyless light (underwater, dark) has its own table.
+  const dayless = new Set(noDaylightPages(vb, locOf, new Map(decidedVb.pages.map(r => [r.pageNumber, r.aboard]))).map(w => w.pageNumber));
   for (const b of storyBeats) {
     const n = Number(b.pageNumber);
     const r = vbByPage.get(n);
@@ -217,6 +226,7 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
       ...(planShot ? { shot: planShot } : {}),
       ...(b.fixed ? { timeOfDay: b.fixed.timeOfDay, indoor: b.fixed.indoor } : {}),
       cites, decidedIds,
+      noDaylight: dayless.has(n) && !(b.fixed && isSkylessLight(b.fixed.timeOfDay)),
       ...(loc ? { location: loc.cite } : {}),
       ...(loc && pop.byLocation[loc.base] ? { population: pop.byLocation[loc.base].population } : {}),
       aboard: r ? r.aboard : null, aboardIds: vehicleIds,
@@ -812,6 +822,6 @@ async function decideCoverPopulation({ arc, coverBeats, visualBible, decided = {
 
 module.exports = {
   litCandidates, offFrameOf, coverLight, coverFacts, decideCoverPopulation, COVER_SHOT, COVER_GAZE,
-  decideBriefFields, assembleBriefs, dropAbsentWearerCites, pageLocations, aboardOnGroundVantage, submergedPages, visualBibleJsonOf,
+  decideBriefFields, assembleBriefs, dropAbsentWearerCites, pageLocations, aboardOnGroundVantage, submergedPages, noDaylightPages, visualBibleJsonOf,
   COVER_PLACE_SHOTS, COVER_PURPOSE, COVER_FOOTING, COVER_ONE_PLACE_NOTE, coverFitQuestion, COVER_PLACE_FLOOR, COVER_PHOTO_MIN_SCORE, coverPhotoOf, bibleLocationOf, materializeCoverPlaces, coverPlaceLabel, coverPlaceCandidates, assignCoverPlaces, coverPlaceState, decideCoverPlaces, applyCoverPlacePages,
 };

@@ -236,6 +236,8 @@ function lightParts(light) {
   const l = light || {};
   // A skyless light has no sky to describe, whatever weather the brief carries.
   if (isSkylessLight(l.timeOfDay)) return { time: TIME_OF_DAY_PHRASES[l.timeOfDay].open, sky: '' };
+  // An interior in a place with no daylit sky outside has no daylit windows (declaredLight `noDaylight`).
+  if (l.noDaylight === true && l.weather === 'none') return { time: NO_DAYLIGHT_PHRASE, sky: '' };
   const covered = weatherOwnsSky(l.weather);
   // Indoors (weather `none`) is window light only: no sun, moon or sky is named.
   const variant = l.weather === 'none' ? 'indoor' : (covered ? 'veiled' : 'open');
@@ -270,6 +272,17 @@ function normaliseLightSources(raw) {
   return (Array.isArray(raw) ? raw : []).map(x => String(x == null ? '' : x).replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 4);
 }
 
+/**
+ * A PLACE WITH NO DAYLIT SKY OUTSIDE (owner, 2026-10-18): a station in orbit, a cave city. The Visual Bible
+ * states `noDaylight` once on the location or vehicle (jevBriefFields.noDaylightPages), code pins it on each
+ * page there, and an interior page then drops the "daylight at the windows" hour phrase (it showed autumn Earth
+ * at sunset through a space station's windows). Structured, never read from prose; the skyless lights
+ * (underwater, dark) are a different thing and keep their own table.
+ */
+function normaliseNoDaylight(raw) { return raw === true || String(raw).trim().toLowerCase() === 'true'; }
+
+const NO_DAYLIGHT_PHRASE = "the place is lit evenly by its own lamps and panels; any window or opening shows what lies outside this world, never the sky or daylight of an Earth day";
+
 /** The sources as a clause, '' when none. */
 function sourcesClause(light) {
   const names = normaliseLightSources((light || {}).sources);
@@ -291,6 +304,7 @@ function declaredLight(metadata) {
     timeOfDay: normaliseTimeOfDay(m.timeOfDay ?? f.timeOfDay),
     weather: normaliseWeather(m.weather ?? f.weather),
     ...(sources.length ? { sources } : {}),
+    ...(normaliseNoDaylight(m.noDaylight ?? f.noDaylight) ? { noDaylight: true } : {}),
   };
 }
 
@@ -517,6 +531,8 @@ module.exports = {
   SUBMERGED_LIGHTS,
   JEV_SUBMERGED_CRITERIA,
   isSkyHidden,
+  normaliseNoDaylight,
+  NO_DAYLIGHT_PHRASE,
   SKYLESS_LIGHT_RULE,
   isSkylessLight,
   isDimLight,

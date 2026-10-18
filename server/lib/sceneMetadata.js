@@ -228,7 +228,7 @@ function parseCreatures(rows) {
  * anything else → 'cast_only'. `crowdExpected` continues to be published
  * alongside, derived, for every consumer that only asks the old question.
  */
-const { normaliseTimeOfDay, normaliseWeather, normaliseLightSources } = require('./sceneLight');
+const { normaliseTimeOfDay, normaliseWeather, normaliseLightSources, normaliseNoDaylight } = require('./sceneLight');
 
 /**
  * THE POPULATION TABLE: the one place a `population` value is defined (owner, 2026-10-06, same rule as the
@@ -1057,6 +1057,7 @@ function extractSceneMetadata(sceneDescription) {
         timeOfDay: normaliseTimeOfDay(metadata.timeOfDay),
         weather: normaliseWeather(metadata.weather),
         lightSources: normaliseLightSources(metadata.lightSources),
+        ...(normaliseNoDaylight(metadata.noDaylight) ? { noDaylight: true } : {}),
         background: metadata.background || null,
         // The Art Director writes `sceneIntent` on every page, and this
         // allowlist dropped it — so the two branches of this function
@@ -1109,6 +1110,7 @@ function extractSceneMetadata(sceneDescription) {
       timeOfDay: normaliseTimeOfDay(metadata.timeOfDay),
       weather: normaliseWeather(metadata.weather),
       lightSources: normaliseLightSources(metadata.lightSources),
+        ...(normaliseNoDaylight(metadata.noDaylight) ? { noDaylight: true } : {}),
       background: metadata.background || null,
       isJsonFormat: true,
       isProseFormat: true
@@ -1255,6 +1257,7 @@ function extractSceneMetadata(sceneDescription) {
       timeOfDay: normaliseTimeOfDay(parsedData.timeOfDay),
       weather: normaliseWeather(parsedData.weather),
       lightSources: normaliseLightSources(parsedData.lightSources),
+      ...(normaliseNoDaylight(parsedData.noDaylight) ? { noDaylight: true } : {}),
       isJsonFormat: true
     };
   }

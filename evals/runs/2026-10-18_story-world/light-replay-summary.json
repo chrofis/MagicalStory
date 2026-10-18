@@ -1,0 +1,48 @@
+{
+ "pages": 3395,
+ "stories": 287,
+ "indoorPages": 45,
+ "changed": 3,
+ "changedPages": [
+  {
+   "id": "job_1792312615714_wpz3fzwyy",
+   "page": 8,
+   "timeOfDay": "evening",
+   "before": {
+    "light": "**LIGHT:** evening: the daylight at the windows fading to gold, the lamps beginning to glow; indoors: the light comes from the room's own sources and any window. It wins over the light and weather of any reference image.",
+    "season": "**SEASON:** Autumn. What a window or door shows of the outdoors is autumn's, the same place alike from page to page; the room itself shows no season."
+   },
+   "after": {
+    "light": "**LIGHT:** the place is lit evenly by its own lamps and panels; any window or opening shows what lies outside this world, never the sky or daylight of an Earth day. It wins over the light and weather of any reference image.",
+    "season": ""
+   }
+  },
+  {
+   "id": "job_1792312615714_wpz3fzwyy",
+   "page": 9,
+   "timeOfDay": "evening",
+   "before": {
+    "light": "**LIGHT:** evening: the daylight at the windows fading to gold, the lamps beginning to glow; indoors: the light comes from the room's own sources and any window. It wins over the light and weather of any reference image.",
+    "season": "**SEASON:** Autumn. What a window or door shows of the outdoors is autumn's, the same place alike from page to page; the room itself shows no season."
+   },
+   "after": {
+    "light": "**LIGHT:** the place is lit evenly by its own lamps and panels; any window or opening shows what lies outside this world, never the sky or daylight of an Earth day. It wins over the light and weather of any reference image.",
+    "season": ""
+   }
+  },
+  {
+   "id": "job_1792312615714_wpz3fzwyy",
+   "page": 10,
+   "timeOfDay": "evening",
+   "before": {
+    "light": "**LIGHT:** evening: the daylight at the windows fading to gold, the lamps beginning to glow; indoors: the light comes from the room's own sources and any window. It wins over the light and weather of any reference image.",
+    "season": "**SEASON:** Autumn. What a window or door shows of the outdoors is autumn's, the same place alike from page to page; the room itself shows no season."
+   },
+   "after": {
+    "light": "**LIGHT:** the place is lit evenly by its own lamps and panels; any window or opening shows what lies outside this world, never the sky or daylight of an Earth day. It wins over the light and weather of any reference image.",
+    "season": ""
+   }
+  }
+ ],
+ "note": "flag simulated: job_1792312615714_wpz3fzwyy LOC003 (Module One pump room) marked noDaylight like the VB would"
+}
