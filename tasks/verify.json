@@ -10362,6 +10362,23 @@
         "paid": true
       },
       "evidence": []
+    },
+    {
+      "id": "story-world-told-2026-10-18",
+      "title": "Every story not set in today's world tells its world, the way in and the way back",
+      "commits": [],
+      "addedAt": "2026-10-18",
+      "status": "pending",
+      "claim": "On a full story set in another world or time (a station in orbit, an undersea realm, a historical place), the arc's STORY LOGIC has Facts lines for the world, and for a crossing the way in and the way back; the page text names the world in its first pages inside the action (no opening backstory paragraph), tells the way in on the page of the crossing and the way back on the page of the return. A story set in today's everyday world gets none of these.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read arcReviewReport.logic (world / way in / way back lines) and pages 1-3 plus the crossing and return pages of the text. A today-story must show no forced world sentence.",
+        "paid": true
+      },
+      "evidence": []
     }
   ],
   "runs": [

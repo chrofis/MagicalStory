@@ -4295,6 +4295,36 @@
       "fix": "The guide's COSTUME field is read (guideCostume) and stated as one rule (themeCostumeRule) in the wardrobe writer and the wardrobe reviewer: the theme's children wear the costume, an adult already dressed for their role stays standard; no COSTUME field, no rule. tests/unit/theme-costume-rule.test.ts; replay evals/runs/2026-10-18_theme-costume.",
       "status": "fixed",
       "fixedIn": "ba4abdf76"
+    },
+    {
+      "id": "story-text-drops-the-world",
+      "title": "A space-station story never says it is in space: the arc named the station and the rocket, no page text does",
+      "reportedAt": "2026-10-18",
+      "source": "Owner-reported. Prod job_1792312615714_wpz3fzwyy (arc sentence 1 names Rowan Station and the rocket from Earth; no page says space).",
+      "rootCause": "The backstory ban, \"background drops nothing\" and the \"look at the place\" finding hid the world, and no rule or owed fact asked for it.",
+      "fix": "OWED_FACT_DEF owes the world, the way in and the way back; WORLD_TELLING_RULE in the shared rulebook; STOCK_BAN, LOAD_BEARING and plan-check 15 make the exception; tests/unit/story-world-told.test.ts; agent-as-model replay evals/runs/2026-10-18_story-world.",
+      "status": "fixed",
+      "fixedIn": "PENDING_A"
+    },
+    {
+      "id": "station-interior-shows-earth-window-light",
+      "title": "Pump-room windows of a space-station story showed autumn Earth at sunset",
+      "reportedAt": "2026-10-18",
+      "source": "Owner-reported. Prod job_1792312615714_wpz3fzwyy interior pages.",
+      "rootCause": "sceneLight indoor hour phrases (\"daylight at the windows fading to gold\") and the indoor SEASON line assume an Earth sky; the Visual Bible era held only \"near future\".",
+      "fix": "VB era is an era-and-world value; VB noDaylight on a location or vehicle is pinned per page; interiors there get NO_DAYLIGHT_PHRASE and no season line. tests/unit/no-daylight-place.test.ts; replay over 3395 stored pages.",
+      "status": "fixed",
+      "fixedIn": "abb4016f0"
+    },
+    {
+      "id": "made-up-world-covers-use-home-town-landmarks",
+      "title": "Covers of a made-up-world story stood on home-town landmarks",
+      "reportedAt": "2026-10-18",
+      "source": "Owner-reported. Prod job_1792312615714_wpz3fzwyy covers 2 and 3.",
+      "rootCause": "decideCoverPlaces was given the offered landmarks and the town without the premiseNamedWorld gate story pages use.",
+      "fix": "storyMayUseTownLandmarks / coverTownInputs: one predicate for pages and covers. tests/unit/cover-places.test.ts; replay 5/5 made-up-world stories 8/15 landmark covers -> 0/15.",
+      "status": "fixed",
+      "fixedIn": "c3d84e464"
     }
   ]
 }

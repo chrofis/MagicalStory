@@ -96,7 +96,7 @@ const SUDDENLY_RULE = 'Never "suddenly" or its equivalent in the story\'s langua
  * carries the separate list; every prose pass reads this line through
  * STYLE_RULEBOOK.
  */
-const STOCK_BAN_RULE = 'No jokes, puns or wordplay. No stock gestures (a hand on a shoulder, ruffled hair, a knowing nod), and no gesture (a hug, a wink, a shrug, a high five) twice in the book. No "it was a [adjective] day", no weather, waking up or backstory to open page 1, no trait labels ("she was brave") and no words like dramatic, ethereal, breathtaking or stunning.';
+const STOCK_BAN_RULE = 'No jokes, puns or wordplay. No stock gestures (a hand on a shoulder, ruffled hair, a knowing nod), and no gesture (a hug, a wink, a shrug, a high five) twice in the book. No "it was a [adjective] day", no weather, waking up or backstory paragraph to open page 1 (naming the world the story is set in inside the action is no backstory), no trait labels ("she was brave") and no words like dramatic, ethereal, breathtaking or stunning.';
 
 /**
  * Two figure rules (owner mandate 2026-10-08, staging job_1791489793707_2ir6nl5kw

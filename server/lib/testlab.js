@@ -10843,6 +10843,8 @@ async function checkRuleGenericity(ruleText, storyId) {
 module.exports = {
   // The wardrobe-writer replay, exported for scripts/admin/replay-theme-costume.js
   runStoryBibleReplayStage,
+  // The beats a stored story's text writer is replayed from (scripts/admin/replay-story-world.js)
+  resolveStoryBeats,
   pinnedVersionIndex,
   storedEvalFromScene,
   gridRepairStoredPage,
