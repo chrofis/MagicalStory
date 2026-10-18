@@ -1,0 +1,301 @@
+{
+ "summary": {
+  "madeUpWorld": {
+   "stories": 5,
+   "withLandmarkCoverBefore": 5,
+   "landmarkCoversBefore": 8,
+   "coversTotal": 15,
+   "landmarkCoversAfter": 0,
+   "costUsd": 0.00146
+  },
+  "realWorld": {
+   "stories": 11,
+   "candidatesUnchanged": 11
+  }
+ },
+ "rows": [
+  {
+   "env": "prod",
+   "id": "job_1791786057698_79n8x82wd",
+   "premiseNamedWorld": true,
+   "storedLandmarkCovers": 1,
+   "covers": 3,
+   "candidatesBefore": 22,
+   "candidatesAfter": 3,
+   "candidatesUnchanged": false,
+   "after": [
+    {
+     "key": "frontCover",
+     "cite": "LOC001.4",
+     "offered": false,
+     "shared": false
+    },
+    {
+     "key": "initialPage",
+     "cite": "LOC001.1",
+     "offered": false,
+     "shared": false
+    },
+    {
+     "key": "backCover",
+     "cite": "LOC002.1",
+     "offered": false,
+     "shared": false
+    }
+   ],
+   "afterLandmarkCovers": 0,
+   "unmet": [],
+   "costUsd": 0.000268
+  },
+  {
+   "env": "prod",
+   "id": "job_1792312615714_wpz3fzwyy",
+   "premiseNamedWorld": true,
+   "storedLandmarkCovers": 2,
+   "covers": 3,
+   "candidatesBefore": 20,
+   "candidatesAfter": 1,
+   "candidatesUnchanged": false,
+   "after": [
+    {
+     "key": "frontCover",
+     "cite": "LOC002.4",
+     "offered": false,
+     "shared": true
+    },
+    {
+     "key": "initialPage",
+     "cite": "LOC002.4",
+     "offered": false,
+     "shared": true
+    },
+    {
+     "key": "backCover",
+     "cite": "LOC002.4",
+     "offered": false,
+     "shared": true
+    }
+   ],
+   "afterLandmarkCovers": 0,
+   "unmet": [
+    "distinct: frontCover and initialPage share LOC002 and its viewpoint",
+    "distinct: frontCover and backCover share LOC002 and its viewpoint",
+    "distinct: initialPage and backCover share LOC002 and its viewpoint with the same cast"
+   ],
+   "costUsd": 0.000256
+  },
+  {
+   "env": "prod",
+   "id": "job_1791918618204_ssjxzvmp4",
+   "premiseNamedWorld": false,
+   "storedLandmarkCovers": 2,
+   "covers": 3,
+   "candidatesBefore": 19,
+   "candidatesAfter": 19,
+   "candidatesUnchanged": true
+  },
+  {
+   "env": "prod",
+   "id": "job_1792251663990_rxjob5qlb",
+   "premiseNamedWorld": false,
+   "storedLandmarkCovers": 1,
+   "covers": 3,
+   "candidatesBefore": 18,
+   "candidatesAfter": 18,
+   "candidatesUnchanged": true
+  },
+  {
+   "env": "prod",
+   "id": "job_1792078014622_uh8tj6ht1",
+   "premiseNamedWorld": false,
+   "storedLandmarkCovers": 0,
+   "covers": 3,
+   "candidatesBefore": 19,
+   "candidatesAfter": 19,
+   "candidatesUnchanged": true
+  },
+  {
+   "env": "staging",
+   "id": "job_1791145238223_50osg2osm",
+   "premiseNamedWorld": false,
+   "storedLandmarkCovers": 0,
+   "covers": 3,
+   "candidatesBefore": 2,
+   "candidatesAfter": 2,
+   "candidatesUnchanged": true
+  },
+  {
+   "env": "staging",
+   "id": "job_1791222889407_ypl33vk8u",
+   "premiseNamedWorld": true,
+   "storedLandmarkCovers": 2,
+   "covers": 3,
+   "candidatesBefore": 5,
+   "candidatesAfter": 3,
+   "candidatesUnchanged": false,
+   "after": [
+    {
+     "key": "frontCover",
+     "cite": "LOC001.5",
+     "offered": false,
+     "shared": false
+    },
+    {
+     "key": "initialPage",
+     "cite": "LOC002.4",
+     "offered": false,
+     "shared": false
+    },
+    {
+     "key": "backCover",
+     "cite": "LOC001.1",
+     "offered": false,
+     "shared": false
+    }
+   ],
+   "afterLandmarkCovers": 0,
+   "unmet": [
+    "floor: initialPage rated 0.07 for LOC002.4, under 0.1"
+   ],
+   "costUsd": 0.000315
+  },
+  {
+   "env": "staging",
+   "id": "job_1791267520938_essbvehs8",
+   "premiseNamedWorld": true,
+   "storedLandmarkCovers": 2,
+   "covers": 3,
+   "candidatesBefore": 6,
+   "candidatesAfter": 4,
+   "candidatesUnchanged": false,
+   "after": [
+    {
+     "key": "frontCover",
+     "cite": "LOC005.2",
+     "offered": false,
+     "shared": false
+    },
+    {
+     "key": "initialPage",
+     "cite": "LOC002.1",
+     "offered": false,
+     "shared": false
+    },
+    {
+     "key": "backCover",
+     "cite": "LOC006.2",
+     "offered": false,
+     "shared": false
+    }
+   ],
+   "afterLandmarkCovers": 0,
+   "unmet": [],
+   "costUsd": 0.000364
+  },
+  {
+   "env": "staging",
+   "id": "job_1791315635053_t0t8qpebu",
+   "premiseNamedWorld": true,
+   "storedLandmarkCovers": 1,
+   "covers": 3,
+   "candidatesBefore": 4,
+   "candidatesAfter": 2,
+   "candidatesUnchanged": false,
+   "after": [
+    {
+     "key": "frontCover",
+     "cite": "LOC001.6",
+     "offered": false,
+     "shared": false
+    },
+    {
+     "key": "initialPage",
+     "cite": "LOC001.5",
+     "offered": false,
+     "shared": true
+    },
+    {
+     "key": "backCover",
+     "cite": "LOC001.5",
+     "offered": false,
+     "shared": true
+    }
+   ],
+   "afterLandmarkCovers": 0,
+   "unmet": [
+    "distinct: initialPage and backCover share LOC001 and its viewpoint with the same cast"
+   ],
+   "costUsd": 0.000259
+  },
+  {
+   "env": "staging",
+   "id": "job_1791450210539_nwi88y9lr",
+   "premiseNamedWorld": false,
+   "storedLandmarkCovers": 0,
+   "covers": 3,
+   "candidatesBefore": 19,
+   "candidatesAfter": 19,
+   "candidatesUnchanged": true
+  },
+  {
+   "env": "staging",
+   "id": "job_1791489793707_2ir6nl5kw",
+   "premiseNamedWorld": false,
+   "storedLandmarkCovers": 0,
+   "covers": 3,
+   "candidatesBefore": 18,
+   "candidatesAfter": 18,
+   "candidatesUnchanged": true
+  },
+  {
+   "env": "staging",
+   "id": "job_1791497309909_6quecrr9t",
+   "premiseNamedWorld": false,
+   "storedLandmarkCovers": 1,
+   "covers": 3,
+   "candidatesBefore": 18,
+   "candidatesAfter": 18,
+   "candidatesUnchanged": true
+  },
+  {
+   "env": "staging",
+   "id": "job_1791531449494_o0kaatvmq",
+   "premiseNamedWorld": false,
+   "storedLandmarkCovers": 2,
+   "covers": 3,
+   "candidatesBefore": 16,
+   "candidatesAfter": 16,
+   "candidatesUnchanged": true
+  },
+  {
+   "env": "staging",
+   "id": "job_1791551239260_a0dpn715x",
+   "premiseNamedWorld": false,
+   "storedLandmarkCovers": 2,
+   "covers": 3,
+   "candidatesBefore": 16,
+   "candidatesAfter": 16,
+   "candidatesUnchanged": true
+  },
+  {
+   "env": "staging",
+   "id": "job_1792078014622_uh8tj6ht1",
+   "premiseNamedWorld": false,
+   "storedLandmarkCovers": 0,
+   "covers": 3,
+   "candidatesBefore": 19,
+   "candidatesAfter": 19,
+   "candidatesUnchanged": true
+  },
+  {
+   "env": "staging",
+   "id": "job_1792226018737_lb65hzkqs",
+   "premiseNamedWorld": false,
+   "storedLandmarkCovers": 1,
+   "covers": 3,
+   "candidatesBefore": 18,
+   "candidatesAfter": 18,
+   "candidatesUnchanged": true
+  }
+ ]
+}

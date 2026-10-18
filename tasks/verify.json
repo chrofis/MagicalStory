@@ -10321,6 +10321,26 @@
         "paid": true
       },
       "evidence": []
+    },
+    {
+      "id": "cover-landmark-gate-2026-10-18",
+      "title": "A made-up-world story has no home-town landmark on a cover",
+      "commits": [],
+      "addedAt": "2026-10-18",
+      "status": "pending",
+      "claim": "On a full story whose premise names its own world (premiseNamedWorld true) with landmarks offered, no cover stands on an offered landmark; covers use the story's own places and, when it has fewer wide vantages than covers, reuse one. A real-location story is unchanged.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open the three covers and jevDecisions.coverPlaces: no cover has an `offered` landmark and each cites a story place (LOCnnn.n of a story page). On a home-town story the landmark covers still appear.",
+        "images": [
+          "covers"
+        ],
+        "paid": true
+      },
+      "evidence": []
     }
   ],
   "runs": [

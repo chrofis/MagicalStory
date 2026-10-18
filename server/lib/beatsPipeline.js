@@ -11,7 +11,7 @@ const { salvageReplanRound } = require('./replanSalvage');
 // so a replay or a test can load them without the pipeline's provider graph.
 const { decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf } = require('./jevBriefFields');
 const { JevDecisionError } = jevDecisions;
-const { landmarkGuidelineActive, offeredLandmarkNames, parseLandmarksStaged, landmarkShortfallFinding } = require('./landmarkGuideline');
+const { landmarkGuidelineActive, coverTownInputs, offeredLandmarkNames, parseLandmarksStaged, landmarkShortfallFinding } = require('./landmarkGuideline');
 const jevPlanCheck = require('./jevPlanCheck');
 const jevSelection = require('./jevSelection');
 const { lookupByName } = require('./castResolver');
@@ -1992,13 +1992,24 @@ ${bibleBody}` : bibleBody;
     const casts = Object.fromEntries(coverBeats.map(cb => [cb.coverKey, String(jevDecisions.planParts(cb.planLine)[1] || '').split(/,\s*/).map(x => x.trim()).filter(Boolean)]));
     // The candidates include the story's OFFERED landmarks no page stands on
     // (owner, 2026-10-04), each rated by its own yes/no per cover.
+    // A made-up world has no home-town landmark on its covers either (the story pages' gate, ONE
+    // predicate: landmarkGuideline.storyMayUseTownLandmarks, via coverTownInputs); the covers then reuse the story's own places.
     const places = await decideCoverPlaces({
       arc: approvedArc, pages: beats, visualBible, coverKeys: coverBeats.map(cb => cb.coverKey), casts,
-      availableLandmarks: inputData.availableLandmarks || [], town: (inputData.userLocation && inputData.userLocation.city) || null,
+      ...coverTownInputs(inputData),
     });
     if (places.unmet && places.unmet.length) {
-      log.error(`🚨 [BEATS] The covers are not distinct: ${places.unmet.join('; ')} — they ship flagged`);
-      gl.error('beats_cover_places_not_distinct', `The covers are not distinct: ${places.unmet.join('; ')}`, null, { unmet: places.unmet, covers: places.covers });
+      // Fewer story vantages than covers: distinct views are impossible by construction, so the covers
+      // reuse a story place (different cast and framing) and that is a note, not a fault.
+      const reuse = places.candidates.length < places.covers.length;
+      const msg = `The covers are not distinct: ${places.unmet.join('; ')}`;
+      if (reuse) {
+        log.warn(`[BEATS] ${msg} — only ${places.candidates.length} story vantage(s) for ${places.covers.length} covers, so a story place is reused`);
+        gl.warn('beats_cover_places_reused', msg, null, { unmet: places.unmet, covers: places.covers });
+      } else {
+        log.error(`🚨 [BEATS] ${msg} — they ship flagged`);
+        gl.error('beats_cover_places_not_distinct', msg, null, { unmet: places.unmet, covers: places.covers });
+      }
     }
     if (jevReport) jevReport.coverPlaces = places;
     if (!places.covers.length) {

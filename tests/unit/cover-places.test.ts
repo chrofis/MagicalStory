@@ -253,6 +253,11 @@ describe('runArtDirector: the covers\' places between the two calls', () => {
     expect(jevReport.coverPlaces.covers).toHaveLength(3);
     expect(jevReport.fallback).toBeFalsy();
   });
+  it('a made-up world (premiseNamedWorld true) puts no offered landmark on any cover, even when landmarks were offered', async () => {
+    const { out, jevReport } = await run(makeJevStub().impl, { premiseNamedWorld: true, availableLandmarks: OFFERED, userLocation: { city: 'the town' } });
+    expect(jevReport.coverPlaces.covers.some((c: any) => c.offered)).toBe(false);
+    for (const c of out.coverBeats) expect(out.visualBible.locations.find((l: any) => c.jevFixed.location.startsWith(l.id + '.')).isRealLandmark).toBeFalsy();
+  });
   it('every cover shot, gaze, light and era are code-owned: in the FIXED block before call 2 and pinned into the brief', async () => {
     const { out, prompts } = await run(makeJevStub().impl);
     for (const c of out.coverBeats) {
@@ -268,7 +273,7 @@ describe('runArtDirector: the covers\' places between the two calls', () => {
     expect(prompts.beats_scene_expansion).toContain('era: medieval');
   });
   it('Jev path with offered landmarks: three distinct covers, the offered places in the bible and in the call-2 prompt', async () => {
-    const { out, prompts, jevReport } = await run(makeJevStub().impl, { availableLandmarks: OFFERED, userLocation: { city: 'the town' } });
+    const { out, prompts, jevReport } = await run(makeJevStub().impl, { premiseNamedWorld: false, availableLandmarks: OFFERED, userLocation: { city: 'the town' } });
     expect(jevReport.coverPlaces.unmet).toEqual([]);
     const cites = out.coverBeats.map((c: any) => c.jevFixed.location);
     expect(new Set(cites.map((x: string) => x.split('.')[0])).size).toBe(3);
@@ -333,5 +338,31 @@ describe('cover places: footing, one scale, purposes', () => {
     const impl = async ({ questions }: any) => ({ answers: Object.fromEntries(Object.entries<any>(questions).map(([id, q]) => [id, { noul: q.instructions.includes('reef wide') ? 0.8 : 0.1 }])), cost: 0, model: 'stub', usage: {} });
     const d = await JBF.decideCoverPlaces({ arc: 'a', pages: pages.slice(0, 2), visualBible: vb, coverKeys: ['frontCover'], availableLandmarks: [lm('The Inland Church')] }, { callImpl: impl });
     expect(d.covers[0].cite).toBe('LOC001.1');
+  });
+});
+
+// Covers obey the story pages' landmark gate (owner, 2026-10-18; staging/prod space-station story:
+// a made-up world with home-town landmark covers). One predicate: landmarkGuideline.storyMayUseTownLandmarks.
+describe('covers obey the landmark gate: a made-up world has no home-town landmark on a cover', () => {
+  const LG = req('../../server/lib/landmarkGuideline');
+  const withTown = (premiseNamedWorld: any) => ({ premiseNamedWorld, availableLandmarks: OFFERED, userLocation: { city: 'the town' } });
+  it('the cover inputs carry the offered landmarks and the town only when the premise names no world of its own', () => {
+    expect(LG.coverTownInputs(withTown(false))).toEqual({ availableLandmarks: OFFERED, town: 'the town' });
+    for (const flag of [true, undefined]) expect(LG.coverTownInputs(withTown(flag))).toEqual({ availableLandmarks: [], town: null });
+  });
+  it('the story pages and the covers read the same predicate', () => {
+    for (const flag of [true, false, undefined]) {
+      expect(LG.landmarkGuidelineActive(withTown(flag))).toBe(LG.storyMayUseTownLandmarks(withTown(flag)));
+      expect(LG.coverTownInputs(withTown(flag)).availableLandmarks.length > 0).toBe(LG.storyMayUseTownLandmarks(withTown(flag)));
+    }
+  });
+  it('with the gate shut every cover takes a story place, reusing one when the story has fewer vantages than covers', async () => {
+    const stub = makeJevStub();
+    const casts = { frontCover: ['Child1', 'Pal'], initialPage: ['Child1'], backCover: ['Child1', 'Pal'] };
+    const one: any = { locations: [{ id: 'LOC001', name: 'the hall', appearsInPages: [1, 2], vantages: [{ id: 'LOC001.1', name: 'hall wide', shot: 'wide', pages: [1] }] }] };
+    const d = await JBF.decideCoverPlaces({ arc: 'a', pages: pages.slice(0, 2), visualBible: one, coverKeys: ['frontCover', 'initialPage', 'backCover'], casts, ...LG.coverTownInputs(withTown(true)) }, { callImpl: stub.impl });
+    expect(d.covers.map((c: any) => c.cite)).toEqual(['LOC001.1', 'LOC001.1', 'LOC001.1']);
+    expect(d.covers.some((c: any) => c.offered)).toBe(false);
+    expect(d.candidates.length).toBeLessThan(d.covers.length);
   });
 });

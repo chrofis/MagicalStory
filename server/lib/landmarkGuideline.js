@@ -17,9 +17,30 @@
 
 const LANDMARK_MINIMUM = 2;
 
+/**
+ * May this story use the reader's real town at all? ONE predicate for story pages
+ * (the guideline below) and covers (beatsPipeline's decideCoverPlaces call): a
+ * story whose premise names its own world (premiseNamedWorld true) or whose flag
+ * was never stamped has no home-town landmark anywhere in the book, covers
+ * included (owner, 2026-10-18; docs/decisions.md "Covers obey the landmark gate").
+ */
+function storyMayUseTownLandmarks(inputData) {
+  return inputData?.premiseNamedWorld === false;
+}
+
+/**
+ * What the cover-place decision may be told about the reader's town: the offered
+ * landmarks and the town's name, or neither for a story that may not use them.
+ * @returns {{availableLandmarks: Array, town: string|null}}
+ */
+function coverTownInputs(inputData) {
+  if (!storyMayUseTownLandmarks(inputData)) return { availableLandmarks: [], town: null };
+  return { availableLandmarks: inputData.availableLandmarks || [], town: (inputData.userLocation && inputData.userLocation.city) || null };
+}
+
 /** Is the guideline in force for this story? */
 function landmarkGuidelineActive(inputData) {
-  return inputData?.premiseNamedWorld === false && (inputData?.availableLandmarks?.length || 0) > 0;
+  return storyMayUseTownLandmarks(inputData) && (inputData?.availableLandmarks?.length || 0) > 0;
 }
 
 /** The names the story was offered, in the list's order. */
@@ -128,6 +149,8 @@ function describeStagedLandmarks(staged) {
 module.exports = {
   LANDMARK_MINIMUM,
   landmarkGuidelineActive,
+  storyMayUseTownLandmarks,
+  coverTownInputs,
   offeredLandmarkNames,
   landmarkRequirement,
   offeredEntryFor,
