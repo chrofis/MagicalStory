@@ -1212,7 +1212,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
     minAppearances = 2,
     // Every secondary character qualifies for a reference on a single page
     // (default 1) so none inherits the primary's face. Non-character elements
-    // keep `minAppearances`. Same rule in trial (bounded by maxElements).
+    // keep `minAppearances`. Same rule in trial.
     characterMinAppearances = 1,
     // false = no cell render gate and no gate re-render. The trial passes false
     // (docs/decisions.md 2026-10-09 "Trial reference sheets: no render gate");
@@ -1224,7 +1224,6 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
     artifactMinAppearances = 1,
     maxPerBatch = 4,
     imageModel = null,
-    maxElements = null,
     storyId = null,    // when present, each generated reference image is
                        // uploaded to R2 and the URL is stored on the VB entry.
     // Aspect ratio for non-character element grids (vehicles/artifacts/
@@ -1283,15 +1282,6 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
   const secondaryCharRefs = needsReference.filter(e => e.type === 'character');
   if (secondaryCharRefs.length > 0) {
     log.info(`[REF-SHEET] 🧑 ${secondaryCharRefs.length} secondary CHARACTER reference(s) — each secondary gets its own face so none inherits the primary's identity: ${secondaryCharRefs.map(e => `${e.name} (${e.pageCount}p)`).join(', ')}`);
-  }
-
-  // Limit elements if maxElements specified (trial mode)
-  if (maxElements && needsReference.length > maxElements) {
-    // Sort by page count descending, then alphabetically
-    needsReference.sort((a, b) => b.pageCount - a.pageCount || a.name.localeCompare(b.name));
-    const droppedByCap = needsReference.slice(maxElements);
-    needsReference.length = maxElements;
-    log.warn(`[REF-SHEET] Limited to top ${maxElements} elements (trial mode); no reference cell for ${droppedByCap.length}: ${droppedByCap.map(e => `${e.id || '?'} ${e.name || e.label || '?'} (${e.pageCount}p)`).join(', ')}`);
   }
 
   if (needsReference.length === 0) {

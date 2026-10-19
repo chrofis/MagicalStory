@@ -2173,14 +2173,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             minAppearances: 2,
             // Every secondary character is in the visual bible with its own
             // reference even on a single page (owner 2026-07-26) — same rule in
-            // trial as full mode; the maxElements cap below still bounds total refs.
+            // trial as full mode.
             characterMinAppearances: 1,
             maxPerBatch: 4,
             // No cell render gate on the trial, by design (docs/decisions.md
             // 2026-10-09 "Trial reference sheets: no render gate"). A full story
             // keeps it.
             renderGate: false,
-            maxElements: 6,  // trial cost cap on reference cells, enforced in code only (the planner prompt states no count; docs/decisions.md 2026-10-19). generateReferenceSheet logs every element it drops.
             storyId: jobId,
             // See the full-mode call site for why: non-character elements
             // should match the page aspect, not avatarAspect.
@@ -3266,7 +3265,7 @@ ${trialWriter.pagesPrompt}`;
     // promise here rather than firing a duplicate finalize-time gen.
     // For FULL mode: this is the canonical kickoff point — scene expansion is
     // a separate second pass after streaming, so timing isn't an issue and the
-    // wider element scope (maxElements: null) is the right default.
+    // wider element scope is the right default.
     let referenceSheetPromise = inputData.trialMode ? trialReferenceSheetPromise : null;
     if (!inputData.trialMode && !skipImages) {
       const refSheetModel = MODEL_DEFAULTS.pageImage; // PIPE-7: was MODEL_DEFAULTS.image (nonexistent)
@@ -3276,7 +3275,6 @@ ${trialWriter.pagesPrompt}`;
         minAppearances: 2, // Non-character elements (locations/artifacts/…) appearing on 2+ pages
         characterMinAppearances: 1, // Every secondary character gets its own face reference, even on a single page (owner)
         maxPerBatch: 4,    // Max 4 elements per grid for quality
-        maxElements: null, // Generate reference sheets for all qualifying elements
         storyId: jobId,    // Phase 1d R2 dual-write: refs upload to stories/{jobId}/vb/{entryId}.jpg
         // Location/vehicle/artifact/animal elements render at the story's own
         // page aspect — not avatarAspect — so a single-element plate reference

@@ -354,7 +354,7 @@ model."
   `visualBible.secondaryCharacters` (get an image only if a *reference* is
   generated). Reference generation is gated by `minAppearances` **default 2**
   (`visualBible.js:1712-1722`) — that's the "sometimes": a secondary on **one
-  page** (or dropped by the trial `maxElements` cap) never gets a reference.
+  page** never gets a reference.
 - Per-page reference selection resolves `sceneCharacters` against
   `inputData.characters` **only** (`server.js:5100`), so a secondary never
   produces a colour-framed identity card. The VB-grid path drops ref-less
@@ -397,7 +397,7 @@ per the owner: `getElementsNeedingReferenceImages` takes a per-type gate — sec
 locations/artifacts/etc keep the 2-page gate. **No name/identity filter** — every
 entry the story put in `secondaryCharacters` gets its own reference and flows into a
 VB-grid cell → per-page packing sends its OWN face to Grok/Gemini → no primary-face
-bleed. Same rule in **full AND trial mode** (trial's `maxElements:6` cap still bounds
+bleed. Same rule in **full AND trial mode** (the trial's reference cells are no longer capped since 2026-10-19;
 refs). Provider-agnostic (VB/reference layer). 10 unit assertions pass; observability
 log `[REF-SHEET] 🧑`.
 **Correction:** the first cut added an `isNamedIndividualCharacter` guard +
