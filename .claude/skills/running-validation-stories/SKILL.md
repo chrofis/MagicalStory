@@ -23,11 +23,13 @@ Validation runs cost real money (a full story ~CHF 2) and time (~20 min). **Clim
 
 - Auth: `TOKEN=$(node scripts/admin/get-admin-token.js)` is the canonical way to get an admin Bearer token (see CLAUDE.md → "Admin API auth"); the runner below does its own login with the same account. The staging Basic gate covers HTML only — `/api/*` needs just the Bearer.
 - Account: `demo-b-hnecf@magicalstory.ch` (admin: unlimited quota, allows 4-page stories + skipCovers, bypassing the wizard's 10-page minimum). It already has characters and styled avatars — pick a story category matching the existing avatars so nothing regenerates.
+- **Pick the cast with `--names=Emma,Noah,Daniel,Sarah`** (first character with each name, in that order). The account holds 20+ characters and a story takes at most 10: without `--names` the runner sends them all and the server refuses the job (`characters must have at most 10 items`). The first `--mains=N` of the list are the main cast.
+- **Trial validation run:** `node scripts/admin/trial-showcase.js` (staging by default, no browser, ~CHF 0.20–0.35, `--dry-run` first). The trial has exactly one character, taken from `tests/helpers/trial-rotation.json`.
 - Runner: `scripts/test-scene-composite-smoke.js` — historic name, but it IS the generic cheap-run harness: logs in, POSTs `/api/jobs/create-story` with `pages: 4`, `skipCovers: true`, optional `--skipEval=false` for the full eval/repair pipeline, then polls to completion.
 
 ```bash
 STAGING_AUTH_USER=... STAGING_AUTH_PASSWORD=... TEST_BASE_URL=https://staging.magicalstory.ch \
-  node scripts/test-scene-composite-smoke.js --pages=4 --skipEval=true
+  node scripts/test-scene-composite-smoke.js --pages=4 --skipEval=true --names=Emma,Noah
 ```
 
 (Leave the composite/phantom flags alone — the composite pipeline is dead by kill-switch; the flags are inert history.)

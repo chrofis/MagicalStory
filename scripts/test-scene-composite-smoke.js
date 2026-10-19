@@ -78,6 +78,8 @@ const SKIP_EVAL = arg('skipEval', 'true').toLowerCase() !== 'false';
 const ART_STYLE = arg('artStyle', 'watercolor');
 const CATEGORY = arg('category', 'adventure');
 const TOPIC = arg('topic', 'pirate');
+// --names=Emma,Noah,Daniel,Sarah → only these account characters are in the story
+// (a story takes at most 10; the smoke account holds more). See the step-2 fetch.
 // --city=Luzern → payload.userLocation, which drives landmark resolution
 // (beats + AD get the city's indexed landmarks). Omit for no landmarks.
 const CITY = arg('city', null);
@@ -187,7 +189,16 @@ async function api(pathSegment, { method = 'GET', body = null, token = null, con
     console.error(`   ❌ /api/characters failed: ${chars.status}`);
     process.exit(1);
   }
-  const characters = chars.body.characters || [];
+  // --names=Emma,Noah picks which of the account's characters are in the story,
+  // in that order (first character with each name). Without it every character
+  // is sent, and a story takes at most 10.
+  const all = chars.body.characters || [];
+  const NAMES = arg('names', null);
+  const characters = NAMES ? NAMES.split(',').map(n => n.trim()).filter(Boolean).map(n => {
+    const c = all.find(x => x.name === n);
+    if (!c) { console.error(`   ❌ --names: no character "${n}" on this account (has: ${all.map(x => x.name).join(', ')})`); process.exit(2); }
+    return c;
+  }) : all;
   console.log(`   ✓ ${characters.length} characters: ${characters.map(c => c.name).join(', ')}`);
   if (characters.length < 1) {
     console.error('   ❌ Account has no characters — pick a different account.');
