@@ -10385,6 +10385,23 @@
         "paid": true
       },
       "evidence": []
+    },
+    {
+      "id": "trial-vb-central-items-and-vehicles",
+      "commits": [
+        "PENDING"
+      ],
+      "addedAt": "2026-10-19",
+      "status": "pending",
+      "claim": "On a trial whose idea names a toy figure, a vessel or another plot-central object, the planner's Visual Bible has an entry for it (a toy figure under artifacts with its properName, a vehicle under vehicles as VEH001), pages that show it cite its id, and the reference sheet draws it; when the 6-cell trial cap drops an element the log names it.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In stories.data.visualBible list artifacts/vehicles and compare with the idea and the arc WITH lines: every named or plot-central object has an entry; no toy figure sits under secondaryCharacters or animals. In the trial log find '[REF-SHEET] Limited to top 6 elements' (if present it lists the dropped ids) and check no named central item is among them. Look at the pages: the toy and any vessel keep one shape across pages."
+      },
+      "evidence": []
     }
   ],
   "runs": [

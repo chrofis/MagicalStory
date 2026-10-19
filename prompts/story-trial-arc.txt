@@ -43,7 +43,7 @@ Every field of a scene hint is written in English, whatever the story language: 
 
 # OUTPUT FORMAT
 
-Output all sections in this exact order. Do not skip any. The Visual Bible must contain every figure, animal and object that the Story Idea names or that your arc uses on two or more scenes, each under the name the arc uses; the maximums below yield to this (the idea own named figures and objects always get their entry), and a figure or object that the arc uses on one scene only follows the one-scene rule below.
+Output all sections in this exact order. Do not skip any. The Visual Bible must contain every figure, animal and object that the Story Idea names or that your arc uses on two or more scenes, each under the name the arc uses. A person the arc uses on one scene only, whom the Story Idea does not name, gets no entry and no name: the prose calls them "a friend" or "a neighbour".
 
 ---STORY ARC---
 One line per scene, all {PAGES} scenes, written in English (planning notes, not story prose):
@@ -71,6 +71,9 @@ TITLE: [A creative, specific title in {LANGUAGE}, containing the name {MAIN_CHAR
   ],
   "locations": [
     { "id": "LOC001", "name": "[Location name]", "pages": [1, 2, 3], "scaleClass": "{SCALE_CLASS_SPEC}", "setting": "[indoor/outdoor, type]", "colors": "[specific colors]", "features": "[distinctive visual elements]", "signatureElement": "[ONE unique detail]", "isRealLandmark": false, "landmarkQuery": null, "landmarkPhoto": "[a real landmark only: the number of the photo its plate shows, from its PHOTOS list, or \"none\". OMIT on an invented location]" }
+  ],
+  "vehicles": [
+    { "id": "VEH001", "label": "[the one English name every prompt uses for this element: one to four words ending in the noun, unique in this bible, never a bare category, never a proper noun, never a word from the story language]", "name": "[plain English noun phrase; a name the story gives it goes in properName]", "properName": "[OMIT unless the story names it]", "pages": [2, 3], "scaleClass": "{SCALE_CLASS_SPEC}", "generic": "[OMIT unless generic — same rule as for artifacts]", "colorAndDetails": "[appearance: shape, colour, material, distinctive features — no size]", "signatureElement": "[ONE unique detail]", "submerged": "[OMIT unless the vehicle lies beneath the surface of the water: true]", "noDaylight": "[OMIT unless the vehicle has no daylit sky of an Earth day outside it — a spacecraft, a station module: true]" }
   ],
   "backgrounds": [
     { "pages": [1, 2], "description": "A sun-drenched cobblestone village square with a medieval fountain in the center. Warm afternoon light. Wide shot. Open space in foreground where characters would stand." },
@@ -126,11 +129,8 @@ Each background describes a scene with no people, no human figures. Include: loc
 - {CREATURE_FEATURES}
 - {ONE_SIDED_FEATURE} {OBJECT_NOT_PLACED} {BODY_CONDITION_MARKER}
 - A name the story gives an element lives in `properName` and nowhere else — never in `label`, `name`, `description` or the page prose. One `properName` belongs to one id: two entries never share a name. An object that transforms later in the story and the creature it becomes are separate ids, and only one of them carries the name.
-- max **2 artifacts** (only props that actually drive the action across multiple scenes — not background dressing)
-- max **2 secondary characters**, and only a person who is drawn on 2 or more pages. A person who is in one page only gets no entry and no name; the prose calls them "a friend" or "a neighbour"
+- {VB_CATEGORY}
 - exactly {BACKGROUND_COUNT} backgrounds, as the BACKGROUNDS section says
-
-Every entry costs a reference image generation pass. A {PAGES}-page story rarely benefits from more than 2 of each — pick the elements that need consistency across scenes and leave the rest as scene-prose details.
 
 ---COVER SCENE---
 Front cover scene hint. The main character ({MAIN_CHARACTER_NAME}) is the only person — no secondary characters. After the LOC, `objects` may list up to {COVER_ELEMENT_CAP} Visual Bible animals or artifacts the cover shows, each with its id and each named in `imageSummary`. An animal the TITLE names is always one of them. Wide shot, balanced composition.{COVER_CLOTHING_NOTE}

@@ -46,6 +46,6 @@ describe('rules from the mermaid/ninja review reach every consumer', () => {
   });
 
   it('the trial writer lets a one-page person stay nameless', () => {
-    expect(read('prompts/story-trial-arc.txt')).toMatch(/one page only gets no entry and no name/);
+    expect(read('prompts/story-trial-arc.txt')).toMatch(/one scene only, whom the Story Idea does not name, gets no entry and no name/);
   });
 });

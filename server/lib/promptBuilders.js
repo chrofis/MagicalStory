@@ -3401,6 +3401,7 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     ONE_SIDED_FEATURE: ONE_SIDED_FEATURE_RULE,
     // An object's description never names the support it rests on (2026-10-17).
     OBJECT_NOT_PLACED: OBJECT_NOT_PLACED_RULE,
+    VB_CATEGORY: VB_CATEGORY_RULE,
     BODY_CONDITION_MARKER: BODY_CONDITION_MARKER_RULE,
     // The shot rules per path: on the Jev path a story page's shot is fixed
     // (owner, 2026-09-28) and no rule sets or widens it.
@@ -9899,6 +9900,14 @@ const PLACE_INSIDE_OUTSIDE_RULE = 'A page whose plan line puts its figures insid
  */
 const ONE_SIDED_FEATURE_RULE = 'Which of a pair carries a one-sided feature (one limb, ear or eye that hangs, is marked or differs from its twin) is never stated as left or right and never judged by side: the specification is relational ("one hangs limp, the other is folded neatly"), and the same figure drawn with the feature on the other side matches it.';
 /**
+ * VB_CATEGORY_RULE: which Visual Bible category a vehicle and a toy figure belong in. ONE sentence pair read by
+ * both Visual Bible writers (visual-bible.txt, story-trial-arc.txt; registry set vb-authoring-sites). The trial
+ * schema had no `vehicles` category and capped artifacts at 2, so a toy captain and its cardboard ship got no
+ * entry and changed shape from page to page (prod trial job_1792387012672_sl4o0ae0q, docs/decisions.md 2026-10-19).
+ */
+const VB_CATEGORY_RULE = "Every named or story-significant vehicle, vessel or structure gets its own `vehicles` entry (ids VEH001…) — the antagonist's and the rival's included, never folded into `locations`. When two of them can share one frame, both need entries. A toy figure the story names or turns on (a teddy, a doll, a puppet, a plush animal) is an `artifacts` entry, with a `properName` when the story names it — never a secondary character (that is a person) and never an `animals` entry.";
+
+/**
  * AN OBJECT IS DESCRIBED ALONE, NEVER WHERE IT IS (owner, 2026-10-17; docs/decisions.md "Object descriptions never
  * name a support"). Staging job_1792226018737_lb65hzkqs: the Visual Bible described a boarding plank as "its inner end
  * resting on the ship's rail", the reference cell drew a short board on a rail stump, the element-cell gate first
@@ -13343,6 +13352,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // The trial writer's Visual Bible entries state a one-sided feature relationally (sibling of visual-bible.txt).
       ONE_SIDED_FEATURE: ONE_SIDED_FEATURE_RULE,
       OBJECT_NOT_PLACED: OBJECT_NOT_PLACED_RULE,
+      VB_CATEGORY: VB_CATEGORY_RULE,
       PICTURE_COUNT: PICTURE_COUNT_RULE,
       CLOSING_MOMENT: CLOSING_MOMENT_RULE,
       // Trial has no Art Director either: the scene-hint composition rules
@@ -14215,6 +14225,7 @@ module.exports = {
   PLACE_INSIDE_OUTSIDE_RULE,
   ONE_SIDED_FEATURE_RULE,
   OBJECT_NOT_PLACED_RULE,
+  VB_CATEGORY_RULE,
   BODY_CONDITION_MARKER_RULE,
   DECLARED_CONDITION_DEF,
   PEAK_OF_ACTION_RULE,

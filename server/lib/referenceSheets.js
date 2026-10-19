@@ -1289,8 +1289,9 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
   if (maxElements && needsReference.length > maxElements) {
     // Sort by page count descending, then alphabetically
     needsReference.sort((a, b) => b.pageCount - a.pageCount || a.name.localeCompare(b.name));
+    const droppedByCap = needsReference.slice(maxElements);
     needsReference.length = maxElements;
-    log.info(`[REF-SHEET] Limited to top ${maxElements} elements (trial mode)`);
+    log.warn(`[REF-SHEET] Limited to top ${maxElements} elements (trial mode); no reference cell for ${droppedByCap.length}: ${droppedByCap.map(e => `${e.id || '?'} ${e.name || e.label || '?'} (${e.pageCount}p)`).join(', ')}`);
   }
 
   if (needsReference.length === 0) {

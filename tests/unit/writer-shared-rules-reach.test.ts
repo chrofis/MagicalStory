@@ -158,7 +158,8 @@ describe('shared prose rules reach both writers as one constant each', () => {
     expect(six).toContain('build tension (2-4), resolve (5-6)');
     expect(six).toContain('Keep it MINIMAL for a 6-scene story');
     expect(six).toContain('exactly 3 backgrounds');
-    expect(six).toContain('A 6-page story rarely benefits');
+    // The per-category counts and the cost sentence ("rarely benefits") left the planner prompt 2026-10-19 (docs/decisions.md).
+    expect(six).not.toContain('rarely benefits');
     expect(six).toContain('at least 4 out of 6');
     expect(six).not.toMatch(/5-scene|out of 5|5-page story|resolve \(4-5\)|3-5 backgrounds/);
     // The 5-page build keeps the split the template used to hard-code.

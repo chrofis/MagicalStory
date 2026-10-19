@@ -295,7 +295,9 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
 
   it('requires an entry for every named vehicle or vessel', () => {
     expect(templates['visualBible']).toMatch(/vehicles\b/i);
-    expect(templates['visualBible']).toMatch(/its own `?vehicles`? entry/i);
+    // The vehicle rule is the shared VB_CATEGORY_RULE since 2026-10-19 (also read by the trial planner).
+    expect(templates['visualBible']).toContain('{VB_CATEGORY}');
+    expect(require('../../server/lib/promptBuilders').VB_CATEGORY_RULE).toMatch(/its own `?vehicles`? entry/i);
   });
 
   // Regression: staging job_1789147573901_m3uam0nxi, Lab experiments 1189/1190.

@@ -4325,6 +4325,15 @@
       "fix": "storyMayUseTownLandmarks / coverTownInputs: one predicate for pages and covers. tests/unit/cover-places.test.ts; replay 5/5 made-up-world stories 8/15 landmark covers -> 0/15.",
       "status": "fixed",
       "fixedIn": "c3d84e464"
+    },
+    {
+      "id": "trial-vb-drops-central-items-and-has-no-vehicles",
+      "title": "The trial planner caps the Visual Bible at 2 artifacts and has no vehicles category, so a central toy figure and its vessel get no entry and change from page to page",
+      "reportedAt": "2026-10-19",
+      "source": "Owner-reported with evidence. Prod trial job_1792387012672_sl4o0ae0q (toy bear captain and cardboard ship: no entry, bear missing p1-p5, ship changes shape), job_1790282439176_ppgelxibt (castle of building bricks changes), job_1790256136168_pbxibjv0r (porridge bowl). 3 of 32 stored trials drop a central item, 20 of 32 sit at the 2-artifact cap, 0 of 14 full stories.",
+      "rootCause": "story-trial-arc.txt said max 2 artifacts / max 2 secondary characters / 'rarely benefits from more than 2 of each' (a cost sentence the code enforces separately with maxElements 6), its schema had no vehicles category (visual-bible.txt has one), and a named toy figure had no stated category.",
+      "fix": "Caps and cost sentence removed; vehicles added to the trial schema; ONE VB_CATEGORY_RULE (promptBuilders) filled into both Visual Bible templates (vehicle rule + toy figure is an artifacts entry); generateReferenceSheet logs every element its cap drops. tests/unit/trial-vb-categories-2026-10-19.test.ts; replay of the real planner call on 41 stored trial inputs (evals/runs/2026-10-19_trial-vb-coverage).",
+      "status": "open"
     }
   ]
 }

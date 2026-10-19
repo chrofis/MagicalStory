@@ -2180,7 +2180,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // 2026-10-09 "Trial reference sheets: no render gate"). A full story
             // keeps it.
             renderGate: false,
-            maxElements: 6,  // trial cap — story-trial.txt limits to max 2 secondaries + 2 artifacts + 2 locations
+            maxElements: 6,  // trial cost cap on reference cells, enforced in code only (the planner prompt states no count; docs/decisions.md 2026-10-19). generateReferenceSheet logs every element it drops.
             storyId: jobId,
             // See the full-mode call site for why: non-character elements
             // should match the page aspect, not avatarAspect.
@@ -2244,7 +2244,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // cost cut from one plate per page), which put every page of a story set
           // at one landmark on a single backdrop (18 of 43 stored staging trials) —
           // docs/decisions.md 2026-10-09 "Trial backgrounds". The writer is told to
-          // declare exactly 3 distinct ones (story-trial.txt), so 3 plates, rendered
+          // declare exactly 3 distinct ones (story-trial-arc.txt), so 3 plates, rendered
           // in parallel. Pages in no location still get their entry's plate.
           const { groupTrialPlatePagesByVantage } = require('./server/lib/sceneMetadata');
           const plateGroups = groupTrialPlatePagesByVantage(vb);
