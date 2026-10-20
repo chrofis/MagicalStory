@@ -1283,7 +1283,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
 
           // Build the image prompt — trial uses rich scene hint as scene description
-          const sceneDescription = page.sceneHint || page.text || '';
+          // No page-text fallback: a page without a scene hint has no picture to draw (decisions.md "Trial call B must deliver a scene hint").
+          const sceneDescription = page.sceneHint;
+          if (!sceneDescription) throw new Error(`page ${page.pageNumber} has no scene hint`);
           // Parsed BEFORE the cell crop: its characters carry pose/perspective,
           // and the crop needs them. `sceneCharacters` is the raw character
           // record list from getCharactersInScene, which has no pose at all, so
@@ -3071,6 +3073,10 @@ ${trialWriter.pagesPrompt}`;
     // Beats mode assembled its own pages (text + beat scene line); the parser
     // has no ---STORY PAGES--- draft/patch structure to merge in that path.
     const storyPages = beatsMode ? beatsResult.pages : parser.extractPages();
+    // A page with no scene hint has nothing to illustrate; the page text is never a stand-in (it was, and the
+    // picture model painted the dialogue). Fail loudly (decisions.md "Trial call B must deliver a scene hint").
+    const noHint = (storyPages || []).filter(p => !p?.sceneHint).map(p => p?.pageNumber);
+    if (noHint.length) throw new Error(`story page(s) ${noHint.join(', ')} have no scene hint — refusing to draw them from the page text`);
 
     // Page-side sibling of the cover reconciliation above: a page may not ask
     // for an outfit the story's clothing contract says does not exist. Left
@@ -3389,7 +3395,7 @@ ${trialWriter.pagesPrompt}`;
     // Collect avatar requirements and prepare styled avatars
     const sceneDescriptions = storyPages.map(page => ({
       pageNumber: page.pageNumber || storyPages.indexOf(page) + 1,
-      description: page.sceneHint || page.text || ''
+      description: page.sceneHint
     }));
     // Build pageClothing from per-character clothing data
     const pageClothing = {};

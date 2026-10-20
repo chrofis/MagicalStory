@@ -15,6 +15,7 @@
  */
 const { buildTrialArcPrompt, buildTrialPagesPrompt } = require('./promptBuilders');
 const { callTextModelStreaming, describeTruncation } = require('./textModels');
+const { UnifiedStoryParser } = require('./outlineParser');
 const { MODEL_DEFAULTS } = require('../config/models');
 
 const PAGES_MARKER = '---STORY PAGES---';
@@ -36,6 +37,26 @@ function addUsage(a, b) {
  * @param {Function} [p.callText]       the model call (tests inject a fake); defaults to callTextModelStreaming
  * @returns {Promise<{text, arcText, pagesText, arcPrompt, pagesPrompt, modelId, usage, arcResult, pagesResult}>}
  */
+/**
+ * Call B owes a scene hint (a JSON `scene` object) for EVERY page. The model has returned text-only pages
+ * once (staging job_1792476898085_zdswtvv9v: pages 1-5 TEXT only, page 6 "SCENE HINT: placeholder"), and
+ * downstream the picture model was then given the page text as the scene. No fallback: throw, naming the
+ * pages. See DECISIONS "Trial call B must deliver a scene hint for every page".
+ */
+function assertEveryPageHasSceneHint(text, sceneCount, modelId) {
+  const pages = new UnifiedStoryParser(text, { isTrial: true }).extractPages();
+  const bad = [];
+  for (let n = 1; n <= sceneCount; n++) {
+    const page = pages.find(p => p.pageNumber === n);
+    let ok = false;
+    if (page && page.sceneHint) {
+      try { ok = !!JSON.parse(page.sceneHint)?.scene; } catch { ok = false; }
+    }
+    if (!ok) bad.push(n);
+  }
+  if (bad.length) throw new Error(`trial pages writer ${modelId} returned no usable scene hint (JSON "scene" block) for page(s) ${bad.join(', ')} of ${sceneCount}`);
+}
+
 async function runTrialWriter({ inputData, sceneCount, pagesModel, arcSuffix = '', onArcText, onPagesChunk, heartbeat, callText = callTextModelStreaming }) {
   const arcPrompt = buildTrialArcPrompt(inputData, sceneCount) + arcSuffix;
   const arcResult = await callText(arcPrompt, null, () => heartbeat && heartbeat(), MODEL_DEFAULTS.trialArcModel,
@@ -57,6 +78,9 @@ async function runTrialWriter({ inputData, sceneCount, pagesModel, arcSuffix = '
   if (pagesResult.truncation?.suspected) throw new Error('trial pages reply was cut off: ' + describeTruncation(pagesResult.truncation));
   const pagesText = String(pagesResult.text || '').trim();
   if (!pagesText.includes(PAGES_MARKER)) throw new Error(`trial pages writer ${pagesResult.modelId || pagesModel} returned no ${PAGES_MARKER} section (${pagesText.length} chars)`);
+  assertEveryPageHasSceneHint(`${arcText}
+
+${pagesText}`, sceneCount, pagesResult.modelId || pagesModel);
 
   return {
     text: `${arcText}\n\n${pagesText}`,
@@ -67,4 +91,4 @@ async function runTrialWriter({ inputData, sceneCount, pagesModel, arcSuffix = '
   };
 }
 
-module.exports = { runTrialWriter, PAGES_MARKER };
+module.exports = { runTrialWriter, assertEveryPageHasSceneHint, PAGES_MARKER };

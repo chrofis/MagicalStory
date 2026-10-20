@@ -4335,6 +4335,15 @@
       "fix": "Caps and cost sentence removed; vehicles added to the trial schema; ONE VB_CATEGORY_RULE (promptBuilders) filled into both Visual Bible templates (vehicle rule + toy figure is an artifacts entry); generateReferenceSheet logs every element its cap drops. tests/unit/trial-vb-categories-2026-10-19.test.ts; replay of the real planner call on 41 stored trial inputs (evals/runs/2026-10-19_trial-vb-coverage).",
       "status": "fixed",
       "fixedIn": "3aef7a678"
+    },
+    {
+      "id": "trial-call-b-text-only-pages-painted-as-scene",
+      "title": "Trial pages writer (call B) returned text-only pages with no scene hints and the pipeline used the PAGE TEXT as the scene description, so the picture model painted dialogue and titles",
+      "reportedAt": "2026-10-20",
+      "source": "Staging trial job_1792476898085_zdswtvv9v (build d40d47ad4): stored outline has TEXT-only pages 1-5 and 'SCENE HINT: placeholder' on page 6; generationLog scene_consistency metadata_parse_failed p6; sceneDescriptions[].description '' on 5/6 pages. 0 of 15 latest prod trials and 18 staging trials had this.",
+      "rootCause": "Two parts. (1) Call B's reply was never validated: the model (claude-sonnet-5-5) returned 6 TEXT blocks with no scene hint JSON (about 1700 output tokens against about 4800 when it complies); the sent prompt was byte-identical to a prompt that gives hints 4/4 on replay (USD ~0.5), so it is a rare model non-compliance, not a prompt or parser defect. (2) storyJobPipeline.js fell back to page.text when sceneHint was empty (startTrialPageImageGeneration and the sceneDescriptions build), which turned the omission into a painted-words image.",
+      "fix": "trialWriter.assertEveryPageHasSceneHint throws when any page lacks a JSON scene hint; both page-text fallbacks removed and a pipeline guard fails any story page without a scene hint. tests/unit/trial-writer-scene-hint-required-2026-10-20.test.ts (real stored failed reply as fixture).",
+      "status": "open"
     }
   ]
 }
