@@ -4354,7 +4354,7 @@
       "rootCause": "buildOneCallSheetPrompt (server/lib/character2x4Sheet.js:366-395) states hair colour but never the stored skinTone; on the costume sheet the season block that pins skin tone is suppressed (oneCallSheet.js:70, character2x4Sheet.js:370/388) and Image 3 is reduced to build only (:378), so only the face photo anchors skin. judgeAvatarSheet gets no photo (oneCallSheet.js:74) and has no skin question, so the sheet shipped.",
       "fix": "buildSkinToneBlock in server/lib/character2x4Sheet.js states physical.skinTone in the sheet prompt (standard and costume); the costume Image 3 line takes build and skin tone. See docs/decisions.md 2026-10-21.",
       "status": "fixed",
-      "fixedIn": "PENDING"
+      "fixedIn": "beef93326"
     }
   ]
 }
