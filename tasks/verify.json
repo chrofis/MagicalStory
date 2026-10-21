@@ -10486,7 +10486,7 @@
     {
       "id": "character-delete-removes-r2-files",
       "commits": [
-        "PENDING"
+        "23ec85736"
       ],
       "addedAt": "2026-10-21",
       "status": "pending",

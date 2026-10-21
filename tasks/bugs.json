@@ -4364,7 +4364,7 @@
       "rootCause": "server/routes/characters.js DELETE prunes prefix characters/${req.user.id}/${characterIdToDelete}/, which does not match the inline key layout the uploads use.",
       "fix": "server/lib/characterR2.js pruneDeletedCharacterFiles deletes the R2 keys named by the deleted character record plus its per-id prefix, skipping any key a remaining character, story or job still references. tests/unit/character-delete-r2.test.ts. See docs/decisions.md 2026-10-21. Orphans already on R2: scripts/admin/orphaned-character-files.js (read only).",
       "status": "fixed",
-      "fixedIn": "PENDING"
+      "fixedIn": "23ec85736"
     }
   ]
 }
