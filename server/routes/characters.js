@@ -907,7 +907,7 @@ router.delete('/:characterId', authenticateToken, async (req, res) => {
 
     // First, get ONLY the character name (not the full data blob)
     const nameResult = await dbQuery(`
-      SELECT c.elem->>'name' as name
+      SELECT c.elem->>'name' as name, c.elem AS elem
       FROM characters,
            jsonb_array_elements(data->'characters') WITH ORDINALITY AS c(elem, idx)
       WHERE id = $1
@@ -919,6 +919,8 @@ router.delete('/:characterId', authenticateToken, async (req, res) => {
     }
 
     const deletedCharName = nameResult[0].name;
+    // Read before the delete: its image URLs are the only record of which R2 files it owned.
+    const deletedCharRecord = nameResult[0].elem;
 
     // Use PostgreSQL to filter out the character and clean relationships IN-PLACE
     // Update both data AND metadata columns
@@ -982,18 +984,19 @@ router.delete('/:characterId', authenticateToken, async (req, res) => {
 
     const remainingCount = updateResult[0]?.remaining_count || 0;
 
-    // Prune the character's R2 prefix (photos, avatars, styled avatars,
-    // avatar-refs). Story deletion has done this for story artefacts since
-    // the R2 migration; character deletion never did, so every deleted
-    // character orphaned its objects on R2 permanently. Best-effort — the
-    // DB delete already won.
+    // Delete the files THIS character owns on R2 (photos, avatars, styled avatars, sheets) unless a
+    // remaining character, story or job still references them (server/lib/characterR2.js,
+    // docs/decisions.md 2026-10-21). The row is already gone, so a failure does not fail the request
+    // (a retry would only 404): it is logged at ERROR and queued in r2_pending_deletions instead.
     try {
-      const r2Pending = require('../lib/r2Pending');
-      const removed = await r2Pending.prunePrefix(
-        `characters/${req.user.id}/${characterIdToDelete}/`, 'character deleted');
-      if (removed > 0) console.log(`☁️  Deleted ${removed} R2 objects for character ${characterIdToDelete}`);
+      const { pruneDeletedCharacterFiles } = require('../lib/characterR2');
+      const r = await pruneDeletedCharacterFiles({
+        userId: req.user.id, characterId: characterIdToDelete, rowId,
+        deletedChar: deletedCharRecord, query: dbQuery,
+      });
+      console.log(`☁️  Character ${characterIdToDelete}: ${r.deleted}/${r.candidates} R2 objects deleted, ${r.keptReferenced.length} kept (still referenced), ${r.failed.length} failed`);
     } catch (r2Err) {
-      console.warn(`R2 cleanup failed for character ${characterIdToDelete}: ${r2Err.message}`);
+      console.error(`[Characters] PRIVACY: R2 cleanup of deleted character ${characterIdToDelete} (user ${req.user.id}) did NOT run: ${r2Err.stack || r2Err.message}. Its files are orphaned until scripts/admin/orphaned-character-files.js is acted on.`);
     }
 
     await logActivity(req.user.id, req.user.username, 'CHARACTER_DELETED', {

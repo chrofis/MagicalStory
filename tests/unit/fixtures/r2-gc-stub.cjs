@@ -61,7 +61,17 @@ class Pool {
   constructor(opts = {}) {
     this.staging = String(opts.connectionString || '') === STAGING_URL;
   }
-  async query(sql) {
+  // The scan matches URLs inside the database (regexp_matches, one row per distinct key); the stub
+  // stores the table text and applies the same pattern the real query is given.
+  async query(sql, params) {
+    const res = await this.rawQuery(sql);
+    if (!/regexp_matches/.test(sql)) return res;
+    const re = new RegExp(params[0], 'g');
+    const keys = new Set();
+    for (const r of res.rows) for (const m of String(r.s || '').matchAll(re)) keys.add(m[1]);
+    return { rows: [...keys].map((k) => ({ k })) };
+  }
+  async rawQuery(sql) {
     if (/information_schema/.test(sql)) {
       return { rows: [{ table_name: 'characters' }, { table_name: 'story_images' }] };
     }

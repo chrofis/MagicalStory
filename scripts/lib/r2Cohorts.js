@@ -112,6 +112,69 @@ async function assertBucketMatchesDatabase(pool) {
 }
 
 /**
+ * Every R2 key stored in a URL anywhere in the database(s) that write to this
+ * bucket: every base table, cast to text. Hard-stops (die) on any table or
+ * database that cannot be scanned, because a silent zero would mark that
+ * table's objects unreferenced. Read-only. Shared by scanAndReport and
+ * scripts/admin/orphaned-character-files.js.
+ *
+ * @param {import('pg').Pool} pool  primary database
+ * @returns {Promise<{referenced:Set<string>, perTable:Map, tablesScanned:number, databases:number}>}
+ */
+async function scanReferencedKeys(pool) {
+  const referenced = new Set();
+  const perTable = new Map();
+  let tablesScanned = 0;
+
+  const sources = [{ label: 'primary database', pool }];
+  if (process.env.STAGING_DATABASE_URL && process.env.STAGING_DATABASE_URL !== process.env.DATABASE_URL) {
+    sources.push({
+      label: 'staging (STAGING_DATABASE_URL)',
+      pool: new Pool({ connectionString: process.env.STAGING_DATABASE_URL, ssl: { rejectUnauthorized: false } }),
+      extra: true,
+    });
+  } else {
+    row('staging reference scan', 'SKIPPED — STAGING_DATABASE_URL not set');
+  }
+
+  for (const src of sources) {
+    let tables;
+    try {
+      tables = await src.pool.query(
+        "select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE' order by table_name"
+      );
+    } catch (err) {
+      die(`could not list tables in ${src.label}: ${err.message}
+  The reference set is incomplete, so no verdict from this run is trustworthy.`);
+    }
+    row(`  scanning ${src.label}`, `${tables.rows.length} table(s)`);
+    for (const { table_name: tn } of tables.rows) {
+      try {
+        // Matched IN the database: string_agg of a whole table into one JS string overflows
+        // (ERR_STRING_TOO_LONG, 2026-10-21) and moves every row over the wire for nothing.
+        const hostRe = HOST.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+        const r = await src.pool.query(
+          `select distinct m[1] as k from "${tn}" src, regexp_matches(src::text, $1, 'g') m`,
+          [hostRe + `([^"'\\s,}\\]\\)]+)`]);
+        const hits = r.rows.map((x) => x.k);
+        const before = referenced.size;
+        hits.forEach((k) => referenced.add(k));
+        if (hits.length) {
+          const key = src.extra ? `${tn} (staging)` : tn;
+          perTable.set(key, { hits: hits.length, newKeys: referenced.size - before });
+        }
+      } catch (err) {
+        die(`could not scan table ${tn} in ${src.label}: ${err.message}
+  The reference set is incomplete, so no verdict from this run is trustworthy.`);
+      }
+    }
+    tablesScanned += tables.rows.length;
+    if (src.extra) await src.pool.end();
+  }
+  return { referenced, perTable, tablesScanned, databases: sources.length };
+}
+
+/**
  * Run the whole read-only half: preflight, banner, reference scan, bucket walk,
  * verdicts, report, manifest. Returns the victim list so a caller that IS a
  * delete tool can act on it; this module itself never deletes.
@@ -161,56 +224,11 @@ async function scanAndReport({ options, modeLabel, toolName }) {
   //    for the same reason a table failure is: skipping it silently marks every
   //    staging-only cohort deletable.
   section('1. REFERENCE SCAN — every base table, cast to text, in every writing database');
-  const referenced = new Set();
-  const perTable = new Map();
-  let tablesScanned = 0;
-
-  const sources = [{ label: 'production (DATABASE_URL)', pool }];
-  if (process.env.STAGING_DATABASE_URL && process.env.STAGING_DATABASE_URL !== process.env.DATABASE_URL) {
-    sources.push({
-      label: 'staging (STAGING_DATABASE_URL)',
-      pool: new Pool({ connectionString: process.env.STAGING_DATABASE_URL, ssl: { rejectUnauthorized: false } }),
-      extra: true,
-    });
-  } else {
-    row('staging reference scan', 'SKIPPED — STAGING_DATABASE_URL not set');
-  }
-
-  for (const src of sources) {
-    let tables;
-    try {
-      tables = await src.pool.query(
-        "select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE' order by table_name"
-      );
-    } catch (err) {
-      die(`could not list tables in ${src.label}: ${err.message}
-  The reference set is incomplete, so no verdict from this run is trustworthy.`);
-    }
-    row(`  scanning ${src.label}`, `${tables.rows.length} table(s)`);
-    for (const { table_name: tn } of tables.rows) {
-      try {
-        const r = await src.pool.query(`select string_agg(src::text,' ') s from "${tn}" src`);
-        const blob = r.rows[0] && r.rows[0].s;
-        if (!blob) continue;
-        const hits = blob.match(new RegExp(HOST.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&') + `[^"'\\s,}\\]\\)]+`, 'g')) || [];
-        const before = referenced.size;
-        hits.forEach((u) => referenced.add(u.slice(HOST.length)));
-        if (hits.length) {
-          const key = src.extra ? `${tn} (staging)` : tn;
-          perTable.set(key, { hits: hits.length, newKeys: referenced.size - before });
-        }
-      } catch (err) {
-        die(`could not scan table ${tn} in ${src.label}: ${err.message}
-  The reference set is incomplete, so no verdict from this run is trustworthy.`);
-      }
-    }
-    tablesScanned += tables.rows.length;
-    if (src.extra) await src.pool.end();
-  }
+  const { referenced, perTable, tablesScanned, databases } = await scanReferencedKeys(pool);
   for (const [t, e] of [...perTable.entries()].sort((a, b) => b[1].hits - a[1].hits)) {
     row(`  ${t}`, `${e.hits} url(s), +${e.newKeys} new key(s)`);
   }
-  row('DATABASES SCANNED', sources.length);
+  row('DATABASES SCANNED', databases);
   row('TABLES SCANNED', tablesScanned);
   row('DISTINCT KEYS REFERENCED', referenced.size);
 
@@ -362,4 +380,5 @@ module.exports = {
   row,
   die,
   scanAndReport,
+  scanReferencedKeys,
 };

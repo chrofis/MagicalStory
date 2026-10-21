@@ -10482,6 +10482,23 @@
         "what": "Compare the standard and costumed avatar sheets with the photo and stored physical.skinTone (including a dark-skinned child), and a costume page next to an everyday page."
       },
       "evidence": []
+    },
+    {
+      "id": "character-delete-removes-r2-files",
+      "commits": [
+        "PENDING"
+      ],
+      "addedAt": "2026-10-21",
+      "status": "pending",
+      "claim": "Deleting a character on staging removes exactly the R2 files its record names (photos, avatars, sheets) with HTTP 404 afterwards, keeps any file a remaining character, story or job still references, and logs no PRIVACY error.",
+      "runShape": [
+        "none"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "On staging: create a user with two characters (photos plus avatars), delete one via DELETE /api/characters/:id, then GET the deleted character's photo URLs (expect 404) and the other character's (expect 200); check the log line 'R2 objects deleted' and no 'PRIVACY' error."
+      },
+      "evidence": []
     }
   ],
   "runs": [
