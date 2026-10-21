@@ -10465,6 +10465,23 @@
         "result": "NOT COVERED",
         "note": "trial: not a trial run"
       }
+    },
+    {
+      "id": "avatar-sheet-skin-tone-stated",
+      "commits": [
+        "PENDING"
+      ],
+      "addedAt": "2026-10-21",
+      "status": "pending",
+      "claim": "A trial or full story whose character has a stored physical.skinTone gets sheets (standard and costume) whose figure keeps that skin tone, and the sheet prompt in the log carries a \"Skin tone: ...\" line; no costume page shows a different-coloured child than the everyday pages.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Compare the standard and costumed avatar sheets with the photo and stored physical.skinTone (including a dark-skinned child), and a costume page next to an everyday page."
+      },
+      "evidence": []
     }
   ],
   "runs": [

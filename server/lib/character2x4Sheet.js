@@ -234,6 +234,17 @@ function buildHairBlock(character) {
   return `\n${hair} Reproduce the hair EXACTLY in every cell — same length, same color, same shape, same parting, worn up or down the same way. The rear-turn cell (cell 4) must show the same hair, head rotated back toward camera to reveal one eye and cheek. Do NOT invent a different cut or a different face.\n`;
 }
 
+// The skin tone the character is DECLARED to have (the stored photo analysis, or the user's override: edits are written into
+// physical), as one block, or ''. Stated like the hair: until 2026-10-21 the sheet prompt never named it, and a costume sheet,
+// whose body reference is told to be ignored but for build, came out brown for a light-skinned child (prod trial
+// job_1792584180547_gr4cnr0u8). Nothing stored, nothing said: the photos decide alone.
+function buildSkinToneBlock(character) {
+  const tone = typeof character?.physical?.skinTone === 'string' ? character.physical.skinTone.trim() : '';
+  return tone ? `
+Skin tone: ${tone}. Face, neck, hands and legs all show exactly this skin tone in every cell, as in the photos: never darker, never lighter.
+` : '';
+}
+
 // ── Decoupled two-call sheet generation (2026-08-08) ────────────────────────
 // ONE combined 2×4 edit produced a HEADLESS bottom (body) row ~70% of the time:
 // squeezed into the near-square bottom cells the model rendered the two rows as
@@ -375,7 +386,7 @@ function buildOneCallSheetPrompt(character, { costumeDescription, costumeName = 
   const referenceBlock = hasReference
     ? (kind === 'standard'
       ? "\nImage 3 is the person's body reference: take its CLOTHING and build only. Whatever the person holds or carries in Image 3 (a hoop, ball or toy, a backpack or bag) is NOT part of the character."
-      : "\nImage 3 is the person's body reference: take its build only. IGNORE its clothing, it is the wrong outfit.")
+      : "\nImage 3 is the person's body reference: take its build and its skin tone only. IGNORE its clothing, it is the wrong outfit.")
     : '';
   const redo = redoLines.length ? `\nCORRECTIONS to the previous attempt (fix all of them, change nothing else):\n${redoLines.map(l => `- ${l}`).join('\n')}` : '';
   return `Image 1 is a layout guide ONLY: a 2×4 grid (two rows of four cells) showing the camera angle and facing direction of each cell. Ignore its silhouettes, bodies and faces. The output contains no arrows.
@@ -385,7 +396,7 @@ Output ONE image: a 2×4 grid, thin dividers between the cells, pure white backg
 TOP ROW (4 cells): head, neck and the top of the shoulders, cut off at the upper chest, with plain white above the hair; never crop the top of the head. BOTTOM ROW (4 cells): the COMPLETE FULL BODY from the very top of the head to the figure's lowest point (normally both feet with shoes), the whole figure inside its cell; if it does not fit, scale it down with white margin above and below. ${proportionsRule}
 In both rows: cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 a REAR TURN: ${REAR_TURN_POSE}. Cell 4 is never a second profile and never a flat back view with no face showing.
 
-Costume${named}: ${costumeDescription}${buildSeasonOutfitBlock(seasonOutfit, costumeOwnsOutfit)}${buildHairBlock(character)}${buildGlassesBlock(character)}
+Costume${named}: ${costumeDescription}${buildSeasonOutfitBlock(seasonOutfit, costumeOwnsOutfit)}${buildHairBlock(character)}${buildSkinToneBlock(character)}${buildGlassesBlock(character)}
 Art style: ${styleLine}${ageFromPhoto ? `. Natural proportions${ageFromPhoto}` : ''}. The face, hair colour and skin tone stay recognisably the person in Image 2.
 ${buildFootwearRule(costumeOwnsOutfit, seasonOutfit?.footwear)}
 Where the costume replaces the legs (a tail, a fin, a single fused lower body) the figure has no legs, no feet and no footwear: it ends at the tip of that form, which is then the lowest point. ${TAIL_POSE_RULE}
@@ -1003,6 +1014,7 @@ module.exports = {
   evaluateVariantSheet,
   declaredAgeBlock,
   buildGlassesBlock,
+  buildSkinToneBlock,
   resolveFacePhoto,
   readAvatarHair,
   _internal: { askSheetJudge, inlinePartOf, hairRequest, parseJudgeJson, isEchoedJudgeVerdict, resolveStyleLineForSheet, REAR_TURN_POSE, SHEET_GROUND_RULE, CELL_NAMES_NOT_DRAWN, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildUnnamedTrimRule, resolveBodyReference },

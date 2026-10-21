@@ -28,8 +28,8 @@ describe('empty hands reaches the sheet prompt', () => {
     expect(p).toMatch(/hoop/);
     expect(p).toMatch(/backpack/);
   });
-  it('a costume sheet takes the body reference build only and ignores its clothes', () => {
-    expect(P({ kind: 'costume', hasReference: true })).toMatch(/take its build only\. IGNORE its clothing/);
+  it('a costume sheet takes the body reference build and skin tone only and ignores its clothes', () => {
+    expect(P({ kind: 'costume', hasReference: true })).toMatch(/take its build and its skin tone only. IGNORE its clothing/);
   });
   it('the full-story avatar template keeps its no-carried-items rule', () => {
     expect(fs.readFileSync(path.join(ROOT, 'prompts/avatar-main-prompt.txt'), 'utf8')).toMatch(/No carried items/);

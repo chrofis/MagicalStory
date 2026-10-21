@@ -4345,6 +4345,16 @@
       "fix": "trialWriter re-asks call B once (fed back with the missing pages) when any page lacks a JSON scene hint, then throws; both page-text fallbacks removed and a pipeline guard fails any story page without a scene hint. tests/unit/trial-writer-scene-hint-required-2026-10-20.test.ts (real stored failed reply as fixture).",
       "status": "fixed",
       "fixedIn": "b757278e8"
+    },
+    {
+      "id": "costume-avatar-sheet-skin-tone-drift",
+      "title": "Trial costume avatar sheet drew the child with brown skin while the standard sheet and the stored photo analysis say light skin, so costume pages show a different-coloured child",
+      "reportedAt": "2026-10-21",
+      "source": "Owner report. Prod trial job_1792584180547_gr4cnr0u8 (Danilo, superhero): costumed sheet preGeneratedStyledAvatars-Danilo-costumed-default brown skin, standard sheet light, physical.skinTone light; covers and p6 brown, p1-p5 light. The family signed up and deleted the character 4 minutes after the story finished.",
+      "rootCause": "buildOneCallSheetPrompt (server/lib/character2x4Sheet.js:366-395) states hair colour but never the stored skinTone; on the costume sheet the season block that pins skin tone is suppressed (oneCallSheet.js:70, character2x4Sheet.js:370/388) and Image 3 is reduced to build only (:378), so only the face photo anchors skin. judgeAvatarSheet gets no photo (oneCallSheet.js:74) and has no skin question, so the sheet shipped.",
+      "fix": "buildSkinToneBlock in server/lib/character2x4Sheet.js states physical.skinTone in the sheet prompt (standard and costume); the costume Image 3 line takes build and skin tone. See docs/decisions.md 2026-10-21.",
+      "status": "fixed",
+      "fixedIn": "PENDING"
     }
   ]
 }

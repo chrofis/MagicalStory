@@ -224,7 +224,7 @@ describe('3. the sheet prompt', () => {
   it('a body reference adds Image 3 only when the caller has one; the kind decides what it is used for', () => {
     expect(sheetLib.buildOneCallSheetPrompt(character, base)).not.toMatch(/Image 3/);
     expect(sheetLib.buildOneCallSheetPrompt(character, { ...base, hasReference: true, kind: 'standard' })).toMatch(/Image 3 is the person's body reference: take its CLOTHING and build only/);
-    expect(sheetLib.buildOneCallSheetPrompt(character, { ...base, hasReference: true })).toMatch(/take its build only\. IGNORE its clothing/);
+    expect(sheetLib.buildOneCallSheetPrompt(character, { ...base, hasReference: true })).toMatch(/take its build and its skin tone only. IGNORE its clothing/);
     expect(() => sheetLib.buildOneCallSheetPrompt(character, { ...base, kind: undefined })).toThrow(/kind must be/);
   });
 
