@@ -3401,6 +3401,7 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     ONE_SIDED_FEATURE: ONE_SIDED_FEATURE_RULE,
     // An object's description never names the support it rests on (2026-10-17).
     OBJECT_NOT_PLACED: OBJECT_NOT_PLACED_RULE,
+    STATE_REPLACES_PART: STATE_REPLACES_PART_RULE,
     VB_CATEGORY: VB_CATEGORY_RULE,
     BODY_CONDITION_MARKER: BODY_CONDITION_MARKER_RULE,
     // The shot rules per path: on the Jev path a story page's shot is fixed
@@ -9918,6 +9919,14 @@ const VB_CATEGORY_RULE = "Every named or story-significant vehicle, vessel or st
  * never demands it and fails a cell that draws one.
  */
 const OBJECT_NOT_PLACED_RULE = "An object's `description` says what it IS and looks like, never where it is: it names no separate thing the object rests on, leans against, hangs from, lies in, is fastened to or points toward (a surface, wall, post, rail, floor, ground, shelf, person). That is page staging, and a reference cell draws the object alone. A part the object is built with (its own hook, base, handle or post) is part of it. A cell that shows the object alone is correct even when its description names a support; a cell that adds a separate support or surface fails.";
+/**
+ * A state's `delta` names the part it replaces (owner 2026-10-23, docs/decisions.md; prod trial
+ * job_1792772600127_tv32st82h: a "snapped" and a "repaired" part were each drawn as an extra object beside the intact
+ * part the base description still named). Written to BOTH Visual Bible writers; the reference-sheet prompt and the
+ * state-consistency judge read STATE_WINS_RULE, its other half.
+ */
+const STATE_REPLACES_PART_RULE = "A `delta` that changes a part of the object names that part exactly as `description` names it and says what it is now: \"the <part> is now <new thing>\" or \"the <part> is <changed condition>\" (the door is now hanging from one hinge; the sail is now patched with a red cloth). It replaces that part wherever `description` names it and never adds a second one beside it. A delta that only adds a feature says so (\"a bandage is now wrapped around the <part>\").";
+const STATE_WINS_RULE = "Where a cell's state change and its description name the same part, the state change wins: draw that part as the state says and not as the description says. The part is replaced, never drawn twice and never drawn beside the old one.";
 const BODY_CONDITION_MARKER_RULE = "A body condition the plot turns on (an injury, a hurt limb, a sign of illness) carries a visible marker a picture can show from any angle (a bandage, a splint, a sling, a plaster): the sentence that introduces the condition names the marker, the page text that first tells it names the marker, and the figure's Visual Bible description (where it has an entry) states the marker, so text and picture agree. How a limb hangs or moves is never the whole condition.";
 // The peak-of-motion instruction, anchored to the plan's own action (owner 2026-10-16, docs/decisions.md): the old wording
 // ("at its peak of motion - mid-leap, mid-swing, mid-throw") pushed a hop to a leap. ONE sentence for both Art Director
@@ -13352,6 +13361,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       // The trial writer's Visual Bible entries state a one-sided feature relationally (sibling of visual-bible.txt).
       ONE_SIDED_FEATURE: ONE_SIDED_FEATURE_RULE,
       OBJECT_NOT_PLACED: OBJECT_NOT_PLACED_RULE,
+      STATE_REPLACES_PART: STATE_REPLACES_PART_RULE,
       VB_CATEGORY: VB_CATEGORY_RULE,
       PICTURE_COUNT: PICTURE_COUNT_RULE,
       CLOSING_MOMENT: CLOSING_MOMENT_RULE,
@@ -14225,6 +14235,8 @@ module.exports = {
   PLACE_INSIDE_OUTSIDE_RULE,
   ONE_SIDED_FEATURE_RULE,
   OBJECT_NOT_PLACED_RULE,
+  STATE_REPLACES_PART_RULE,
+  STATE_WINS_RULE,
   VB_CATEGORY_RULE,
   BODY_CONDITION_MARKER_RULE,
   DECLARED_CONDITION_DEF,

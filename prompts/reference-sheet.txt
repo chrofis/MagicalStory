@@ -15,7 +15,7 @@ Generate one image laid out as a {GRID_SHAPE_PHRASE}.{GRID_SEPARATION} Each cell
 - Simple backgrounds: solid pastel color or subtle gradient (no detailed scenes)
 {CELL_LAYOUT_REQ}
 {TEXT_RULE}
-- All content must be safe, family-friendly, and age-appropriate{BATCH_GUARD}
+- All content must be safe, family-friendly, and age-appropriate{BATCH_GUARD}{STATE_RULE}
 
 **FOR CHARACTERS:**
 - 3/4 view showing face and upper body clearly

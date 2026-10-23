@@ -739,6 +739,14 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
     ? '\n- Each cell shows only its own element, never anything described for another cell, and no lettering or readable words anywhere'
     : '';
 
+  // A state cell is "base description, delta". The delta names the part it replaces (promptBuilders
+  // STATE_REPLACES_PART_RULE, docs/decisions.md 2026-10-23); this line is the sheet's half: the state wins where the two
+  // name the same part. Absent from a sheet with no state cell. Carries its own leading newline.
+  const stateRule = elements.some(el => el && el.stateName)
+    ? `
+- ${require('./promptBuilders').STATE_WINS_RULE}`
+    : '';
+
   // A solo cell whose entry carries `text` is the one place lettering is
   // wanted; every other sheet keeps the blanket ban.
   const textCell = count === 1 && String(elements[0]?.text || '').trim();
@@ -766,6 +774,7 @@ Fix exactly that; everything else stays as described above.`
     GRID_LAYOUT: gridLayoutLines.join('\n'),
     TEXT_RULE: textRule,
     BATCH_GUARD: batchGuard,
+    STATE_RULE: stateRule,
     GRID_SEPARATION: gridSeparation,
     CELL_LAYOUT_REQ: cellLayoutReq,
     CLOSING: closing,
@@ -945,7 +954,7 @@ function stateCellsGatePrompt(parent, cells) {
   // as a rule every cell must obey, so a state whose delta IS a colour change
   // failed for making it: staging job_1790539784661_6mjcny1c7, recheck "grey in
   // the second image … not described" against the delta "dull grey scales".
-  return `You are checking ${cells.length} cells cut from a reference sheet for an illustrated children's book. They are meant to show ONE object, ${article(kind)} ${kind}, described as: "${desc}", in ${cells.length} states, in this order: ${list} Each listed change is intended: whatever a state names — a colour, a surface, a glow, a part added, missing or broken — is expected in that cell, and where it differs from the description the state wins for that cell. Judge strictly: is it the same object in every cell — same shape, build and material, and the same colour except where a state names a colour change — differing only in what the states name? Two different objects, or a change no state names, fails. ${objectNotPlacedRule()} Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
+  return `You are checking ${cells.length} cells cut from a reference sheet for an illustrated children's book. They are meant to show ONE object, ${article(kind)} ${kind}, described as: "${desc}", in ${cells.length} states, in this order: ${list} Each listed change is intended: whatever a state names — a colour, a surface, a glow, a part added, missing or broken — is expected in that cell, and where it differs from the description the state wins for that cell. ${require('./promptBuilders').STATE_WINS_RULE} Judge strictly: is it the same object in every cell — same shape, build and material, and the same colour except where a state names a colour change — differing only in what the states name? Two different objects, or a change no state names, fails. ${objectNotPlacedRule()} Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
 }
 
 async function checkElementCellRender(cellBase64, el, styleDescription = '', modelKey = require('../config/models').MODEL_DEFAULTS.vbElementCellGate) {

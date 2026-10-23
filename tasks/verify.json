@@ -10530,6 +10530,22 @@
           "note": "Smoke account: appended throwaway character 999000123 whose photos named two fresh R2 files (characters/<user>/999000123/photos/face.jpg and characters/<user>/characters_<user>/inline/...). DELETE /api/characters/999000123 -> 200; both objects gone afterwards (HeadObject 404); the other 22 characters unchanged; log \"2/2 R2 objects deleted, 0 kept (still referenced), 0 failed\", no PRIVACY error. Keep-if-referenced path is covered by tests/unit/character-delete-r2.test.ts, not by this run."
         }
       ]
+    },
+    {
+      "id": "state-delta-names-replaced-part",
+      "commits": [],
+      "addedAt": "2026-10-23",
+      "status": "pending",
+      "claim": "On a story whose object has states, each state delta names the part it changes exactly as the description names it (\"the <part> is now ...\"), and the reference sheet draws that part as the state says: one replacement part per cell, never the old part with a new one beside it.",
+      "runShape": [
+        "trial",
+        "full"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In stories.data.visualBible read each states[].delta of an object with states: it must start from a named part that the description also names. Then open that object's state reference cells and confirm the changed part appears once, as the delta says."
+      },
+      "evidence": []
     }
   ],
   "runs": [
