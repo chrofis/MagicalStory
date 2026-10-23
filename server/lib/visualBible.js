@@ -3356,6 +3356,74 @@ function isPlateBorneElement(ref, sceneObjects = null) {
   return true;
 }
 
+/**
+ * THE ELEMENTS A PLATE DRAWS for one page: every vehicle and every large-scale
+ * artifact the plate's STRUCTURES block lists (prompts.buildPlateStructuresText).
+ * One predicate for that block and for the plate grouping, so "what the plate
+ * draws" can never mean two things.
+ *
+ * AD IS THE AUTHORITY on presence (owner, 2026-09-04): when the caller passes
+ * the scene's objects[] the element is drawn only when that list names it (the
+ * `aboard` vehicle always); with no objects[] (trial plates built before briefs
+ * exist, covers) the VB page list decides. Artifacts only, never a figure
+ * (2026-09-15).
+ *
+ * @returns {Object[]} VB entries (with a description), in vehicles-then-artifacts order
+ */
+function plateStructureEntries(visualBible, pageNumber, { aboardId = null, sceneObjects = null } = {}) {
+  if (!visualBible || pageNumber == null) return [];
+  const adAuthored = Array.isArray(sceneObjects);
+  const staged = (v) => {
+    if (!v.description) return false;
+    if (adAuthored) return (aboardId && v.id === aboardId) || sceneObjectsNameEntry(sceneObjects, v);
+    const pages = v.pages || v.appearsInPages;
+    return Array.isArray(pages) && pages.includes(pageNumber);
+  };
+  return [
+    ...(visualBible.vehicles || []),
+    ...(visualBible.artifacts || []).filter(e => isLargeScaleClass(e.scaleClass)),
+  ].filter(staged);
+}
+
+/**
+ * The state each plate-drawn element is in on a page, as [{entry, state}]
+ * (`state` null for an element with no states). The camera's own `aboard`
+ * vehicle is left out: the plate names it without describing it, so its state
+ * changes nothing on the plate. Decided from state ids and the bible's own
+ * page lists only (elementRefCell), never from description prose.
+ */
+function plateElementStates(visualBible, pageNumber, { aboardId = null, sceneObjects = null } = {}) {
+  return plateStructureEntries(visualBible, pageNumber, { aboardId, sceneObjects })
+    .filter(e => !(aboardId && e.id === aboardId))
+    .map(entry => ({ entry, state: elementRefCell(entry, null, pageNumber).state }));
+}
+
+/**
+ * Partition pages into plates: two pages can share a plate unless some element
+ * BOTH of their plates draw stands in a different state on each (docs/decisions.md
+ * 2026-10-23 "A plate is split where an element it draws changes state"). A page
+ * whose plate does not draw an element has no say about its state, so it joins
+ * the first group it does not contradict. Order-stable and deterministic.
+ *
+ * @param {Array<{pageNumber:number, aboardId?:string|null, sceneObjects?:Array|null}>} pages
+ * @returns {number[][]} page numbers per plate, in order of each plate's first page
+ */
+function partitionPagesByPlateState(visualBible, pages) {
+  const groups = [];
+  for (const p of pages) {
+    const mine = new Map(plateElementStates(visualBible, p.pageNumber, { aboardId: p.aboardId || null, sceneObjects: p.sceneObjects || null })
+      .map(({ entry, state }) => [entry.id, state ? state.id : '']));
+    const fit = groups.find(g => [...mine].every(([id, st]) => !g.states.has(id) || g.states.get(id) === st));
+    if (fit) {
+      fit.pageNumbers.push(p.pageNumber);
+      for (const [id, st] of mine) fit.states.set(id, st);
+    } else {
+      groups.push({ pageNumbers: [p.pageNumber], states: mine });
+    }
+  }
+  return groups.map(g => g.pageNumbers);
+}
+
 function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, aboardId = null, sceneObjects = null) {
   if (!visualBible) return [];
 
@@ -3391,7 +3459,7 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, ab
     // hasRef admits a stated element whose render lives on a state row, so the
     // cell has to be resolved here too — reading the entry's own fields would
     // push an undefined image onto the plate call.
-    const { cell } = elementRefCell(entry);
+    const { cell } = elementRefCell(entry, null, pageNumber);
     refs.push({
       id: entry.id,
       name: entry.name,
@@ -3429,7 +3497,7 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, ab
       if (adAuthored) {
         if (!sceneObjectsNameEntry(sceneObjects, entry)) continue;
       } else if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
-      const { cell } = elementRefCell(entry);
+      const { cell } = elementRefCell(entry, null, pageNumber);
       refs.push({
         id: entry.id,
         name: entry.name,
@@ -4043,6 +4111,9 @@ module.exports = {
   hasElementReference,
   elementRefCell,
   getEmptySceneElementReferences,
+  plateStructureEntries,
+  plateElementStates,
+  partitionPagesByPlateState,
   isRecurringCreature,
   getRecurringCreatureIds,
   vbStoryPageCount,

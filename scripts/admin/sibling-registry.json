@@ -1319,6 +1319,15 @@
       "severity": "block"
     },
     {
+      "id": "plate-grouping-splits-at-element-state",
+      "axis": "trial plate grouping vs full-story vantage grouping",
+      "reason": "A plate is split wherever a vehicle or large element it draws changes state between its pages (docs/decisions.md 2026-10-23, prod trial job_1792772600127_tv32st82h: pages 2-5 shared one plate that drew a wagon while the cart was broken on p2-p3 and repaired on p4-p5). groupTrialPlatePagesByVantage (trial) and groupPagesByVantage (full story, platePipeline.renderVantagePlates) must both partition through visualBible.partitionPagesByPlateState, the one predicate; the plate STRUCTURES line (prompts.buildPlateStructuresText) and the plate grid cell (getEmptySceneElementReferences) read the same state per page.",
+      "file": "server/lib/sceneMetadata.js",
+      "blockPattern": "function\\s+(groupPagesByVantage|groupTrialPlatePagesByVantage)\\s*\\(",
+      "mustContain": "partitionPagesByPlateState(",
+      "severity": "block"
+    },
+    {
       "id": "textmodel-stream-completion",
       "axis": "streaming provider entry points (Anthropic / Gemini / xAI / OpenRouter)",
       "reason": "every streaming entry point in textModels.js must throw streamCutError when its body ends without that provider's completion signal; the OpenRouter path accepted two cut page-brief streams as successes (staging job_1791145238223_50osg2osm, 7 of the last 40 staging beats stories). docs/decisions.md 2026-10-05.",

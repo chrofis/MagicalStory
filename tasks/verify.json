@@ -39,18 +39,34 @@
       }
     },
     {
+      "id": "trial-plate-split-at-state-and-keeps-vehicle-cell",
+      "commits": [],
+      "addedAt": "2026-10-23",
+      "claim": "On a trial whose vehicle (or large element) changes state between pages that share a background entry, the entry is rendered as one plate per state (pages with the same state share a plate), each plate's STRUCTURES line carries that state's change, and every plated page keeps the vehicle's cell in ITS state in the grid (the trial plate sends no element image). A full story splits a vantage's plate the same way and its plate grid cell is the state's cell.",
+      "runShape": [
+        "trial",
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Trial log line `[TRIAL] N plate(s) for M page(s): ...` lists more plates than backgrounds[] entries when a VEH/large ART has states; `[VB-GRID] Trial page N:` lists the vehicle's state id (e.g. VEH001.2, VEH001.3) among the cells on every page that cites it (`plate sent, carries no element image: vehicle/structure kept`); stories.data.sceneImages[].emptyScenePrompt/prompt of each plate has the state's delta in its STRUCTURES block; look at the plates and pages: the vehicle is drawn in the page's state. Full story: `[VANTAGE]` keys with a `~2` suffix, plate-grid cell per state."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
       "id": "trial-page-grid-production-selector",
       "commits": [
         "e4f6ccb16"
       ],
       "addedAt": "2026-10-07",
-      "claim": "On a trial run every page's VB grid is the production page grid: at most 4 cells, no landmark photo among the cells, a plate-borne vehicle/structure named in the hint's objects[] absent from the grid on a plated page, and the stored prompt's reference claim names exactly the kept cells; the trial still makes one image call per page.",
+      "claim": "On a trial run every page's VB grid is the production page grid: at most 4 cells, no landmark photo among the cells, (superseded 2026-10-23 for plate-borne vehicles/structures: the trial plate carries no element image, so a plated trial page KEEPS that cell, see trial-plate-split-at-state-and-keeps-vehicle-cell), and the stored prompt's reference claim names exactly the kept cells; the trial still makes one image call per page.",
       "runShape": [
         "trial"
       ],
       "check": {
         "kind": "human",
-        "what": "In the generation log read the `[VB-GRID] Trial page N:` lines (cell count <= 4, a VEH or building-scale element dropped on plated pages that cite it); in stories.data.sceneImages[].prompt check the 'rough images of' claim names only those cells and no landmark; count page image calls (one per page)."
+        "what": "In the generation log read the `[VB-GRID] Trial page N:` lines (cell count <= 4); in stories.data.sceneImages[].prompt check the 'rough images of' claim names only those cells and no landmark; count page image calls (one per page)."
       },
       "status": "confirmed",
       "evidence": [

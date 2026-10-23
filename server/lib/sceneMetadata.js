@@ -2068,10 +2068,28 @@ function groupPagesByVantage(pageDataArray, visualBible) {
     if (!groups.has(key)) groups.set(key, { vantage: v, pageNumbers: [] });
     groups.get(key).pageNumbers.push(pd.pageNumber);
   }
-  if (unassigned.length > 0) {
-    groups.set('__unassigned__', { vantage: null, pageNumbers: unassigned });
+  // A PLATE IS SPLIT WHERE AN ELEMENT IT DRAWS CHANGES STATE (owner, 2026-10-23,
+  // docs/decisions.md): pages of one vantage whose plate-drawn elements stand in
+  // different states cannot share a picture. The first sub-group keeps the
+  // vantage's key, the others get `<key>~<n>`; every sub-group keeps the same
+  // `vantage` object, so the vantage's own id (landmark citation, page record)
+  // is unchanged. Pages in the same states stay together, contiguous or not.
+  const { partitionPagesByPlateState } = require('./visualBible');
+  const pageDataByNumber = new Map(pageDataArray.map(pd => [pd.pageNumber, pd]));
+  const out = new Map();
+  for (const [key, group] of groups) {
+    const parts = partitionPagesByPlateState(visualBible, group.pageNumbers.map(pn => {
+      const sm = pageDataByNumber.get(pn)?.sceneMetadata;
+      return { pageNumber: pn, aboardId: sm?.aboard || null, sceneObjects: sm?.objects || null };
+    }));
+    parts.forEach((pageNumbers, i) => {
+      out.set(i === 0 ? key : `${key}~${i + 1}`, { vantage: group.vantage, pageNumbers });
+    });
   }
-  return groups;
+  if (unassigned.length > 0) {
+    out.set('__unassigned__', { vantage: null, pageNumbers: unassigned });
+  }
+  return out;
 }
 
 /**
@@ -2100,6 +2118,7 @@ function groupPagesByVantage(pageDataArray, visualBible) {
  *   ordered by first page; covers exactly the pages `backgrounds[]` names, once.
  */
 function groupTrialPlatePagesByVantage(visualBible) {
+  const { partitionPagesByPlateState } = require('./visualBible');
   const backgrounds = Array.isArray(visualBible?.backgrounds) ? visualBible.backgrounds : [];
   const locations = Array.isArray(visualBible?.locations) ? visualBible.locations : [];
   const claimed = new Set();
@@ -2110,14 +2129,21 @@ function groupTrialPlatePagesByVantage(visualBible) {
     const pages = [...new Set(bg.pages.filter(pn => typeof pn === 'number' && !claimed.has(pn)))].sort((a, b) => a - b);
     if (pages.length === 0) continue;
     pages.forEach(pn => claimed.add(pn));
-    const loc = locations.find(l => l?.id && Array.isArray(l.pages) && l.pages.includes(pages[0])) || null;
-    let vantageId = null;
-    if (loc) {
-      const k = (perLoc.get(loc.id) || 0) + 1;
-      perLoc.set(loc.id, k);
-      vantageId = `${loc.id}.${k}`;
+    // SPLIT WHERE A DRAWN ELEMENT CHANGES STATE (owner, 2026-10-23, docs/decisions.md):
+    // the entry's pages are partitioned by the state of every vehicle / large
+    // element the plate would draw. Trial briefs do not exist yet, so the VB page
+    // lists decide what is drawn (no objects[]). One state throughout = one plate,
+    // exactly as before.
+    for (const statePages of partitionPagesByPlateState(visualBible, pages.map(pageNumber => ({ pageNumber })))) {
+      const loc = locations.find(l => l?.id && Array.isArray(l.pages) && l.pages.includes(statePages[0])) || null;
+      let vantageId = null;
+      if (loc) {
+        const k = (perLoc.get(loc.id) || 0) + 1;
+        perLoc.set(loc.id, k);
+        vantageId = `${loc.id}.${k}`;
+      }
+      out.push({ vantageId, pages: statePages, description: bg.description, landmarkPhoto: bg.landmarkPhoto });
     }
-    out.push({ vantageId, pages, description: bg.description, landmarkPhoto: bg.landmarkPhoto });
   }
   out.sort((a, b) => a.pages[0] - b.pages[0]);
   return out;

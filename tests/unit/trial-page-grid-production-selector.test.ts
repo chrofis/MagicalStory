@@ -74,7 +74,7 @@ describe('trial page grid is built by the production helper', () => {
     const end = PIPELINE.indexOf('const startCoverGeneration = ', start);
     expect(start).toBeGreaterThan(-1);
     const trial = PIPELINE.slice(start, end);
-    expect(trial).toMatch(/require\('\.\/server\/lib\/pageRenderCall'\)\.buildPageVbGrid\(\{\s*visualBible: streamingVisualBible, pageNumber: page\.pageNumber, sceneMetadata, hasPlate: !!trialPlate,\s*\}\)/);
+    expect(trial).toMatch(/require\('\.\/server\/lib\/pageRenderCall'\)\.buildPageVbGrid\(\{\s*visualBible: streamingVisualBible, pageNumber: page\.pageNumber, sceneMetadata, hasPlate: !!trialPlate,[\s\S]*?plateCarriesElements: false,\s*\}\)/);
     // The reference claim is rebuilt from the KEPT cells, as Phase 5a-pre-grid does.
     expect(trial).toContain('})(kept.map(e => e.id).filter(Boolean));');
     // The hand-rolled selection is gone: no own selector call, no cap 6, no
@@ -92,7 +92,7 @@ describe('trial page grid is built by the production helper', () => {
     expect(PIPELINE).not.toMatch(/^\s*getElementReferenceImagesByIds,/m);
   });
 
-  it('with the plate sent: the plate-borne boat is dropped, the cap is VB_SLOT_MAX_ELEMENTS, no landmark rides in the grid', async () => {
+  it('with a plate that carries the element grid (the story run): the plate-borne boat is dropped, the cap is VB_SLOT_MAX_ELEMENTS, no landmark rides in the grid', async () => {
     gridCalls.length = 0;
     const sceneMetadata = extractSceneMetadata(trialHint(OBJECTS));
     // The hint's six objects (plus the setting's LOC, which never gets a cell).

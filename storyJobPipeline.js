@@ -1365,8 +1365,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // passes the plate through unchanged (clothingResolve.applyReferenceMode).
           const { kept, visualBibleGrid: trialVbGrid } = await require('./server/lib/pageRenderCall').buildPageVbGrid({
             visualBible: streamingVisualBible, pageNumber: page.pageNumber, sceneMetadata, hasPlate: !!trialPlate,
+            // The trial plate is painted while the reference cells are still
+            // rendering and its call sends no element grid (286086573), so it
+            // carries no element image: the page keeps its vehicle / large
+            // element cell. docs/decisions.md 2026-10-23.
+            plateCarriesElements: false,
           });
-          log.info(`🔲 [VB-GRID] Trial page ${page.pageNumber}: ${kept.length} cell(s)${kept.length ? ` — ${kept.map(e => e.id).join(', ')}` : ''} (${trialPlate ? 'plate sent, plate-borne vehicle/structure dropped' : 'no plate sent, vehicle/structure kept'})`);
+          log.info(`🔲 [VB-GRID] Trial page ${page.pageNumber}: ${kept.length} cell(s)${kept.length ? ` — ${kept.map(e => e.id).join(', ')}` : ''} (${trialPlate ? 'plate sent, carries no element image: vehicle/structure kept' : 'no plate sent, vehicle/structure kept'})`);
 
           // Built AFTER the grid so the REQUIRED OBJECTS checklist can point
           // at the reference images that actually ride with this call — the

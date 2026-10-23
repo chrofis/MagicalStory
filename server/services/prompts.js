@@ -779,6 +779,15 @@ function buildEmptyScenePrompt(opts = {}) {
 const PLATE_STRUCTURE_MATCH_RULE = 'Any vessel, vehicle or built structure in this backdrop is one of those described below — match its colour, construction and named parts, never a generic substitute';
 const PLATE_STRUCTURE_PART_RULE = 'Render only the part of the vessel the camera sees. When the camera stands on board, show the deck, rail and fittings around it — never the vessel seen from outside. When the camera stands outside it, show the vessel from outside, whole to the part the camera sees.';
 
+// The state an element is in on the pages a plate serves, as a clause on its
+// STRUCTURES line. A plate is split wherever a drawn element changes state
+// (docs/decisions.md 2026-10-23), so every page of one plate shows the element
+// in this one state. Written from the state row's id-keyed `delta` field.
+function plateStateClause(state) {
+  const delta = String(state?.delta || '').trim();
+  return delta ? ` In this scene (${state.name}): ${delta} This state's change overrides the description above where they conflict.` : '';
+}
+
 function buildPlateStructuresText(opts = {}) {
   // The Visual Bible description of every vehicle listed for this page.
   // The Art Director's plate prose routinely names a vessel generically ("a
@@ -797,32 +806,13 @@ function buildPlateStructuresText(opts = {}) {
     // always included (the AD set `aboard`, so its deck-level line is
     // AD-authorized). Callers with no AD metadata (trial plates built before
     // briefs exist, covers) pass no sceneObjects and keep the pages behaviour.
-    const gateAboardId = opts.aboardId || null;
-    const adAuthored = Array.isArray(opts.sceneObjects);
-    const { sceneObjectsNameEntry } = require('../lib/visualBible');
-    const { isLargeScaleClass } = require('../lib/visualBible');
-    const staged = (v) => {
-      if (!v.description) return false;
-      if (adAuthored) {
-        return (gateAboardId && v.id === gateAboardId) || sceneObjectsNameEntry(opts.sceneObjects, v);
-      }
-      const pages = v.pages || v.appearsInPages;
-      return Array.isArray(pages) && pages.includes(opts.pageNumber);
-    };
-    // STRUCTURES, not just vehicles (owner, 2026-09-15). A built structure the
-    // bible classed at vehicle, building or landscape scale is part of the
-    // backdrop exactly like a vessel, and the plate is the only place its size
-    // can be stated against bollards, cobbles and quay height. Same AD-authority
-    // gate, same aboard exception. Vehicles keep the pre-2026-09-15 behaviour
-    // whatever their class — stored bibles carry none.
-    const pageVehicles = [
-      ...(opts.visualBible.vehicles || []),
-      // Artifacts only: a creature or a person is a FIGURE, and this prompt
-      // forbids drawing one. Listing it under "vessel, vehicle or built
-      // structure" both mislabelled it and asked for something the same prompt
-      // refuses (2026-09-15).
-      ...(opts.visualBible.artifacts || []).filter(e => isLargeScaleClass(e.scaleClass)),
-    ].filter(staged);
+    // "What the plate draws" is ONE predicate (visualBible.plateStructureEntries),
+    // shared with the plate grouping that splits a plate where an element changes
+    // state. Vehicles keep the pre-2026-09-15 behaviour whatever their class;
+    // artifacts only when large (a creature or a person is a FIGURE, and this
+    // prompt forbids drawing one).
+    const { plateStructureEntries, elementRefCell } = require('../lib/visualBible');
+    const pageVehicles = plateStructureEntries(opts.visualBible, opts.pageNumber, { aboardId: opts.aboardId || null, sceneObjects: opts.sceneObjects });
     if (pageVehicles.length > 0) {
       // The vehicle the camera stands ON gets a name-only mention, never its
       // full exterior description. The plate prose for such a page is already
@@ -836,7 +826,7 @@ function buildPlateStructuresText(opts = {}) {
       const aboardId = opts.aboardId || null;
       const lines = pageVehicles.map(v => (aboardId && v.id === aboardId)
         ? `- ${v.name || v.type || 'structure'}: ${require('../lib/visualBible').ABOARD_CAMERA_RULE}`
-        : `- ${v.name || v.type || 'structure'}: ${v.description}`);
+        : `- ${v.name || v.type || 'structure'}: ${v.description}${plateStateClause(elementRefCell(v, null, opts.pageNumber).state)}`);
       // Render only the visible PART, not the whole vessel. The old wording
       // ("render it exactly to its description") demanded the full vehicle even
       // when the camera stands on its deck, which shipped duplicate ships, a

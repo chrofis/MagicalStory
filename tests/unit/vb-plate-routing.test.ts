@@ -250,7 +250,7 @@ describe('Phase 5a-pre-grid rebuilds the claim from the kept cells', () => {
     expect(src).toMatch(/keepPageGridElements\(refs, \{ hasPlate, sceneMetadata: pageData\.sceneMetadata \}\)/);
     const shared = fs.readFileSync(path.join(__dirname, '..', '..', 'server/lib/pageRenderCall.js'), 'utf8');
     // conditional on a plate being sent — the no-plate fallback
-    expect(shared).toContain('(hasPlate ? (refs || []).filter(e => !isPlateBorneElement(e, sceneObjects)) : (refs || []))');
+    expect(shared).toContain('(dropPlateBorne ? (refs || []).filter(e => !isPlateBorneElement(e, sceneObjects)) : (refs || []))');
   });
 
   it('recomputes the prompt from the kept set, not from the selection', () => {

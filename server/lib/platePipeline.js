@@ -191,7 +191,7 @@ async function renderVantagePlates(vantageId, group, env) {
   const vantageLandmarkMisses = [];
   const landmarkPhotos = await ensureLandmarkPhotoBytes(
     await getLandmarkPhotosForScene(visualBible, repPageData.sceneMetadata, {
-      pageNumber: repPageNum, vantageId, misses: vantageLandmarkMisses,
+      pageNumber: repPageNum, vantageId: v.vantageId, misses: vantageLandmarkMisses,
     }),
     { misses: vantageLandmarkMisses },
   );
@@ -504,7 +504,9 @@ async function renderVantagePlates(vantageId, group, env) {
         grokRefImages: derivedForPage ? [plateImage] : plateRefs,
         textAreaMask: null,
         emptySceneVbGrid: emptySceneVbGridDataUrl,
-        vantageId,
+        // The VANTAGE's id, not this group's key: a vantage split at an element
+        // state change (groupPagesByVantage) has several groups, one vantage.
+        vantageId: v.vantageId,
         vantageName: v.name,
         locationName: v.locationName,
         // Same QC-history shape the per-page path stores (dev panel):

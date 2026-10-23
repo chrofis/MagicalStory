@@ -65,14 +65,22 @@ function selectPageElementRefs(visualBible, pageNumber, sceneMetadata) {
 /**
  * The selected elements that actually enter the page grid. A plate that was
  * SENT carries every plate-borne element (vehicles, building/landscape scale)
- * the brief's objects[] admitted; the element the camera stands on (`aboard`)
- * never enters the grid. A plateless page keeps its large elements.
+ * the brief's objects[] admitted, PROVIDED the plate call itself carried that
+ * element's image (`plateCarriesElements`, default true: the story run's plate
+ * is painted from the element grid). The TRIAL plate is painted while the
+ * reference cells are still rendering and sends none, so the trial passes
+ * `plateCarriesElements: false` and its page keeps the cell. A page must never
+ * lose an element's reference to a plate that did not carry it
+ * (docs/decisions.md 2026-10-23, bug trial-plated-vehicle-gets-no-reference).
+ * The element the camera stands on (`aboard`) never enters the grid. A
+ * plateless page keeps its large elements.
  */
-function keepPageGridElements(refs, { hasPlate, sceneMetadata }) {
+function keepPageGridElements(refs, { hasPlate, sceneMetadata, plateCarriesElements = true }) {
   const { isPlateBorneElement, aboardWithheldId } = require('./visualBible');
   const aboardId = aboardWithheldId(sceneMetadata?.aboard);
   const sceneObjects = sceneMetadata?.objects || null;
-  return (hasPlate ? (refs || []).filter(e => !isPlateBorneElement(e, sceneObjects)) : (refs || []))
+  const dropPlateBorne = hasPlate && plateCarriesElements;
+  return (dropPlateBorne ? (refs || []).filter(e => !isPlateBorneElement(e, sceneObjects)) : (refs || []))
     .filter(e => !aboardId || e.id !== aboardId);
 }
 
@@ -85,10 +93,10 @@ function keepPageGridElements(refs, { hasPlate, sceneMetadata }) {
  * render a page outside the run (regeneration.js); the run itself builds the
  * grid in storyJobPipeline.js Phase 5a-pre-grid from the same two functions.
  */
-async function buildPageVbGrid({ visualBible, pageNumber, sceneMetadata, hasPlate }) {
+async function buildPageVbGrid({ visualBible, pageNumber, sceneMetadata, hasPlate, plateCarriesElements = true }) {
   if (!visualBible) return { kept: [], visualBibleGrid: null };
   const { buildVisualBibleGrid } = require('./referenceSheets');
-  const kept = keepPageGridElements(selectPageElementRefs(visualBible, pageNumber, sceneMetadata), { hasPlate, sceneMetadata });
+  const kept = keepPageGridElements(selectPageElementRefs(visualBible, pageNumber, sceneMetadata), { hasPlate, sceneMetadata, plateCarriesElements });
   return { kept, visualBibleGrid: kept.length > 0 ? await buildVisualBibleGrid(kept, []) : null };
 }
 
