@@ -4385,6 +4385,16 @@
       "fix": "return await iterateOutcome() at both sites: the error stays on that page (round result with error, page keeps its best version) and the story continues. tests/unit/repair-round-page-error-stays-on-page.test.ts.",
       "status": "fixed",
       "fixedIn": "01b184097"
+    },
+    {
+      "id": "trial-plated-vehicle-gets-no-reference",
+      "title": "On a trial, a vehicle on a plated page is rendered with no image reference at all: the page grid drops it as plate-borne, but the trial plate is built with no VB grid",
+      "reportedAt": "2026-10-23",
+      "source": "Prod trial job_1792772600127_tv32st82h (Derin, 6 pages): handcart VEH001 (two wheels, states intact/broken/repaired) drawn as a four-wheeled wagon on p2-p5 with the drawbar whole on p3 after it broke. Replaying pageRenderCall.selectPageElementRefs on the stored data picks the right state cell on every page (VEH001_2 for p2-p3, VEH001_3 for p4-p6); keepPageGridElements then drops it because hasPlate is true; grokRefImages on all 6 pages = plate, avatar, chest+cord sheet; emptySceneVbGrid null on all pages.",
+      "rootCause": "keepPageGridElements (server/lib/pageRenderCall.js:71) filters isPlateBorneElement whenever a plate was sent, assuming the plate carries the element image (true on the full path: plate VB grid). The trial plate call (storyJobPipeline.js:2282-2298) passes no references (\"No VB element grid is built on the trial plate call\", 286086573, 2026-09-13). The trial page adopted the production page-grid filter on 2026-10-07 (decisions.md \"The trial page grid is the production page grid\") without that difference.",
+      "fix": "keepPageGridElements/buildPageVbGrid take plateCarriesElements (default true: the story run paints its plate from the element grid); the trial passes false, so a plated trial page keeps its vehicle / large-element cell in the page state. The trial plate is also split per element state. docs/decisions.md 2026-10-23; tests/unit/plate-splits-at-element-state-2026-10-23.test.ts.",
+      "status": "fixed",
+      "fixedIn": "66fdd39c1"
     }
   ]
 }
