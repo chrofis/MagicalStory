@@ -40,7 +40,9 @@
     },
     {
       "id": "trial-plate-split-at-state-and-keeps-vehicle-cell",
-      "commits": ["66fdd39c1"],
+      "commits": [
+        "66fdd39c1"
+      ],
       "addedAt": "2026-10-23",
       "claim": "On a trial whose vehicle (or large element) changes state between pages that share a background entry, the entry is rendered as one plate per state (pages with the same state share a plate), each plate's STRUCTURES line carries that state's change, and every plated page keeps the vehicle's cell in ITS state in the grid (the trial plate sends no element image). A full story splits a vantage's plate the same way and its plate grid cell is the state's cell.",
       "runShape": [
@@ -10528,7 +10530,7 @@
       "status": "confirmed",
       "claim": "Deleting a character on staging removes exactly the R2 files its record names (photos, avatars, sheets) with HTTP 404 afterwards, keeps any file a remaining character, story or job still references, and logs no PRIVACY error.",
       "runShape": [
-        "none"
+        "any"
       ],
       "check": {
         "kind": "human",
@@ -10555,7 +10557,7 @@
       "claim": "On a story whose object has states, each state delta names the part it changes exactly as the description names it (\"the <part> is now ...\"), and the reference sheet draws that part as the state says: one replacement part per cell, never the old part with a new one beside it.",
       "runShape": [
         "trial",
-        "full"
+        "full-story"
       ],
       "check": {
         "kind": "human",
