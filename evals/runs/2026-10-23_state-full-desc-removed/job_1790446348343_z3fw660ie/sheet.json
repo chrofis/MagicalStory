@@ -1,0 +1,67 @@
+{
+ "element": {
+  "pool": "artifacts",
+  "id": "ART004",
+  "name": "small oak sea chest",
+  "description": "a small oak sea chest with a domed lid, iron bands across its sides and corners, a flat iron hasp at the front of the lid and iron hinges at the back",
+  "states": [
+   {
+    "id": "ART004.1",
+    "name": "closed",
+    "delta": "the lid is closed flat over the chest",
+    "description": "a small oak sea chest with a domed lid closed flat, iron bands across its sides and corners, a flat iron hasp at the front of the lid and iron hinges at the back",
+    "removed": [],
+    "pages": [
+     14
+    ]
+   },
+   {
+    "id": "ART004.2",
+    "name": "open",
+    "delta": "the lid is now raised open on its hinges",
+    "description": "a small oak sea chest with a domed lid now raised open on its hinges, iron bands across its sides and corners, a flat iron hasp at the front and dark wood showing inside",
+    "removed": [],
+    "pages": [
+     15
+    ]
+   }
+  ]
+ },
+ "cells": [
+  {
+   "id": "ART004.1",
+   "name": "small oak sea chest — closed",
+   "description": "a small oak sea chest with a domed lid closed flat, iron bands across its sides and corners, a flat iron hasp at the front of the lid and iron hinges at the back",
+   "states": [],
+   "type": "artifact",
+   "kind": null,
+   "pageCount": 2,
+   "label": "small oak sea chest, closed",
+   "displayName": "small oak sea chest",
+   "baseDescription": "a small oak sea chest with a domed lid, iron bands across its sides and corners, a flat iron hasp at the front of the lid and iron hinges at the back",
+   "stateName": "closed",
+   "delta": "the lid is closed flat over the chest",
+   "removed": [],
+   "extractedDescription": null
+  },
+  {
+   "id": "ART004.2",
+   "name": "small oak sea chest — open",
+   "description": "a small oak sea chest with a domed lid now raised open on its hinges, iron bands across its sides and corners, a flat iron hasp at the front and dark wood showing inside",
+   "states": [],
+   "type": "artifact",
+   "kind": null,
+   "pageCount": 2,
+   "label": "small oak sea chest, open",
+   "displayName": "small oak sea chest",
+   "baseDescription": "a small oak sea chest with a domed lid, iron bands across its sides and corners, a flat iron hasp at the front of the lid and iron hinges at the back",
+   "stateName": "open",
+   "delta": "the lid is now raised open on its hinges",
+   "removed": [],
+   "extractedDescription": null
+  }
+ ],
+ "prompt": "You are creating reference images for a children's storybook.\r\n\r\n**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout the painted surface, soft edges between forms. No vignette, no unpainted paper margin, no deckle or torn-paper edge. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.\r\n\r\nGenerate one image laid out as a square grid with two rows and two columns (four cells total). Cells are separated by thick, perfectly straight black gridlines so each cell can be cropped out cleanly. Each cell shows ONE element in isolation against a simple neutral background.\r\n\r\n**LAYOUT:**\r\nTop-left: This is the small oak sea chest: a small oak sea chest with a domed lid closed flat, iron bands across its sides and corners, a flat iron hasp at the front of the lid and iron hinges at the back\nTop-right: This is the small oak sea chest: a small oak sea chest with a domed lid now raised open on its hinges, iron bands across its sides and corners, a flat iron hasp at the front and dark wood showing inside\nBottom-left: the same element as Top-left, drawn a second time, identical in every detail: This is the small oak sea chest: a small oak sea chest with a domed lid closed flat, iron bands across its sides and corners, a flat iron hasp at the front of the lid and iron hinges at the back\nBottom-right: the same element as Top-right, drawn a second time, identical in every detail: This is the small oak sea chest: a small oak sea chest with a domed lid now raised open on its hinges, iron bands across its sides and corners, a flat iron hasp at the front and dark wood showing inside\r\n\r\n**REQUIREMENTS:**\r\n- Each cell must show ONLY that single element, clearly visible and centered\r\n- Only the element itself is drawn. A person, animal or object the description names to convey its size or scale, or to say what it attaches to, is part of, or is used with, is never drawn\r\n- Each cell reads as the element it is named as. When the shapes and parts described also fit a commoner everyday object, the cell shows the named one\r\n- Consistent art style across ALL cells matching the style description above\r\n- Simple backgrounds: solid pastel color or subtle gradient (no detailed scenes)\r\n- Equal-sized cells separated by thick straight black gridlines\r\n- Every cell is purely visual — only illustrations, only drawings. Zero text, zero labels, zero letters, zero captions, zero numbers, zero grid coordinates anywhere in the image.\r\n- All content must be safe, family-friendly, and age-appropriate\n- Each cell shows only its own element, never anything described for another cell, and no lettering or readable words anywhere\n- Where a cell's state change and its description name the same part, the state change wins: draw that part as the state says and not as the description says. The part is replaced, never drawn twice and never drawn beside the old one.\r\n\r\n**FOR CHARACTERS:**\r\n- 3/4 view showing face and upper body clearly\r\n- Neutral standing pose, arms at sides or relaxed\r\n- Character facing slightly toward viewer\r\n- Clear view of distinctive features and clothing\r\n\r\n**FOR OBJECTS/ARTIFACTS:**\r\n- Centered in the cell, well-lit\r\n- Show the complete object at a good size\r\n- Include key identifying details\r\n- Simple angle that shows the object clearly\r\n- A comparison in the description gives size or shape only. Draw the named object, never the thing it is compared to, and never a blend of the two\r\n- One object per cell, even when the description mentions its parts or what it is made of\r\n- An object that is held, worn or attached to a person or creature (a lead, leash, rein, string, strap, collar, harness) is drawn alone, lying or hanging by itself: never with the person or creature it attaches to, not even as a silhouette, shadow, faint outline or part of one, and never a second copy of the object\r\n- Only the material the description names is drawn: an object built of leaves, snow or sand shows those loose, with no twigs, straw, wicker, rim or woven frame the description does not name\r\n\r\n**FOR VEHICLES/VESSELS/STRUCTURES:**\r\n- Real-world proportions at real-world scale: fittings such as a bell, wheel, barrel or railing stay small against the hull or body, exactly as on the real thing — never enlarged as on a toy or model kit\r\n- Stated dimensions in the description set the scale of every part\r\n\r\n**FOR ANIMALS:**\r\n- Full body visible in a natural pose\r\n- A creature the description calls grown, adult or old has a mature body: long limbs, neck and tail and a head small for the body. A friendly face never turns it into a young one with a big head, a round belly and short limbs\r\n- Show distinctive coloring and features\r\n- Facing the viewer or in 3/4 view\r\n\r\nGenerate as a single image with equal-sized cells arranged exactly as described in the LAYOUT above. Thick black gridlines separate every cell so each cell can be extracted cleanly.\r\n",
+ "modelId": "grok-imagine-image",
+ "cost": 0.02
+}

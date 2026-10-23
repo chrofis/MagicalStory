@@ -1,0 +1,21 @@
+{
+ "judged_by": "claude (hand, pixels read), 2026-10-23",
+ "writer_route": "full: claude-haiku-5-5 (Anthropic); trial planner: google/gemini-3.7-flash direct, thinkingLevel low (prod route is OpenRouter, local key revoked)",
+ "sheets": [
+  {"story": "job_1792772600127_tv32st82h", "cell": "VEH001.3 repaired", "new_ok": false, "previous_ok": false,
+   "new": "the carved branch is lashed across the top of the cart AND the intact straight tow bar with its oval handle is still drawn at the front; the cell's removed line named the 'splintered broken wooden tow bar' and the model drew a whole tow bar. VEH001.2 broken is correct (one snapped tow bar, no extra part). Old form of the replaced part is NOT absent.",
+   "wheels": "four, matching the new description of four wheels (old stored description said two)"},
+  {"story": "job_1792041406330_mxoqmhu6k", "cell": "ART001.2 torn strap / ART001.3 scarf-mended", "new_ok": false, "previous_ok": false,
+   "new": "torn: one strap shredded and dangling beside an intact one, correct. mended: the scarf is knotted around the whole bag, both shoulder straps intact and no torn strap: the torn strap's old form is absent but the mend is not on a strap. Same defect as the previous run. The grid detector also saw the sheet as merged panels (cell mapping NONE for two cells), a render problem of this single draw."},
+  {"story": "job_1792312615714_wpz3fzwyy", "cell": "ART001.2 zip open", "new_ok": true, "previous_ok": true,
+   "new": "one zip fully open, bag empty inside, one set of straps; cell 1 half shut"},
+  {"story": "job_1790446348343_z3fw660ie", "cell": "ART004.2 open", "new_ok": true, "previous_ok": true,
+   "new": "one domed lid raised on its hinges, no second lid"},
+  {"story": "job_1791450210539_nwi88y9lr", "cell": "ART004.2 open", "new_ok": true, "previous_ok": true,
+   "new": "one lid raised, compass, coins and letter inside as the state says; earth still on the chest as its description says"}
+ ],
+ "rate": {"new": "3/5", "previous": "3/5"},
+ "writer_rates": {"state_description_present": "5/5 stories (every state of every stateful element carries description)", "removed_present": "5/5 stories carry the field; non-empty on 2 of the 5 chosen elements (Derin cart, backpack)",
+  "removed_quality": "mixed: Derin repaired lists the broken tow bar (right), Derin broken lists 'oval handle' (a part that should be present or a piece of the old bar); backpack torn lists 'one intact shoulder strap' (an intact part, wrong), chests and kit bag list nothing"},
+ "note_layout": "a 2- or 3-state element renders on a 2x2 grid with the 4th cell a duplicate of cell 1 (production layout); only the state cells are judged"
+}

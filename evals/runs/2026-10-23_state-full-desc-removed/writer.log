@@ -1,0 +1,18 @@
+📝 Prompt templates loaded: 97/97 ok
+[WARN] [UNIFIED-PARSER] VB CONTRACT (blanket-appears-in-pages): ART001 "pirate treasure chest" claims 6 of 6 pages — a blanket range bakes the element into scenes that never contain it
+[WARN] [UNIFIED-PARSER] VB CONTRACT (blanket-appears-in-pages): ART002 "red folding pocket knife" claims 6 of 6 pages — a blanket range bakes the element into scenes that never contain it
+[WARN] [UNIFIED-PARSER] VB CONTRACT (blanket-appears-in-pages): VEH001 "four-wheeled red wooden handcart" claims 6 of 6 pages — a blanket range bakes the element into scenes that never contain it
+job_1792772600127_tv32st82h $0.0160 running $0.0160 new stateful: VEH001 four-wheeled red wooden handcart
+🔍 Found env vars with 'RUNWARE': "RUNWARE_API_KEY"
+🎨 Runware API: ✅ Configured (key: t2PZ2ekF...)
+🎨 Grok Imagine API: ✅ Configured (key: xai-yPKH...)
+[WARN] [UNIFIED-PARSER] VB CONTRACT (blanket-appears-in-pages): ART001 "child's canvas backpack" claims 6 of 6 pages — a blanket range bakes the element into scenes that never contain it
+job_1792041406330_mxoqmhu6k $0.0181 running $0.0341 new stateful: ART001 child's canvas backpack; ART002 woollen neck scarf
+🌊 [STREAM] Starting streaming request to Anthropic (128000 max tokens)...
+job_1792312615714_wpz3fzwyy $0.0228 running $0.0569 new stateful: ART001 dark grey nylon kit bag; ANI001 Humbug
+🌊 [STREAM] Starting streaming request to Anthropic (128000 max tokens)...
+[WARN] [VISUAL BIBLE] CLO001: no scaleClass authored — scale routing falls back to the entry type and the prompt to any stored size text
+job_1790446348343_z3fw660ie $0.0256 running $0.0824 new stateful: ART001 sea chart on paper; ART003 knotted wool rope; ART004 small oak sea chest
+🌊 [STREAM] Starting streaming request to Anthropic (128000 max tokens)...
+job_1791450210539_nwi88y9lr $0.0266 running $0.1090 new stateful: ART001 old paper chart; ART003 coarse canvas galley sack; ART004 old oak chest
+SPENT 0.1090 of 0.18

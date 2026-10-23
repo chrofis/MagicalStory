@@ -1,0 +1,10 @@
+{"at":"2026-10-23T20:19:04.512Z","story":"job_1792772600127_tv32st82h","step":"writer","model":"gemini-3.7-flash","modelId":"google/gemini-3.7-flash","cost":0.01597725,"in":9868,"out":2287,"ms":18989}
+{"at":"2026-10-23T20:19:28.650Z","story":"job_1792041406330_mxoqmhu6k","step":"writer","model":"gemini-3.7-flash","modelId":"google/gemini-3.7-flash","cost":0.01811625,"in":10460,"out":2739,"ms":22912}
+{"at":"2026-10-23T20:22:26.943Z","story":"job_1792312615714_wpz3fzwyy","step":"writer","model":"claude-haiku-5-5","modelId":"claude-haiku-5-5","cost":0.0227663,"in":25393,"out":40454,"ms":176718}
+{"at":"2026-10-23T20:25:57.646Z","story":"job_1790446348343_z3fw660ie","step":"writer","model":"claude-haiku-5-5","modelId":"claude-haiku-5-5","cost":0.025560199999999998,"in":17912,"out":47538,"ms":209002}
+{"at":"2026-10-23T20:29:29.170Z","story":"job_1791450210539_nwi88y9lr","step":"writer","model":"claude-haiku-5-5","modelId":"claude-haiku-5-5","cost":0.02658,"in":25565,"out":48047,"ms":210034}
+{"at":"2026-10-23T20:29:49.089Z","story":"job_1792772600127_tv32st82h","step":"sheet","modelId":"grok-imagine-image","cost":0.02,"usage":{"cost":0.02,"direct_cost":0.02,"inferenceTime":8988},"ms":8995}
+{"at":"2026-10-23T20:30:00.682Z","story":"job_1792041406330_mxoqmhu6k","step":"sheet","modelId":"grok-imagine-image","cost":0.02,"usage":{"cost":0.02,"direct_cost":0.02,"inferenceTime":9598},"ms":9599}
+{"at":"2026-10-23T20:30:13.549Z","story":"job_1792312615714_wpz3fzwyy","step":"sheet","modelId":"grok-imagine-image","cost":0.02,"usage":{"cost":0.02,"direct_cost":0.02,"inferenceTime":8357},"ms":8358}
+{"at":"2026-10-23T20:30:22.897Z","story":"job_1790446348343_z3fw660ie","step":"sheet","modelId":"grok-imagine-image","cost":0.02,"usage":{"cost":0.02,"direct_cost":0.02,"inferenceTime":7785},"ms":7786}
+{"at":"2026-10-23T20:30:32.590Z","story":"job_1791450210539_nwi88y9lr","step":"sheet","modelId":"grok-imagine-image","cost":0.02,"usage":{"cost":0.02,"direct_cost":0.02,"inferenceTime":8622},"ms":8624}
