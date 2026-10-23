@@ -1066,9 +1066,11 @@ export default function TrialGenerationPage() {
       <Navigation minimal brandLink={false} />
 
       {/* Content */}
-      {/* The finished story uses the whole phone width: no outer gutter, no card padding or frame (md+ keeps the card). */}
+      {/* The finished story uses the whole phone width: no outer gutter, no card padding or frame (md+ keeps the card).
+          On larger screens the card itself widens for the book (owner PC, 2026-10-23: a 32rem column was "a thin middle
+          column" with the desktop spread spilling out of it). */}
       <div className={bookBleed ? 'px-0 md:px-8 py-0 md:py-8' : 'px-3 md:px-8 py-4 md:py-8'}>
-        <div className={`max-w-lg mx-auto bg-white ${bookBleed ? 'p-0 md:p-8 md:rounded-2xl md:shadow-xl' : 'rounded-2xl shadow-xl p-5 md:p-8'}`}>
+        <div className={`mx-auto bg-white ${bookBleed ? 'max-w-lg md:max-w-3xl lg:max-w-5xl p-0 md:p-8 md:rounded-2xl md:shadow-xl' : 'max-w-lg rounded-2xl shadow-xl p-5 md:p-8'}`}>
 
           {/* ── Progress / Status (compact, on top) ────────────────── */}
           <div className={`flex flex-col items-center text-center mb-3 ${bookBleed ? 'px-4 pt-3 md:p-0' : ''}`}>

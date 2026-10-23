@@ -110,6 +110,13 @@ export default defineConfig({
       testMatch: /(trial-viewer-no-white-page|trial-waiting-slide-frame|trial-avatar-frames|trial-book-fullwidth-arrows|trial-book-signin-page).spec.ts/,
     },
 
+    // Trial result on desktop windows with the API mocked (no auth, no backend).
+    {
+      name: 'trial-viewer-desktop',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /trial-book-desktop-width\.spec\.ts/,
+    },
+
     // Repair-tile visibility (no auth dep — injects admin JWT directly).
     {
       name: 'repair-tile',

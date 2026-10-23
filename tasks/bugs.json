@@ -4365,6 +4365,16 @@
       "fix": "server/lib/characterR2.js pruneDeletedCharacterFiles deletes the R2 keys named by the deleted character record plus its per-id prefix, skipping any key a remaining character, story or job still references. tests/unit/character-delete-r2.test.ts. See docs/decisions.md 2026-10-21. Orphans already on R2: scripts/admin/orphaned-character-files.js (read only).",
       "status": "fixed",
       "fixedIn": "23ec85736"
+    },
+    {
+      "id": "trial-book-thin-column-on-desktop",
+      "title": "Finished trial story on a PC shows in a thin 32rem middle column: the card stays max-w-lg and the desktop book spread spills out of it; between 768 and 1023 px the single page is boxed into 512 px",
+      "reportedAt": "2026-10-23",
+      "source": "Owner on PC, 2026-10-23: \"for trial there is this thin middle coloumn, that is fine for mobile but not for PC\". Reproduced with tests/e2e/trial-book-desktop-width.spec.ts (4 of 5 desktop sizes failed).",
+      "rootCause": "client/src/pages/TrialGenerationPage.tsx kept the card at max-w-lg for the finished book; TrialBook broke the spread out with a left-1/2 translate instead of the card widening.",
+      "fix": "The card widens for the finished book (md:max-w-3xl lg:max-w-5xl) and TrialBook fills it (no break-out). Phone layout unchanged (trial-viewer-webkit 24/24).",
+      "status": "fixed",
+      "fixedIn": "pending"
     }
   ]
 }

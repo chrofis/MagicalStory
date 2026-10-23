@@ -103,7 +103,7 @@ const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePag
 
   return (
     <>
-      <div className="relative h-[72vh] min-h-[440px] max-h-[780px] w-full lg:w-[min(1000px,calc(100vw-4rem))] lg:relative lg:left-1/2 lg:-translate-x-1/2">
+      <div className="relative h-[72vh] min-h-[440px] max-h-[780px] w-full">
         <BookViewer
           key={structureKey}
           ref={bookRef}
