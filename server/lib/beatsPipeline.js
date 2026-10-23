@@ -349,6 +349,8 @@ function syncVisualBibleSection(bibleSections, visualBible) {
         entry.states = mem.states.map(st => ({
           name: st.name,
           delta: st.delta,
+          ...(st.description ? { description: st.description } : {}),
+          ...(Array.isArray(st.removed) && st.removed.length ? { removed: st.removed } : {}),
           pages: pageList(st.pages),
           ...(typeof st.held === 'boolean' ? { held: st.held } : {}),
         }));

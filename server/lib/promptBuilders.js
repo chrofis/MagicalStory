@@ -3402,6 +3402,7 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     // An object's description never names the support it rests on (2026-10-17).
     OBJECT_NOT_PLACED: OBJECT_NOT_PLACED_RULE,
     STATE_REPLACES_PART: STATE_REPLACES_PART_RULE,
+    STATE_FULL_DESCRIPTION: STATE_FULL_DESCRIPTION_RULE,
     VB_CATEGORY: VB_CATEGORY_RULE,
     BODY_CONDITION_MARKER: BODY_CONDITION_MARKER_RULE,
     // The shot rules per path: on the Jev path a story page's shot is fixed
@@ -9926,6 +9927,7 @@ const OBJECT_NOT_PLACED_RULE = "An object's `description` says what it IS and lo
  * state-consistency judge read STATE_WINS_RULE, its other half.
  */
 const STATE_REPLACES_PART_RULE = "A `delta` that changes a part of the object names that part exactly as `description` names it and says what it is now: \"the <part> is now <new thing>\" or \"the <part> is <changed condition>\" (the door is now hanging from one hinge; the sail is now patched with a red cloth). It replaces that part wherever `description` names it and never adds a second one beside it. A delta that only adds a feature says so (\"a bandage is now wrapped around the <part>\").";
+const STATE_FULL_DESCRIPTION_RULE = "Every state carries `description` and `removed`. `description` is a complete standalone description of the object in that state: the entry's own `description` with the changed part already replaced, every other word kept, so the replaced part's old form is never mentioned (a door hanging from one hinge: the whole description again, with the door described as hanging from one hinge where it was described whole). `removed` lists the short names of the parts that are no longer there in that state, the old form of a replaced part or a part broken off or lost, as the entry names them; [] when nothing is gone.";
 const STATE_WINS_RULE = "Where a cell's state change and its description name the same part, the state change wins: draw that part as the state says and not as the description says. The part is replaced, never drawn twice and never drawn beside the old one.";
 const BODY_CONDITION_MARKER_RULE = "A body condition the plot turns on (an injury, a hurt limb, a sign of illness) carries a visible marker a picture can show from any angle (a bandage, a splint, a sling, a plaster): the sentence that introduces the condition names the marker, the page text that first tells it names the marker, and the figure's Visual Bible description (where it has an entry) states the marker, so text and picture agree. How a limb hangs or moves is never the whole condition.";
 // The peak-of-motion instruction, anchored to the plan's own action (owner 2026-10-16, docs/decisions.md): the old wording
@@ -13362,6 +13364,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       ONE_SIDED_FEATURE: ONE_SIDED_FEATURE_RULE,
       OBJECT_NOT_PLACED: OBJECT_NOT_PLACED_RULE,
       STATE_REPLACES_PART: STATE_REPLACES_PART_RULE,
+      STATE_FULL_DESCRIPTION: STATE_FULL_DESCRIPTION_RULE,
       VB_CATEGORY: VB_CATEGORY_RULE,
       PICTURE_COUNT: PICTURE_COUNT_RULE,
       CLOSING_MOMENT: CLOSING_MOMENT_RULE,
@@ -14236,6 +14239,7 @@ module.exports = {
   ONE_SIDED_FEATURE_RULE,
   OBJECT_NOT_PLACED_RULE,
   STATE_REPLACES_PART_RULE,
+  STATE_FULL_DESCRIPTION_RULE,
   STATE_WINS_RULE,
   VB_CATEGORY_RULE,
   BODY_CONDITION_MARKER_RULE,

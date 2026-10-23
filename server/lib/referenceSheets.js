@@ -604,7 +604,17 @@ function elementCellText(el) {
   const textSentence = elementTextSentence(el);
   // The description rarely ends in a full stop; the text sentence needs one.
   const stop = textSentence && desc && !/[.!?]$/.test(desc) ? '.' : '';
-  return `${elementKindSentence(el)}${desc}${stop}${textSentence}`;
+  return `${elementKindSentence(el)}${desc}${stop}${textSentence}${removedPartsSentence(el)}`;
+}
+
+/**
+ * "Not in this picture: <part>, <part>." for a state cell whose state lists `removed` parts. The array strings are only
+ * joined into this fixed sentence; nothing reads or matches them (owner iron rule, docs/decisions.md 2026-10-23).
+ * Empty string when the cell removes nothing.
+ */
+function removedPartsSentence(el) {
+  const parts = Array.isArray(el?.removed) ? el.removed.map(p => String(p || '').trim()).filter(Boolean) : [];
+  return parts.length ? ` Not in this picture: ${parts.join(', ')}.` : '';
 }
 
 // Words, never digits: a literal "2x2" in the prompt used to get painted onto
@@ -949,7 +959,7 @@ function stateCellsGatePrompt(parent, cells) {
   const rawType = String(parent?.kind || parent?.type || '').trim();
   const kind = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : (String(parent?.build || '').trim() || elementDisplayLabel(parent));
   const desc = String(parent?.description || '').trim();
-  const list = cells.map((c, i) => `${i + 1}. ${c.stateName || stateLabelOf(parent, c)}: ${c.delta || ''}`.trim()).join(' ');
+  const list = cells.map((c, i) => `${i + 1}. ${c.stateName || stateLabelOf(parent, c)}: ${c.delta || ''}${removedPartsSentence(c)}`.trim()).join(' ');
   // EACH LISTED CHANGE IS INTENDED (owner, 2026-09-28). "same … colour" read
   // as a rule every cell must obey, so a state whose delta IS a colour change
   // failed for making it: staging job_1790539784661_6mjcny1c7, recheck "grey in
@@ -1083,6 +1093,16 @@ function expandElementStateCells(el) {
     states.forEach((st, i) => { if (!st.id) st.id = `${parent}.${i + 1}`; });
   }
   const baseDesc = String(el.extractedDescription || el.description || '').trim().replace(/[.;\s]+$/, '');
+  // A state's cell is its OWN full description (`state.description`, the changed part already replaced) plus the
+  // `removed` line. STORED-DATA CONSTRAINT, not a fallback: a bible authored before 2026-10-23 has no
+  // `state.description`, and its cell stays base + delta (the only shape those stories carry). That path logs an error
+  // per state so a NEW story that lacks the field is never silent. docs/decisions.md 2026-10-23.
+  const cellDescription = (s) => {
+    const own = String(s.description || '').trim().replace(/[.;\s]+$/, '');
+    if (own) return own;
+    log.error(`[REF-SHEET] "${el.name}" state "${s.name}" has no state.description — cell built from base description + delta (stored-data shape from before 2026-10-23)`);
+    return `${baseDesc}, ${s.delta}`;
+  };
   // A state batch bypasses maxPerBatch by construction (all states of one
   // object render in one call), and the AD prompt asks for at most four states
   // — but nothing enforces that, so an over-authored entry silently produces a
@@ -1116,7 +1136,8 @@ function expandElementStateCells(el) {
       baseDescription: baseDesc,
       stateName: s.name,
       delta: s.delta,
-      description: `${baseDesc}, ${s.delta}`,
+      description: cellDescription(s),
+      removed: Array.isArray(s.removed) ? s.removed : [],
       extractedDescription: null,
       states: [],
     })),

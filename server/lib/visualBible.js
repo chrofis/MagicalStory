@@ -59,10 +59,18 @@ function normaliseObjectStates(raw, parentId) {
     const delta = String(s.delta || '').trim();
     if (!delta) continue;
     const n = out.length + 1;
+    // `description` (the whole object in this state, the replaced part's old form never mentioned) and `removed` (short
+    // names of parts no longer there) are typed fields the sheet cell is built from; code only carries them, never reads
+    // their prose (docs/decisions.md 2026-10-23, full description per state). Absent on every bible authored before them:
+    // null / [], never a guess.
+    const description = String(s.description || '').trim();
+    const removed = Array.isArray(s.removed) ? s.removed.map(r => String(r || '').trim()).filter(Boolean) : [];
     out.push({
       id: `${base}.${n}`,
       name: String(s.name || `state ${n}`).trim(),
       delta,
+      description: description || null,
+      removed,
       pages: Array.isArray(s.pages) ? s.pages.filter(p => Number.isFinite(Number(p))).map(Number) : [],
       // STRUCTURED contact flag: true when a character's hands are on the
       // object in this look, false when nothing touches it. It is what lets
