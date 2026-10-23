@@ -10489,7 +10489,7 @@
         "23ec85736"
       ],
       "addedAt": "2026-10-21",
-      "status": "pending",
+      "status": "confirmed",
       "claim": "Deleting a character on staging removes exactly the R2 files its record names (photos, avatars, sheets) with HTTP 404 afterwards, keeps any file a remaining character, story or job still references, and logs no PRIVACY error.",
       "runShape": [
         "none"
@@ -10498,7 +10498,18 @@
         "kind": "human",
         "what": "On staging: create a user with two characters (photos plus avatars), delete one via DELETE /api/characters/:id, then GET the deleted character's photo URLs (expect 404) and the other character's (expect 200); check the log line 'R2 objects deleted' and no 'PRIVACY' error."
       },
-      "evidence": []
+      "evidence": [
+        {
+          "storyId": "none (API test)",
+          "env": "staging",
+          "build": "7f69f133b",
+          "runDate": "2026-10-23 08:38 CH",
+          "checkedAt": "2026-10-23 08:40 CH",
+          "result": "HUMAN-CONFIRMED",
+          "by": "claude",
+          "note": "Smoke account: appended throwaway character 999000123 whose photos named two fresh R2 files (characters/<user>/999000123/photos/face.jpg and characters/<user>/characters_<user>/inline/...). DELETE /api/characters/999000123 -> 200; both objects gone afterwards (HeadObject 404); the other 22 characters unchanged; log \"2/2 R2 objects deleted, 0 kept (still referenced), 0 failed\", no PRIVACY error. Keep-if-referenced path is covered by tests/unit/character-delete-r2.test.ts, not by this run."
+        }
+      ]
     }
   ],
   "runs": [
