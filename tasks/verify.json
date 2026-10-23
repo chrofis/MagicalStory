@@ -10551,10 +10551,12 @@
     },
     {
       "id": "state-delta-names-replaced-part",
-      "commits": [],
+      "commits": [
+        "cd3e184dd"
+      ],
       "addedAt": "2026-10-23",
       "status": "failed",
-      "claim": "On a story whose object has states, each state delta names the part it changes exactly as the description names it (\"the <part> is now ...\"), and the reference sheet draws that part as the state says: one replacement part per cell, never the old part with a new one beside it.",
+      "claim": "On a story whose object has states, each state delta names the part it changes exactly as the description names it (\"the <part> is now ...\"), and each state also carries its own full description (the changed part already replaced) and a removed list, and the reference sheet cell built from them draws that part as the state says: one replacement part per cell, never the old part with a new one beside it.",
       "runShape": [
         "trial",
         "full-story"
@@ -10573,6 +10575,16 @@
           "result": "HUMAN-FAILED",
           "by": "claude",
           "note": "5-case replay, small sample (evals/runs/2026-10-23_state-replaces-part). Writer half holds: 5/5 new deltas name the part as the description names it (old 2/5); Derin now 'the wooden drawbar is now replaced by a sturdy carved branch...'. Sheet half fails: 3/5 sheets correct, the same 3 open/close cases as the old sheets; Derin repaired cell draws the branch lashed beside the cart with the broken drawbar still there, and the backpack mended cell adds the scarf beside intact straps. Trial planner run on Google direct (OpenRouter key revoked locally)."
+        },
+        {
+          "storyId": "job_1792772600127_tv32st82h",
+          "env": "prod",
+          "build": "1cc354acedcc8c1c3a4735e14ee68c0c248df134",
+          "runDate": "2026-10-23 18:23:20 CH",
+          "checkedAt": "2026-10-23 22:31:33 CH",
+          "result": "HUMAN-FAILED",
+          "by": "claude",
+          "note": "5-case replay of the full-description + removed-list build (evals/runs/2026-10-23_state-full-desc-removed), small sample, one draw per case. state.description present on every state; sheets 3/5, same as before (kit bag, oak chest, sea chest pass; Derin repaired cell still draws the intact tow bar beside the branch despite 'Not in this picture: splintered broken wooden tow bar'; backpack mended cell scarf around the bag). Derin wheels 4 = new description. Trial planner on Google direct (OpenRouter key revoked locally)."
         }
       ]
     }
