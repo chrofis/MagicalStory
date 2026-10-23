@@ -4374,7 +4374,7 @@
       "rootCause": "client/src/pages/TrialGenerationPage.tsx kept the card at max-w-lg for the finished book; TrialBook broke the spread out with a left-1/2 translate instead of the card widening.",
       "fix": "The card widens for the finished book (md:max-w-3xl lg:max-w-5xl) and TrialBook fills it (no break-out). Phone layout unchanged (trial-viewer-webkit 24/24).",
       "status": "fixed",
-      "fixedIn": "pending"
+      "fixedIn": "5c2dd42fc"
     }
   ]
 }
