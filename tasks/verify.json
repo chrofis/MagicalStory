@@ -40,7 +40,7 @@
     },
     {
       "id": "trial-plate-split-at-state-and-keeps-vehicle-cell",
-      "commits": [],
+      "commits": ["66fdd39c1"],
       "addedAt": "2026-10-23",
       "claim": "On a trial whose vehicle (or large element) changes state between pages that share a background entry, the entry is rendered as one plate per state (pages with the same state share a plate), each plate's STRUCTURES line carries that state's change, and every plated page keeps the vehicle's cell in ITS state in the grid (the trial plate sends no element image). A full story splits a vantage's plate the same way and its plate grid cell is the state's cell.",
       "runShape": [
