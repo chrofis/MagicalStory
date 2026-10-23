@@ -10553,7 +10553,7 @@
       "id": "state-delta-names-replaced-part",
       "commits": [],
       "addedAt": "2026-10-23",
-      "status": "pending",
+      "status": "failed",
       "claim": "On a story whose object has states, each state delta names the part it changes exactly as the description names it (\"the <part> is now ...\"), and the reference sheet draws that part as the state says: one replacement part per cell, never the old part with a new one beside it.",
       "runShape": [
         "trial",
@@ -10563,7 +10563,18 @@
         "kind": "human",
         "what": "In stories.data.visualBible read each states[].delta of an object with states: it must start from a named part that the description also names. Then open that object's state reference cells and confirm the changed part appears once, as the delta says."
       },
-      "evidence": []
+      "evidence": [
+        {
+          "storyId": "job_1792772600127_tv32st82h",
+          "env": "prod",
+          "build": "1cc354acedcc8c1c3a4735e14ee68c0c248df134",
+          "runDate": "2026-10-23 18:23:20 CH",
+          "checkedAt": "2026-10-23 21:55:40 CH",
+          "result": "HUMAN-FAILED",
+          "by": "claude",
+          "note": "5-case replay, small sample (evals/runs/2026-10-23_state-replaces-part). Writer half holds: 5/5 new deltas name the part as the description names it (old 2/5); Derin now 'the wooden drawbar is now replaced by a sturdy carved branch...'. Sheet half fails: 3/5 sheets correct, the same 3 open/close cases as the old sheets; Derin repaired cell draws the branch lashed beside the cart with the broken drawbar still there, and the backpack mended cell adds the scarf beside intact straps. Trial planner run on Google direct (OpenRouter key revoked locally)."
+        }
+      ]
     }
   ],
   "runs": [

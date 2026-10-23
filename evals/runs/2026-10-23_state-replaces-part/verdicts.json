@@ -1,0 +1,33 @@
+{
+ "judged_by": "claude (hand, pixels read), 2026-10-23",
+ "writer": [
+  {"story": "job_1792772600127_tv32st82h", "kind": "trial", "element": "VEH001 handcart",
+   "old": "fitted with a carved sturdy branch bound tightly with golden braided rope", "old_names_part": false,
+   "new": "the wooden drawbar is now replaced by a sturdy carved branch lashed firmly with twisted rope", "new_names_part": true, "new_is_replacement": true,
+   "note": "new description says FOUR red-rimmed wheels (old said two): the writer, not the sheet, changed the count"},
+  {"story": "job_1792041406330_mxoqmhu6k", "kind": "trial", "element": "ART001 backpack",
+   "old": "right strap securely fastened with a knotted lilac knitted scarf", "old_names_part": true,
+   "new": "the torn shoulder strap is firmly knotted to the top seam with a knitted wool scarf", "new_names_part": true, "new_is_replacement": "mend (addition), worded per the rule",
+   "note": "scarf ART002 state 'knotted tightly around the torn shoulder strap of the canvas backpack' names another element (pre-existing class)"},
+  {"story": "job_1792312615714_wpz3fzwyy", "kind": "full", "element": "ART001 kit bag",
+   "old": "long zip along the top edge fully open and hanging loose", "old_names_part": true,
+   "new": "the zip is now fully open along the top edge, its zip tape hanging loose", "new_names_part": true, "new_is_replacement": "changed condition"},
+  {"story": "job_1790446348343_z3fw660ie", "kind": "full", "element": "ART002 -> ART004 small oak chest",
+   "old": "lid thrown back revealing a pile of old silver coins inside", "old_names_part": "lid, but the description named no lid",
+   "new": "the lid is now raised and standing open on its hinges", "new_names_part": true, "new_is_replacement": "changed condition",
+   "extra": "ART005 mast: 'the mast is now lowered horizontally and its yard tip is broken away' (yard tip named in description)"},
+  {"story": "job_1791450210539_nwi88y9lr", "kind": "full", "element": "ART009 -> ART006 oak sea chest",
+   "old": "its heavy wooden lid thrown fully back on its brass hinges to reveal the hollow interior", "old_names_part": "lid, but the description named no lid",
+   "new": "the lid is now standing open, with a brass compass, old coins and a folded letter lying inside", "new_names_part": true, "new_is_replacement": "changed condition"},
+  {"story": "job_1792482580699_3iiy0v4dj", "kind": "full", "element": "ART001 shoebox", "new": null, "note": "not evaluable: the replay folded the shoebox airlock into the rocket vehicle VEH001, no state written"},
+  {"story": "job_1790536739048_ruynosw80", "kind": "full", "element": "ART001 birdcage", "new": null, "note": "not evaluable: the replay gave the birdcage one page and no states ('door hinged open' sits in its description)"}
+ ],
+ "sheets": [
+  {"story": "job_1792772600127_tv32st82h", "cell": "VEH001.3 repaired", "new_ok": false, "new": "a whole branch lashed with rope ALONG the side of the cart, and the old plank drawbar still under it, broken: drawn beside, not replaced (the trigger defect again)", "old_ok": false, "old": "a log lashed along the top of the cart, no drawbar", "wheels": "new 4 (matches its new description of four); old 4 against a description of two"},
+  {"story": "job_1792041406330_mxoqmhu6k", "cell": "ART001.2 torn / ART001.3 mended", "new_ok": false, "new": "torn: a third strap hangs over the front flap while both shoulder straps stay intact; mended: scarf knotted over the flap, both straps intact, no strap tied", "old_ok": false, "old": "torn ok; mended: scarf wrapped round the bag, straps intact"},
+  {"story": "job_1792312615714_wpz3fzwyy", "cell": "ART001.2 zip open", "new_ok": true, "new": "one zip, fully open; the 'zip tape hanging loose' reads as an extra dangling strip; bag drawn with three straps against 'two carry straps' in every cell", "old_ok": true, "old": "zip open, one zip"},
+  {"story": "job_1790446348343_z3fw660ie", "cell": "ART004.2 open", "new_ok": true, "new": "one lid, raised on its hinges", "old_ok": true, "old": "one lid, open, coins inside as the state said"},
+  {"story": "job_1791450210539_nwi88y9lr", "cell": "ART006.2 open", "new_ok": true, "new": "one domed lid, open; compass, coins, letter inside as the state says", "old_ok": true, "old": "one lid, open, empty as the state said"}
+ ],
+ "note_layout": "a 2- or 3-state element renders on a 2x2 grid with the 4th cell a duplicate of cell 1 (production layout); only the state cells are judged"
+}

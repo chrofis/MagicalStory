@@ -1,0 +1,12 @@
+{"at":"2026-10-23T19:38:28.586Z","story":"job_1792312615714_wpz3fzwyy","step":"writer","model":"claude-haiku-5-5","modelId":"claude-haiku-5-5","cost":0.0246222,"in":25027,"out":44239,"ms":194449}
+{"at":"2026-10-23T19:41:31.942Z","story":"job_1792482580699_3iiy0v4dj","step":"writer","model":"claude-haiku-5-5","modelId":"claude-haiku-5-5","cost":0.022106999999999998,"in":15985,"out":41017,"ms":182395}
+{"at":"2026-10-23T19:43:12.344Z","story":"job_1790536739048_ruynosw80","step":"writer","model":"claude-haiku-5-5","modelId":"claude-haiku-5-5","cost":0.012317400000000001,"in":15709,"out":21493,"ms":99075}
+{"at":"2026-10-23T19:45:05.367Z","story":"job_1792772600127_tv32st82h","step":"writer","model":"gemini-3.7-flash","modelId":"google/gemini-3.7-flash","cost":0.0146505,"in":9699,"out":1967,"ms":17733}
+{"at":"2026-10-23T19:45:24.958Z","story":"job_1792041406330_mxoqmhu6k","step":"writer","model":"gemini-3.7-flash","modelId":"google/gemini-3.7-flash","cost":0.0162645,"in":10291,"out":2279,"ms":19004}
+{"at":"2026-10-23T19:48:58.938Z","story":"job_1790446348343_z3fw660ie","step":"writer","model":"claude-haiku-5-5","modelId":"claude-haiku-5-5","cost":0.0258411,"in":17546,"out":48173,"ms":212544}
+{"at":"2026-10-23T19:52:28.653Z","story":"job_1791450210539_nwi88y9lr","step":"writer","model":"claude-haiku-5-5","modelId":"claude-haiku-5-5","cost":0.0269934,"in":25199,"out":48947,"ms":208476}
+{"at":"2026-10-23T19:53:08.326Z","story":"job_1792772600127_tv32st82h","step":"sheet","modelId":"grok-imagine-image","cost":0.02,"usage":{"cost":0.02,"direct_cost":0.02,"inferenceTime":8481},"ms":8488}
+{"at":"2026-10-23T19:53:17.706Z","story":"job_1792041406330_mxoqmhu6k","step":"sheet","modelId":"grok-imagine-image","cost":0.02,"usage":{"cost":0.02,"direct_cost":0.02,"inferenceTime":7002},"ms":7004}
+{"at":"2026-10-23T19:53:29.687Z","story":"job_1792312615714_wpz3fzwyy","step":"sheet","modelId":"grok-imagine-image","cost":0.02,"usage":{"cost":0.02,"direct_cost":0.02,"inferenceTime":10710},"ms":10712}
+{"at":"2026-10-23T19:53:41.272Z","story":"job_1790446348343_z3fw660ie","step":"sheet","modelId":"grok-imagine-image","cost":0.02,"usage":{"cost":0.02,"direct_cost":0.02,"inferenceTime":9504},"ms":9504}
+{"at":"2026-10-23T19:53:53.446Z","story":"job_1791450210539_nwi88y9lr","step":"sheet","modelId":"grok-imagine-image","cost":0.02,"usage":{"cost":0.02,"direct_cost":0.02,"inferenceTime":8250},"ms":8251}
