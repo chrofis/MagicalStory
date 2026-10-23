@@ -4375,6 +4375,16 @@
       "fix": "The card widens for the finished book (md:max-w-3xl lg:max-w-5xl) and TrialBook fills it (no break-out). Phone layout unchanged (trial-viewer-webkit 24/24).",
       "status": "fixed",
       "fixedIn": "5c2dd42fc"
+    },
+    {
+      "id": "repair-iterate-rejection-kills-story",
+      "title": "One page's iterate repair throwing fails the WHOLE story: the round dispatch returns iterateOutcome() un-awaited inside its per-page try, so the per-page catch is skipped and the rejection reaches Promise.all",
+      "reportedAt": "2026-10-23",
+      "source": "Prod showcase job_1792748239565_nnf6vsk0u (10 pages, Dubois/fr) failed at 68% in repair round 1: Gemini refused the iterate composition analysis of one page (PROHIBITED_CONTENT, sceneValidator.analyzeGeneratedImage). Stack ends at iterateOutcome with no awaiting caller; pages 5 and 10 kept iterating after the job was marked failed.",
+      "rootCause": "da9cd1185 (2026-10-07, on prod since 2026-10-11 17:40 CH) wrapped the iterate branch in iterateOutcome() and returned it without await at both call sites (method iterate, and the inpaint no-op re-route).",
+      "fix": "return await iterateOutcome() at both sites: the error stays on that page (round result with error, page keeps its best version) and the story continues. tests/unit/repair-round-page-error-stays-on-page.test.ts.",
+      "status": "fixed",
+      "fixedIn": "pending"
     }
   ]
 }

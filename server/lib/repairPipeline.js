@@ -2726,7 +2726,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               if (!triedIterate) {
                 log.warn(`🪃 [UNIFIED PIPELINE] Round ${round} page ${pageNumber}: the inpaint changed nothing inside its target — re-routing to iterate`);
                 require('./runMetrics').forJob(storyData?.id || jobId).count('inpaint_noop_rerouted');
-                return iterateOutcome();
+                return await iterateOutcome();
               }
               log.warn(`🚫 [UNIFIED PIPELINE] Round ${round} page ${pageNumber}: the inpaint changed nothing inside its target, and an iterate was already tried`);
             }
@@ -2760,7 +2760,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                   : 'inpaint had no instruction to send (every finding was filtered or the plan left it empty)'
             );
           }
-          if (method === 'iterate') return iterateOutcome();
+          if (method === 'iterate') return await iterateOutcome();
           if (method === 'char-fix') {
             const result = await executeCharFixAction(img, decision, round, recolourInput);
             if (result?.imageData) {
