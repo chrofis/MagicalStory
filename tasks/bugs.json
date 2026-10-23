@@ -4384,7 +4384,7 @@
       "rootCause": "da9cd1185 (2026-10-07, on prod since 2026-10-11 17:40 CH) wrapped the iterate branch in iterateOutcome() and returned it without await at both call sites (method iterate, and the inpaint no-op re-route).",
       "fix": "return await iterateOutcome() at both sites: the error stays on that page (round result with error, page keeps its best version) and the story continues. tests/unit/repair-round-page-error-stays-on-page.test.ts.",
       "status": "fixed",
-      "fixedIn": "pending"
+      "fixedIn": "01b184097"
     }
   ]
 }
