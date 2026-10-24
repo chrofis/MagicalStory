@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { DEMO_ROTATION, DemoRotationEntry } from './helpers/demo-rotation';
 import { getFamily, DemoLanguage, DemoFamily } from './helpers/demo-characters';
+import { translations } from '../client/src/constants/translations';
 
 const PHOTOS_DIR = path.resolve(__dirname, 'fixtures', 'demo-photos');
 
@@ -687,6 +688,13 @@ async function walkToCharacterList(page: Page, charName: string) {
   await page.waitForTimeout(2000);
 }
 
+// The step-1 title in every UI language, read from the client's own strings: a
+// hard-coded copy went stale when the English title became "Characters & Story
+// Roles" (3ef7a5f04) and the 2026-10-24 showcase clicked Next behind the
+// "Only one character" modal for 90 minutes.
+const CHARACTER_LIST_TITLE_RE = new RegExp(
+  Object.values(translations).map(t => t.charactersStepTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'i');
+
 async function isOnCharacterListNow(page: Page): Promise<boolean> {
   // Character list = wizard Step 1 "Charaktere & Rollen" WITH the Create
   // Another button (has create-another text). The avatar-waiting screen ALSO
@@ -697,7 +705,7 @@ async function isOnCharacterListNow(page: Page): Promise<boolean> {
   // and a 500ms race here causes the caller to fall through to clickAnyNext,
   // which then clicks the wizard step-advance Weiter and triggers the
   // "Nur ein Charakter" modal — blocking subsequent character creation.
-  const listHeader = await page.locator('text=/Charaktere & Rollen|Characters & Roles|Personnages & Rôles/i').first()
+  const listHeader = await page.getByText(CHARACTER_LIST_TITLE_RE).first()
     .isVisible({ timeout: 3000 }).catch(() => false);
   if (!listHeader) return false;
   const createAnother = await page.locator('button').filter({ hasText: CREATE_ANOTHER_RE }).first()
@@ -862,7 +870,8 @@ async function driveToCharacterList(page: Page, char: DemoCharacter, deadlineMs:
         && await weiterBtn.isVisible({ timeout: 400 }).catch(() => false)
         && await weiterBtn.isEnabled().catch(() => false)) {
       console.log(`      → weiter/save on avatar step`);
-      await weiterBtn.click();
+      // Bounded: an overlay that intercepts the click must not hold the loop past its deadline.
+      await weiterBtn.click({ timeout: 10000 }).catch(e => console.log(`      ! weiter click blocked: ${String(e.message).split('\n')[0]}`));
       lastWeiterAt = Date.now();
       continue;
     }
