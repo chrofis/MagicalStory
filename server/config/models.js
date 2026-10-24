@@ -749,6 +749,10 @@ const MODEL_DEFAULTS = {
   // words that must be readable (a sign, a plaque). Standard cannot spell;
   // 2.0 is typography-aware. Solo cells only (buildReferenceSheetBatches).
   vbTextCellModel: 'grok-imagine-2',
+  // The tier a Visual Bible sheet renders on when it draws an element's STATE cells
+  // (an element with states[]). Grok 1 draws a replaced part beside the old one;
+  // Grok 2 replaces it (5/5 vs 3/5 sheets). See docs/decisions.md 2026-10-24.
+  vbStateCellModel: 'grok-imagine-2',
   avatar: 'grok-imagine',                    // Character avatars (clothing variants). Switched from
                                               // Gemini 2.5 Flash Image because Gemini's safety filter
                                               // rejects adult-face photos with IMAGE_OTHER, leaving

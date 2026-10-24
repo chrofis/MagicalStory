@@ -1145,6 +1145,29 @@ function expandElementStateCells(el) {
 }
 
 /**
+ * A state batch: the cells `expandElementStateCells` minted for ONE object. The
+ * mark is structural (`stateName` is set only there), never read from prose.
+ */
+function isStateCellBatch(batch) {
+  return Array.isArray(batch) && batch.length > 1 && batch.every(c => c && c.stateName);
+}
+
+/**
+ * The model a sheet batch renders on. A text cell goes to the typography-aware
+ * tier; a state batch goes to vbStateCellModel (Grok 1 draws a replaced part
+ * beside the old one, Grok 2 replaces it — docs/decisions.md 2026-10-24); every
+ * other batch keeps the caller's override (null = MODEL_DEFAULTS.pageImage).
+ * State batches are always solo (buildReferenceSheetBatches), so the whole batch
+ * is one object's cells — never a mix with unrelated elements.
+ */
+function referenceSheetBatchModel(batch, override = null) {
+  const { MODEL_DEFAULTS } = require('../config/models');
+  if (batch.length === 1 && String(batch[0].text || '').trim()) return MODEL_DEFAULTS.vbTextCellModel;
+  if (isStateCellBatch(batch)) return MODEL_DEFAULTS.vbStateCellModel;
+  return override;
+}
+
+/**
  * The structural lock behind the one-call guarantee: every cell of one object
  * lives in exactly one batch, and that batch holds ALL of them.
  *
@@ -1366,8 +1389,10 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       // A solo cell whose entry carries `text` renders on the typography-aware
       // tier; every other batch keeps the caller's model.
       const textCell = batch.length === 1 && String(batch[0].text || '').trim();
-      const batchModel = textCell ? require('../config/models').MODEL_DEFAULTS.vbTextCellModel : imageModelOverride;
+      const stateCell = isStateCellBatch(batch);
+      const batchModel = referenceSheetBatchModel(batch, imageModelOverride);
       if (textCell) log.info(`[REF-SHEET] ✍️ "${batch[0].name}" carries readable text "${textCell}" — rendering on ${batchModel}`);
+      else if (stateCell) log.info(`[REF-SHEET] 🔧 "${batch[0].displayName}" draws ${batch.length} state cells — rendering on ${batchModel}`);
       const result = await callGeminiAPIForImage(
         prompt, [], null, 'avatar', null, batchModel, null, '',
         null, [], 0, null, null, null, null, batchAspectOverride
@@ -1930,6 +1955,8 @@ module.exports = {
   characterAgeCue,
   buildReferenceSheetBatches,
   expandElementStateCells,
+  isStateCellBatch,
+  referenceSheetBatchModel,
   assertStateCellsCoLocated,
   generateReferenceSheet,
   recordReferenceSheetUsage,

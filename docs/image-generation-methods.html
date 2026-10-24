@@ -394,7 +394,7 @@
 <tr>
   <td>VB element reference SHEET &rarr; per-element cutouts</td>
   <td><code>server/lib/referenceSheets.js</code> &rarr; <code>generateReferenceSheet</code> / <code>splitGridIntoReferences</code>, grid measured by <code>server/lib/sheetGrid.js</code> &rarr; <code>detectSheetGrid</code></td>
-  <td>Gemini image (sheet) + gemini-2.5-flash-lite (identification, mismatch only)</td>
+  <td>Grok 1 (sheet; <code>MODEL_DEFAULTS.pageImage</code>) + gemini-2.5-flash-lite (identification, mismatch only). Per batch, <code>referenceSheetBatchModel</code>: a readable-text cell &rarr; <code>vbTextCellModel</code>, a state-cell batch &rarr; <code>vbStateCellModel</code> (both Grok 2; decisions.md 2026-10-24)</td>
   <td>
     <p>Elements needing a reference are batched (max 4) into ONE multi-cell sheet per call, then cut back apart into one image per element. The prompt asks for a fixed layout &mdash; 2&times;2 for exactly four elements, a single vertical column otherwise &mdash; but <strong>the model does not reliably draw the requested number of cells</strong>, and the requested count was never verified against the pixels.</p>
     <p><strong>Since 2026-09-06 the grid is measured, not assumed.</strong> <code>detectSheetGrid</code> is count-free: it finds the gutter bands (thin near-uniform full-span lines, black or white) with an adaptive uniformity threshold, rejects wide uniform fields (a pale margin, a flat sky) and edge-touching runs (the outer frame), and derives cols&times;rows from what is actually drawn. Then:</p>

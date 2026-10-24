@@ -9087,7 +9087,7 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
  *
  * params.elementId   — bare id (ART001 / CHR001 / VEH002); a stated object renders every state
  * params.gateOnly    — judge the STORED cell(s), no image call
- * params.model       — IMAGE_MODELS key (default: text → vbTextCellModel, else pageImage)
+ * params.model       — IMAGE_MODELS key (default: text → vbTextCellModel, states → vbStateCellModel, else pageImage)
  * params.text        — readable words for the element (overrides the entry's `text`)
  * params.description — description override
  * promptOverride     — replaces the reference-sheet template
@@ -9124,8 +9124,7 @@ async function runVbElementCellStage(target, { experimentId, promptOverride = nu
   if (params.text !== undefined) el.text = String(params.text || '').trim() || null;
   if (params.description) el.description = String(params.description);
   const cells = refSheets.expandElementStateCells(el);
-  const textCell = cells.length === 1 && String(cells[0].text || '').trim();
-  const modelKey = params.model || (textCell ? MODEL_DEFAULTS.vbTextCellModel : MODEL_DEFAULTS.pageImage);
+  const modelKey = params.model || refSheets.referenceSheetBatchModel(cells, MODEL_DEFAULTS.pageImage);
   if (!IMAGE_MODELS[modelKey]) throw new Error(`Unknown model "${modelKey}" — not an IMAGE_MODELS key`);
   const styleDescription = resolveArtStyle(storyData.artStyle, IMAGE_MODELS[modelKey].backend) || resolveArtStyle('pixar');
   const aspect = type === 'character' ? null : (storyData.layout?.imageAspect || MODEL_DEFAULTS.pageAspect);

@@ -10587,6 +10587,24 @@
           "note": "5-case replay of the full-description + removed-list build (evals/runs/2026-10-23_state-full-desc-removed), small sample, one draw per case. state.description present on every state; sheets 3/5, same as before (kit bag, oak chest, sea chest pass; Derin repaired cell still draws the intact tow bar beside the branch despite 'Not in this picture: splintered broken wooden tow bar'; backpack mended cell scarf around the bag). Derin wheels 4 = new description. Trial planner on Google direct (OpenRouter key revoked locally)."
         }
       ]
+    },
+    {
+      "id": "state-sheet-grok2-routing",
+      "commits": [
+        "ae9f362d7"
+      ],
+      "addedAt": "2026-10-24",
+      "status": "pending",
+      "claim": "On a story whose Visual Bible has an element with states, that element's reference sheet renders on grok-imagine-image-2.0 (log line '[REF-SHEET] ... state cells — rendering on grok-imagine-2'), other sheets stay on the page model, and the state cells draw a replaced or mended part once, never beside the old part.",
+      "runShape": [
+        "trial",
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Find the '[REF-SHEET] ... draws N state cells — rendering on grok-imagine-2' log line (or the sheet usage row priced at 0.04) for the element, then open its state reference cells and confirm the changed part appears once as the state says. Plain sheets of the same story must show no such line."
+      },
+      "evidence": []
     }
   ],
   "runs": [
