@@ -24,6 +24,7 @@ Last full sweep: **2026-09-06**.
 
 ## P0 — gating the production promotion
 
+- [ ] Nightwear (pyjamas) + bath-time retired: paid replays of the bible writer, wardrobe review, Art Director and pyjama sheets (~USD 3.20, owner go needed) and a human check of one going-to-bed story (verify.json `nightwear-bed-pages`) → tasks/pyjamas-bath-2026-10-24.md
 - [ ] Showcase fixes 2026-10-07 plan (open items: render count after repair fixes, cost ledger, round-2 convergence verify) → tasks/showcase-fixes-2026-10-07.md
 - [ ] Reader MAJOR admitted to repair + wrong_action routed to page redo (2026-10-15; open: staging story-run proof, verify.json `reader-major-regen`) → tasks/repair-reader-major-regen-2026-10-15.md
 - [ ] Gull rerun findings 2026-10-17: briefs drop page-text cast (p1/p4/p5/p17), ship drawn twice when aboard (p14/p18), gangplank look-book entry bakes in a position so p6/p15/p16 draw a board on a rail stump, p19 harsh score, ending return → tasks/gull-rerun-findings-2026-10-17.md

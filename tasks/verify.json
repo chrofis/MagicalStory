@@ -10634,6 +10634,26 @@
         "result": "NOT COVERED",
         "note": "trial: not a trial run"
       }
+    },
+    {
+      "id": "nightwear-bed-pages",
+      "title": "A going-to-bed story renders its bed pages in pyjamas from a nightwear sheet; no child bathes; covers stay in day clothes",
+      "commits": [
+        "82ca574ea",
+        "97b2d4e46"
+      ],
+      "addedAt": "2026-10-24",
+      "status": "pending",
+      "claim": "On a going-to-bed story (full and trial): clothingRequirements gives every person the plan puts in bed a nightwear outfit (two-piece pyjamas, covered torso) and nobody else; a styled-nightwear sheet exists for each of them; the pages that put them in bed carry clothing nightwear and draw those pyjamas, the day pages around them draw the day outfit; no page shows a child bathing; the front, initial and back covers show the day outfit (never pyjamas) and primaryClothing is not nightwear. A pyjama sheet that fails twice fails the book (refunded) rather than drawing day clothes.",
+      "runShape": [
+        "full-story",
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open the story: clothingRequirements[child].nightwear.used is true with a pyjama top and bottoms description, characterAvatars[child] has styled-nightwear, the bed pages (pageClothing) are nightwear and look like pyjamas, the other pages and all three covers are the day outfit, and no page shows bathing. For a trial, the topic id must be going-to-bed and the pyjama sheet is drawn at prepare-title (the waiting-page slides include it). Also confirm the log shows no 'NIGHTWEAR CACHE MISS'."
+      },
+      "evidence": []
     }
   ],
   "runs": [
