@@ -93,12 +93,12 @@ describe('parseTeachingGuideFile', () => {
         expect(banner, `${f} [${id}] has banner pollution`).toBeUndefined();
       }
     }
-    expect(total).toBe(207);
+    expect(total).toBe(206);
   });
 
   it('every life-challenge guide is in the band register — no advice voice left', () => {
     const guides = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'life-challenge-guides.txt'));
-    expect(guides.size).toBe(64);
+    expect(guides.size).toBe(63);
     for (const [id, guide] of guides) {
       expect(guide.trim(), `[${id}] is empty`).not.toBe('');
       expect(guide, `[${id}] still carries a Key messages: line`).not.toMatch(/Key messages:/);
@@ -110,7 +110,7 @@ describe('parseTeachingGuideFile', () => {
 
   it('life-challenge guides parse all 64 topics clean', () => {
     const guides = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'life-challenge-guides.txt'));
-    expect(guides.size).toBe(64);
+    expect(guides.size).toBe(63);
     for (const id of ['no-pacifier', 'understanding-rules', 'trying-new-things', 'grandparent-sick']) {
       const g = guides.get(id);
       expect(g, `${id} missing`).toBeTruthy();

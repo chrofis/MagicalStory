@@ -95,10 +95,10 @@ describe('trial topic grid — cap of six', () => {
     }
   });
 
-  it('draws from the widened pool — the 16 curated plus 26 age-gated topics', () => {
-    // 13 from 896895deb, then 5 infant and 8 pre-teen topics on 2026-09-13: the
+  it('draws from the widened pool — the 16 curated plus 25 age-gated topics', () => {
+    // 13 from 896895deb, then 5 infant and 8 pre-teen topics on 2026-09-13 (bath-time retired 2026-10-24): the
     // grid could not be filled at 0-1 and repeated itself at 9-12 without them.
-    expect(trialLifeChallengeIds.length).toBe(popularLifeChallengeIds.length + 26);
+    expect(trialLifeChallengeIds.length).toBe(popularLifeChallengeIds.length + 25);
     expect(new Set(trialLifeChallengeIds).size).toBe(trialLifeChallengeIds.length);
     for (const pid of popularLifeChallengeIds) expect(trialLifeChallengeIds).toContain(pid);
     for (const tid of trialLifeChallengeIds) {
@@ -342,19 +342,19 @@ describe('every life challenge carries a window, or is a declared life event', (
     'staying-hospital', 'death-pet', 'grandparent-sick', 'new-sibling',
   ];
 
-  it('labels all 64 — a window, or one of the eight any-age life events', () => {
-    expect(lifeChallenges.length).toBe(64);
+  it('labels all 63 — a window, or one of the eight any-age life events', () => {
+    expect(lifeChallenges.length).toBe(63);
     const fieldless = lifeChallenges.filter(c => !c.suitableAges).map(c => c.id).sort();
     expect(fieldless).toEqual([...ANY_AGE_LIFE_EVENTS].sort());
   });
 
-  // The five 0-2 topics the owner commissioned on 2026-09-13. They are the only
+  // The four 0-2 topics (five commissioned on 2026-09-13; bath-time retired 2026-10-24). They are the only
   // windows allowed to start at 0: the earlier "no developmental topic carries a
   // 0" ruling was made when the catalogue had nothing for an infant at all, and
   // authoring these is what superseded it.
-  const INFANT_TOPICS = ['first-foods', 'bath-time', 'first-steps', 'first-words', 'going-outside'];
+  const INFANT_TOPICS = ['first-foods', 'first-steps', 'first-words', 'going-outside'];
 
-  it('starts a window at 0 only for the five infant topics', () => {
+  it('starts a window at 0 only for the four infant topics', () => {
     for (const c of lifeChallenges) {
       if (!c.suitableAges) continue;
       if (c.suitableAges[0] === 0) expect(INFANT_TOPICS).toContain(c.id);

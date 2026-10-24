@@ -168,12 +168,11 @@ function ageWindowOf(id: string): [number, number] | undefined {
 
 const lifeChallengeCatalogue: Omit<LifeChallenge, 'suitableAges'>[] = [
   // Baby & Toddler (0-4 years)
-  // The five 0-2 topics below are ordinary topics on the ordinary shelf: the
+  // The four 0-2 topics below are ordinary topics on the ordinary shelf: the
   // window does the age work and `ageGroup` stays a shelf label. They exist
   // because AGE_BANDS already routes ages 0-1 to the routine book and the
   // catalogue had nothing to point it at (docs/decisions.md 2026-09-13).
   { id: 'first-foods', name: { en: 'Learning to Eat', de: 'Essen lernen', fr: 'Apprendre à manger', it: 'Imparare a mangiare' }, emoji: '🥄', ageGroup: 'toddler', liveness: 5, pole: 'both', family: 'eating' },
-  { id: 'bath-time', name: { en: 'Bath Time', de: 'Baden', fr: 'Le bain', it: 'Il bagnetto' }, emoji: '🛁', ageGroup: 'toddler', liveness: 4, pole: 'both' },
   { id: 'first-steps', name: { en: 'Learning to Walk', de: 'Laufen lernen', fr: 'Apprendre à marcher', it: 'Imparare a camminare' }, emoji: '👣', ageGroup: 'toddler', liveness: 4, pole: 'milestone' },
   { id: 'first-words', name: { en: 'First Words', de: 'Erste Wörter', fr: 'Premiers mots', it: 'Prime parole' }, emoji: '💬', ageGroup: 'toddler', liveness: 4, pole: 'milestone' },
   { id: 'going-outside', name: { en: 'Going Outside', de: 'Nach draussen gehen', fr: 'Sortir dehors', it: 'Uscire fuori' }, emoji: '🦺', ageGroup: 'toddler', liveness: 3, pole: 'milestone' },
@@ -272,9 +271,9 @@ export const trialLifeChallengeIds = [
   'washing-hands', 'whining', 'picky-eating', 'waiting-turn',
   'being-patient', 'saying-sorry', 'new-sibling', 'visiting-doctor',
   'going-vacation',
-  // The five 0-2 topics. Without them the age-0 and age-1 grids could not be
+  // The four 0-2 topics. Without them the age-0 and age-1 grids could not be
   // filled at all, which is how the catalogue gap was found.
-  'first-foods', 'bath-time', 'first-steps', 'first-words', 'going-outside',
+  'first-foods', 'first-steps', 'first-words', 'going-outside',
   // Eight ages-6-12 topics. Without them ages 9-12 rendered the same four
   // tiles over and over: the pool simply had no pre-teen depth.
   'homework', 'reading-alone', 'managing-emotions', 'anxiety-worrying',

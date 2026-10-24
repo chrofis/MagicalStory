@@ -704,7 +704,6 @@ Story entry points (pick one or combine):
 - Aquarium visit where fish start talking
 - Pool party where the pool becomes an ocean
 - Reading a mermaid book that pulls them under the sea
-- Bath time imagination that becomes real
 
 Story guidance:
 - Set underwater: coral reefs, sunken ships, underwater kingdoms, beaches

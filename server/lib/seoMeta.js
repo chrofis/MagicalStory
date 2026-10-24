@@ -66,7 +66,6 @@ const THEMES = {
     'fathers-day': { en: "Father's Day", de: 'Vatertags', fr: 'histoire fête des pères', it: 'Festa del Papà' },
   },
   'life-challenges': {
-    'bath-time': { en: 'Bath Time', de: 'Baden', fr: 'Le bain', it: 'Il bagnetto' },
     'first-foods': { en: 'Learning to Eat', de: 'Essen lernen', fr: 'Apprendre à manger', it: 'Imparare a mangiare' },
     'first-steps': { en: 'Learning to Walk', de: 'Laufen lernen', fr: 'Apprendre à marcher', it: 'Imparare a camminare' },
     'first-words': { en: 'First Words', de: 'Erste Wörter', fr: 'Premiers mots', it: 'Prime parole' },

@@ -34,7 +34,7 @@ const base = (age: number, extra: any) => ({
   pages: 8,
   ...extra,
 });
-const LIFE = { storyCategory: 'life-challenge', storyTopic: 'bath-time' };
+const LIFE = { storyCategory: 'life-challenge', storyTopic: 'first-foods' };
 
 const arcPrompts = (input: any) => [
   String(pb.buildArcCreatePrompt(input, 8)),

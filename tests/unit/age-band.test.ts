@@ -465,7 +465,7 @@ describe('shared/topic-age-windows.json reaches both consumers', () => {
     for (const c of lifeChallenges) {
       expect(c.suitableAges, c.id).toEqual(shared[c.id]);
     }
-    expect(Object.keys(shared).length).toBe(56);
+    expect(Object.keys(shared).length).toBe(55); // 56 before bath-time was retired (2026-10-24)
   });
 });
 

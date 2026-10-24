@@ -146,7 +146,7 @@ describe('round 24 — the seed is the mechanism, the topic is what the child do
 
   // shared/topic-age-windows.json — the complete 0-2 set. A new one here means
   // a new [[idea]] block with its own "inside the pattern" line.
-  const BABY_TOPICS = ['bath-time', 'first-foods', 'first-steps', 'first-words', 'going-outside'];
+  const BABY_TOPICS = ['first-foods', 'first-steps', 'first-words', 'going-outside'];
 
   it('the contract ranks the seed against the topic', () => {
     expect(IDEA_CONTRACT_PATTERN).toContain(

@@ -16,37 +16,6 @@
 # the telling forbid a stated moral at every age. The prose is background for the
 # writer, never material to deliver to the child.
 
-[bath-time]
-**What the book is.** An ordinary bath, from the water running to the towel. The
-pleasure is the things in it — the water, the foam, the flannel, the cup that
-pours, the boat, the plug — each one named as it comes.
-
-[[idea]]
-**Inside the pattern.** The book's pattern comes from the pattern seed, and that seed is the
-mechanism of the book. The topic sets only what the child does inside it. The child's part
-here is: the child does the thing in the water — the splash, the pour, the reach for
-what floats.
-
-**What answers back.** One thing in the bath answers or resists: it bobs away, it pours, it is warm,
-it sticks to the wall, it will not stay under.
-
-**The child moves.** A grown-up is there, washing and lifting, and the splashing, pouring, reaching
-and patting is the child's own. Never being clean, and never why we wash.
-[[/idea]]
-
-**What happens.** Warm water, being lowered in, splashing, pouring, being washed,
-hair rinsed, lifted out, wrapped up. One page per step, and something new to look
-at on each.
-
-**The small thing that goes wrong.** Soap near the eyes, a toy floating out of
-reach, water that startles when it first touches. Put right within a page — a
-cloth, a hand, a reach.
-
-**What it is not.** Not a child who refuses and is talked round. Not being clean,
-and not why we wash.
-
-**Ending.** Wrapped in a towel, warm, carried off. Nothing said about what it meant.
-
 [first-foods]
 **What the book is.** Learning to eat. The high chair, the bib, the spoon, the
 bowl, and a first taste of a few ordinary things.
@@ -276,10 +245,10 @@ table.
 **Ending.** The meal finishes, the table is left, the day carries on.
 
 [going-to-bed]
-**What the book is.** The last hour of a day, in order: bath, pyjamas, teeth,
+**What the book is.** The last hour of a day, in order: pyjamas, teeth,
 story, goodnight.
 
-**What happens.** Each step of the routine gets its page — the water, the buttons,
+**What happens.** Each step of the routine gets its page — the buttons,
 the brush, the book, the light turned low, the door left as it is always left.
 
 **The room at night.** Safe and familiar. A night light is allowed. Whatever is

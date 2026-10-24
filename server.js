@@ -2464,6 +2464,8 @@ function resolvePrerenderedFile(routePath, lang) {
 // throws away whatever link equity it had.
 const LEGACY_REDIRECTS = {
   '/so-funktionierts': '/kinderbuch-erstellen',
+  // bath-time retired 2026-10-24 (docs/decisions.md): no story shows a child bathing.
+  '/themes/life-challenges/bath-time': '/themes/life-challenges',
 };
 
 // Canonical host + retired-slug consolidation. Both www and apex used to answer 200,

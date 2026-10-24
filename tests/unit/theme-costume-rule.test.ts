@@ -59,7 +59,7 @@ describe('wardrobe writer prompt', () => {
     expect(p).not.toContain('THEME_COSTUME_RULE');
   });
   it('a non-adventure story gets nothing', () => {
-    const p = wardrobe({ storyCategory: 'life-challenge', storyTopic: 'bath-time' });
+    const p = wardrobe({ storyCategory: 'life-challenge', storyTopic: 'first-foods' });
     expect(p).not.toContain("The theme's costume is");
   });
 });

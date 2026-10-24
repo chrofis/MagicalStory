@@ -44,7 +44,7 @@ const swissTopic = `${swissCity.id}-1`;
 const beats = [{ page: 1, beat: 'the child finds the door' }, { page: 2, beat: 'the door opens' }];
 
 const CASES: Record<string, any> = {
-  'life-challenge': { storyCategory: 'life-challenge', storyTopic: 'bath-time' },
+  'life-challenge': { storyCategory: 'life-challenge', storyTopic: 'first-foods' },
   educational: { storyCategory: 'educational', storyTopic: 'alphabet' },
   historical: { storyCategory: 'historical', storyTopic: 'moon-landing' },
   adventure: { storyCategory: 'adventure', storyTheme: 'pirate' },
