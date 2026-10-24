@@ -1201,6 +1201,18 @@
       "severity": "block"
     },
     {
+      "id": "clothing-category-vocabulary",
+      "axis": "category vocabulary",
+      "reason": "Every place that reads a clothing category out of AI text (a page's metadata JSON, the cover and page Characters block, the scene-description Clothing line) takes its words from clothingCategories.js CANONICAL / NIGHTWEAR. Until 2026-10-24 each spelled 'standard'/'costumed' by hand; the third category (nightwear) reached them all or a pyjama page was read as 'standard' (docs/decisions.md 2026-10-24). A new category, or a changed token, reaches every parser together.",
+      "members": [
+        "server/lib/sceneMetadata.js",
+        "server/lib/outlineParser/unified.js",
+        "server/lib/outlineParser/shared.js",
+        "server/lib/clothingResolve.js"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "main-character-selection",
       "axis": "wizard vs prompt builders",
       "reason": "The wizard's live age line says which mains the server counts and whose age picks the band; client/src/utils/mainCharacters.ts mirrors pickMainCharacters (cap: 1 main for up to 2 characters, 2 for 3 or more; oldest main decides). A change to the cap or sort on one side makes the wizard promise a story the server does not write (2026-10-04: three books for a 2-year-old written for her 4-year-old brother).",

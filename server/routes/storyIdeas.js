@@ -752,7 +752,7 @@ function ideaRequestError(body) {
     ['storyType', b.storyType], ['storyTypeName', b.storyTypeName], ['storyCategory', b.storyCategory],
     ['storyTopic', b.storyTopic], ['storyTheme', b.storyTheme], ['customThemeText', b.customThemeText],
     ['language', b.language, 20], ['languageLevel', b.languageLevel, 50],
-  ]) || g.characterListError(b.characters) || g.relationshipListError(b.relationships) || g.locationError(b.userLocation);
+  ]) || g.lifeChallengeTopicError(b.storyCategory, b.storyTopic) || g.characterListError(b.characters) || g.relationshipListError(b.relationships) || g.locationError(b.userLocation);
 }
 
 /**

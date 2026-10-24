@@ -181,6 +181,30 @@ describe('2. prepare-title and the job reuse it', () => {
     expect(res.body.costumeType).toBeNull();
   });
 
+  // docs/decisions.md 2026-10-24: the typed topic id `going-to-bed` also draws the pyjama sheet at prepare-title.
+  it('prepare-title for a bedtime topic draws the nightwear sheet, with its description, and no costume', async () => {
+    database.getPool = () => fakePool({ char: row({ preGeneratedStyledAvatars: { Kid: { standard: 'https://r2/std.jpg' } }, preGeneratedStandardFor: STAMP }) });
+    const style = vi.spyOn(trialSheets, 'styleAndPersistTrialSheets').mockResolvedValue({ slides: ['https://r2/a.jpg'] });
+    const res = fakeRes();
+    await finalHandler('/prepare-title')({ sessionUser: { userId: 'u1' }, body: { storyCategory: 'life-challenge', storyTopic: 'going-to-bed', storyTheme: '' }, headers: {} }, res);
+    expect(style).toHaveBeenCalledTimes(1);
+    const args = style.mock.calls[0][0];
+    expect(args.requirements.map((r: any) => r.clothingCategory)).toEqual(['nightwear']);
+    const reqs = Object.values(args.clothingRequirements)[0] as any;
+    expect(reqs.nightwear.used).toBe(true);
+    expect(reqs.nightwear.description).toMatch(/pyjama top/);
+    expect(reqs.costumed).toBeUndefined();
+  });
+
+  it('prepare-title for a bedtime topic WITH a theme costume draws both, and any other topic never draws nightwear', async () => {
+    database.getPool = () => fakePool({ char: row({ preGeneratedStyledAvatars: { Kid: { standard: 'https://r2/std.jpg' } }, preGeneratedStandardFor: STAMP }) });
+    const style = vi.spyOn(trialSheets, 'styleAndPersistTrialSheets').mockResolvedValue({ slides: ['https://r2/a.jpg'] });
+    const res = fakeRes();
+    await finalHandler('/prepare-title')({ sessionUser: { userId: 'u1' }, body: { storyCategory: 'adventure', storyTheme: 'pirate', storyTopic: '' }, headers: {} }, res);
+    expect(style.mock.calls[0][0].requirements.map((r: any) => r.clothingCategory)).toEqual(['costumed:pirate']);
+    expect(Object.values(style.mock.calls[0][0].clothingRequirements)[0]).not.toHaveProperty('nightwear');
+  });
+
   it('create-story hands BOTH in-flight promises to the job', () => {
     const src = read('server/routes/trial.js');
     expect(src).toContain('const standardAvatarsReady = inFlightStandardSheetsOnRow.get(userId) || null;');
@@ -212,6 +236,23 @@ describe('2. prepare-title and the job reuse it', () => {
       await done;
       expect(seen).toEqual(['prepare-standard-avatar']);
       expect(order).toEqual(['seed:costumed', 'style:costumed:pirate', 'seed:standard', 'style:standard', 'done']);
+    });
+
+    it('the pyjama sheet comes from the prepare-title call and waits for it, never for the standard one', async () => {
+      const order: string[] = [];
+      const withNight = [...reqs, { pageNumber: 'pre-cover', clothingCategory: 'nightwear', characterNames: ['Kid'] }];
+      const seen: string[] = [];
+      await pipeline.runTrialEarlyStyling({
+        requirements: withNight, titleAvatarsReady: Promise.resolve(), standardAvatarsReady: Promise.resolve(),
+        awaitPrepared: async (_r: any, what: string) => { seen.push(what); return { Kid: { nightwear: 'n' } }; },
+        jobStartAvatars: null,
+        seed: (a: any) => order.push(`seed:${a ? Object.keys(a.Kid).join('+') : 'none'}`),
+        style: async (r: any[]) => { order.push(`style:${r.map(x => x.clothingCategory).join('+')}`); },
+        onDone: () => order.push('done'),
+      });
+      expect(order).toContain('style:costumed:pirate+nightwear');
+      expect(order).toContain('style:standard');
+      expect(seen.sort()).toEqual(['prepare-standard-avatar', 'prepare-title']);
     });
 
     it('styling an already seeded standard sheet runs no second sheet generation (the cache hit)', async () => {

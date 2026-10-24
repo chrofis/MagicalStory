@@ -2865,7 +2865,7 @@ async function persistStyledAvatar(userId, characterId, artStyle, clothingCatego
   if (!Object.prototype.hasOwnProperty.call(ART_STYLES, artStyle)) {
     throw new Error(`persistStyledAvatar: unknown artStyle "${artStyle}" (not in ART_STYLES)`);
   }
-  // clothingCategory is one of: 'standard' | 'costumed'
+  // clothingCategory is one of: 'standard' | 'nightwear' | 'costumed'
   // (bare) | 'costumed:<costumeKey>' (legacy). Anything else is a bug.
   const CLOTHING_BARE_RE = /^[a-z][a-z0-9_]{0,30}$/;
   const isCostumed = clothingCategory === 'costumed' || clothingCategory.startsWith('costumed:');

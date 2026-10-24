@@ -40,7 +40,8 @@ const KEYWORDS = {
 
 // Clothing categories (same across languages). 'formal' was a legacy
 // category, fully removed Phase 5. 'costumed' is the bare key — no subtype.
-const CLOTHING_CATEGORIES = ['costumed', 'standard'];
+// Read from the one list in clothingCategories.js (nightwear added 2026-10-24).
+const CLOTHING_CATEGORIES = [...require('../clothingCategories').CANONICAL];
 
 // ============================================================================
 // SHARED HELPERS - Used by both UnifiedStoryParser and ProgressiveUnifiedParser
@@ -126,7 +127,13 @@ function parseCharacterClothingBlock(content) {
     // → boilerplate fallback fired on every cover. Making the `:type` suffix
     // optional fixes that without affecting scene hints that DO carry typed
     // costumed values.
-    const linePattern = /(?:^|,\s*)[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?[^:\r\n]*):\s*(standard|formal|costumed(?::(?:\{[^}]*\}|[^\r\n,]+?))?)((?:\s*,\s*(?:depth|perspective|position|holds|holding|gazes\s+at|gaze|priority)\s*:\s*[^,\r\n]+)*)/gim;
+    // The non-costumed tokens come from the one category list (CLOTHING_CATEGORIES); `costumed` keeps its own
+    // alternative LAST so a `costumed:type` subtype is not cut short by a bare match.
+    const plainTokens = CLOTHING_CATEGORIES.filter(c => c !== 'costumed').join('|');
+    const linePattern = new RegExp(
+      String.raw`(?:^|,\s*)[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?[^:\r\n]*):\s*(${plainTokens}|formal|costumed(?::(?:\{[^}]*\}|[^\r\n,]+?))?)((?:\s*,\s*(?:depth|perspective|position|holds|holding|gazes\s+at|gaze|priority)\s*:\s*[^,\r\n]+)*)`,
+      'gim'
+    );
     // Annotation keys Claude may slip into the line (e.g. "depth: foreground", "perspective: side", "holds: book", "gazes at: chest", "priority: essential").
     // We never want these mistaken for character names — they should be silently dropped.
     const ANNOTATION_KEYS = new Set(['depth', 'perspective', 'position', 'pose', 'view', 'shot', 'action', 'holds', 'holding', 'gazes', 'gaze', 'priority', 'mood']);
@@ -605,7 +612,7 @@ function extractCharacterNamesFromScene(sceneDescription) {
       /^\s*\*\*([^*:]+?)\*\*\s*:?/gm,
       // Non-bold: "- Name (position): clothing" or "- Name: clothing"
       // Requires bullet + clothing value to avoid matching section headers
-      /^[\t ]*[-*\u2022]\s+([^:\r\n(]+?)(?:\s*\([^)]*\))?\s*:\s*(?:standard|formal|costumed)/gm,
+      new RegExp(String.raw`^[\t ]*[-*•]\s+([^:\r\n(]+?)(?:\s*\([^)]*\))?\s*:\s*(?:${CLOTHING_CATEGORIES.join('|')}|formal)`, 'gm'),
     ];
 
     for (const pattern of namePatterns) {

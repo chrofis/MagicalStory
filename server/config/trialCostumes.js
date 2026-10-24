@@ -373,6 +373,29 @@ const TRIAL_COSTUMES = {
   }
 };
 
+// Pyjamas for a trial whose typed topic id is a bedtime story (docs/decisions.md 2026-10-24): keyed on the topic
+// ID, never on words. Not a costume: it is the third outfit category, drawn at prepare-title beside the others.
+// Two-piece, covered torso, feet named (nightwear rule, promptBuilders WARDROBE_RULES.NIGHTWEAR_DEF).
+const TRIAL_NIGHTWEAR = {
+  'life-challenge': {
+    'going-to-bed': {
+      male: "Long-sleeve soft blue cotton pyjama top and matching long blue pyjama bottoms, grey knitted socks",
+      female: "Long-sleeve soft purple cotton pyjama top and matching long purple pyjama bottoms, white knitted socks"
+    }
+  }
+};
+
+/**
+ * The pyjamas of a trial story, or null when its typed topic id is not a bedtime topic.
+ * @param {{storyCategory?: string, storyTopic?: string, gender?: string}} inputs
+ * @returns {{ description: string } | null}
+ */
+function getTrialNightwear({ storyCategory, storyTopic, gender } = {}) {
+  const outfits = TRIAL_NIGHTWEAR[storyCategory]?.[storyTopic];
+  if (!outfits) return null;
+  return { description: outfits[String(gender || '').toLowerCase() === 'female' ? 'female' : 'male'] };
+}
+
 /**
  * Get trial costume for a character based on story topic and category.
  * @param {string} storyTopic - The story topic ID (e.g., 'pirate', 'moon-landing')
@@ -423,4 +446,4 @@ function getTrialCostumeForStory({ storyCategory, storyTheme, storyTopic, gender
   return getTrialCostume(topic, category, gender || '');
 }
 
-module.exports = { TRIAL_COSTUMES, getTrialCostume, resolveTrialCostumeLookup, getTrialCostumeForStory };
+module.exports = { TRIAL_COSTUMES, TRIAL_NIGHTWEAR, getTrialCostume, getTrialNightwear, resolveTrialCostumeLookup, getTrialCostumeForStory };

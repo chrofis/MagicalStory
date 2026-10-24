@@ -36,6 +36,7 @@ Determine which clothing variants each character needs, based on the page plan.
 
 - Mark `used: true` only for variants that actually appear.{ERA_CLOTHING_RULE}{THEME_COSTUME_RULE}
 - Set `costumed.used: true` whenever the theme, setting or era implies special clothing, and name it in `costumed.costume` (`medieval`, `wizard`, `pirate`, `firefighter`, `1920s`, …). Leave it false for a present-day story in everyday clothes that states no theme costume, and for any character whose own role clothing the story keeps.
+- Set `nightwear.used: true` for each person the page plan puts in bed, or into pyjamas for a bedtime routine at night: a child, and an adult too when the plan has them in bed. An adult who only sits at a bedside reading or tucking in stays in their day outfit, and so does anyone whose pages are in daytime. Write `nightwear.description` as the full pyjama outfit, top and bottoms, in the same words-and-colour style as every other outfit. Everyone else leaves `nightwear.used` false. {NIGHTWEAR_DEF}
 - **A character the story already dresses for their role stays `standard`** — a working captain, a uniformed officer, a baker at their own oven. Their own outfit IS their clothing in this world, and the theme's costume puts a second set of clothes on someone who came dressed. Costume the characters the theme is a costume FOR.
 - **A garment the story turns on is described IN FULL in the outfit that wears it** — a garment the arc or plan has someone hold, lend, wrap or lose goes in the outfit of the character who wears it first (the one the plan first gives it to, when no one wears it), as the garment they name, with colour, material and what makes this one recognisable, in the slot it occupies. The Visual Bible copies those words for its own entry of the same object, so the two never describe it differently. It stays in the outfit as worn even on pages the character is without it; those pages record it off in their `wornItems` row.
 - `description` is the FULL final outfit for this story — top, bottom, footwear, accessories — as one self-contained sentence. The avatar generator uses it verbatim.
@@ -48,7 +49,7 @@ Determine which clothing variants each character needs, based on the page plan.
 - {FACE_COVER_DEF}
 - **The costume must read as that costume at a glance.** {COSTUME_RECOGNISABLE_DEF}
 - **Every garment matches the character's sex.** {SEX_FIT_DEF}
-- **A child's swimwear or costume has a covering top.** {CHILD_TOP_DEF}
+- **A child's swimwear, costume or nightwear has a covering top.** {CHILD_TOP_DEF}
 - **A costume that replaces the legs is one tail from the waist down.** {TAIL_DEF}
 - **Characters are told apart by colour.** A different dominant colour per character, on their largest garment.
   - {COLOUR_WORDS_DEF}
@@ -68,11 +69,13 @@ Only the block below. No preamble, no commentary.
   "clothingRequirements": {
     "[CharacterName]": {
       "standard": { "used": true, "description": "[full final outfit]", "garments": [{ "slot": "top", "name": "[garment]", "colour": "[colour word]" }] },
-      "costumed": { "used": true, "costume": "[costume name, e.g. wizard]", "description": "[full costumed outfit]", "garments": [{ "slot": "headwear", "name": "[garment]", "colour": "[colour word]" }] }
+      "costumed": { "used": true, "costume": "[costume name, e.g. wizard]", "description": "[full costumed outfit]", "garments": [{ "slot": "headwear", "name": "[garment]", "colour": "[colour word]" }] },
+      "nightwear": { "used": true, "description": "[full pyjama outfit]", "garments": [{ "slot": "top", "name": "[garment]", "colour": "[colour word]" }] }
     },
     "[AnotherCharacter]": {
       "standard": { "used": true, "description": "[full final outfit]", "garments": [{ "slot": "top", "name": "[garment]", "colour": "[colour word]" }] },
-      "costumed": { "used": false }
+      "costumed": { "used": false },
+      "nightwear": { "used": false }
     }
   }
 }

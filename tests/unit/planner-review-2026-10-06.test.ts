@@ -213,7 +213,7 @@ describe('the wardrobe rules come from one set of constants, in the bible writer
   it('every rule reaches both prompts verbatim', () => {
     const bible = PB.buildStoryBibleFromBeatsPrompt(input, beats, '1. A girl swims.');
     const review = PB.buildClothingReviewPrompt(input, clothing, beats);
-    expect(Object.keys(PB.WARDROBE_RULES)).toHaveLength(9);
+    expect(Object.keys(PB.WARDROBE_RULES)).toHaveLength(10); // NIGHTWEAR_DEF added 2026-10-24
     for (const [name, def] of Object.entries<string>(PB.WARDROBE_RULES)) {
       expect(bible, `${name} missing from the bible writer`).toContain(def);
       expect(review, `${name} missing from the reviewer`).toContain(def);

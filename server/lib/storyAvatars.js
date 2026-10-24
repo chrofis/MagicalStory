@@ -4,7 +4,7 @@
  * The target architecture (see plans/story-scoped-avatars) is that every
  * reference image used during a story's generation is sourced from a
  * story-level 2×4 sheet stored at `story.data.characterAvatars[name].<key>`.
- * `<key>` is one of: `'costumed'`, `'styled-standard'`. There is ONE `costumed` slot per character per story —
+ * `<key>` is one of: `'costumed'`, `'styled-standard', 'styled-nightwear'`. There is ONE `costumed` slot per character per story —
  * no `costumed:pirate` / `costumed:knight` subtype keying.
  *
  * Phase 1 of the migration adds a SHADOW WRITE: project the existing per-
@@ -16,7 +16,7 @@
 'use strict';
 
 const { log } = require('../utils/logger');
-const { AVATAR_SLOTS } = require('./clothingCategories');
+const { PLAIN_SHEET_CATEGORIES, NIGHTWEAR } = require('./clothingCategories');
 const { isOverTheShoulderPerspective } = require('./shotVocabulary');
 
 /**
@@ -83,7 +83,7 @@ function projectStoryCharacterAvatars(characters, artStyle) {
 
     // Non-costumed styled sheets (optional add-ons, "the character out of
     // costume in art style"). Each is keyed as `styled-<clothing>`.
-    for (const clothing of AVATAR_SLOTS) {
+    for (const clothing of PLAIN_SHEET_CATEGORIES) {
       const url = extractUrl(styled[clothing]);
       if (!url) continue;
       entry[`styled-${clothing}`] = url;
@@ -98,7 +98,7 @@ function projectStoryCharacterAvatars(characters, artStyle) {
     for (const key of Object.keys(styled)) {
       if (!isOffCategory(key)) continue;
       const parsed = parseOffCategory(key);
-      if (!parsed || ![...AVATAR_SLOTS, 'costumed'].includes(parsed.baseCategory)) continue;
+      if (!parsed || ![...PLAIN_SHEET_CATEGORIES, 'costumed'].includes(parsed.baseCategory)) continue;
       const url = extractUrl(styled[key]);
       if (!url) continue;
       // The costumed slot is bare 'costumed' (one costume per story), so its
@@ -233,7 +233,7 @@ function resolveSheetForRef(story, ref, opts = {}) {
   const clothingRaw = String(ref.clothingCategory || '').toLowerCase();
   let slotKey;
   if (clothingRaw.startsWith('costumed')) slotKey = 'costumed';
-  else if (AVATAR_SLOTS.includes(clothingRaw)) slotKey = `styled-${clothingRaw}`;
+  else if (PLAIN_SHEET_CATEGORIES.includes(clothingRaw)) slotKey = `styled-${clothingRaw}`;
   else slotKey = 'costumed';
 
   // WARDROBE STATE. Same substitution mechanism as the costumed-vs-standard
@@ -268,7 +268,8 @@ function resolveSheetForRef(story, ref, opts = {}) {
   // standard was rendered in costume, invisibly, for three runs
   // (job_1786826686448 p1). The fallback stays — a reference beats none —
   // but it says so, and the ref carries the category actually sent.
-  if (!uri && story.costumed) {
+  // Pyjamas are never stood in for by the costume sheet (docs/decisions.md 2026-10-24): a missing nightwear sheet is null.
+  if (!uri && story.costumed && clothingRaw !== NIGHTWEAR) {
     log.warn(`👕 [STORY-CELLS] ${ref.name || '?'}: no "${slotKey}" entry — falling back to the costumed sheet (ref asked for "${clothingRaw || 'none'}")`);
     uri = story.costumed;
     ref.clothingCategory = 'costumed';

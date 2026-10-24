@@ -20,6 +20,7 @@ const {
   getExtractJsonFromText,
   auditVisualBibleContract,
 } = require('./shared');
+const { NIGHTWEAR } = require('../clothingCategories');
 
 class UnifiedStoryParser {
   /**
@@ -641,6 +642,7 @@ class UnifiedStoryParser {
                 const raw = char.clothing.toLowerCase();
                 let clothing = 'standard';
                 if (raw.includes('costumed')) clothing = 'costumed';
+                else if (raw.includes(NIGHTWEAR)) clothing = NIGHTWEAR;
                 characterClothing[baseName] = clothing;
                 characters.push(char.name);
                 // Capture optional depth/perspective from JSON char object

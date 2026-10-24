@@ -137,6 +137,7 @@ const {
   findingPages,
   buildClothingReviewPrompt,
   parseClothingReview,
+  acceptAddedWardrobeCategory,
   applyClothingFix,
   parsePlanResponse,
   pickMainCharacters,
@@ -3188,13 +3189,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           // transforms or costumes a character whose wardrobe has no entry for
           // it. Accepted only in the explicit `costumed:<name>` form — a plain
           // rewrite of an unused category is still stray (hallucination guard).
-          if (name && fix.category === 'costumed' && fix.costume && (!entry || !entry.used)) {
-            entry = clothingRequirements[name].costumed = {
-              ...(clothingRequirements[name].costumed || {}),
-              used: true,
-              costume: fix.costume,
-            };
-          }
+          // `nightwear` is accepted the same way (a page puts someone in bed): acceptAddedWardrobeCategory.
+          entry = acceptAddedWardrobeCategory(clothingRequirements, name, fix, entry);
           if (!entry || !entry.used) { stray.push(`${fix.name}/${fix.category}`); continue; }
           const before = entry.description || '';
           if (before === fix.description) continue;

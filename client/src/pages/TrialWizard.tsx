@@ -14,6 +14,7 @@ import { trackTrialStep } from '@/utils/trialFunnel';
 import { isTrialSessionDead } from '@/utils/trialSession';
 import { useAnalyzerPresence } from '@/hooks/useAnalyzerPresence';
 import { parseChildAge } from '@/constants/storyTypes';
+import { knownDeepLink } from '@/utils/wizardStoryType';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -238,17 +239,16 @@ export default function TrialWizard() {
   // whether in-wizard topic curation buys anything at all.
   const deepLink = useRef<{ category: string; topic: string }>(
     (() => {
-      const params = new URLSearchParams(window.location.search);
-      return { category: params.get('category') || '', topic: params.get('topic') || '' };
+      return knownDeepLink(window.location.search);
     })()
   ).current;
 
   // Story input state — pre-fill from URL params (from theme pages)
   const [storyInput, setStoryInput] = useState<StoryInput>(() => {
-    const params = new URLSearchParams(window.location.search);
+    const link = knownDeepLink(window.location.search);
     return {
-      storyCategory: params.get('category') || '',
-      storyTopic: params.get('topic') || '',
+      storyCategory: link.category,
+      storyTopic: link.topic,
       storyTheme: '',
       storyDetails: '',
       language: storyLanguage,

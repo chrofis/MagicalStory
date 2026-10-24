@@ -27,6 +27,20 @@ function textFieldsError(pairs) {
   return null;
 }
 
+/**
+ * A life-challenge topic id with no guide (retired such as bath-time, or misspelled) is refused
+ * by name at the door; there is no guide-less story (docs/decisions.md 2026-10-24).
+ */
+function lifeChallengeTopicError(category, topic) {
+  try {
+    require('./promptBuilders').assertKnownLifeChallengeTopic(category, topic);
+    return null;
+  } catch (e) {
+    if (e && e.code === 'UNKNOWN_LIFE_CHALLENGE_TOPIC') return e.message;
+    throw e;
+  }
+}
+
 /** A list of short strings: max 20 items of max 100 characters. */
 function traitListError(label, list) {
   if (list === undefined || list === null) return null;
@@ -124,6 +138,6 @@ function abortOnClientClose(res) {
 
 module.exports = {
   FIELD_MAX_CHARS, IDEA_TEXT_MAX_CHARS, TRAITS_MAX_ITEMS, TRAIT_MAX_CHARS, CHARACTERS_MAX, TOO_MANY_CHARACTERS, RELATIONSHIPS_MAX,
-  textError, textFieldsError, traitListError, characterTraitsError, characterListError,
+  textError, textFieldsError, lifeChallengeTopicError, traitListError, characterTraitsError, characterListError,
   relationshipListError, locationError, userImageSourceError, abortOnClientClose,
 };

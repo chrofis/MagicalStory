@@ -5,7 +5,7 @@
 
 const { log } = require('../utils/logger');
 const { lookupByName } = require('./castResolver');
-const { resolveCharacterReqs, AVATAR_SLOTS, assertNotRemovedSeasonCategory } = require('./clothingCategories');
+const { resolveCharacterReqs, AVATAR_SLOTS, CANONICAL, PLAIN_SHEET_CATEGORIES, assertNotRemovedSeasonCategory } = require('./clothingCategories');
 const { getPrimaryPhoto, getStandardAvatar, getFaceThumb, getBodyThumb } = require('./characterPhotos');
 
 let imagesModule = null;
@@ -238,9 +238,8 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
       return 'costumed';
     }
 
-    // Standard categories
-    const validValues = ['standard'];
-    if (validValues.includes(clothingLower)) {
+    // Plain categories (standard, nightwear) — the one list in clothingCategories.js
+    if (PLAIN_SHEET_CATEGORIES.includes(clothingLower)) {
       log.debug(`[CLOTHING] Using JSON metadata: "${clothingLower}"`);
       return clothingLower;
     }
@@ -256,7 +255,7 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
   const keywords = '(?:Clothing|Kleidung|Vêtements|Tenue)';
 
   // Valid clothing values — Phase 5: bare 'costumed' only, no subtype suffix.
-  const values = '(standard|costumed)';
+  const values = `(${CANONICAL.join('|')})`;
 
   // Pattern 1: Same line - keyword and value on same line with any markdown/separators
   // Handles: **Clothing:** winter, *Clothing*: **winter**, --Clothing--: winter, ## 4. Clothing: winter
@@ -281,7 +280,7 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
   if (keywordMatch) {
     const startIndex = keywordMatch.index;
     const nearbyText = sceneDescription.substring(startIndex, startIndex + 100);
-    const valueMatch = nearbyText.match(/\b(standard|costumed)\b/i);
+    const valueMatch = nearbyText.match(new RegExp(String.raw`\b(${CANONICAL.join('|')})\b`, 'i'));
     if (valueMatch) {
       return valueMatch[1].toLowerCase();
     }
@@ -292,7 +291,7 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
     if (warnOnInvalid) {
       const invalidValueMatch = nearbyText.match(/:\s*\*{0,2}(\w+)/i);
       const invalidValue = invalidValueMatch ? invalidValueMatch[1] : '(empty)';
-      log.error(`[CLOTHING] No valid clothing value near keyword (found: "${invalidValue}"). Valid values: standard, costumed`);
+      log.error(`[CLOTHING] No valid clothing value near keyword (found: "${invalidValue}"). Valid values: ${CANONICAL.join(', ')}`);
     }
     return null;
   }

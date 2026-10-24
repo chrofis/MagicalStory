@@ -1520,7 +1520,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     const inputErr = guards.textFieldsError([
       ['storyCategory', storyCategory], ['storyTopic', storyTopic], ['storyTheme', storyTheme],
       ['storyDetails', storyDetails, guards.IDEA_TEXT_MAX_CHARS], ['language', language, 20], ['ideaKind', ideaKind, 20],
-    ]) || guards.locationError(userLocation);
+    ]) || guards.locationError(userLocation) || guards.lifeChallengeTopicError(storyCategory, storyTopic);
     if (inputErr) return res.status(400).json({ error: inputErr });
 
     // Atomic check-and-increment to prevent race condition (two simultaneous requests).
@@ -2457,7 +2457,7 @@ router.post('/generate-ideas-stream', verifySessionToken, trialIdeasLimiter, asy
   // Free text goes into two paid Sonnet prompts: cap it before the stream opens (code review 2026-10 T1).
   const { storyCategory: _c, storyTopic: _t, storyTheme: _th, language: _l, characters: _ch, userLocation: _u } = req.body || {};
   const inputError = guards.textFieldsError([['storyCategory', _c], ['storyTopic', _t], ['storyTheme', _th], ['language', _l, 20]])
-    || guards.characterListError(_ch) || guards.locationError(_u);
+    || guards.characterListError(_ch) || guards.locationError(_u) || guards.lifeChallengeTopicError(_c, _t);
   if (inputError) return res.status(400).json({ error: inputError });
   // A closed tab stops both paid arms.
   const signal = guards.abortOnClientClose(res);
@@ -2935,7 +2935,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     if (!storyCategory || (!storyTopic && !storyTheme)) {
       return res.status(400).json({ error: 'storyCategory and storyTopic or storyTheme are required' });
     }
-    const inputErr = guards.textFieldsError([['storyCategory', storyCategory], ['storyTopic', storyTopic], ['storyTheme', storyTheme]]);
+    const inputErr = guards.textFieldsError([['storyCategory', storyCategory], ['storyTopic', storyTopic], ['storyTheme', storyTheme]]) || guards.lifeChallengeTopicError(storyCategory, storyTopic);
     if (inputErr) return res.status(400).json({ error: inputErr });
 
     // Once the trial story is taken there is nothing left to prepare (code review 2026-10 T3).
@@ -2963,9 +2963,12 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     const { characterId, mainChar, character } = loaded;
 
     // Look up costume using the resolved lookup topic/category
-    const { getTrialCostume } = require('../config/trialCostumes');
+    const { getTrialCostume, getTrialNightwear } = require('../config/trialCostumes');
     const costume = getTrialCostume(lookupTopic, lookupCategory, mainChar.gender || 'male');
     const costumeType = costume ? costume.costumeType : null;
+    // A bedtime topic (typed id `going-to-bed`) also needs the pyjama sheet; it is drawn here, off the critical
+    // path, beside the costume (docs/decisions.md 2026-10-24).
+    const nightwear = getTrialNightwear({ storyCategory, storyTopic, gender: mainChar.gender || 'male' });
 
     // ONE costumed sheet per trial (code review 2026-10 T3, docs/decisions.md): a repeat call for the same
     // costume returns what is stored; a call for a DIFFERENT costume generates nothing - the story job builds
@@ -2982,7 +2985,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
 
     // No costume for this topic: nothing to style here. The standard sheet is made at the form, and the job
     // styles anything still missing.
-    if (!costume) {
+    if (!costume && !nightwear) {
       log.info(`[TRIAL AVATARS] prepare-title for user ${userId}: no costume for ${lookupCategory}/${lookupTopic}, nothing to prepare`);
       return res.json({ costumeType: null, avatarSlides: slidesForClient(mainChar) });
     }
@@ -2990,14 +2993,14 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     const avatarClothingRequirements = {
       [character.name]: {
         standard: { used: true, signature: 'none' },
-        costumed: { used: true, costume: costume.costumeType, description: costume.description },
+        ...(costume ? { costumed: { used: true, costume: costume.costumeType, description: costume.description } } : {}),
+        ...(nightwear ? { nightwear: { used: true, description: nightwear.description } } : {}),
       },
     };
-    const avatarRequirements = [{
-      pageNumber: 'cover',
-      clothingCategory: `costumed:${costume.costumeType}`,
-      characterNames: [character.name],
-    }];
+    const avatarRequirements = [
+      ...(costume ? [{ pageNumber: 'cover', clothingCategory: `costumed:${costume.costumeType}`, characterNames: [character.name] }] : []),
+      ...(nightwear ? [{ pageNumber: 'bed', clothingCategory: 'nightwear', characterNames: [character.name] }] : []),
+    ];
 
     // A costumed sheet ignores the season (the costume is the outfit); it is passed for parity with the job.
     const { seasonOutfitGuidance } = require('../lib/season');

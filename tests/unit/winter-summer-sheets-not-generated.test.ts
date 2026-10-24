@@ -14,9 +14,9 @@ const read = (f: string) => fs.readFileSync(path.join(__dirname, '../../prompts'
 // docs/decisions.md 2026-10-10 (second entry): winter and summer are not clothing categories at all.
 // A season word is prose. A stored page that asked for the category cannot be repaired.
 describe('winter/summer are not clothing categories', () => {
-  it('one base slot, two category buckets', () => {
+  it('one base slot, three category buckets (nightwear added 2026-10-24, docs/decisions.md; a season is still prose)', () => {
     expect([...cats.AVATAR_SLOTS]).toEqual(['standard']);
-    expect([...cats.CANONICAL]).toEqual(['standard', 'costumed']);
+    expect([...cats.CANONICAL]).toEqual(['standard', 'costumed', 'nightwear']);
     expect(cats.STORED_AVATAR_SLOTS).toBeUndefined();
   });
 

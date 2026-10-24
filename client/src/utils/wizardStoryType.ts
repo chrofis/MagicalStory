@@ -23,6 +23,21 @@ export function isStoryTypeComplete(sel: StoryTypeSelection): boolean {
   return !!sel.storyTopic;
 }
 
+import { lifeChallenges } from '../constants/storyTypes';
+
+/**
+ * The `?category=&topic=` deep link, with a retired or misspelled life-challenge topic
+ * (bath-time, retired 2026-10-24) dropped: it opens the wizard with nothing preselected.
+ * A topic with no guide would be a guide-less story; the server refuses it by name.
+ */
+export function knownDeepLink(search: string): { category: string; topic: string } {
+  const params = new URLSearchParams(search);
+  const category = params.get('category') || '';
+  const topic = params.get('topic') || '';
+  if (category === 'life-challenge' && topic && !lifeChallenges.some(c => c.id === topic)) return { category: '', topic: '' };
+  return { category, topic };
+}
+
 // Keys of the step-3/5 state the wizard restores from localStorage.
 const STORY_TYPE_KEYS = ['story_type', 'story_theme', 'story_custom_theme_text', 'story_details', 'story_topic_name'] as const;
 
@@ -45,9 +60,7 @@ export interface StoredStoryType {
  * topic handlers would have set for that click ('realistic' wrapper, topic id).
  */
 export function initialStoryType(search: string, storage: Pick<Storage, 'getItem' | 'removeItem'>): StoredStoryType {
-  const params = new URLSearchParams(search);
-  const urlCategory = params.get('category');
-  const urlTopic = params.get('topic');
+  const { category: urlCategory, topic: urlTopic } = knownDeepLink(search);
   if (!urlCategory && !urlTopic) {
     return {
       storyType: storage.getItem('story_type') || '',

@@ -6,6 +6,7 @@
 const { log } = require('../utils/logger');
 const { OutlineParser, extractCharacterNamesFromScene } = require('./outlineParser');
 const { buildCastIndex, resolveEntity, sameEntity, entriesMentioned, isNameMentioned } = require('./castResolver');
+const { NIGHTWEAR } = require('./clothingCategories');
 
 /**
  * Extract JSON object from a string that may have text before/after it or be wrapped in code blocks
@@ -987,6 +988,7 @@ function extractSceneMetadata(sceneDescription) {
         const costumedMatch = raw.match(/costumed:(?!costumed)(.+)/);
         if (costumedMatch) characterClothing[char.name] = `costumed:${costumedMatch[1].trim()}`;
         else if (raw.includes('costumed')) characterClothing[char.name] = 'costumed';
+        else if (raw.includes(NIGHTWEAR)) characterClothing[char.name] = NIGHTWEAR;
         else characterClothing[char.name] = 'standard';
       }
       // Perspective and depth from metadata
@@ -1141,11 +1143,12 @@ function extractSceneMetadata(sceneDescription) {
       if (char.name) {
         characterNames.push(char.name);
         if (char.clothing) {
-          // Normalize: only 4 valid categories — extract from any AI format
+          // Normalize: only the canonical categories (clothingCategories.js CANONICAL) — extract from any AI format
           const raw = char.clothing.toLowerCase();
           const costumedMatch = raw.match(/costumed:(?!costumed)(.+)/);
           if (costumedMatch) characterClothing[char.name] = `costumed:${costumedMatch[1].trim()}`;
           else if (raw.includes('costumed')) characterClothing[char.name] = 'costumed';
+          else if (raw.includes(NIGHTWEAR)) characterClothing[char.name] = NIGHTWEAR;
           else characterClothing[char.name] = 'standard';
         }
         if (char.position) {

@@ -7851,9 +7851,7 @@ async function runClothingReviewStage(target, { params = {}, promptOverride = nu
     let entry = name ? after[name]?.[fix.category] : null;
     // Mirror production: check 9 may ADD costumed:<name> for a beat-driven
     // transformation the bible missed.
-    if (name && fix.category === 'costumed' && fix.costume && (!entry || !entry.used)) {
-      entry = after[name].costumed = { ...(after[name].costumed || {}), used: true, costume: fix.costume };
-    }
+    entry = require('./promptBuilders').acceptAddedWardrobeCategory(after, name, fix, entry);
     if (!entry || !entry.used) { stray.push(`${fix.name}/${fix.category}`); continue; }
     if ((entry.description || '') === fix.description) continue;
     changed.push({ name, category: fix.costume ? `costumed:${fix.costume}` : fix.category, before: entry.description || '', after: fix.description });

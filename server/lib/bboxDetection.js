@@ -1308,7 +1308,7 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
   const isCategoryLabel = (str) => {
     if (!str || typeof str !== 'string') return false;
     const s = str.trim().toLowerCase();
-    if (['standard', 'costumed'].includes(s)) return true;
+    if (require('./clothingCategories').CANONICAL.includes(s)) return true;
     if (s.startsWith('costumed:')) return true;
     return false;
   };

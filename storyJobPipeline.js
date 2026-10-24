@@ -174,7 +174,9 @@ async function awaitPreparedAvatars(ready, { userId, characterId, what, timeoutM
  * awaitPrepared(ready) resolves to the persisted sheets of the finished prepare call.
  */
 function runTrialEarlyStyling({ requirements, titleAvatarsReady, standardAvatarsReady, awaitPrepared, jobStartAvatars, seed, style, onDone }) {
-  const isCostumed = (r) => String(r.clothingCategory).startsWith('costumed');
+  // The sheets the prepare-title call draws are the costume and the pyjamas (docs/decisions.md 2026-10-24); the standard
+  // sheet comes from prepare-standard-avatar. Each group waits on its own call.
+  const isCostumed = (r) => String(r.clothingCategory).startsWith('costumed') || r.clothingCategory === 'nightwear';
   const standardReqs = requirements.filter(r => !isCostumed(r));
   const costumedReqs = requirements.filter(isCostumed);
   seed(jobStartAvatars); // what the row already held at job start (a finished sheet; no-op when null)
@@ -766,7 +768,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // TRIAL MODE: Start avatar styling immediately using pre-defined costumes
     // This runs in parallel with story generation (no need to wait for outline clothing)
     if (inputData.trialMode && !skipImages && artStyle !== 'realistic') {
-      const { getTrialCostumeForStory } = require('./server/config/trialCostumes');
+      const { getTrialCostumeForStory, getTrialNightwear } = require('./server/config/trialCostumes');
       const mainChar = (inputData.characters || [])[0];
       // Category/theme/topic -> costume mapping lives in trialCostumes.js, so the
       // avatar prewarm, this job and the idea generator cannot disagree about
@@ -778,14 +780,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         gender: mainChar?.gender || ''
       });
 
+      // The pyjamas of a bedtime topic (typed id `going-to-bed`), per character by gender; null for every other topic.
+      const nightwearFor = (char) => getTrialNightwear({
+        storyCategory: inputData.storyCategory, storyTopic: inputData.storyTopic, gender: char?.gender || ''
+      });
+
       // Build clothing requirements from config (not from outline)
       const trialClothingRequirements = {};
       for (const char of (inputData.characters || [])) {
+        const pyjamas = nightwearFor(char);
         trialClothingRequirements[char.name] = {
           standard: { used: true, signature: 'none' },
           costumed: costume
             ? { used: true, costume: costume.costumeType, description: costume.description }
-            : { used: false }
+            : { used: false },
+          ...(pyjamas ? { nightwear: { used: true, description: pyjamas.description } } : {})
         };
       }
 
@@ -806,7 +815,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // parallel, inside the ~100s outline window, so the wall-clock cost is
       // near zero — the saving was never worth a trial-only avatar path.
       const trialAvatarRequirements = (inputData.characters || []).flatMap(char => {
-        const cats = costume ? [`costumed:${costume.costumeType}`, 'standard'] : ['standard'];
+        const cats = [
+          ...(costume ? [`costumed:${costume.costumeType}`] : []),
+          'standard',
+          ...(nightwearFor(char) ? ['nightwear'] : []),
+        ];
         return cats.map(cat => ({
           pageNumber: 'pre-cover',
           clothingCategory: cat,
@@ -3679,15 +3692,8 @@ ${trialWriter.pagesPrompt}`;
     // primaryClothing = dominant category across all pages — it is a live
     // fallback in repair/regen paths, so a hardcoded 'standard' fed standard
     // avatars into repairs on winter-only stories.
-    const categoryCounts = {};
-    for (const entry of Object.values(pageClothing)) {
-      for (const cat of Object.values(entry)) {
-        const norm = require('./server/lib/clothingCategories').normalizeClothingCategory(cat);
-        categoryCounts[norm] = (categoryCounts[norm] || 0) + 1;
-      }
-    }
-    const primaryClothing = Object.entries(categoryCounts)
-      .sort((a, b) => b[1] - a[1])[0]?.[0] || 'standard';
+    // Pyjama pages are not counted (dominantDayCategory; docs/decisions.md 2026-10-24).
+    const primaryClothing = require('./server/lib/clothingCategories').dominantDayCategory(pageClothing) || 'standard';
     const pageClothingData = {
       primaryClothing,
       pageClothing
@@ -4336,6 +4342,8 @@ ${trialWriter.pagesPrompt}`;
             }
           }
         }
+        // A cover page shows the day outfit; a brief that put anyone in pyjamas on it is stopped here.
+        if (coverOpts) require('./server/lib/clothingCategories').assertCoverClothingIsDay(perCharClothing, `page ${pageNum}`);
         const defaultClothing = 'standard';
         const sceneClothingRequirements = buildSceneClothingRequirements(
           sceneCharacters,

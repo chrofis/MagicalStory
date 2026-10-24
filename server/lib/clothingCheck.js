@@ -34,7 +34,7 @@
 
 const { log } = require('../utils/logger');
 const { lookupByName, nameRegExp } = require('./castResolver');
-const { resolveCharacterReqs } = require('./clothingCategories');
+const { resolveCharacterReqs, NIGHTWEAR } = require('./clothingCategories');
 const { resolveWornItemsForPage, unlinkedWornCandidates, trackedWornGarments, missingWornRows } = require('./wornItems');
 
 // Slot labels the writer emits. A slot the character does not wear is OMITTED
@@ -720,8 +720,11 @@ function checkClothingIncomplete(page, clothingRequirements) {
     if (stated.length === 0) continue;                                     // outfit_missing's case
     // A slot is missing only when NO clause of it is stated: a shirt under a
     // named pullover is still a dressed top.
+    // Pyjamas need no footwear: slippers, socks or bare feet are all a complete bedtime outfit.
+    const pyjamas = String(category).toLowerCase() === NIGHTWEAR;
     const missing = REQUIRED_SLOTS
       .filter(slot => !((legless || waistUp) && slot !== 'top'))
+      .filter(slot => !(pyjamas && slot === 'footwear'))
       .map(slot => clauses.filter(c => c.slot === slot))
       .filter(of => of.length && !of.some(c => named(c)))
       .map(of => of[0]);

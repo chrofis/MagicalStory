@@ -23,7 +23,8 @@ const { previewImageField } = require('../lib/checkpointImages');
 const { getPool, withTransaction, offloadJsonbImages, inlineOffloadPrefix } = require('../services/database');
 const email = require('../../email');
 const { normalizeCharacterName } = require('../lib/characterName');
-const { CHARACTERS_MAX, TOO_MANY_CHARACTERS } = require('../lib/requestGuards');
+const guards = require('../lib/requestGuards');
+const { CHARACTERS_MAX, TOO_MANY_CHARACTERS } = guards;
 const { settleJobWithRefund, JOB_SAVING_PROGRESS } = require('../lib/jobCredits');
 
 function getDbPool() { return getPool(); }
@@ -167,6 +168,12 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
         code: TOO_MANY_CHARACTERS,
         max: CHARACTERS_MAX,
       });
+    }
+    // A life-challenge topic with no guide (retired, misspelled) is refused by name; no guide-less story.
+    const topicError = guards.lifeChallengeTopicError(inputData.storyCategory, inputData.storyTopic);
+    if (topicError) {
+      log.warn(`🚫 [CREATE-STORY] ${req.user.username}: ${topicError}`);
+      return res.status(400).json({ error: topicError, code: 'UNKNOWN_LIFE_CHALLENGE_TOPIC' });
     }
     // Remove idempotencyKey from input_data as it's stored separately
     delete inputData.idempotencyKey;

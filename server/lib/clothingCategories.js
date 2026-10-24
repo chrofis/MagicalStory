@@ -2,13 +2,16 @@
  * Clothing Categories — canonical normalizer.
  *
  * Single source of truth for mapping AI-produced clothing category strings
- * to one of 2 canonical buckets. Used on BOTH write and read sides of the
+ * to one of 3 canonical buckets. Used on BOTH write and read sides of the
  * styled avatar cache so lookups are guaranteed to match regardless of
  * AI variability (case, language, costume subtype).
  *
- * Two buckets:
+ * Three buckets:
  *   - "standard"  — default everyday clothing
  *   - "costumed"  — story-specific outfit (costume subtype lives elsewhere)
+ *   - "nightwear" — pyjamas, for the pages that put someone in bed (docs/decisions.md 2026-10-24;
+ *                   the "Revisit if" of the 2026-10-10 winter/summer removal). Only the exact token
+ *                   maps here; it is never a cover outfit and never a story's primaryClothing.
  *
  * Tolerates:
  *   - Case variations: "Costumed", "COSTUMED" → "costumed"
@@ -21,7 +24,20 @@
  */
 
 // Canonical buckets — the ONLY valid cache key values
-const CANONICAL = Object.freeze(['standard', 'costumed']);
+// ONE list: every place that names the story's sheet categories reads this (parsers, regexes,
+// persistence, sheet keys) instead of spelling the words again.
+const CANONICAL = Object.freeze(['standard', 'costumed', 'nightwear']);
+const NIGHTWEAR = 'nightwear';
+// Categories whose sheet NOTHING stands in for: a book that needs one and has none fails (a costume:
+// owner 2026-10-05; pyjamas: 2026-10-24) instead of drawing the outfit from text over another sheet.
+const NO_STAND_IN_CATEGORIES = Object.freeze(['costumed', NIGHTWEAR]);
+// The sheet categories stored as a plain `styled-<category>` key (everything but the costume, which has its own
+// `costumed` slot): the standard outfit and the pyjamas.
+const PLAIN_SHEET_CATEGORIES = Object.freeze(CANONICAL.filter(c => c !== 'costumed'));
+// The day book: every category except the pyjamas. These are the buckets that can stand in for each other
+// (a missing costume never takes the standard sheet, but standard may take a costume sheet) and the only ones a
+// cover or a story's primaryClothing may name; pyjamas never stand in for a day outfit and a day outfit never for them.
+const DAY_CATEGORIES = Object.freeze(CANONICAL.filter(c => c !== NIGHTWEAR));
 const { buildCastIndex, lookupByName } = require('./castResolver');
 
 // The one base avatar slot a character has (excludes story-specific 'costumed', which is
@@ -44,10 +60,10 @@ function assertNotRemovedSeasonCategory(raw, who = '') {
 }
 
 /**
- * Normalize any clothing category string to one of 2 canonical buckets (standard, costumed).
+ * Normalize any clothing category string to one of the canonical buckets (CANONICAL).
  *
  * @param {string|null|undefined} category - Raw category from AI output
- * @returns {'standard'|'costumed'}
+ * @returns {'standard'|'costumed'|'nightwear'}
  */
 function normalizeClothingCategory(category) {
   if (!category) return 'standard';
@@ -72,6 +88,9 @@ function normalizeClothingCategory(category) {
       raw.startsWith('disfraz')) {
     return 'costumed';
   }
+
+  // Pyjamas: the exact token only. Prose that merely mentions nightwear is not a category.
+  if (raw === NIGHTWEAR) return NIGHTWEAR;
 
   // Everything else (including unknown/typo) → standard
   return 'standard';
@@ -138,7 +157,10 @@ function reconcileCoverClothingWithRequirements(coverHints, clothingRequirements
     if (!hint || !hint.characterClothing || typeof hint.characterClothing !== 'object') continue;
 
     for (const [charName, requestedClothing] of Object.entries(hint.characterClothing)) {
-      const usedCategories = getUsedClothingCategories(clothingRequirements, charName);
+      // A cover shows the DAY outfit: pyjamas are neither a valid request nor a valid replacement
+      // (docs/decisions.md 2026-10-24), so a character's pyjama entry is not one of its cover choices.
+      const usedCategories = getUsedClothingCategories(clothingRequirements, charName)
+        .filter((cat) => DAY_CATEGORIES.includes(normalizeClothingCategory(cat)));
       if (usedCategories.length === 0) continue; // No requirements for this character — leave as-is
 
       // Compare requested vs used using canonical buckets so 'costumed:pirate'
@@ -229,6 +251,42 @@ function reconcilePageClothingWithRequirements(perCharClothing, clothingRequirem
   }
 
   return { clothing, overrides };
+}
+
+/**
+ * The story's primaryClothing: the DAY category most pages dress their characters in, or null when no page
+ * names one. Pyjama pages are not counted: primaryClothing is what the covers and the repair fallbacks read, and
+ * a bedtime book with more pyjama pages than day pages must not make pyjamas the book's outfit.
+ *
+ * @param {Object} pageClothing - { [pageNumber]: { [charName]: category } }
+ * @returns {string|null}
+ */
+function dominantDayCategory(pageClothing) {
+  const counts = {};
+  for (const entry of Object.values(pageClothing || {})) {
+    for (const cat of Object.values(entry || {})) {
+      const norm = normalizeClothingCategory(cat);
+      if (!DAY_CATEGORIES.includes(norm)) continue;
+      counts[norm] = (counts[norm] || 0) + 1;
+    }
+  }
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+}
+
+/**
+ * A cover shows the day outfit. A brief that dresses anyone on a cover in pyjamas broke the cover rule
+ * (prompts/scene-briefs-all.txt C3); that is stated and stopped here, never drawn and never quietly rewritten
+ * (docs/decisions.md 2026-10-24).
+ *
+ * @param {Object|null} perCharClothing - { [charName]: category } of one cover
+ * @param {string} label - which cover, for the message
+ */
+function assertCoverClothingIsDay(perCharClothing, label = 'cover') {
+  for (const [name, cat] of Object.entries(perCharClothing || {})) {
+    if (normalizeClothingCategory(cat) === NIGHTWEAR) {
+      throw new Error(`[COVER] ${label}: ${name} is dressed in ${NIGHTWEAR}, but a cover shows the day outfit. The cover brief broke the cover rule; no cover is drawn from it.`);
+    }
+  }
 }
 
 /**
@@ -337,10 +395,16 @@ function resolveRenderedClothingCategory(storyData, pageNumber, charName, record
 
 module.exports = {
   CANONICAL,
+  NIGHTWEAR,
+  NO_STAND_IN_CATEGORIES,
+  PLAIN_SHEET_CATEGORIES,
+  DAY_CATEGORIES,
   AVATAR_SLOTS,
   assertNotRemovedSeasonCategory,
   normalizeClothingCategory,
   getUsedClothingCategories,
+  assertCoverClothingIsDay,
+  dominantDayCategory,
   reconcileCoverClothingWithRequirements,
   reconcilePageClothingWithRequirements,
   resolveCharacterReqs,

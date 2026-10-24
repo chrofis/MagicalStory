@@ -33,7 +33,7 @@
  */
 
 const { log } = require('../utils/logger');
-const { AVATAR_SLOTS } = require('./clothingCategories');
+const { AVATAR_SLOTS, CANONICAL, NIGHTWEAR } = require('./clothingCategories');
 const {
   WORN_SLOTS, resolveWornItemsForPage, isOffForCharacter, sameName, outfitVersionOf,
 } = require('./wornItems');
@@ -157,7 +157,8 @@ function versionRedressNote(versions) {
  * job_1790446348343_z3fw660ie, four pages). One costume per character per
  * story, so 'costumed' names the sheet.
  */
-const SHEET_BASE_CATEGORIES = ['standard', 'costumed'];
+// Read from the one category list (clothingCategories.js CANONICAL): pyjamas are a sheet too.
+const SHEET_BASE_CATEGORIES = CANONICAL;
 function sheetCategoryOf(raw) {
   const c = String(raw || '').trim().toLowerCase();
   if (c.startsWith('costumed')) return 'costumed';
@@ -179,6 +180,8 @@ function baseCategoryFor(clothingRequirements, characterName) {
   for (const cat of AVATAR_SLOTS) {
     if (charReqs[cat]?.used === true) return cat;
   }
+  // A character whose only outfit in the book is pyjamas (the whole book is a bedtime) has that sheet as base.
+  if (charReqs[NIGHTWEAR]?.used === true) return NIGHTWEAR;
   return null;
 }
 

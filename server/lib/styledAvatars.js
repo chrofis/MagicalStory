@@ -12,7 +12,7 @@
  */
 
 const fs = require('fs');
-const { AVATAR_SLOTS } = require('./clothingCategories');
+const { AVATAR_SLOTS, CANONICAL, NIGHTWEAR, NO_STAND_IN_CATEGORIES, PLAIN_SHEET_CATEGORIES, DAY_CATEGORIES } = require('./clothingCategories');
 const path = require('path');
 const { log } = require('../utils/logger');
 const { compressImageToJPEG, callGeminiAPIForImage } = require('./images');
@@ -709,6 +709,14 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
         log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - final clothingDescription: ${clothingDescription ? `${clothingDescription.substring(0, 80)}…` : 'none'}`);
       }
 
+      // A pyjama sheet is drawn from the story's nightwear description and from nothing else. Without one the
+      // sheet would be the day outfit under a pyjama key, which is the substitution this category exists to
+      // prevent (docs/decisions.md 2026-10-24): skip it, loudly; the final coverage pass fails the book.
+      if (clothingCategory === NIGHTWEAR && !clothingDescription) {
+        log.error(`❌ [STYLED AVATARS] ${charName}: the story needs a nightwear sheet but clothingRequirements has no nightwear description — no sheet is drawn`);
+        continue;
+      }
+
       if (originalAvatar && typeof originalAvatar === 'string' && originalAvatar.startsWith('data:image')) {
         // Realistic style needs no STYLE conversion (base avatars are already
         // photos) — but the story may have CHANGED the outfit: the outline
@@ -721,7 +729,8 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
         // whenever the resolved outfit differs from the stored base clothing;
         // skip only when they match (base avatar already correct).
         const storedClothing = String(char.avatars?.clothing?.[clothingCategory] || '').trim();
-        const outfitChanged = !!clothingDescription && clothingDescription.trim() !== storedClothing;
+        // Pyjamas are always a redress: the reference avatar's clothes are the day outfit.
+        const outfitChanged = !!clothingDescription && (clothingCategory === NIGHTWEAR || clothingDescription.trim() !== storedClothing);
         const isCostumedCat = clothingCategory.startsWith('costumed:') || clothingCategory === 'costumed';
         if (isRealistic && !isCostumedCat && !outfitChanged) {
           log.debug(`⏭️ [STYLED AVATARS] ${charName}:${clothingCategory} - skipping for realistic style (outfit unchanged, base avatar matches)`);
@@ -952,7 +961,9 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 }
 
 // Canonical buckets a styled avatar can live under in the cache.
-const STYLED_AVATAR_BUCKETS = ['costumed', ...AVATAR_SLOTS];
+// The buckets a character's "has any avatar at all" is asked of. Pyjamas are left out: a character with only a
+// pyjama sheet has no avatar for the day book.
+const STYLED_AVATAR_BUCKETS = DAY_CATEGORIES;
 
 /**
  * A required costumed sheet could not be generated. "No costume, no book"
@@ -962,10 +973,14 @@ const STYLED_AVATAR_BUCKETS = ['costumed', ...AVATAR_SLOTS];
  * bare-chested child that way.
  */
 class MissingRequiredCostumeSheetError extends Error {
-  constructor(characterNames) {
-    super(`The costume sheet for ${characterNames.join(', ')} could not be created, so the story cannot be illustrated. No credits are charged for a failed story; please try again.`);
+  // `categories`: which no-stand-in sheet is missing. The pyjama sheet fails the book the same way as a
+  // costume (docs/decisions.md 2026-10-24); the class keeps its name because callers and tests know it.
+  constructor(characterNames, categories = ['costumed']) {
+    const what = categories.length === 1 && categories[0] === NIGHTWEAR ? 'pyjama' : categories.includes(NIGHTWEAR) ? 'costume and pyjama' : 'costume';
+    super(`The ${what} sheet for ${characterNames.join(', ')} could not be created, so the story cannot be illustrated. No credits are charged for a failed story; please try again.`);
     this.name = 'MissingRequiredCostumeSheetError';
     this.characterNames = characterNames;
+    this.categories = categories;
   }
 }
 
@@ -1045,12 +1060,13 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
   };
 
   const missingCostumeFor = [];
+  const missingSheetCategories = new Set();
   for (const char of characters) {
     const nameKey = String(char?.name || '').trim().toLowerCase();
     const required = requiredCategories.get(nameKey);
     if (!required) continue;
-    // Realistic: only a required costume implies a sheet must exist.
-    if (isRealistic && !required.has('costumed')) continue;
+    // Realistic: only a required costume or pyjama sheet implies a sheet must exist.
+    if (isRealistic && !NO_STAND_IN_CATEGORIES.some(c => required.has(c))) continue;
     const hasAny = STYLED_AVATAR_BUCKETS.some(b => styledAvatarCache.has(getAvatarCacheKey(char, b, artStyle)));
     // Per-category gap check: a character with SOME avatar used to pass the
     // guarantee silently even when a REQUIRED category was missing (a failed
@@ -1059,7 +1075,7 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
     // still serves pages, so no seeding — but the gap must be loud.
     if (hasAny) {
       const missing = [...required].filter(cat => {
-        if (isRealistic && cat !== 'costumed') return false;
+        if (isRealistic && !NO_STAND_IN_CATEGORIES.includes(cat)) return false;
         const key = getAvatarCacheKey(char, cat, artStyle);
         return !styledAvatarCache.has(key) || guaranteeSeededKeys.has(key);
       });
@@ -1085,8 +1101,12 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
         if (bucket.length > MAX_GENERATION_LOG_ENTRIES) {
           bucket.splice(0, bucket.length - MAX_GENERATION_LOG_ENTRIES);
         }
-        // A missing COSTUMED sheet fails the book (see MissingRequiredCostumeSheetError).
-        if (missing.includes('costumed')) missingCostumeFor.push(char.name);
+        // A missing COSTUMED or PYJAMA sheet fails the book (see MissingRequiredCostumeSheetError).
+        const missingNoStandIn = missing.filter(c => NO_STAND_IN_CATEGORIES.includes(c));
+        if (missingNoStandIn.length > 0) {
+          missingCostumeFor.push(char.name);
+          missingNoStandIn.forEach(c => missingSheetCategories.add(c));
+        }
       }
       continue;
     }
@@ -1098,11 +1118,14 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
       continue;
     }
 
-    // No avatar at all AND a costume is required: nothing may stand in for it.
-    if (required.has('costumed')) {
-      log.error(`[AVATAR] ❌ ${char.name} has no styled avatar and the story requires a costume — failing the story`);
-      getCurrentLogger()?.error('avatar_category_missing', 'Required costumed sheet missing and no avatar of any bucket exists', char.name, { artStyle, missing: ['costumed'] });
+    // No avatar at all AND a costume or pyjamas are required: nothing may stand in for them.
+    // (only the ones nobody drew: a pyjama sheet that exists is not what fails the book when the day sheet is the gap)
+    const requiredNoStandIn = NO_STAND_IN_CATEGORIES.filter(c => required.has(c) && !styledAvatarCache.has(getAvatarCacheKey(char, c, artStyle)));
+    if (requiredNoStandIn.length > 0) {
+      log.error(`[AVATAR] ❌ ${char.name} has no styled avatar and the story requires ${requiredNoStandIn.join(' and ')} — failing the story`);
+      getCurrentLogger()?.error('avatar_category_missing', `Required ${requiredNoStandIn.join(' and ')} sheet missing and no avatar of any bucket exists`, char.name, { artStyle, missing: requiredNoStandIn });
       missingCostumeFor.push(char.name);
+      requiredNoStandIn.forEach(c => missingSheetCategories.add(c));
       continue;
     }
     const avatars = char.avatars || char.clothingAvatars;
@@ -1156,7 +1179,7 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
       }
     }
   }
-  if (missingCostumeFor.length > 0) throw new MissingRequiredCostumeSheetError(missingCostumeFor);
+  if (missingCostumeFor.length > 0) throw new MissingRequiredCostumeSheetError(missingCostumeFor, [...missingSheetCategories]);
 }
 
 /**
@@ -1194,11 +1217,11 @@ function getStyledAvatar(characterRef, clothingCategory, artStyle) {
   // A costume is never stood in for by another bucket's sheet (owner, 2026-10-05,
   // "no costume, no book"): a story that requires one fails in
   // ensureStyledAvatarCoverage before any page asks, so a miss here is a bug.
-  if (requestedCanonical === 'costumed') {
-    log.error(`❌ [STYLED-AVATAR] COSTUMED CACHE MISS: ${cacheKey} — no other bucket substitutes for a costume`);
+  if (NO_STAND_IN_CATEGORIES.includes(requestedCanonical)) {
+    log.error(`❌ [STYLED-AVATAR] ${requestedCanonical.toUpperCase()} CACHE MISS: ${cacheKey} — no other bucket substitutes for ${requestedCanonical}`);
     return null;
   }
-  const fallbackOrder = ['costumed', 'standard'];  // no other sheet stands in
+  const fallbackOrder = ['costumed', ...DAY_CATEGORIES.filter(c => c !== 'costumed')];  // no other sheet stands in; pyjamas are never a stand-in
   for (const bucket of fallbackOrder) {
     if (bucket === requestedCanonical) continue;
     const altKey = getAvatarCacheKey(characterRef, bucket, artStyle);
@@ -1563,7 +1586,7 @@ function findNearestClothingCategory(raw) {
   const normalized = raw.toLowerCase().trim();
 
   // Valid categories
-  const validCategories = ['standard', 'costumed'];
+  const validCategories = CANONICAL;
 
   // Exact match
   if (validCategories.includes(normalized)) return normalized;
@@ -1778,7 +1801,7 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
  * @returns {Record<string, string>|null} Map of clothingCategory -> styledAvatar, or null if none found
  */
 function getStyledAvatarsForCharacter(characterRef, artStyle) {
-  const clothingCategories = AVATAR_SLOTS;
+  const clothingCategories = PLAIN_SHEET_CATEGORIES;
   const result = {};
   let foundAny = false;
 
@@ -2078,9 +2101,13 @@ function missingCostumedRefs(photos) {
   for (const photo of photos || []) {
     if (!photo) continue;
     const requested = normalizeClothingCategory(photo.requestedClothingCategory || photo.clothingCategory || '');
-    if (requested !== 'costumed') continue;
-    const hasCostumedRef = (typeof photo.photoType === 'string' && photo.photoType.startsWith('costumed-')) || photo.isStyled === true;
-    if (!hasCostumedRef) missing.push(photo.name);
+    if (!NO_STAND_IN_CATEGORIES.includes(requested)) continue;
+    // Pyjamas are the same case as a costume: only their own styled sheet is a valid reference
+    // (photoType `styled-nightwear`); the standard avatar or a body photo is the day outfit.
+    const hasOwnRef = requested === NIGHTWEAR
+      ? (typeof photo.photoType === 'string' && photo.photoType === `styled-${NIGHTWEAR}`)
+      : ((typeof photo.photoType === 'string' && photo.photoType.startsWith('costumed-')) || photo.isStyled === true);
+    if (!hasOwnRef) missing.push(photo.name);
   }
   return missing;
 }

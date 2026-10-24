@@ -96,7 +96,7 @@ You are an Art Director reviewing scene briefs for children's book illustrations
 CLOTHING RULES:
 - Select clothing for each character only from their available avatars listed above
 - Never assign a costume that isn't in the character's available list
-- The `clothing` value is the one EXPECTED CLOTHING below gives that character on this page, spelled as the list above spells it (`costumed:<costume>` included)
+- The `clothing` value is the one EXPECTED CLOTHING below gives that character on this page, spelled as the list above spells it (`costumed:<costume>` and `nightwear` included)
 {EXPECTED_CLOTHING}
 {LOCKED_PERSPECTIVES}
 
@@ -300,7 +300,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 - `characters[]`: one entry per character. Always `name`, `clothing`, `position`, `depth` and `looksAt`; for foreground/midground characters add `expression` and `emotion` (rule 28b). `depth` is `foreground`, `midground` or `background` — distance from the camera, never elevation and never a size.
   - {FOOTING_FIELD}
   - `position` is a short relational phrase matching the prose (`on the boat`, `behind the protagonist`, `in the foreground`, `at the doorway`). Use `left`/`right` only when the VISUAL LANGUAGE rule allows it.
-  - `clothing` is the value EXPECTED CLOTHING gives the character on this page, as AVAILABLE AVATARS spells it (`costumed:<costume>` included). Also describe the costume in the prose.
+  - `clothing` is the value EXPECTED CLOTHING gives the character on this page, as AVAILABLE AVATARS spells it (`costumed:<costume>` and `nightwear` included). Also describe the costume in the prose; on a `nightwear` page name the pyjama top and bottoms.
   - `expression` is a short visible-cue phrase from the page text ("eyes wide, mouth open, brows pulled tight"), never an emotion word alone. Keep it consistent with the prose. The underlying emotion comes from the page text and the draft — you may strengthen the visible cue, never replace the emotion itself.
   - Add `"perspective": "back view"`, `"side"` or `"over-the-shoulder"` (the near figure of an `over-the-shoulder` page) only when non-standard; omit otherwise.
   - Add `"depth": "background"` only for tiny/distant figures; omit for foreground/midground.

@@ -28,7 +28,7 @@ import { getCurrentSeason } from './wizard/WizardStep3BookSettings';
 import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal';
 import { FaceSelectionModal } from '@/components/character';
 import { INITIAL_USER_CREDITS, IMAGE_REGENERATION_COST, COVER_REGENERATION_COST } from '@/constants/credits';
-import { isStoryTypeComplete, initialStoryType } from '@/utils/wizardStoryType';
+import { isStoryTypeComplete, initialStoryType, knownDeepLink } from '@/utils/wizardStoryType';
 import { clearWizardStorage } from '@/services/storage';
 
 // Types
@@ -4713,7 +4713,7 @@ export default function StoryWizard() {
             storyTheme={storyTheme}
             customThemeText={customThemeText}
             userLocation={userLocation}
-            preselectedFromUrl={!!searchParams.get('topic')}
+            preselectedFromUrl={!!knownDeepLink(searchParams.toString()).topic}
             onCategoryChange={handleCategoryChange}
             onTopicChange={handleTopicChange}
             onThemeChange={handleThemeChange}
@@ -5953,7 +5953,7 @@ export default function StoryWizard() {
       />
 
       {/* Pre-selected topic banner (from theme page URL params) */}
-      {storyCategory && storyTopic && step < 4 && step !== 6 && searchParams.get('topic') && (() => {
+      {storyCategory && storyTopic && step < 4 && step !== 6 && knownDeepLink(searchParams.toString()).topic && (() => {
         // Look up the topic name for display. NOTE: use the static ESM imports —
         // a `require()` here is a ReferenceError in the browser bundle (Vite ships
         // pure ESM) and, with no ErrorBoundary, white-screens the whole app.

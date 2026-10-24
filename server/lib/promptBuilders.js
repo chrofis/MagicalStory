@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const { log } = require('../utils/logger');
 const { nameRegExp } = require('./castResolver');
+const { CANONICAL, NIGHTWEAR } = require('./clothingCategories');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { textZoneRulesActive } = require('../config/runtime');
@@ -719,7 +720,7 @@ function buildCastIdentityDescription(char, clothingText = '') {
   // expected to resolve the category to prose (buildClothingDescription); this
   // is the backstop for when it cannot.
   const tag = String(clothingText || '').trim().toLowerCase();
-  const isCategory = ['standard', 'costumed'].includes(tag) || tag.startsWith('costumed:');
+  const isCategory = CANONICAL.includes(tag) || tag.startsWith('costumed:');
   const wearable = isCategory ? '' : clothingText;
   return wearable ? `${base}. Wearing: ${wearable}` : base;
 }
@@ -1295,6 +1296,29 @@ function buildHistoricalIdeaGuide(sheet) {
   }
   parts.push("The idea is one child's day inside this event: what they want from a person here, and what stands in the way. Facts from the sheet stay true; the sheet is not the story.");
   return parts.join('\n\n');
+}
+
+/**
+ * A life-challenge story needs a guide: the guide IS the topic. A topic id with no guide
+ * (a retired topic such as bath-time, a typo, a stale bookmark) would otherwise produce a
+ * quiet guide-less story, so it is rejected with a named error instead (docs/decisions.md
+ * 2026-10-24, bath-time retired; no fallbacks). Other categories carry free-form topics
+ * and are not checked here.
+ */
+class UnknownLifeChallengeTopicError extends Error {
+  constructor(topic) {
+    super(`[TOPIC] "${topic}" is not a known life-challenge topic (retired or misspelled); no story can be built for it.`);
+    this.name = 'UnknownLifeChallengeTopicError';
+    this.code = 'UNKNOWN_LIFE_CHALLENGE_TOPIC';
+    this.topic = topic;
+  }
+}
+
+function assertKnownLifeChallengeTopic(category, topicId) {
+  if (category !== 'life-challenge' || !topicId) return;
+  if (!LIFE_CHALLENGE_GUIDES.has(String(topicId).toLowerCase().replace(/\s+/g, '-'))) {
+    throw new UnknownLifeChallengeTopicError(topicId);
+  }
 }
 
 function getTeachingGuide(category, topicId) {
@@ -7780,6 +7804,7 @@ function themeCostumeBullet(inputData) {
 }
 
 function buildStoryContextFields(inputData) {
+  assertKnownLifeChallengeTopic(inputData.storyCategory, inputData.storyTopic);
   const language = inputData.language || 'en';
   const brief = buildStoryBriefBody(inputData);
   const characterSourceRuleText = characterSourceRule();
@@ -10376,7 +10401,7 @@ const EXPRESSION_FIELD_RULE = "Every foreground or midground character carries `
  * by default", which documented the silent default as if it were a feature and
  * gave the author a reason to leave rows out.
  */
-const WORN_ITEMS_ROW_RULE = "one row for every Visual Bible element that is a garment of a character on this page, whether or not the page mentions it: any element with a `wornAs` link, and any `clothing` or `artifacts` element whose `wornBy` names a character or whose `type` is an outfit slot. `{id, owner, state, location, wearer, redressNote}`: `owner` is the `wornAs` owner or the `wornBy` character, `state` is `\"worn\"` or `\"off\"`, and `off` requires both `location`, a short phrase naming where it now lies or who holds it, and `redressNote`, the wardrobe instruction of the garment-removal rule, and `keptGarments`, the list of garments that stay on, as that rule describes. `wearer` is set only when another character on this page wears the item instead of its owner, and then `state` is `\"worn\"`. The prose must agree with the row. A garment given a row on one page and left out on another has no state on that page, and that is reported back as a fault.";
+const WORN_ITEMS_ROW_RULE = "one row for every Visual Bible element that is a garment of a character on this page, whether or not the page mentions it: any element with a `wornAs` link, and any `clothing` or `artifacts` element whose `wornBy` names a character or whose `type` is an outfit slot. `{id, owner, state, location, wearer, redressNote}`: `owner` is the `wornAs` owner or the `wornBy` character, `state` is `\"worn\"` or `\"off\"`, and `off` requires both `location`, a short phrase naming where it now lies or who holds it, and `redressNote`, the wardrobe instruction of the garment-removal rule, and `keptGarments`, the list of garments that stay on, as that rule describes. `wearer` is set only when another character on this page wears the item instead of its owner, and then `state` is `\"worn\"`. The prose must agree with the row. A garment given a row on one page and left out on another has no state on that page, and that is reported back as a fault. A row refers to the outfit of the character's clothing category on this page: on a `nightwear` page that outfit is the pyjamas, and a garment of the day outfit is not on the page.";
 
 /**
  * SAY WHAT IS THERE, NOT WHAT IS GONE (2026-09-19).
@@ -12723,7 +12748,10 @@ const WARDROBE_RULES = {
   COSTUME_RECOGNISABLE_DEF: 'Every garment is one that costume is known for, named with the word that names it there. A garment that only hints at the theme does not count, and neither does one borrowed from a different costume or named with a word belonging to one.',
   COLOUR_WORDS_DEF: 'Every colour is one of these words, alone: ' + WARDROBE_COLOURS.join(', ') + '. No shade name, no modifier (dark, light, pale) and no compound.',
   SEX_FIT_DEF: "A male character wears garments made for boys or men, a female character garments made for girls or women. When a costume has a male and a female form, each character wears the form matching theirs.",
-  CHILD_TOP_DEF: "A child's swimwear or costume always has a covering top: a long-sleeve or short-sleeve `swim shirt` (rash-guard) over the whole torso, shoulders to waist. Never a `bikini`, a bare chest, a bare midriff, or a one-piece (a skirt or tail below it leaves the torso reading bare).",
+  CHILD_TOP_DEF: "A child's swimwear, costume or nightwear always has a covering top: a long-sleeve or short-sleeve `swim shirt` (rash-guard) over the whole torso, shoulders to waist (nightwear: the pyjama top the nightwear rule defines). Never a `bikini`, a bare chest, a bare midriff, or a one-piece (a skirt or tail below it leaves the torso reading bare).",
+  // Pyjamas (docs/decisions.md 2026-10-24): the third outfit category. One definition, filled into the bible writer, the
+  // wardrobe reviewer and nothing else; the Art Director and the evaluators never restate it.
+  NIGHTWEAR_DEF: 'Nightwear is two-piece pyjamas: a top covering the torso from shoulders to waist (long or short sleeve) and pyjama bottoms (long or shorts). Slippers or socks may be worn, or bare feet. Never a vest or singlet, a bare chest or midriff, or a one-piece or nightdress.',
   TAIL_DEF: 'A costume that replaces the legs (a tail, a fin) is one tail from the waist down, written as replacing the legs. Never a skirt over legs, and no feet, bare feet or footwear.',
   SLOT_STATE_DEF: 'One state per garment slot: never two garments in one slot that exclude each other, and a slot the character does not wear is omitted, never written out as empty.',
   VARIETY_DEF: "Two characters never wear the same set of garments recoloured, neither the whole outfit nor what is left once a page takes an outer layer off. A child's covering top and a leg-replacing tail are never the garment given up: vary colour, sleeve length, neckline and trim around them.",
@@ -12807,6 +12835,23 @@ function applyClothingFix(entry, fix, who) {
   else delete entry.garments;
 }
 
+/**
+ * Check 9 (coverage) of the wardrobe review may ADD a category the bible missed: a costume a page puts on
+ * (`costumed:<name>`) or the pyjamas a page puts someone in bed in (`nightwear`). A plain rewrite of an unused
+ * category stays stray (hallucination guard). ONE rule for the pipeline and the Test Lab, which mirrors it.
+ * Mutates `reqs[name]` and returns the entry to apply the fix to (the existing one when nothing is added).
+ */
+function acceptAddedWardrobeCategory(reqs, name, fix, entry) {
+  if (!name || entry?.used) return entry;
+  if (fix.category === 'costumed' && fix.costume) {
+    return (reqs[name].costumed = { ...(reqs[name].costumed || {}), used: true, costume: fix.costume });
+  }
+  if (fix.category === NIGHTWEAR) {
+    return (reqs[name][NIGHTWEAR] = { ...(reqs[name][NIGHTWEAR] || {}), used: true });
+  }
+  return entry;
+}
+
 function parseClothingReview(raw) {
   const full = String(raw || '');
   const marker = full.match(/---\s*CLOTHING\s*---/i);
@@ -12822,7 +12867,9 @@ function parseClothingReview(raw) {
   // `costumed:<name>` is how check 9 ADDS a category the bible missed — the
   // costume name rides in the heading and the merge needs it to mark the
   // category used.
-  const re = /^[ \t]*#{1,4}[ \t]*\**([^/\n]+?)\**[ \t]*\/[ \t]*\**(standard|costumed(?::[\w-]+)?)\b[^\n]*$/gim;
+  // The plain categories come from the one list (clothingCategories.js CANONICAL).
+  const plainCategories = CANONICAL.filter(c => c !== 'costumed').join('|');
+  const re = new RegExp(String.raw`^[ \t]*#{1,4}[ \t]*\**([^/\n]+?)\**[ \t]*\/[ \t]*\**(${plainCategories}|costumed(?::[\w-]+)?)\b[^\n]*$`, 'gim');
   const marks = [];
   let m;
   while ((m = re.exec(body)) !== null) {
@@ -13237,10 +13284,19 @@ function trialFillValues(inputData, sceneCount = null) {
     // this template to declare it in) registered it as a Visual Bible artifact,
     // which reaches the page as a PROP painted onto the standard outfit rather
     // than worn (prod job_1788698812047_q5b1vuds7).
-    const clothingEnum = costume ? '[standard | costumed]' : 'standard';
-    const clothingRule = costume
+    // A bedtime topic (typed topic id `going-to-bed`) also has pyjamas: the third outfit (docs/decisions.md 2026-10-24).
+    const nightwear = require('../config/trialCostumes').getTrialNightwear({
+      storyCategory: inputData.storyCategory, storyTopic: inputData.storyTopic, gender: mainChar?.gender || ''
+    });
+    const clothingChoices = ['standard', ...(costume ? ['costumed'] : []), ...(nightwear ? [NIGHTWEAR] : [])];
+    const clothingEnum = clothingChoices.length > 1 ? `[${clothingChoices.join(' | ')}]` : 'standard';
+    const nightwearRule = nightwear
+      ? ' A page that puts the character in bed, or into pyjamas for the bedtime routine at night, is `nightwear`, and every page before and after the bedtime routine is `standard`' + (costume ? ' (or `costumed`, where the story has the costume)' : '') + '. The text of the first `nightwear` page shows the change as an action (the child pulls the pyjamas on, is dressed for bed), never as a description of how it looks, and the page where the child is dressed for the day again shows that change the same way. Every `nightwear` page, the `imageSummary` names the pyjama top and the pyjama bottoms in the words of the `nightwear` line under Avatar Selection, because the illustration draws only what the `imageSummary` states. The cover is never `nightwear`.'
+      : '';
+    const clothingRule = (costume
       ? '- `characters.clothing`: a character with a `costumed` variant is `costumed` on every page where the story has them in costume and `standard` on every page where the story has them in everyday clothes. A story that opens already in role (the child is the knight, the pilot, the queen from its first sentence) is `costumed` from page 1. A story that opens in everyday clothes and moves into the costume shows that change in the TEXT of the first `costumed` page, as an action (the child pulls it on, is handed it, is dressed in it), never as a description of how it looks. The picture never shows a costume the text has not put on, and never everyday clothes where the text has the character in role. Never `standard` on every page. Every page where a character is `costumed`, the `imageSummary` of that page also names what the costume is made of, in the words of the `costumed` line under Avatar Selection (garment names and colours, in the sentence that places the character), because the illustration draws only what the `imageSummary` states and a costume it never names comes out as everyday clothes or as a vague "costume".'
-      : '- `characters.clothing`: always `standard` — this story has no costume variant. Nobody puts on or wears a costume; a costume named in the story idea stays something in the scene, never a garment on a character.';
+      : `- \`characters.clothing\`: ${nightwear ? '`standard` on every page except the bedtime pages' : 'always `standard`'} — this story has no costume variant. Nobody puts on or wears a costume; a costume named in the story idea stays something in the scene, never a garment on a character.`
+    ) + nightwearRule;
     const coverClothingNote = costume ? ' Characters in costumed clothing; the `imageSummary` names the garments of the costume in the words of the `costumed` line under Avatar Selection.' : '';
     const coverClothing = costume ? 'costumed' : 'standard';
 
@@ -13261,7 +13317,14 @@ The main character has two avatar styles available:
 
 **IMPORTANT**: The MAJORITY of scenes (at least ${costumedMin} out of ${pageCount}) MUST use \`costumed\` for the main character's clothing in scene hints. Use \`standard\` only for 1-${standardMax} scenes where it makes narrative sense (e.g., the opening pages before the character puts the costume on, or a brief real-world moment).
 
-**Self-check before the output:** for every page whose main-character \`clothing\` differs from the page before, the text of that page shows the change as an action (putting on, taking off, being dressed); a page 1 marked \`standard\` has the character in everyday clothes in its text, and a page 1 whose text has the character in role is marked \`costumed\`.`;
+**Self-check before the output:** for every page whose main-character \`clothing\` differs from the page before, the text of that page shows the change as an action (putting on, taking off, being dressed); a page 1 marked \`standard\` has the character in everyday clothes in its text, and a page 1 whose text has the character in role is marked \`costumed\`.${nightwear ? `\n- \`nightwear\` — ${nightwear.description}` : ''}`;
+    } else if (nightwear) {
+      avatarSelection = `# Avatar Selection
+The main character has two avatar styles available:
+- \`standard\` — everyday modern clothes
+- \`nightwear\` — ${nightwear.description}
+
+Use \`nightwear\` only on the pages where the character is in bed or dressed for bed; every other page is \`standard\`. For every page whose main-character \`clothing\` differs from the page before, the text of that page shows the change as an action (putting on the pyjamas, being dressed for the day).`;
     }
 
     // Build landmarks instruction for the visual bible.
@@ -14021,6 +14084,8 @@ function buildTrialIdeaPrompts({
 }
 
 module.exports = {
+  assertKnownLifeChallengeTopic,
+  UnknownLifeChallengeTopicError,
   buildDividerLandmarksSection,
   landmarksStagedRule,
   landmarkStagedAdBlock,
@@ -14403,6 +14468,7 @@ module.exports = {
   GARMENT_ONE_OUTFIT_RULE,
   WARDROBE_RULES,
   parseClothingReview,
+  acceptAddedWardrobeCategory,
   applyClothingFix,
   parseBeats,
   parsePagePlan,

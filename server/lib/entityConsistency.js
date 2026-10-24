@@ -780,6 +780,12 @@ async function getStyledAvatarForClothing(character, artStyle, clothingCategory,
     log.info(`🔍 [AVATAR-LOOKUP] ${charName}: no ${clothingCategory} styled avatar for ${artStyle} — exact lookup, refusing a cross-category substitute`);
     return null;
   }
+  // Pyjamas are never stood in for (docs/decisions.md 2026-10-24): a repair or eval of a pyjama page against the
+  // day outfit's sheet would paint the pyjamas away. No sheet, no reference.
+  if (String(clothingCategory) === 'nightwear') {
+    log.error(`🔍 [AVATAR-LOOKUP] ${charName}: no nightwear sheet for ${artStyle} — nothing substitutes for pyjamas, returning null`);
+    return null;
+  }
 
   // Realistic: styledAvatars.realistic only holds story-REDRESSED categories
   // (+costumes). When the requested category wasn't redressed, its BASE
@@ -802,7 +808,7 @@ async function getStyledAvatarForClothing(character, artStyle, clothingCategory,
 
   // Try any other available styled avatar (winter, summer, or first costumed)
   for (const [key, value] of Object.entries(styledForArt)) {
-    if (key === 'costumed') continue;
+    if (key === 'costumed' || key.startsWith('nightwear')) continue;   // pyjamas are never another outfit's stand-in
     const r = await resolveStyled(value);
     if (r) {
       log.warn(`⚠️ [AVATAR-LOOKUP] ${charName}: wanted ${clothingCategory} but only ${key} exists — sending ${key} (output will show ${key} clothing)`);

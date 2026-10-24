@@ -48,8 +48,8 @@ describe('arriving with ?category=&topic= starts a NEW story-type selection', ()
 
   it('drops the previous theme, custom text, plot and topic name', () => {
     const storage = storageWith(previous);
-    const sel = initialStoryType('?category=life-challenge&topic=dentist', storage);
-    expect(sel).toEqual({ storyType: 'dentist', storyCategory: 'life-challenge', storyTopic: 'dentist', storyTheme: 'realistic', customThemeText: '', storyDetails: '' });
+    const sel = initialStoryType('?category=life-challenge&topic=visiting-doctor', storage);
+    expect(sel).toEqual({ storyType: 'visiting-doctor', storyCategory: 'life-challenge', storyTopic: 'visiting-doctor', storyTheme: 'realistic', customThemeText: '', storyDetails: '' });
     for (const k of ['story_type', 'story_theme', 'story_custom_theme_text', 'story_details', 'story_topic_name']) {
       expect(storage.map.has(k)).toBe(false);
     }
