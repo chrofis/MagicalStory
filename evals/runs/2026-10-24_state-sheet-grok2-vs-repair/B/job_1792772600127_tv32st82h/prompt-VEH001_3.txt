@@ -1,0 +1,4 @@
+Edit this picture of one object. Keep the object, the painting style, the background and the framing exactly as they are; change only what the description below requires.
+The object must look exactly like this: A handcart built from red-painted slatted pine timber with four black rubber-treaded wheels, an iron axle assembly, and a carved natural ash branch handle lashed securely to the iron axle mount with thick golden-tan jute rope knots.
+These parts are gone from the object and must not be drawn anywhere on it, not even a trace or a second copy: splintered broken wooden tow bar. Draw the part that replaced them once only.
+Output the single object picture, same composition.

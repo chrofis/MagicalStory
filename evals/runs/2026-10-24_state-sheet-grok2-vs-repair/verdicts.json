@@ -1,0 +1,30 @@
+{
+ "judged_by": "claude (hand, pixels read), 2026-10-24",
+ "spend_usd": 0.34,
+ "prior_run_rate_grok1_sheet": "3/5",
+ "arm_A_grok2_full_2x2": {
+  "files": "A/<storyId>/sheet.jpg (+cell-*.png, sheet.json)",
+  "sheets": [
+   {"story": "job_1792772600127_tv32st82h", "cell": "VEH001.2 broken / VEH001.3 repaired", "ok": true, "note": "broken: one tow bar snapped, jagged ends, no oval handle. repaired: a rough ash branch lashed to the cart with jute rope, the old bar is gone, replacement drawn once. Style drifts from Grok 1 (finer, flatter watercolour, grey-beige/green/lilac backgrounds)."},
+   {"story": "job_1792041406330_mxoqmhu6k", "cell": "ART001.2 torn / ART001.3 mended", "ok": true, "note": "torn: one intact strap, the other a ragged blue cloth strip dangling. mended: a knitted gold-red scarf knotted at the strap's top attachment, no loose strap end left. Borderline: the scarf hangs by the strap rather than clearly joining two strap ends. Bag drawn front-on (Grok 1 drew back view); grid clean."},
+   {"story": "job_1792312615714_wpz3fzwyy", "cell": "ART001.2 zip open", "ok": true, "note": "one zip open, empty inside, single strap per side, bag identical to base cell"},
+   {"story": "job_1790446348343_z3fw660ie", "cell": "ART004.2 open", "ok": true, "note": "one domed lid raised, one chest, matches base"},
+   {"story": "job_1791450210539_nwi88y9lr", "cell": "ART004.2 open", "ok": true, "note": "one lid raised, compass, coins and letter inside; base cell matches"}
+  ],
+  "rate_cases": "5/5", "rate_state_cells": "7/7"
+ },
+ "arm_B_grok1_plus_one_edit": {
+  "files": "B/<storyId>/edit-<cell>.png, before-after.jpg (left = Grok 1 cell, right = edited), prompt-<cell>.txt",
+  "sheets": [
+   {"story": "job_1792772600127_tv32st82h", "cell": "VEH001.2 broken", "ok": true, "note": "bar snapped with a splintered end, the handle hole is gone"},
+   {"story": "job_1792772600127_tv32st82h", "cell": "VEH001.3 repaired", "ok": false, "note": "old intact tow bar with oval handle is gone, a curved lashed branch drawn at the front, BUT the log lashed across the top of the cart is still there: the replacement part is drawn twice"},
+   {"story": "job_1792041406330_mxoqmhu6k", "cell": "ART001.2 torn", "ok": true, "note": "one strap intact, one strap torn and dangling; old shredded bag front gone"},
+   {"story": "job_1792041406330_mxoqmhu6k", "cell": "ART001.3 mended", "ok": false, "note": "scarf still knotted around the whole bag, not joining a strap; a loose strap end still hangs at lower right"},
+   {"story": "job_1792312615714_wpz3fzwyy", "cell": "ART001.2 zip open", "ok": true, "note": "unchanged, open and empty; slightly darker interior"},
+   {"story": "job_1790446348343_z3fw660ie", "cell": "ART004.2 open", "ok": true, "note": "one lid raised. Collateral: chest redrawn (lid hasp, darker iron, different construction) = object drift vs the base cell"},
+   {"story": "job_1791450210539_nwi88y9lr", "cell": "ART004.2 open", "ok": true, "note": "open with compass, coins, letter; cleaner/darker palette, dirt stains lost, earth heap kept (slight drift)"}
+  ],
+  "rate_cases": "3/5", "rate_state_cells": "5/7",
+  "note": "both failing replace/mend cases stay failing; the edit also moves objects off their base cell (2 of 7 cells drifted)"
+ }
+}

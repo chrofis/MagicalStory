@@ -1,0 +1,10 @@
+{
+ "modelId": "grok-imagine-image-2.0",
+ "aspect": "1:1",
+ "cost": 0.04,
+ "cells": [
+  "VEH001.1",
+  "VEH001.2",
+  "VEH001.3"
+ ]
+}

@@ -1,0 +1,4 @@
+Edit this picture of one object. Keep the object, the painting style, the background and the framing exactly as they are; change only what the description below requires.
+The object must look exactly like this: canvas backpack in deep turquoise blue with a gold-and-crimson knitted woollen scarf knotted firmly around the torn strap to reconnect it to the base, a zippered main compartment, and a silver metal buckle on the front flap; seen from behind, the backpack shows a bright gold-and-crimson wool knot connecting the strap to the bag.
+These parts are gone from the object and must not be drawn anywhere on it, not even a trace or a second copy: dangling loose strap end. Draw the part that replaced them once only.
+Output the single object picture, same composition.

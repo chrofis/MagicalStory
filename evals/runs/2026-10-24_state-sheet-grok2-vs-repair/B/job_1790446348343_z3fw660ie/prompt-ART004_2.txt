@@ -1,0 +1,3 @@
+Edit this picture of one object. Keep the object, the painting style, the background and the framing exactly as they are; change only what the description below requires.
+The object must look exactly like this: a small oak sea chest with a domed lid now raised open on its hinges, iron bands across its sides and corners, a flat iron hasp at the front and dark wood showing inside.
+Output the single object picture, same composition.
