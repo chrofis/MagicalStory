@@ -689,6 +689,102 @@ function resolveObjectState(entry, handle = null, pageNumber = null, sceneMetada
 }
 
 /**
+ * The hard cap on an object-state clause. The REQUIRED OBJECTS block is a
+ * name-only presence checklist (decisions.md 2026-09-02): emitting the Visual
+ * Bible DESCRIPTION there handed the image model a full exterior spec for an
+ * element the shot only shows part of. A state clause is allowed on that line
+ * as a fourth rider alongside `size`, `(worn by X)` and a two-sided prop's
+ * orientation - but only as a DELTA, and only this short.
+ *
+ * The cap is what keeps the extension from becoming a reversal. It is applied
+ * in code rather than trusted to the authoring prompt because the prompt is
+ * where the 2026-09-02 failure came from in the first place. It matches the
+ * word budget the authoring templates ask for, so a compliant delta always
+ * survives whole.
+ */
+const STATE_CLAUSE_MAX_WORDS = 15;
+
+/**
+ * Cut an over-long state delta down to the cap — LOUDLY.
+ *
+ * The delta is the ONLY thing that tells one state of an object from another,
+ * so a silent cut can remove exactly the distinguishing words and the wrong
+ * variant is drawn with nothing in the log to say why. It warns with the full
+ * authored text so the cut is diagnosable after the run.
+ *
+ * It never throws: an over-long delta must not kill a paid generation
+ * (docs/decisions.md, "gates are guidelines"), so the trim is the fallback and
+ * the warning is the signal.
+ *
+ * @param {string} delta - the authored state delta
+ * @param {Object} [ctx] - identity for the warning: { id, name }
+ * @param {{silent?:boolean}} [opts] - a JUDGE re-deriving the clause the generator printed cuts it the same way without repeating the warning
+ * @returns {string} the delta, cut to STATE_CLAUSE_MAX_WORDS words
+ */
+function trimStateClause(delta, ctx = null, { silent = false } = {}) {
+  const words = String(delta || '').trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
+  if (words.length <= STATE_CLAUSE_MAX_WORDS) return words.join(' ');
+  if (silent) return words.slice(0, STATE_CLAUSE_MAX_WORDS).join(' ');
+  const who = ctx && (ctx.id || ctx.name)
+    ? `${ctx.id || '?'}${ctx.name ? ` "${ctx.name}"` : ''}`
+    : 'unidentified state';
+  log.warn(`⚠️ [IMAGE PROMPT] State clause for ${who} cut from ${words.length} to ${STATE_CLAUSE_MAX_WORDS} words — the tail is dropped and may hold what tells this state from another. Authored delta: "${words.join(' ')}"`);
+  return words.slice(0, STATE_CLAUSE_MAX_WORDS).join(' ');
+}
+
+/**
+ * The matching rule a brief's citation uses to find a Visual Bible entry: by
+ * id, by the handle's PARENT id ("ART001.2" -> ART001), by a "[ID]" bracket, by
+ * exact name, and (non-strict) by name containment. ONE function for the page
+ * prompt's REQUIRED OBJECTS walk and for every judge that re-reads the brief.
+ */
+function entryMatchesCitation(entry, searchTerm, strictMode = false) {
+  const searchLower = String(searchTerm || '').toLowerCase().trim();
+  const nameLower = (entry.name || '').toLowerCase().trim();
+  const idLower = (entry.id || '').toLowerCase().trim();
+  const entryBase = baseVbId(entry.id);
+  if (idLower && idLower === searchLower) return true;
+  const searchBase = baseVbId(String(searchTerm || ''));
+  if (entryBase && searchBase && entryBase === searchBase) return true;
+  const idMatch = String(searchTerm || '').match(/\[([A-Z]{3}\d+(?:\.\d+)?)\]/);
+  if (idMatch && entryBase && baseVbId(idMatch[1]) === entryBase) return true;
+  if (nameLower === searchLower) return true;
+  if (strictMode) return false;
+  if (nameLower.includes(searchLower)) return true;
+  if (searchLower.includes(nameLower) && nameLower.length >= 3) return true;
+  return false;
+}
+
+/** interactions[] rows that name a `receiver` (the object a result later arrives at). */
+function receiverRowsOf(sceneMetadata) {
+  return (Array.isArray(sceneMetadata?.interactions) ? sceneMetadata.interactions : [])
+    .filter(r => r && typeof r.receiver === 'string' && r.receiver.trim() && r.object);
+}
+
+/**
+ * THE STATE CLAUSE A PAGE GIVES AN ELEMENT: the one derivation behind the
+ * generator's REQUIRED OBJECTS line AND the clause the judges are shown, so a
+ * judge can never be handed a state the generator was not (decisions.md
+ * 2026-10-24 "wrong_state"). resolveObjectState picks the state; the page's
+ * instant outranks it (`contradicted` drops it); the RECEIVER of another row's
+ * result never carries one; the 15-word cap is applied last.
+ *
+ * @returns {{resolved:Object, state:Object|null, stateDelta:string, clause:string, dropped:('contradicted'|'receiver'|null), receiverRow:Object|null}}
+ *   `clause` is the text that follows the element on the line ('' = none).
+ */
+function pageObjectStateClause(entry, handle, pageNumber, sceneMetadata, { visualBible = null, silent = false } = {}) {
+  const resolved = resolveObjectState(entry, handle, pageNumber, sceneMetadata, { silent, visualBible });
+  let state = resolved.state;
+  let stateDelta = state ? resolved.promptDelta : '';
+  let dropped = null;
+  if (resolved.contradicted) { dropped = 'contradicted'; state = null; stateDelta = ''; }
+  const receiverRow = state ? receiverRowsOf(sceneMetadata).find(r => entryMatchesCitation(entry, r.receiver)) || null : null;
+  if (receiverRow) { dropped = 'receiver'; state = null; stateDelta = ''; }
+  const clause = (state && stateDelta) ? trimStateClause(stateDelta, state, { silent }) : '';
+  return { resolved, state, stateDelta, clause, dropped, receiverRow };
+}
+
+/**
  * Does this entry have a reference render anywhere?
  *
  * A stated object has NO base cell — its states ARE the cells — so its render
@@ -4111,6 +4207,10 @@ module.exports = {
   entryNamedByRow,
   citedEntries,
   resolveObjectState,
+  pageObjectStateClause,
+  entryMatchesCitation,
+  receiverRowsOf,
+  trimStateClause,
   appearanceContradiction,
   MIN_APPEARANCE_EVIDENCE,
   scenePlacesObject,

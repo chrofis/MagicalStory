@@ -200,6 +200,9 @@ const MAX_SEVERITY_TYPES = {
   // the brief states (flying for hopping) is a MAJOR by the semantic judge and
   // the reader's weights; it must not outrank a missing or wrong character.
   wrong_action: 'major',
+  // wrong_state capped at MAJOR (2026-10-24): an element drawn in a different state than the page
+  // gives it (closed book drawn open) - the same footing as wrong_action.
+  wrong_state: 'major',
   // garment_facing capped at MAJOR (owner-approved, 2026-10-04): image-evaluation
   // D-05e — a garment's front features drawn on a figure seen from behind (or
   // the reverse). A full-length zip on a back is plain to a reader, so it may

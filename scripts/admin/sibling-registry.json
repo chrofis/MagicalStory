@@ -305,6 +305,11 @@
             "note": "D-31 measures a vehicle listed in ELEMENT SIZES against the size given there. The generator half is that vehicle's REQUIRED OBJECTS line, the same elementPageScaleNote sentence."
           },
           {
+            "critic": "D-35 `wrong_state`",
+            "generator": "{REQUIRED_OBJECTS}",
+            "note": "D-35 (and image-semantic's wrong_state rule) is MAJOR when an object is drawn in a different state than the page gave it. The generator half is that object's state clause on its REQUIRED OBJECTS line; BOTH judges are handed the SAME clause from the same derivation (visualBible.pageObjectStateClause: PAGE ELEMENTS via vbIdGuard.formatElementsBlock, REQUIRED OBJECTS via evalPipeline.buildEvalObjectStates), pinned in tests/unit/wrong-state-judge.test.ts. decisions.md 2026-10-24."
+          },
+          {
             "critic": "D-05e `garment_facing`",
             "generator": "{CHARACTER_REFERENCE_LIST}",
             "note": "D-05e is MAJOR/MINOR when a garment's front features are drawn on a figure seen from behind (or the reverse). The generator half is the WORN ITEMS line in the character reference list (wornItems.buildWornStateLines): for a wearer the brief draws from behind it carries the tag `seen from the back` and the garment's authored `back` look, never its front description. The judges read the same tag on that character's CLOTHING CONTRACT line (evalPipeline.buildEvalClothingContract). Both sides decide facing with wornItems.faceAwayNames -> storyAvatars.resolveCellPose. Pinned in tests/unit/worn-item-facing.test.ts."

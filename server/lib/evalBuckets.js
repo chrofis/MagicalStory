@@ -76,6 +76,9 @@ const BUCKETS = {
   // 56 times in 241 (23%) as action_interaction. Page redo owns it — see
   // repairLogic ITERATE_ROUTED_TYPES. docs/decisions.md 2026-10-15.
   wrong_action:         { owner: 'semantic', kind: 'graded', repair: 'regen' },
+  // wrong_state: an element drawn in a different state than the one the page gives it (a
+  // closed book drawn open). Redrawn, never edited: same route as wrong_action. docs/decisions.md 2026-10-24.
+  wrong_state:          { owner: 'semantic', kind: 'graded', repair: 'regen' },
   action_interaction:   { owner: 'semantic', kind: 'graded', repair: 'inpaint_or_regen' }, // rope slack while pulling, wrong aim, faces away from target
   object_presence:      { owner: 'quality',  kind: 'binary', repair: 'inpaint' },
   object_count:         { owner: 'quality',  kind: 'graded', repair: 'inpaint' },
@@ -234,6 +237,7 @@ const TYPE_TO_BUCKET = {
   structure_scale: 'structure_scale', undersized_structure: 'structure_scale',
   creature_scale: 'creature_scale',
   wrong_action: 'wrong_action',
+  wrong_state: 'wrong_state',
   duplicate_object: 'duplicate_object', duplicated_object: 'duplicate_object',
   duplicate_prop: 'duplicate_object', object_duplication: 'duplicate_object',
   rendered_text: 'rendered_text', text: 'rendered_text',
@@ -453,7 +457,7 @@ const CONSOLIDATED_TYPES = Object.freeze([
   'image_coherence', 'character_identity', 'duplicate_character', 'duplicate_identity',
   'missing_character', 'extra_character', 'clothing', 'clothing_detail', 'clothing_sex', 'garment_facing',
   'accessory', 'accessory_missing', 'hair', 'hair_nuance', 'face_drift', 'face_destroyed',
-  'cutout_artifact', 'nudity', 'child_torso_uncovered', 'anatomy', 'body_build', 'figure_completeness', 'action_interaction', 'wrong_action',
+  'cutout_artifact', 'nudity', 'child_torso_uncovered', 'anatomy', 'body_build', 'figure_completeness', 'action_interaction', 'wrong_action', 'wrong_state',
   'object_presence', 'missing_element', 'object_count', 'duplicate_object', 'scale',
   'structure_scale', 'creature_scale', 'setting', 'style_consistency', 'rendered_text', 'required_text',
   'character_marking', 'anachronism', 'garment_colour', 'naturalness', 'emotion',

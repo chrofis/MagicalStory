@@ -2088,7 +2088,46 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, de
  * @returns {{block: string, source: string|null}} `block` empty means nothing
  *          could be resolved; the template then tells the judge to skip.
  */
-function buildEvalRequiredObjects({ pagePrompt = null, sceneMetadata = null, visualBible = null, language = 'en' } = {}) {
+/**
+ * THE STATES THE PAGE GAVE ITS OBJECTS, for the quality judge's REQUIRED OBJECTS
+ * line: `name (state: clause)` per stated object, the clause being exactly the one
+ * the generator's REQUIRED OBJECTS line carried (visualBible.pageObjectStateClause,
+ * one derivation; the page's own citations come from the generator's own
+ * collectVbObjectCitations). '' when no object carries a state.
+ */
+function buildEvalObjectStates({ sceneMetadata = null, visualBible = null, pageNumber = null, language = 'en' } = {}) {
+  if (!sceneMetadata || !visualBible) return '';
+  const { collectVbObjectCitations } = require('./promptBuilders');
+  const { pageObjectStateClause, entryMatchesCitation } = require('./visualBible');
+  const { resolveExpectedObjectLabels } = require('./bboxDetection');
+  const out = [];
+  const seen = new Set();
+  for (const citation of collectVbObjectCitations(sceneMetadata)) {
+    const entry = (visualBible.artifacts || []).find(a => entryMatchesCitation(a, typeof citation === 'string' ? citation : (citation && citation.id) || ''));
+    if (!entry || seen.has(entry.id)) continue;
+    seen.add(entry.id);
+    const handle = typeof citation === 'string' ? citation : (citation && citation.id) || null;
+    const { clause } = pageObjectStateClause(entry, handle, pageNumber, sceneMetadata, { visualBible, silent: true });
+    if (!clause) continue;
+    const label = resolveExpectedObjectLabels([entry.id], visualBible, language)[0] || entry.name;
+    out.push(`${label} (state: ${clause})`);
+  }
+  return out.join('; ');
+}
+
+function buildEvalRequiredObjects({ pagePrompt = null, sceneMetadata = null, visualBible = null, language = 'en', pageNumber = null } = {}) {
+  const names = buildEvalRequiredObjectNames({ pagePrompt, sceneMetadata, visualBible, language });
+  let states = '';
+  try { states = buildEvalObjectStates({ sceneMetadata, visualBible, pageNumber, language }); } catch (err) {
+    log.error(`[EVAL] object states for REQUIRED OBJECTS could not be built (${err.message}) - the judge gets names only`);
+  }
+  if (!states) return names;
+  // Names stay first and untouched: D-16b and the other readers of this line
+  // still see the same comma list; the states follow as one labelled clause.
+  return { ...names, block: `${names.block}${names.block ? '. ' : ''}STATE GIVEN FOR EACH STATED OBJECT: ${states}`, source: names.source || 'states' };
+}
+
+function buildEvalRequiredObjectNames({ pagePrompt = null, sceneMetadata = null, visualBible = null, language = 'en' } = {}) {
   const dedupe = (names) => {
     const seen = new Set();
     const out = [];
@@ -2365,6 +2404,7 @@ function prepareEvalJudgeInputs({ originalPrompt, referenceImages, evaluationTyp
       // The label must match the lead the page prompt actually emitted, which
       // is language-dependent (elementLeadLabel).
       language: evalOptions.language || evalOptions.storyMeta?.language || 'en',
+      pageNumber: evalOptions.pageNumber ?? null,
     });
     const requiredObjectsBlock = requiredObjects.block;
     // REQUIRED TEXT allow-list (2026-09-21), fourth member of the

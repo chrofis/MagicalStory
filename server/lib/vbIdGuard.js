@@ -343,7 +343,17 @@ function elementDisplayLabel(entry) {
   return name || labelOf(entry);
 }
 
-function formatElementsBlock(objectIds, visualBible = null) {
+/**
+ * PAGE ELEMENTS for the semantic judge: `ID — label`, and for an object the page
+ * gives a STATE, `ID — label (state: <clause>)`. The clause is the one the
+ * generator's REQUIRED OBJECTS line carried (visualBible.pageObjectStateClause:
+ * same resolver, same drops, same cap), so the judge is never asked about a
+ * state the generator was not given. Needs `sceneMetadata` (the brief's
+ * interactions decide whether the state is dropped) and the page number (the
+ * bible's page table); without them a stated object is listed without a clause.
+ * Only artifacts carry states, as in the generator.
+ */
+function formatElementsBlock(objectIds, visualBible = null, { sceneMetadata = null, pageNumber = null } = {}) {
   const ids = Array.isArray(objectIds) ? objectIds : [];
   if (ids.length === 0 || !visualBible) return '(none)';
   const pools = ['artifacts', 'animals', 'secondaryCharacters', 'vehicles', 'locations', 'mainCharacters'];
@@ -364,7 +374,13 @@ function formatElementsBlock(objectIds, visualBible = null) {
     const label = elementDisplayLabel(entry);
     if (!label) continue;
     seen.add(base);
-    lines.push(`${base} — ${label}`);
+    let stateClause = '';
+    if ((visualBible.artifacts || []).includes(entry) && sceneMetadata) {
+      const handle = typeof raw === 'string' ? raw : (raw && raw.id) || null;
+      stateClause = require('./visualBible')
+        .pageObjectStateClause(entry, handle, pageNumber, sceneMetadata, { visualBible, silent: true }).clause;
+    }
+    lines.push(`${base} — ${label}${stateClause ? ` (state: ${stateClause})` : ''}`);
   }
   return lines.length ? lines.join('\n') : '(none)';
 }

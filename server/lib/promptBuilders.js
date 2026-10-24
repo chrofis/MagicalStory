@@ -20,7 +20,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE } = require('./requiredText');
 const { GARMENT_BACK_RULE, WORN_SLOT_FIELD_RULE, GARMENT_LIST_RULE, WARDROBE_COLOURS, normaliseGarments } = require('./wornItems');
-const { SCALE_CLASS_SPEC, ANIMAL_ANATOMY_SPEC, GROWN_CREATURE_SCALE_CLASSES, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote, ABOARD_CAMERA_RULE, isAboardElementId } = require('./visualBible');
+const { SCALE_CLASS_SPEC, ANIMAL_ANATOMY_SPEC, GROWN_CREATURE_SCALE_CLASSES, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, pageObjectStateClause, entryMatchesCitation, receiverRowsOf, elementScaleNote, withScaleNote, ABOARD_CAMERA_RULE, isAboardElementId } = require('./visualBible');
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, CLOSEUP_KEPT_FIXED_SHOT_RULE, FOOTING_RULE, FOOTING_FIELD, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE, GROUP_STAGING_FIXED_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { SLOP_RULES } = require('./proseSlop');
@@ -4628,48 +4628,6 @@ function stripWornStateFromDescription(description) {
  */
 
 /**
- * The hard cap on an object-state clause. The REQUIRED OBJECTS block is a
- * name-only presence checklist (decisions.md 2026-09-02): emitting the Visual
- * Bible DESCRIPTION there handed the image model a full exterior spec for an
- * element the shot only shows part of. A state clause is allowed on that line
- * as a fourth rider alongside `size`, `(worn by X)` and a two-sided prop's
- * orientation - but only as a DELTA, and only this short.
- *
- * The cap is what keeps the extension from becoming a reversal. It is applied
- * in code rather than trusted to the authoring prompt because the prompt is
- * where the 2026-09-02 failure came from in the first place. It matches the
- * word budget the authoring templates ask for, so a compliant delta always
- * survives whole.
- */
-const STATE_CLAUSE_MAX_WORDS = 15;
-
-/**
- * Cut an over-long state delta down to the cap — LOUDLY.
- *
- * The delta is the ONLY thing that tells one state of an object from another,
- * so a silent cut can remove exactly the distinguishing words and the wrong
- * variant is drawn with nothing in the log to say why. It warns with the full
- * authored text so the cut is diagnosable after the run.
- *
- * It never throws: an over-long delta must not kill a paid generation
- * (docs/decisions.md, "gates are guidelines"), so the trim is the fallback and
- * the warning is the signal.
- *
- * @param {string} delta - the authored state delta
- * @param {Object} [ctx] - identity for the warning: { id, name }
- * @returns {string} the delta, cut to STATE_CLAUSE_MAX_WORDS words
- */
-function trimStateClause(delta, ctx = null) {
-  const words = String(delta || '').trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
-  if (words.length <= STATE_CLAUSE_MAX_WORDS) return words.join(' ');
-  const who = ctx && (ctx.id || ctx.name)
-    ? `${ctx.id || '?'}${ctx.name ? ` "${ctx.name}"` : ''}`
-    : 'unidentified state';
-  log.warn(`⚠️ [IMAGE PROMPT] State clause for ${who} cut from ${words.length} to ${STATE_CLAUSE_MAX_WORDS} words — the tail is dropped and may hold what tells this state from another. Authored delta: "${words.join(' ')}"`);
-  return words.slice(0, STATE_CLAUSE_MAX_WORDS).join(' ');
-}
-
-/**
  * A Visual Bible OBJECT entity id (everything but CHR — the human cast).
  * Accepts the three citation shapes a brief writes: "ANI001", "Funkli
  * [ANI001]", { id: 'ANI001' }. Dotted facet handles ("ART001.2") keep their
@@ -5085,8 +5043,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // structured version — a fixed sentence the model cannot rewrite, and the
   // receiver's state clause dropped for this page (the strip site is in the
   // artifact loop below).
-  const receiverRows = (Array.isArray(metadata?.interactions) ? metadata.interactions : [])
-    .filter(r => r && typeof r.receiver === 'string' && r.receiver.trim() && r.object);
+  const receiverRows = receiverRowsOf(metadata);
   const receiverPlacement = buildReceiverPlacement(receiverRows);
   if (receiverPlacement) {
     cleanSceneDescription += `\n\n${receiverPlacement}`;
@@ -5135,36 +5092,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     // a second entry. Matching the raw handle against `entry.id` found nothing
     // and the substring fallbacks below could not save it either, so the
     // object dropped out of REQUIRED OBJECTS with no log line at all.
-    const matchesEntry = (entry, searchTerm, strictMode = false) => {
-      const searchLower = searchTerm.toLowerCase().trim();
-      const nameLower = (entry.name || '').toLowerCase().trim();
-      const idLower = (entry.id || '').toLowerCase().trim();
-      const entryBase = baseVbId(entry.id);
-
-      // Match by ID (exact match, e.g., "CLO001", "CHR002")
-      if (idLower && idLower === searchLower) return true;
-
-      // Match by the handle's PARENT id ("ART001.2" -> ART001).
-      const searchBase = baseVbId(searchTerm);
-      if (entryBase && searchBase && entryBase === searchBase) return true;
-
-      // Extract ID from search term if present (e.g., "Der weise Ritter [CHR002]" -> "CHR002").
-      // The dotted suffix is part of the bracket form too — "Signpost [ART004.2]".
-      const idMatch = searchTerm.match(/\[([A-Z]{3}\d+(?:\.\d+)?)\]/);
-      if (idMatch && entryBase && baseVbId(idMatch[1]) === entryBase) return true;
-
-      // Exact name match (always allowed)
-      if (nameLower === searchLower) return true;
-
-      // For strict mode (characters), only allow exact matches or ID matches
-      if (strictMode) return false;
-
-      // For non-strict mode (objects/locations), allow partial matches
-      if (nameLower.includes(searchLower)) return true;
-      if (searchLower.includes(nameLower) && nameLower.length >= 3) return true;
-
-      return false;
-    };
+    const matchesEntry = entryMatchesCitation;
 
     // (Removed 2026-06-09) Secondary-character lookups in this section.
     // Both the metadata.characters loop and the CHR-id detour inside the
@@ -5225,14 +5153,16 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // whose instant pressed two halves together — the render obeyed the
         // state twice). Its delta is dropped from this line, loudly; the
         // object itself stays listed.
-        const resolved = resolveObjectState(artifact, handle, pageNumber, metadata, { visualBible });
-        let state = resolved.state;
+        // The drops below (contradiction, receiver) and the 15-word cap are ONE derivation, shared with the
+        // judges (visualBible.pageObjectStateClause): the clause a judge is shown is this line's clause.
+        const stc = pageObjectStateClause(artifact, handle, pageNumber, metadata, { visualBible });
+        const resolved = stc.resolved;
+        const state = resolved.state; // pre-drop: the warnings below name the state that was dropped
         // ONE OBJECT, ONE POSITION PER PAGE PROMPT. This block's own header
         // promises each element "appears exactly as the scene description
         // places it", so where the brief places the object the state's
         // placement half is not asserted against it (the delta's appearance
         // half always stays — that is what the state is FOR).
-        let stateDelta = state ? resolved.promptDelta : '';
         // ONE reference format for this object's state, shared by the three
         // clause-drop warnings below. Each of them was a hand-maintained copy
         // that read `state.id` directly, and a bible stored before the dotted
@@ -5243,7 +5173,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
           ? `${st.id} ("${st.name}")`
           : `${artifact.id} state "${(st && st.name) || '?'}"`);
         if (state && resolved.placementDropped.length > 0) {
-          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${stateRef(state)} — the scene places ${artifact.id} at "${resolved.scenePlacement}", so the state's placement clause(s) are dropped from REQUIRED OBJECTS: "${resolved.placementDropped.join(', ')}". Kept: "${stateDelta}"`);
+          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${stateRef(state)} — the scene places ${artifact.id} at "${resolved.scenePlacement}", so the state's placement clause(s) are dropped from REQUIRED OBJECTS: "${resolved.placementDropped.join(', ')}". Kept: "${resolved.promptDelta}"`);
         }
         // A SPLIT MAY SHORTEN A DELTA, NEVER REPLACE IT. Every segment read as
         // placement, so the cut would have left the line with no state clause
@@ -5265,21 +5195,17 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
               + `on the word(s) ${(resolved.evidenceTokens || []).map(t => `"${t}"`).join(', ') || '(none recorded)'} — "${resolved.evidence}"`
             : `the brief's interactions ${resolved.held ? 'put hands on it' : 'declare no hands on it'} but the state says the object is ${state.held ? 'in hand' : 'untouched'}`;
           log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${stateRef(state)} — ${why} — state clause dropped, the page's instant wins. Delta was: "${state.delta}"`);
-          state = null;
-          stateDelta = '';
         }
         // The RECEIVER of another row's result never carries a state clause
         // on the acting page: the bible writes the effect onto it ("water
         // jetting into the interior"), and that clause is what pulls the
         // result to the receiver instead of the contact. Same drop mechanism
         // as the `held` contradiction above; the object itself stays listed.
-        const receiverRow = state ? receiverRows.find(r => matchesEntry(artifact, r.receiver)) : null;
+        const receiverRow = stc.receiverRow;
         if (receiverRow) {
           log.warn(`⚠️ [RECEIVER] Page ${pageNumber}: ${stateRef(state)} is the receiver of ${receiverRow.character}'s action on ${receiverRow.object} — state clause dropped, the result belongs at the contact. Delta was: "${state.delta}"`);
-          state = null;
-          stateDelta = '';
         }
-        pushRequired({ name: artifact.name, id: artifact.id, type: 'object', description, entry: artifact, state, stateDelta });
+        pushRequired({ name: artifact.name, id: artifact.id, type: 'object', description, entry: artifact, state: stc.state, stateClause: stc.clause });
         continue;
       }
 
@@ -5515,7 +5441,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // shorten a delta, never replace it. It is empty only where an axis
         // above dropped the state outright (contradiction, receiver), and then
         // `obj.state` is null too, so no dangling dash reaches the line.
-        const stateNote = (obj.state && obj.stateDelta) ? ` — ${trimStateClause(obj.stateDelta, obj.state)}` : '';
+        const stateNote = obj.stateClause ? ` — ${obj.stateClause}` : '';
         requiredObjectsSection += `* ${lead}${sizeNote}${stateNote}${wornSuffix}${wornOn}${offWhere}\n`;
         pushRequiredText(refEntry, refName);
       }

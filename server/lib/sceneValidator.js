@@ -981,7 +981,7 @@ function semanticDeclaredLight(sceneHint, imagePrompt) {
  * docs/decisions.md "Every critic judges against the source the generator was
  * given, uncut").
  */
-function semanticDeclaredBlocks({ sceneHint = null, imagePrompt = null, visualBible = null } = {}) {
+function semanticDeclaredBlocks({ sceneHint = null, imagePrompt = null, visualBible = null, pageNumber = null } = {}) {
   let interactionsBlock = '(none declared)';
   let elementsBlock = '(none)';
   let declaredLightLine = '';
@@ -994,7 +994,7 @@ function semanticDeclaredBlocks({ sceneHint = null, imagePrompt = null, visualBi
     interactionsBlock = guard.formatInteractionsBlock(interactions, visualBible, guard.gazeCharacters(sceneMeta));
     const objects = sceneMeta?.objects
       || (Array.isArray(sceneMeta?.fullData?.objects) ? sceneMeta.fullData.objects : null);
-    elementsBlock = guard.formatElementsBlock(objects, visualBible);
+    elementsBlock = guard.formatElementsBlock(objects, visualBible, { sceneMetadata: sceneMeta, pageNumber });
     declaredLightLine = semanticDeclaredLight(sceneHint, imagePrompt);
   } catch (err) {
     log.error(`[SEMANTIC] declared blocks could not be read from the brief (${err.message}) — the judge gets none`);
@@ -1037,7 +1037,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
   // and this block — which is the ONE place `i.object` (a raw VB id) is
   // rendered — was the exception. Shared builder now (vbIdGuard.js).
   const { interactionsBlock, elementsBlock, declaredLightLine } =
-    semanticDeclaredBlocks({ sceneHint, imagePrompt, visualBible: evalContext.visualBible || null });
+    semanticDeclaredBlocks({ sceneHint, imagePrompt, visualBible: evalContext.visualBible || null, pageNumber: evalContext.pageNumber ?? null });
 
   // Convert image to base64 if needed
   let imageBase64 = imageData;

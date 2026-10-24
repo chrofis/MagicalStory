@@ -10654,6 +10654,22 @@
         "what": "Open the story: clothingRequirements[child].nightwear.used is true with a pyjama top and bottoms description, characterAvatars[child] has styled-nightwear, the bed pages (pageClothing) are nightwear and look like pyjamas, the other pages and all three covers are the day outfit, and no page shows bathing. For a trial, the topic id must be going-to-bed and the pyjama sheet is drawn at prepare-title (the waiting-page slides include it). Also confirm the log shows no 'NIGHTWEAR CACHE MISS'."
       },
       "evidence": []
+    },
+    {
+      "id": "wrong-state-judge-2026-10-24",
+      "title": "A page drawing an element in the wrong state gets a wrong_state finding; the judges are told the state",
+      "commits": [],
+      "addedAt": "2026-10-24",
+      "status": "pending",
+      "claim": "On a story whose Visual Bible has an object with states (a book closed on one page, open on another): the semantic judge's PAGE ELEMENTS and the quality judge's REQUIRED OBJECTS carry the page's state clause (the same words as the page prompt's REQUIRED OBJECTS line), and a page that draws the object in a different state gets a wrong_state finding (MAJOR, page-redo route), not object_presence / missing_element / wrong_action. Repair admission is unchanged.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In the story's eval_calls (kind semantic) find a page that cites a stated object: the prompt's PAGE ELEMENTS line must end with (state: ...) and match the state clause on that page's REQUIRED OBJECTS line. If any page draws the object in a different state, its finding is typed wrong_state with the element id; check also that no correct stated page got a wrong_state (false-positive rate)."
+      },
+      "evidence": []
     }
   ],
   "runs": [

@@ -1624,6 +1624,10 @@ const NOT_INPAINTABLE_TYPES = new Set([
   // action_interaction 56 of 241 times (23%). Its own type so the facing / gaze /
   // pose findings (action_interaction, SETTLED: inpaint) stay on inpaint.
   'wrong_action',
+  // wrong_state (owner, 2026-10-24): an element drawn in a different state than the page gives it.
+  // Redrawn, not edited - the same page-redo route as wrong_action. Admission to repair is deliberately
+  // unchanged (findBadPages) pending cost statistics. docs/decisions.md 2026-10-24.
+  'wrong_state',
   // cutout_artifact: see CROP_ARTIFACT_TYPES — the page has no such defect.
   'cutout_artifact',
 ]);
@@ -1636,7 +1640,7 @@ const NOT_INPAINTABLE_TYPES = new Set([
  * the p16 drop on staging job_1790373080139_vnx5l8iy7 told the log a
  * character repair would handle a dragon, and nothing ever did.
  */
-const ITERATE_ROUTED_TYPES = new Set(['creature_scale', 'extra_character', 'missing_character', 'setting', 'wrong_action']);
+const ITERATE_ROUTED_TYPES = new Set(['creature_scale', 'extra_character', 'missing_character', 'setting', 'wrong_action', 'wrong_state']);
 
 /**
  * Types that describe OUR entity-grid crop, not the page: a hard white gap or a
