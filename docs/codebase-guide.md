@@ -299,6 +299,18 @@ Every user gets a unique referral code (format: `MagicRoger427`). When someone u
 
 ---
 
+## Gift Vouchers
+
+Decision: `docs/decisions.md` 2026-10-25. Plan: `tasks/vouchers-2026-10-25.md`.
+
+- **Files:** `migrations/047_vouchers.sql`, `server/lib/vouchers.js` (code, crypto, redeem, book claim, PDF card), `server/routes/vouchers.js`, `server/routes/admin/vouchers.js`, `emails/voucher.html` + `sendVoucherEmail` in `email.js`, the `type === 'voucher'` branch and `voucherBook` handling in the `server.js` Stripe webhook, values in `CREDIT_CONFIG.VOUCHER`.
+- **State machine:** `active -> redeemed | void`; `expired` is derived from `expires_at`, never stored. Redeem is one transaction (row lock, credits, `credit_transactions` type `voucher_redeem`, unique per voucher). The book credit is `book_order_session_id` (NULL = unused): claimed after the Stripe session exists, released on `checkout.session.expired` / `async_payment_failed`.
+- **Endpoints:** `GET /api/vouchers/lookup/:code`, `POST /api/vouchers/redeem`, `POST /api/vouchers/checkout` (no login), `GET /api/vouchers/mine`, `GET /api/vouchers/mine/:id/pdf`, `GET /api/vouchers/book-credit`, `POST /api/vouchers/book-checkout` (softcover CHF 0, hardcover CHF 10, max 50 pages); admin under `/api/admin/vouchers`: `POST /batch`, `GET /`, `GET /:id/pdf`, `POST /:id/void`, `POST /:id/resend`.
+- **Env:** `VOUCHER_SECRET` (required; codes are AES-256-GCM encrypted at rest, sha256 for lookup). Presence shown under `keys` in `/api/admin/diagnostics`.
+- **Tests:** `npx vitest run tests/unit/vouchers.test.ts`.
+
+---
+
 ## Shared Story Viewer — Book Spread
 
 Desktop: two-page book spread layout matching a real open book.
