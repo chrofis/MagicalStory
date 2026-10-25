@@ -1,0 +1,46 @@
+**THIS IMAGE DEPICTS:** Marc stands downstairs in the living room holding the closed teal picture book, looking down at it as he begins counting down.
+
+Generate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No lettering on any surface: no words, names, letters, title, caption, label or signature. The only exception is a REQUIRED TEXT block below; with no such block, nothing is lettered. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.
+
+When the FIRST reference photo shows a real location (architecture, landscape, no characters), render the scene IN it — copy its setting and geography, not its rendering: if it looks photographic, the ART STYLE below still governs. Its time of day and weather give way to the LIGHT line, when one is given. All OTHER reference photos define character IDENTITY only — face, hair, skin tone, build, clothing — never pose, framing, or composition. Each character's position, action, body direction and size come from the scene description and the COMPOSITION rules below.
+
+AGE & PROPORTIONS (render each character at their real age, regardless of the action described):
+- Marc: young adult proportions about 7.5-8 heads tall, full adult height, more developed than a teenager, mature face with defined bone structure and no adolescent softness, no signs of middle age
+
+Marc, a young adult man of average build with short wavy dark brown hair parted on the side, brown eyes and an angular jawline, wearing an orange knit sweater over a white collared shirt, brown chino trousers with a black belt, and brown leather boots, stands in the downstairs living room holding the closed deep teal picture book in both hands. His fingers clasp the teal cloth-covered board, and his brown eyes look down at the closed cover as his mouth opens slightly to count down. Behind him, the cosy living room holds a grey fabric sofa draped with a knitted throw, a low wooden coffee table, and a bookshelf along the cream wall under warm evening light.
+
+**Composition:**
+- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that target — not the camera — unless the scene declares a facing for them, which always wins. When the target is in the background and no facing is declared, the character faces away, back or side visible. Companions sharing a movement or destination all face the same way.
+- A standing character stands on visible standable ground — never on or over water, and never in the air — unless the scene description has them swim, float, or fly, and then no ground is invented under them. Outside a close-up and the near figure of an over-the-shoulder shot, each standing figure is drawn complete down to both feet, placed on the surface the scene names for that figure — where several surfaces are named, a ledge above and a floor below, each figure stands on its own. A lower body may be hidden by an object in front of the figure, never by the figure ending.
+- A vessel, building or vehicle keeps its true size against the figures near it: a person reaches about to a boat's rail, a doorway lintel or a wheel hub — never eye-level with a masthead, a rooftop or a chimney. A held or carried object keeps the size stated for it against the hand or body holding it.
+
+**REQUIRED OBJECTS IN THIS SCENE (each where the scene description places it):**
+* **picture book** (object) — fills a hand — about the size of Marc's hand — the book is closed, its cover shut
+These sizes win over any size the scene description gives the same element.
+Attached rough image of picture book — match its look at the size and placement the scene description gives it.
+Dividing, opening or breaking an object never multiplies its markings: a device, emblem or pattern stays one marking, the split runs through it, and each part shows only its share.
+
+**SEASON:** Autumn. What a window or door shows of the outdoors is autumn's, the same place alike from page to page; the room itself shows no season.
+
+**LIGHT:** dusk: dim blue-grey light at the windows, the lamps lit; indoors: the light comes from the room's own sources and any window. It wins over the light and weather of any reference image.
+
+**ART STYLE:** A traditional Japanese manga illustration: intricate ink linework, backgrounds and scenery in monochrome ink with atmospheric screentones and dramatic lighting, while character clothing, hair and key story objects keep their natural colours (colour-spread cover style, not black-and-white interior panels). Never photographic. Faces: clean ink lines, screentone shading, large but less extreme eyes than anime, defined noses, expressive mouths. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.
+
+**REQUIRED CAST:** Every named character is in the frame, exactly one of each, and no one else is added. A character given no action is still drawn, placed and occupied as the moment suggests.
+
+**DEPTH AND SIZE:** Depth is distance from the camera, not size: `foreground` is nearest and most prominent, low in the frame; `midground` sits in the middle band, further back; `background` is furthest and smallest. The same element is drawn larger in the foreground than it would be deeper in the frame — but a size stated for an element always wins over its depth: a small object in the foreground is drawn close and sharp at its true size against the figures near it, never enlarged to fill the lower half. An element with no stated size that is genuinely large — a vessel, a building, a vehicle, a big animal — does dominate the foreground.
+
+**COUNTS:** An exact number the scene states for a group of like things is three or fewer, and exactly that many are drawn. A group given as more than three, a cluster, a row, a few or several is drawn with no countable exact number.
+
+**NO MARKS ON A CHARACTER:** No arrow, symbol, logo, badge, decal, sticker or coloured graphic is painted onto a character's skin, hair, face or clothing. A garment's own pattern and any emblem the Visual Bible states for that character are the only exceptions; nothing is added to mark, label or point at a figure, least of all on the back of a head.
+
+**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests or gestures, and never joins a contact the scene gives to another part of that character's body.
+
+**SHOT:** The scene description declares the shot. A medium shot keeps each figure whole inside the frame.
+
+
+EXACT POSES:
+- Marc: holds the picture book in both hands — the picture book: fills a hand
+
+EXPRESSIONS AND EYES (exactly these, no default smiles; a face turned away shows its expression in profile or three-quarter view):
+- Marc: brows level, eyes looking down at the book, mouth open; eyes on picture book, face turned the same way, never to the viewer

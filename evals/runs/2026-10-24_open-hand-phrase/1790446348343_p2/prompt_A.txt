@@ -1,0 +1,44 @@
+**THIS IMAGE DEPICTS:** Fiona catches the sea chart as it slides out from behind a crooked wooden frame. She reaches out with one hand to grasp the weathered parchment edge. The dim indoor light illuminates her focused expression in the dusty corner.
+
+Generate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No lettering on any surface — no words, names or letters anywhere in the image. The only exception is a REQUIRED TEXT block below; with no such block, nothing in the image is lettered. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.
+
+When the FIRST reference photo shows a real location (architecture, landscape, no characters), render the scene IN it — copy its setting and geography, not its rendering: if it looks photographic, the ART STYLE below still governs. Its time of day and weather give way to the LIGHT line, when one is given. All OTHER reference photos define character IDENTITY only — face, hair, skin tone, build, clothing — never pose, framing, or composition. Each character's position, action, body direction and size come from the scene description and the COMPOSITION rules below.
+
+AGE & PROPORTIONS (render each character at their real age, regardless of the action described):
+- Fiona: adult proportions about 7.5-8 heads tall, full adult height, mature bone structure, clearly older than a young adult and not yet showing the age signs of middle age
+
+**WORN ITEMS ON THIS PAGE (the attached references are not authoritative for these):**
+- Fiona IS wearing this on this page: dark grey wool pirate coat — white loose-weave cotton pirate blouse with a wide open collar and full sleeves gathered at the wrist, a weathered dark grey wool pirate coat worn open with wide cuffs and brass buttons, a black cotton knee-length ski…. Draw it on Fiona even if the attached reference shows Fiona without it.
+
+An adult woman—average build, light brown straight neck-length brushed back hair with a center part, blue eyes, wearing a white loose-weave cotton pirate blouse, a weathered dark grey wool pirate coat worn open, a black knee-length skirt, a broad orange sailcloth sash knotted at the left hip, and black ankle boots—reaches carefully into the shadows of a dusty interior corner in the center foreground. She touches the edge of a thick yellowish parchment sea chart sliding halfway out from behind a crooked, heavy wooden frame leaning against the rough stone wall. The tight close-up frames her waist-up as her fingers gently catch the weathered edge of the rolled parchment to stop it from slipping further to the floor. The dim, still indoor lighting casts deep shadows behind the heavy wooden frames, highlighting her focused blue eyes and the crisp white cotton of her pirate blouse beneath the heavy grey wool coat.
+
+**Composition:**
+- A standing character stands on visible standable ground — never on or over water, and never in the air — unless the scene description has them swim, float, or fly, and then no ground is invented under them. Outside a close-up and the near figure of an over-the-shoulder shot, each standing figure is drawn complete down to both feet, placed on the surface the scene names for that figure — where several surfaces are named, a ledge above and a floor below, each figure stands on its own. A lower body may be hidden by an object in front of the figure, never by the figure ending.
+
+**REQUIRED OBJECTS IN THIS SCENE (each appears exactly as the scene description places it):**
+* **sea chart** (object) — fills an open hand — about the size of Fiona's open hand — rolled or folded back with worn edges
+Each size stated above holds over any other size the scene description gives the same element.
+The attached reference images include a rough image of sea chart — match its look at the size and placement the scene description gives it.
+A state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.
+
+**SEASON:** Autumn. Foliage, ground cover, sky and daylight colour are autumn's throughout the book — identical from page to page for the same place, and matching autumn even when a reference photo was taken in another season. Indoor frames and the page's own time of day are unaffected.
+
+**LIGHT:** afternoon: warm daylight from a sun past its height; indoors: the light comes from the room's own sources and any window. This is the page's time of day and weather, and it wins over the light and weather of any reference image.
+
+**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout the painted surface, soft edges between forms. No vignette, no unpainted paper margin, no deckle or torn-paper edge. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.
+
+**REQUIRED CAST:** Every named character is in the frame, exactly one of each, and no one else is added. A character the scene description gives no action to is still drawn, placed where the moment puts them and doing something consistent with it.
+
+**DEPTH AND SIZE:** Depth is distance from the camera, not size: `foreground` is nearest and most prominent, low in the frame; `midground` sits in the middle band, further back; `background` is furthest and smallest. The same element is drawn larger in the foreground than it would be deeper in the frame — but a size stated for an element always wins over its depth: a small object in the foreground is drawn close and sharp at its true size against the figures near it, never enlarged to fill the lower half. An element with no stated size that is genuinely large — a vessel, a building, a vehicle, a big animal — does dominate the foreground.
+
+**NO MARKS ON A CHARACTER:** No arrow, symbol, logo, badge, decal, sticker or coloured graphic is painted onto a character's skin, hair, face or clothing. A garment's own pattern and any emblem the Visual Bible states for that character are the only exceptions; nothing is added to mark, label or point at a figure, least of all on the back of a head.
+
+**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests or gestures, and never joins a contact the scene gives to another part of that character's body.
+
+**SHOT:** The scene description declares the shot. A close-up ends at the waist: legs, knees and feet lie below the bottom frame edge and cannot appear — never widen a close-up into a full-figure or establishing shot.
+
+EXACT POSES:
+- Fiona: catches the sliding sea chart — the sea chart: fills an open hand
+
+EXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named):
+- Fiona: brows slightly raised, eyes focused, lips parted; eyes on sea chart

@@ -1,0 +1,57 @@
+**THIS IMAGE DEPICTS:** Facundo hurls the chestnut-wrapped map copy across the river while Sarah shrieks, sending Herr Frei running for the bridge.
+
+Generate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No lettering on any surface — no words, names or letters anywhere in the image. The only exception is a REQUIRED TEXT block below; with no such block, nothing in the image is lettered. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.
+
+When the FIRST reference photo shows a real location (architecture, landscape, no characters), render the scene IN it — copy its setting and geography, not its rendering: if it looks photographic, the ART STYLE below still governs. Its time of day and weather give way to the LIGHT line, when one is given. All OTHER reference photos define character IDENTITY only — face, hair, skin tone, build, clothing — never pose, framing, or composition. Each character's position, action, body direction and size come from the scene description and the COMPOSITION rules below.
+
+**HEIGHT ORDER (shortest to tallest):** Sarah (shortest) -> Facundo (taller)
+
+AGE & PROPORTIONS (render each character at their real age, regardless of the action described):
+- Sarah, Facundo: young adult proportions about 7.5-8 heads tall, full adult height, more developed than a teenager, mature face with defined bone structure and no adolescent softness, no signs of middle age
+
+DISTINCTIVE FEATURES (on every page, wherever the angle shows them):
+- Sarah: small gold stud earrings, light freckles
+- Facundo: light stubble, beaded necklace
+
+REFERENCE CARD FRAMES (match each person to their card): BLUE = Sarah; RED = Facundo. The colours only identify the cards: never paint a frame into the scene, and never recolour anything to match one.
+
+On the wide stone quay steps that descend straight down into the dark river water, Facundo — a young man with average build, short wavy dark brown tousled hair, brown eyes, wearing a black open-fronted pirate vest over a white linen shirt, brown cotton trousers, a red cloth sash, a black cloth bandana, a beaded necklace, and a black cloth eye patch pushed up on his forehead — stands in the foreground, his arm swung forward mid-throw. From his hand flies a tightly wrapped bundle of rough brown paper bound with a loop of string around a chestnut. Beside him, Sarah — a young woman with average build, shoulder-length wavy loose blonde hair, blue eyes, wearing a blue sleeveless pirate waistcoat over a white linen shirt, brown knee-length breeches, a wide yellow cloth sash, and a blue cotton bandana — stands with both arms raised high in the air, her face lifted in a shriek. They both watch the small wrapped bundle fly out over the wide, flat expanse of the grey Limmat river flowing away from the camera in the midground. The wooden pirate ship rests tied at the steps behind them. In the deep background, Herr Frei — a small distant figure in a grey jacket — sprints along the matching stone steps on the far bank toward the distant stone bridge crossing the water.
+
+**Composition:**
+- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that target — not the camera — unless the scene declares a facing for them, which always wins. When the target is in the background and no facing is declared, the character faces away, back or side visible. Companions sharing a movement or destination all face the same way.
+- A standing character stands on visible standable ground — never on or over water, and never in the air — unless the scene description has them swim, float, or fly, and then no ground is invented under them. Outside a close-up and the near figure of an over-the-shoulder shot, each standing figure is drawn complete down to both feet, placed on the surface the scene names for that figure — where several surfaces are named, a ledge above and a floor below, each figure stands on its own. A lower body may be hidden by an object in front of the figure, never by the figure ending.
+- A vessel, building or vehicle keeps its true size against the figures near it: a person reaches about to a boat's rail, a doorway lintel or a wheel hub — never eye-level with a masthead, a rooftop or a chimney. A held or carried object keeps the size stated for it against the hand or body holding it.
+
+**REQUIRED OBJECTS IN THIS SCENE (each where the scene description places it):**
+* **galley sack map** (object) — fills a hand — about the size of Sarah's hand — tightly wrapped in a bundle around a small round nut and bound tight with a
+* **wooden pirate ship** (vehicle) — several adults high, the size of a house — about three times the height of Sarah and Facundo
+These sizes win over any size the scene description gives the same element.
+Attached rough image of galley sack map — match its look at the size and placement the scene description gives it.
+Dividing, opening or breaking an object never multiplies its markings: a device, emblem or pattern stays one marking, the split runs through it, and each part shows only its share.
+
+**SEASON:** Autumn. Foliage, ground cover, sky and daylight colour are autumn's on every page, the same place alike from page to page, even when a reference photo shows another season. Indoor frames and the page's time of day are unaffected.
+
+**LIGHT:** evening: the daylight fading, lit windows beginning to glow; overcast: a flat grey cloud-covered sky, soft even light, soft faint shadows; no sun disc, no moon and no blue sky anywhere in the picture. It wins over the light and weather of any reference image.
+
+**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout the painted surface, soft edges between forms. No vignette, no unpainted paper margin, no deckle or torn-paper edge. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.
+
+**REQUIRED CAST:** Every named character is in the frame, exactly one of each. Add a few unnamed passers-by far behind the cast (where the scene description places them, if it does), each much smaller than any listed character, busy with their own business and mostly turned away, every face fully drawn, none sharing a listed character's hair, build or outfit. No one else is added. A character given no action is still drawn, placed and occupied as the moment suggests.
+
+**DEPTH AND SIZE:** Depth is distance from the camera, not size: `foreground` is nearest and most prominent, low in the frame; `midground` sits in the middle band, further back; `background` is furthest and smallest. The same element is drawn larger in the foreground than it would be deeper in the frame — but a size stated for an element always wins over its depth: a small object in the foreground is drawn close and sharp at its true size against the figures near it, never enlarged to fill the lower half. An element with no stated size that is genuinely large — a vessel, a building, a vehicle, a big animal — does dominate the foreground.
+
+**COUNTS:** An exact number the scene states for a group of like things is three or fewer, and exactly that many are drawn. A group given as more than three, a cluster, a row, a few or several is drawn with no countable exact number.
+
+**NO MARKS ON A CHARACTER:** No arrow, symbol, logo, badge, decal, sticker or coloured graphic is painted onto a character's skin, hair, face or clothing. A garment's own pattern and any emblem the Visual Bible states for that character are the only exceptions; nothing is added to mark, label or point at a figure, least of all on the back of a head.
+
+**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests or gestures, and never joins a contact the scene gives to another part of that character's body.
+
+**SHOT:** The scene description declares the shot. An ultra-wide shot shows the whole setting from a distance, the figures small within it and both ends of any separation visible.
+
+
+EXACT POSES:
+- Facundo: throws the bundle — the galley sack map: fills a hand
+- Sarah: watches the bundle fly
+
+EXPRESSIONS AND EYES (exactly these, no default smiles; a face turned away shows its expression in profile or three-quarter view):
+- Facundo: brows drawn down, jaw set tight, eyes focused on the throw; eyes on galley sack map, face turned the same way, never to the viewer
+- Sarah: brows raised high, eyes wide, mouth wide open in a scream; eyes on galley sack map, face turned the same way, never to the viewer

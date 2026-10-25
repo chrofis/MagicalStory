@@ -127,6 +127,17 @@ drawing is for the owner (not added to BACKLOG.md: shared registry).
   handle a `nightwear` styled key), database.js strip/persist (generic category regex), avatarSlides.js (a pyjama sheet
   becomes a waiting-page slide of a bedtime trial, which is fine).
 
+### Pyjama sheets, run 2026-10-25 (generation only, sheet judge not exercised)
+
+Spend USD 0.80 (20 Grok 2.0 calls at USD 0.04; ledger in evals/runs/2026-10-25_pyjama-sheets/ledger.jsonl). The sheet judge needs
+`GEMINI_API_KEY` and no Gemini key was available, so the judge acceptance rate was NOT measured. Sheets came from the real
+`generateOneCallSheet` (kind costume, references face+body) with the real `getTrialNightwear` text (going-to-bed, long-sleeve top and
+long bottoms, socks), watercolor, for 20 stored staging characters: ages 1-70, 11 male and 9 female (toddler 2, 3; 4-8: 8; 12-14: 2; adults 22-70: 8).
+Own pixel check of all 20 sheets (every cell): **20/20 two-piece pyjamas, torso covered, no nudity, no one-piece, socks on**; face and hair consistent
+across the eight cells. Not covered: shorts / short-sleeve pyjamas (only the long description was drawn), a female aged 13-17 (none stored),
+the sheet judge's verdict, and identity against the source photo (not compared side by side). One layout oddity: Daniel (38) has uneven cell borders in the bottom row.
+Three picked characters (Leynor, Margaret, James) had no loadable face photo and were replaced (no API call made).
+
 ### Review of the 2026-10-25 run (main session)
 
 - Correction: Jules in `job_1792859316244_6429d0n83` is NOT an over-mark. Plan line 6 reads "Jules, in his pyjamas,

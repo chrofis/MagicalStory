@@ -1,0 +1,18 @@
+{
+ "key": "1791918618204_p5",
+ "env": "prod",
+ "storyId": "job_1791918618204_ssjxzvmp4",
+ "page": 5,
+ "kind": "control",
+ "state": "no state (flashlight)",
+ "model": "grok-imagine-image-2.0",
+ "refUrls": [
+  "https://images.magicalstory.ch/stories/job_1791918618204_ssjxzvmp4/debug/p5/v0/grok-ref-0.jpg",
+  "https://images.magicalstory.ch/stories/job_1791918618204_ssjxzvmp4/debug/p5/v0/grok-ref-1.jpg",
+  "https://images.magicalstory.ch/stories/job_1791918618204_ssjxzvmp4/debug/p5/v0/grok-ref-2.jpg"
+ ],
+ "origUrl": "https://images.magicalstory.ch/stories/job_1791918618204_ssjxzvmp4/scene/p5/v0.jpg",
+ "aspect": "1:1",
+ "openHandInA": 3,
+ "openHandLeftInB": 0
+}

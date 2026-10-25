@@ -1,0 +1,66 @@
+**THIS IMAGE DEPICTS:** Daniel, Sarah, Noah, and Emma crouch around the cardboard rocket on the living room rug and lift it together, preparing to carry it toward the closed balcony door.
+
+Generate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No lettering on any surface: no words, names, letters, title, caption, label or signature. The only exception is a REQUIRED TEXT block below; with no such block, nothing is lettered. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.
+
+When the FIRST reference photo shows a real location (architecture, landscape, no characters), render the scene IN it — copy its setting and geography, not its rendering: if it looks photographic, the ART STYLE below still governs. Its time of day and weather give way to the LIGHT line, when one is given. All OTHER reference photos define character IDENTITY only — face, hair, skin tone, build, clothing — never pose, framing, or composition. Each character's position, action, body direction and size come from the scene description and the COMPOSITION rules below.
+
+**HEIGHT ORDER (shortest to tallest):** Emma (shortest) -> Noah (taller) -> Sarah (noticeably taller) -> Daniel (taller)
+
+AGE & PROPORTIONS (render each character at their real age, regardless of the action described):
+- Emma: preschool-age proportions about 4.5 heads tall, large head relative to body, soft rounded features, steady on their feet
+- Noah: early grade-school proportions about 5.5 heads tall, rounded child features, older than a kindergarten child — NOT toddler proportions
+- Daniel, Sarah: adult proportions about 7.5-8 heads tall, full adult height, mature bone structure, clearly older than a young adult and not yet showing the age signs of middle age
+
+DISTINCTIVE FEATURES (on every page, wherever the angle shows them):
+- Emma: freckles, small stud earrings
+- Daniel: beard, mustache
+
+REFERENCE CARD FRAMES (match each person to their card): BLUE = Emma; GREEN = Noah; RED = Daniel; PURPLE = Sarah. The colours only identify the cards: never paint a frame into the scene, and never recolour anything to match one.
+
+**WORN ITEMS ON THIS PAGE (these win over the attached references):**
+- Sarah IS wearing this on this page: silver drop earring — : a small silver-grey teardrop pendant hanging from a short curved hook, the top of the hook a tiny round loop, polished metal.
+
+In the center of the warm living room, Daniel, Sarah, Noah, and Emma crouch together around the base of the finished cardboard rocket, each gripping a different bottom edge to lift the craft slightly off the deep red rug. Daniel, an adult man with dark brown short wavy tousled hair, brown eyes, a soft jawline, and a short beard and mustache, wears a green chunky knit wool sweater, dark brown corduroy trousers, and brown leather lace-up ankle boots, smiling broadly with soft crinkles at his eyes as his hands curl under the corrugated rim. Beside him, Sarah, an adult woman with loose chin-length straight blonde hair parted at the side, blue eyes, and rectangular dark-framed glasses, wears a yellow cotton cardigan buttoned over a white cotton t-shirt, slim grey jeans, grey canvas sneakers, and small grey drop earrings, her face beaming with lips upturned as she lifts her side. On the other side, Noah, a young school-age boy with tousled ear-length wavy light blonde hair and bangs brushing his eyebrows, blue eyes, and rounded cheeks, wears a blue cotton-blend astronaut flight suit with long sleeves, a high round collar, elasticated cuffs, a black fabric utility belt, white astronaut gloves with ribbed cuffs, and black padded astronaut boots, his bright grin showing sheer excitement. Emma, a preschool-age girl with brown wavy hair tied in a mid-back ponytail, brown eyes, and freckles across her nose, wears a white cotton-blend astronaut coverall suit with long sleeves, elasticated cuffs, a wide red fabric belt, small white stud earrings, and white padded astronaut boots, giggling with open-mouthed joy as she clasps the bottom of the hull. The cylindrical brown and white cardboard rocket rises about Daniel's height, featuring a pointed nose cone, three triangular red fins at the bottom, a round glassy window set in its front side, and the brown shoebox airlock fitted to its lower flank with both flat lids firmly shut. In the background, honey-brown wooden floorboards extend to cream walls, a grey sofa and low wooden table rest on the left, a tall wooden bookshelf stands at the right, and the tall glass balcony door in the far wall remains closed against the soft golden autumn afternoon light showing russet tree branches outside.
+
+**Composition:**
+- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that target — not the camera — unless the scene declares a facing for them, which always wins. When the target is in the background and no facing is declared, the character faces away, back or side visible. Companions sharing a movement or destination all face the same way.
+- A standing character stands on visible standable ground — never on or over water, and never in the air — unless the scene description has them swim, float, or fly, and then no ground is invented under them. Outside a close-up and the near figure of an over-the-shoulder shot, each standing figure is drawn complete down to both feet, placed on the surface the scene names for that figure — where several surfaces are named, a ledge above and a floor below, each figure stands on its own. A lower body may be hidden by an object in front of the figure, never by the figure ending.
+- A vessel, building or vehicle keeps its true size against the figures near it: a person reaches about to a boat's rail, a doorway lintel or a wheel hub — never eye-level with a masthead, a rooftop or a chimney. A held or carried object keeps the size stated for it against the hand or body holding it.
+
+**REQUIRED OBJECTS IN THIS SCENE (each where the scene description places it):**
+* **shoebox airlock** (object) — fills a hand — about the size of Emma's hand — both flat lids closed on the box
+* **cardboard rocket** (vehicle) — as tall as a standing adult — about one and a half times the height of Emma and Noah and about as tall as Daniel and Sarah
+These sizes win over any size the scene description gives the same element.
+Attached rough image of shoebox airlock — match its look at the size and placement the scene description gives it.
+Dividing, opening or breaking an object never multiplies its markings: a device, emblem or pattern stays one marking, the split runs through it, and each part shows only its share.
+
+**SEASON:** Autumn. What a window or door shows of the outdoors is autumn's, the same place alike from page to page; the room itself shows no season.
+
+**LIGHT:** afternoon: warm daylight at the windows; indoors: the light comes from the room's own sources and any window. It wins over the light and weather of any reference image.
+
+**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout the painted surface, soft edges between forms. No vignette, no unpainted paper margin, no deckle or torn-paper edge. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.
+
+**REQUIRED CAST:** Every named character is in the frame, exactly one of each, and no one else is added. A character given no action is still drawn, placed and occupied as the moment suggests.
+
+**DEPTH AND SIZE:** Depth is distance from the camera, not size: `foreground` is nearest and most prominent, low in the frame; `midground` sits in the middle band, further back; `background` is furthest and smallest. The same element is drawn larger in the foreground than it would be deeper in the frame — but a size stated for an element always wins over its depth: a small object in the foreground is drawn close and sharp at its true size against the figures near it, never enlarged to fill the lower half. An element with no stated size that is genuinely large — a vessel, a building, a vehicle, a big animal — does dominate the foreground.
+
+**COUNTS:** An exact number the scene states for a group of like things is three or fewer, and exactly that many are drawn. A group given as more than three, a cluster, a row, a few or several is drawn with no countable exact number.
+
+**NO MARKS ON A CHARACTER:** No arrow, symbol, logo, badge, decal, sticker or coloured graphic is painted onto a character's skin, hair, face or clothing. A garment's own pattern and any emblem the Visual Bible states for that character are the only exceptions; nothing is added to mark, label or point at a figure, least of all on the back of a head.
+
+**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests or gestures, and never joins a contact the scene gives to another part of that character's body.
+
+**SHOT:** The scene description declares the shot. A wide shot shows the full setting.
+
+
+EXACT POSES:
+- Emma: lifts the cardboard rocket by its lower edges together
+- Noah: lifts the cardboard rocket by its lower edges together
+- Daniel: lifts the cardboard rocket by its lower edges together
+- Sarah: lifts the cardboard rocket by its lower edges together
+
+EXPRESSIONS AND EYES (exactly these, no default smiles; a face turned away shows its expression in profile or three-quarter view):
+- Emma: eyes wide and bright, mouth curved in an open laughing smile; eyes on cardboard rocket, face turned the same way, never to the viewer
+- Noah: broad grinning mouth, brows relaxed and raised, eyes crinkled in delight; eyes on cardboard rocket, face turned the same way, never to the viewer
+- Daniel: warm crinkling eyes, gentle upward curve of mouth within his beard; eyes on cardboard rocket, face turned the same way, never to the viewer
+- Sarah: eyes bright behind glasses, cheeks rounded in a wide happy smile; eyes on cardboard rocket, face turned the same way, never to the viewer

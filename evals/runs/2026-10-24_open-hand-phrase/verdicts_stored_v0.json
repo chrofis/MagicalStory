@@ -1,0 +1,17 @@
+{
+ "what": "Visual verdicts (read by eye) on the STORED production render (story_images scene v0, made from prompt_A.txt). This is one free arm-A draw per case, not the A/B. wrongOpen = object drawn open/unrolled/lid-up where the stated state says closed/shut/rolled/wrapped.",
+ "cases": {
+  "1792859316244_p6":  {"kind":"state","state":"book closed, cover shut","wrongOpen":true,"note":"Marc holds the book open, reading"},
+  "1792482580699_p1":  {"kind":"state","state":"both flat lids closed","wrongOpen":false,"note":"shoebox lid on, closed"},
+  "1791450210539_p13": {"kind":"state","state":"wrapped bundle around a nut","wrongOpen":false,"note":"tied paper bundle in the air"},
+  "1790446348343_p2":  {"kind":"state","state":"rolled or folded back","wrongOpen":true,"note":"half unrolled, face with the wall drawing shown (partial; scene has her catch it sliding out)"},
+  "1790446348343_p7":  {"kind":"state","state":"rolled or folded back","wrongOpen":true,"note":"held flat against chest, face shown, not rolled"},
+  "1790446348343_p13": {"kind":"state","state":"rolled or folded back","wrongOpen":false,"note":"rolled scroll behind her back (one edge loose)"},
+  "1790446348343_p15": {"kind":"state","state":"rolled or folded back","wrongOpen":true,"note":"unrolled, face shown while handing it over"},
+  "1792482580699_p5":  {"kind":"state","state":"both flat lids closed","wrongOpen":false,"note":"closed shoebox in talons"},
+  "1792482580699_p6":  {"kind":"mixed","state":"inner lid shut, outer lid lifted off one open end","wrongOpen":true,"note":"box fully open, hinged lid up, no shut inner lid; prompt also says 'open outer lid' in the depicts line (confounded)"},
+  "1792482580699_p8":  {"kind":"mixed","state":"inner lid shut, outer lid lifted off one open end","wrongOpen":true,"note":"box fully open, lid up; depicts line says 'the open shoebox airlock' (confounded)"},
+  "1791918618204_p5":  {"kind":"control","state":"none","wrongOpen":null,"note":"not judged: no state"}
+ },
+ "summary": "strict state cases 4/8 drawn open-ish (book p6; sea chart p2 partial, p7, p15); mixed 2/2 but confounded by 'open' in their own depicts lines"
+}

@@ -1,0 +1,18 @@
+{
+ "key": "1790446348343_p15",
+ "env": "staging",
+ "storyId": "job_1790446348343_z3fw660ie",
+ "page": 15,
+ "kind": "state",
+ "state": "sea chart rolled or folded back",
+ "model": "grok-imagine-image-2.0",
+ "refUrls": [
+  "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/debug/p11/v0/grok-ref-0.jpg",
+  "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/debug/p15/v0/grok-ref-1.jpg",
+  "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/debug/p15/v0/grok-ref-2.jpg"
+ ],
+ "origUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/scene/p15/v0.jpg",
+ "aspect": "1:1",
+ "openHandInA": 3,
+ "openHandLeftInB": 0
+}

@@ -1,0 +1,137 @@
+{
+ "spend": 0.88,
+ "calls": [
+  {
+   "key": "1792859316244_p6",
+   "arm": "A",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1792859316244_p6",
+   "arm": "B",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1792482580699_p1",
+   "arm": "A",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1792482580699_p1",
+   "arm": "B",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1791450210539_p13",
+   "arm": "A",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1791450210539_p13",
+   "arm": "B",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1790446348343_p2",
+   "arm": "A",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1790446348343_p2",
+   "arm": "B",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1790446348343_p7",
+   "arm": "A",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1790446348343_p7",
+   "arm": "B",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1790446348343_p13",
+   "arm": "A",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1790446348343_p13",
+   "arm": "B",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1790446348343_p15",
+   "arm": "A",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1790446348343_p15",
+   "arm": "B",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1792482580699_p5",
+   "arm": "A",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1792482580699_p5",
+   "arm": "B",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1792482580699_p6",
+   "arm": "A",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1792482580699_p6",
+   "arm": "B",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1792482580699_p8",
+   "arm": "A",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1792482580699_p8",
+   "arm": "B",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1791918618204_p5",
+   "arm": "A",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  },
+  {
+   "key": "1791918618204_p5",
+   "arm": "B",
+   "model": "grok-imagine-image-2.0",
+   "usd": 0.04
+  }
+ ]
+}

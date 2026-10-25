@@ -1,0 +1,16 @@
+{
+ "key": "1792482580699_p5",
+ "env": "staging",
+ "storyId": "job_1792482580699_3iiy0v4dj",
+ "page": 5,
+ "kind": "state",
+ "state": "both flat lids closed on the box",
+ "model": "grok-imagine-image-2.0",
+ "refUrls": [
+  "https://images-staging.magicalstory.ch/stories/job_1792482580699_3iiy0v4dj/debug/p5/v0/grok-ref-0.jpg"
+ ],
+ "origUrl": "https://images-staging.magicalstory.ch/stories/job_1792482580699_3iiy0v4dj/scene/p5/v0.jpg",
+ "aspect": "1:1",
+ "openHandInA": 1,
+ "openHandLeftInB": 0
+}

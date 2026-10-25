@@ -1,0 +1,45 @@
+**THIS IMAGE DEPICTS:** Lorena holds the sea chart behind her back, refusing to give it to Herr Brunner, who reaches for it. Fog and dusk light shadow the massive stone wall behind them.
+
+Generate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No lettering on any surface — no words, names or letters anywhere in the image. The only exception is a REQUIRED TEXT block below; with no such block, nothing in the image is lettered. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.
+
+When the FIRST reference photo shows a real location (architecture, landscape, no characters), render the scene IN it — copy its setting and geography, not its rendering: if it looks photographic, the ART STYLE below still governs. Its time of day and weather give way to the LIGHT line, when one is given. All OTHER reference photos define character IDENTITY only — face, hair, skin tone, build, clothing — never pose, framing, or composition. Each character's position, action, body direction and size come from the scene description and the COMPOSITION rules below.
+
+AGE & PROPORTIONS (render each character at their real age, regardless of the action described):
+- Lorena: young adult proportions about 7.5-8 heads tall, full adult height, more developed than a teenager, mature face with defined bone structure and no adolescent softness, no signs of middle age
+
+A young adult woman—average build, dark brown wavy shoulder-length hair in a ponytail, brown eyes, wearing a purple cotton pirate blouse, a black skirt, and a black leather belt—stands in the left midground on the riverside landing holding a thick yellowish sea chart firmly behind her back. She glares across at an older man—tall, broad-shouldered, short grey hair, wearing a dark blue uniform jacket and grey trousers—in the right midground, who leans forward aggressively and reaches an empty hand out toward her. The medium shot against the massive smooth stone retaining wall captures the tense standoff in the misty, fading dusk light.
+
+**Composition:**
+- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that target — not the camera — unless the scene declares a facing for them, which always wins. When the target is in the background and no facing is declared, the character faces away, back or side visible. Companions sharing a movement or destination all face the same way.
+- A standing character stands on visible standable ground — never on or over water, and never in the air — unless the scene description has them swim, float, or fly, and then no ground is invented under them. Outside a close-up and the near figure of an over-the-shoulder shot, each standing figure is drawn complete down to both feet, placed on the surface the scene names for that figure — where several surfaces are named, a ledge above and a floor below, each figure stands on its own. A lower body may be hidden by an object in front of the figure, never by the figure ending.
+- A vessel, building or vehicle keeps its true size against the figures near it: a person reaches about to a boat's rail, a doorway lintel or a wheel hub — never eye-level with a masthead, a rooftop or a chimney. A held or carried object keeps the size stated for it against the hand or body holding it.
+
+**REQUIRED OBJECTS IN THIS SCENE (each appears exactly as the scene description places it):**
+* **sea chart** (object) — fills an open hand — about the size of Lorena's open hand — rolled or folded back with worn edges
+Each size stated above holds over any other size the scene description gives the same element.
+The attached reference images include a rough image of sea chart — match its look at the size and placement the scene description gives it.
+A state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.
+
+**SEASON:** Autumn. Foliage, ground cover, sky and daylight colour are autumn's throughout the book — identical from page to page for the same place, and matching autumn even when a reference photo was taken in another season. Indoor frames and the page's own time of day are unaffected.
+
+**LIGHT:** dusk: the sun down, a deep blue fading sky, the first lamps lit; fog softening the distance. This is the page's time of day and weather, and it wins over the light and weather of any reference image.
+
+**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout the painted surface, soft edges between forms. No vignette, no unpainted paper margin, no deckle or torn-paper edge. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.
+
+**REQUIRED CAST:** Every named character is in the frame, exactly one of each, and no one else is added. A character the scene description gives no action to is still drawn, placed where the moment puts them and doing something consistent with it.
+
+**DEPTH AND SIZE:** Depth is distance from the camera, not size: `foreground` is nearest and most prominent, low in the frame; `midground` sits in the middle band, further back; `background` is furthest and smallest. The same element is drawn larger in the foreground than it would be deeper in the frame — but a size stated for an element always wins over its depth: a small object in the foreground is drawn close and sharp at its true size against the figures near it, never enlarged to fill the lower half. An element with no stated size that is genuinely large — a vessel, a building, a vehicle, a big animal — does dominate the foreground.
+
+**NO MARKS ON A CHARACTER:** No arrow, symbol, logo, badge, decal, sticker or coloured graphic is painted onto a character's skin, hair, face or clothing. A garment's own pattern and any emblem the Visual Bible states for that character are the only exceptions; nothing is added to mark, label or point at a figure, least of all on the back of a head.
+
+**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests or gestures, and never joins a contact the scene gives to another part of that character's body.
+
+**SHOT:** The scene description declares the shot. A medium shot keeps each figure whole inside the frame.
+
+EXACT POSES:
+- Lorena: holds the thick sea chart behind her back — the sea chart: fills an open hand
+- Herr Brunner: looking off into the scene, not at the viewer
+
+EXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named):
+- Lorena: eyes narrowed, jaw firmly set in defiance; eyes on Herr Brunner
+- Herr Brunner: furrowed brows, tight mouth; eyes on Lorena

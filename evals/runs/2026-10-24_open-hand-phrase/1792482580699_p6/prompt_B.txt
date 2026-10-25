@@ -1,0 +1,49 @@
+**THIS IMAGE DEPICTS:** Sarah carefully holds her small silver drop earring at the open outer lid of the shoebox airlock inside the rocket cabin.
+
+Generate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No lettering on any surface: no words, names, letters, title, caption, label or signature. The only exception is a REQUIRED TEXT block below; with no such block, nothing is lettered. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.
+
+When the FIRST reference photo shows a real location (architecture, landscape, no characters), render the scene IN it — copy its setting and geography, not its rendering: if it looks photographic, the ART STYLE below still governs. Its time of day and weather give way to the LIGHT line, when one is given. All OTHER reference photos define character IDENTITY only — face, hair, skin tone, build, clothing — never pose, framing, or composition. Each character's position, action, body direction and size come from the scene description and the COMPOSITION rules below.
+
+AGE & PROPORTIONS (render each character at their real age, regardless of the action described):
+- Sarah: adult proportions about 7.5-8 heads tall, full adult height, mature bone structure, clearly older than a young adult and not yet showing the age signs of middle age
+
+**WORN ITEMS ON THIS PAGE (these win over the attached references):**
+- Sarah is NOT wearing this on this page: silver drop earring — : a small silver-grey teardrop pendant hanging from a short curved hook, the top of the hook a tiny round loop, polished metal — held in her fingers.
+
+Inside the compact rocket cabin, Sarah leans forward in a waist-up close-up, her fingers carefully holding a small silver drop earring poised at the open outer portal of the cardboard airlock. Sarah, an adult woman of average build with straight chin-length blonde hair tucked partly behind her ear, blue eyes, and rectangular dark-framed glasses, wears her yellow cotton cardigan buttoned over a white cotton t-shirt, her brow smooth and focused, eyes intent on the delicate silver teardrop, and her lips held in a steady, calm line. The cardboard shoebox airlock is mounted to the corrugated cabin wall, its inner flat lid firmly shut across the top while its rectangular outer lid is lifted open to reveal the small opening leading outward. The polished fingertip-sized silver earring glints faintly against Sarah's fingers as she positions it over the airlock channel. Behind her, the white-painted cardboard cabin wall features red trim and faint outlines of dials on the forward panel beneath the dark glass of the round window.
+
+**Composition:**
+- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that target — not the camera — unless the scene declares a facing for them, which always wins. When the target is in the background and no facing is declared, the character faces away, back or side visible. Companions sharing a movement or destination all face the same way.
+- A standing character stands on visible standable ground — never on or over water, and never in the air — unless the scene description has them swim, float, or fly, and then no ground is invented under them. Outside a close-up and the near figure of an over-the-shoulder shot, each standing figure is drawn complete down to both feet, placed on the surface the scene names for that figure — where several surfaces are named, a ledge above and a floor below, each figure stands on its own. A lower body may be hidden by an object in front of the figure, never by the figure ending.
+- A vessel, building or vehicle keeps its true size against the figures near it: a person reaches about to a boat's rail, a doorway lintel or a wheel hub — never eye-level with a masthead, a rooftop or a chimney. A held or carried object keeps the size stated for it against the hand or body holding it.
+
+**REQUIRED OBJECTS IN THIS SCENE (each where the scene description places it):**
+* **shoebox airlock** (object) — fills a hand — about the size of Sarah's hand — inner lid shut across the top, outer lid lifted off one open end
+* **silver drop earring** (object) — small enough to sit on a fingertip — small enough to sit on Sarah's fingertip — held in her fingers
+* **cardboard rocket** (vehicle) — as tall as a standing adult — about as tall as Sarah
+These sizes win over any size the scene description gives the same element.
+Attached rough images of: shoebox airlock; silver drop earring — match each one's look at the size and placement the scene description gives it.
+Dividing, opening or breaking an object never multiplies its markings: a device, emblem or pattern stays one marking, the split runs through it, and each part shows only its share.
+
+**LIGHT:** dark: a pitch-dark place, the scene lit only by the light sources in it. It wins over the light and weather of any reference image.
+
+**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout the painted surface, soft edges between forms. No vignette, no unpainted paper margin, no deckle or torn-paper edge. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.
+
+**REQUIRED CAST:** Every named character is in the frame, exactly one of each, and no one else is added. A character given no action is still drawn, placed and occupied as the moment suggests.
+
+**DEPTH AND SIZE:** Depth is distance from the camera, not size: `foreground` is nearest and most prominent, low in the frame; `midground` sits in the middle band, further back; `background` is furthest and smallest. The same element is drawn larger in the foreground than it would be deeper in the frame — but a size stated for an element always wins over its depth: a small object in the foreground is drawn close and sharp at its true size against the figures near it, never enlarged to fill the lower half. An element with no stated size that is genuinely large — a vessel, a building, a vehicle, a big animal — does dominate the foreground.
+
+**COUNTS:** An exact number the scene states for a group of like things is three or fewer, and exactly that many are drawn. A group given as more than three, a cluster, a row, a few or several is drawn with no countable exact number.
+
+**NO MARKS ON A CHARACTER:** No arrow, symbol, logo, badge, decal, sticker or coloured graphic is painted onto a character's skin, hair, face or clothing. A garment's own pattern and any emblem the Visual Bible states for that character are the only exceptions; nothing is added to mark, label or point at a figure, least of all on the back of a head.
+
+**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests or gestures, and never joins a contact the scene gives to another part of that character's body.
+
+**SHOT:** The scene description declares the shot. A close-up ends at the waist: legs, knees and feet lie below the bottom frame edge and cannot appear — never widen a close-up into a full-figure or establishing shot.
+
+
+EXACT POSES:
+- Sarah: holds the silver drop earring at the airlock opening
+
+EXPRESSIONS AND EYES (exactly these, no default smiles; a face turned away shows its expression in profile or three-quarter view):
+- Sarah: brows level and concentrated, eyes focused downward, lips gently closed; eyes on silver drop earring, face turned the same way, never to the viewer
