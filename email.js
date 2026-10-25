@@ -72,7 +72,7 @@ const EMAIL_TEMPLATES = {};
 
 function loadEmailTemplates() {
   const emailsDir = path.join(__dirname, 'emails');
-  const templateFiles = ['story-complete.html', 'trial-story-complete.html', 'trial-reminder.html', 'story-failed.html', 'order-confirmation.html', 'order-shipped.html', 'order-failed.html', 'email-verification.html', 'password-reset.html'];
+  const templateFiles = ['story-complete.html', 'trial-story-complete.html', 'trial-reminder.html', 'story-failed.html', 'order-confirmation.html', 'order-shipped.html', 'order-failed.html', 'email-verification.html', 'password-reset.html', 'voucher.html'];
 
   for (const file of templateFiles) {
     const filePath = path.join(emailsDir, file);
@@ -684,6 +684,40 @@ async function sendOrderConfirmationEmail(customerEmail, customerName, orderDeta
     console.error('❌ Email send error:', err);
     return null;
   }
+}
+
+/**
+ * Send a gift voucher (QR + printable PDF card) to the buyer, or to an address chosen by an admin.
+ * @param {string} toEmail
+ * @param {string} language
+ * @param {{code:string,url:string,pdfBuffer:Buffer,expiresAt:?(string|Date),credits:number}} voucher
+ */
+async function sendVoucherEmail(toEmail, language, { code, url, pdfBuffer, expiresAt, credits }) {
+  if (!resend) {
+    console.log('📧 Email not configured - skipping voucher email');
+    return null;
+  }
+  const template = getTemplateSection('voucher', language);
+  if (!template) throw new Error('voucher email template missing');
+  const values = {
+    code,
+    url,
+    credits: String(credits),
+    expiry: expiresAt ? new Date(expiresAt).toLocaleDateString('de-CH') : '',
+    noExpiry: expiresAt ? '' : '1',
+  };
+  const { data, error } = await sendTracked(resend, 'voucher', {
+    from: EMAIL_FROM,
+    replyTo: EMAIL_REPLY_TO,
+    to: toEmail,
+    subject: fillTemplate(template.subject, values),
+    text: fillTemplate(template.text, values),
+    html: fillTemplate(template.html, values, { html: true }),
+    attachments: [{ filename: 'Magical-Story-Gutschein.pdf', content: pdfBuffer }],
+  }, { language });
+  if (error) throw new Error('voucher email failed: ' + (error.message || JSON.stringify(error)));
+  console.log(`📧 Voucher email sent to ${toEmail} (${language}), id: ${data.id}`);
+  return data;
 }
 
 /**
@@ -1447,6 +1481,7 @@ module.exports = {
   formatDeliveryEstimate,
   sendOrderShippedEmail,
   sendOrderFailedEmail,
+  sendVoucherEmail,
   // Auth emails (return structured results)
   sendEmailVerificationEmail,
   sendPasswordResetEmail,

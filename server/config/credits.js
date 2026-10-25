@@ -55,6 +55,19 @@ const CREDIT_CONFIG = {
     CODE_LENGTH: 8,                 // 8-char uppercase alphanumeric, no ambiguous chars
   },
 
+  // Gift vouchers. A voucher = 500 credits (a story is capped at 25 pages, so two stories in one
+  // book) + one book credit. Book rule (owner, 2026-10-25): up to maxPages content pages,
+  // softcover costs CHF 0, hardcover costs hardcoverSurchargeCents; CH shipping included in both.
+  // bookCents = CHF 41 softcover up to 50 pages (pricing_tiers tier 3) + CHF 10 shipping = CHF 51:
+  // the list value of the free softcover, used for display and as the voucher's stated value.
+  VOUCHER: {
+    GIFT: { priceCents: 5900, credits: 500, bookCents: 5100 },
+    MAX_BOOK_PAGES: 50,
+    HARDCOVER_SURCHARGE_CENTS: 1000,
+    CAMPAIGN_DEFAULT_EXPIRY_MONTHS: 12,
+    CODE_CHARS: 20,
+  },
+
   // Story page limits
   // 1 page = 1 scene = 1 illustration (picture-book layout for all reading levels)
   STORY_PAGES: {
