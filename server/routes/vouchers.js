@@ -233,9 +233,9 @@ router.post('/vouchers/book-checkout', authenticateToken, async (req, res) => {
       }],
       discounts: [{ coupon: coupon.id }],
       mode: 'payment',
-      // A softcover voucher book totals CHF 0: collect a payment method only when an amount is due
-      // (Stripe API ref, Checkout Session payment_method_collection: https://docs.stripe.com/api/checkout/sessions/object).
-      payment_method_collection: 'if_required',
+      // A softcover voucher book totals CHF 0. Do NOT set payment_method_collection here: Stripe
+      // rejects it in payment mode ("only if there are recurring prices", seen on staging
+      // 2026-10-25); a zero-total payment-mode session completes without a card on its own.
       success_url: `${frontend()}/orders?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${frontend()}/gutschein/buch?payment=cancelled`,
       metadata: {
