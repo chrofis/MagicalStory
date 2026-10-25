@@ -237,7 +237,7 @@ const PDF_STRINGS = {
     contains: (c, p) => `${c} crédits pour jusqu'à ${c / 10} pages d'histoire et un livre jusqu'à ${p} pages, livraison (CH) incluse : couverture souple offerte, couverture rigide avec supplément de CHF 10.`,
     expiry: d => `Valable jusqu'au ${d}`, noExpiry: 'Sans date limite',
     steps: ['Scanner le code QR ou ouvrir le lien', 'Créer un compte ou se connecter et utiliser le bon', 'Créer une histoire et commander le livre'],
-    code: 'Ton code',
+    code: 'Votre code',
   },
   it: {
     title: 'Buono regalo', subtitle: 'Gift voucher',
