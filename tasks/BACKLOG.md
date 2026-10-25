@@ -53,6 +53,7 @@ Last full sweep: **2026-09-06**.
 ---
 
 ## In flight
+- [ ] (2026-10-25) **Gift vouchers built, staging validation pending.** Code on staging branch (fabf2e7bd..e3e52f5e8, 26 unit tests + guards green). Open: set `VOUCHER_SECRET` on staging and prod; push staging; Stripe TEST walk-through (buy CHF 59 → email + PDF; redeem → 500 credits; `/gutschein/buch` softcover CHF 0 → confirm Stripe `payment_status` value → order row + Gelato draft; hardcover CHF 10); then prod push approval. Out of scope: scheduled delivery to recipient email, printed cards. → tasks/vouchers-2026-10-25.md, docs/codebase-guide.md "Gift Vouchers"
 - [ ] (2026-10-07) Branch claude/backlog-trial-2026-10-07 (~125 commits) awaiting staging + owner OK; 8 stopped follow-up tasks incl. the owner-approved keyword H1s → tasks/session-handover-2026-10-07.md
 
 - [ ] Step-4 idea pre-generation sometimes does not fire (staging 2026-10-05, demo-berger, entry 18, twice): step 5 shows the empty placeholder. Diagnose the pre-generate effect; suspect the abort-on-input-change effect right below it → client/src/pages/StoryWizard.tsx:1998 (spec works around it at tests/demo-story.spec.ts, Step 5)
