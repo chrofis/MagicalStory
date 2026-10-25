@@ -76,6 +76,33 @@ inputs, per the iron rule (a set of at least 20, positives and clean negatives, 
 Report as rates (n of N). If the bible writer's nightwear marking is below about 90% on the positives or above about
 5% on the negatives, the decision's "Revisit if" applies (typed in-bed flag on the plan line instead of a prose rule).
 
+### Paid validation run, 2026-10-25 (three of the four replays; pyjama sheets not run: no working xAI/Gemini key)
+
+Spend USD 1.67 of the 2.60 cap (63 calls; ledger and raw outputs in evals/runs/2026-10-25_nightwear-text-replays/, results.jsonl has one line per stage).
+Keys came from the owner's key file at runtime. Prompts were built by the real builders over stored plan lines.
+
+**The planned sets could not be filled.** Only 2 stored stories put anyone in bed with plan lines (prod going-to-bed
+job_1792859316244_6429d0n83 and job_1791918618204_ssjxzvmp4); no story in either DB is a sleepover; no stored plan has an adult in bed
+or a plan line that dresses someone for the day. Two more positives (Lily and the Sunken Shell, Der Fussball vor der Tuer) exist only
+as prose, so their beats are reconstructed from the pages (flagged contaminated); Danilo (daytime hospital bed) is ambiguous and not scored.
+Rates below are therefore over 4 persons in 4 stories, not 10 stories.
+
+| Replay | Result |
+|---|---|
+| Writer, positives (3 samples each) | 12/12 intended persons marked (Lea x2, Lily, Noah). Over-marks: Jules 3/3 in 6429 (at the bedroom door in the bedtime routine; the plan does not put him in bed or pyjamas), Emma 2/3 in the Fussball story (prose-reconstructed input) |
+| Writer, negatives | 0/72 characters marked, 15/15 stories clean; nightwear key present on 89/89 characters |
+| Review check 9, stored pre-nightwear bibles | adds Lea nightwear x2 and Lily = 3/3 evaluable; Noah story not rebuildable (no used outfit stored); Danilo (daytime hospital bed) also added, ambiguous |
+| Review, false adds on negatives (writer bibles) | 0/15 |
+| Review check 6 | pyjamas without shoes stated complete 3/3; in Lily the reviewer still rewrote the nightwear text only to drop "bare feet" (churn) |
+| Art Director, bed pages | clothing nightwear 6/6 (2 bed pages x 3 samples); covers never nightwear 33/33; 0 nightwear in 62 negative story pages |
+| Art Director, bed page names pyjama top AND bottoms | **0/6.** 6429 p10 says "purple pyjamas" (3/3); ssj p14 names no pyjama in 2/3 and "red flannel pyjamas" in 1/3. Other nightwear pages of the same books do name top and trousers (e.g. ssj p4, p7; 6429 p8) |
+| Art Director, day page after a dressing line returns to day | not testable (no stored dressing line) |
+
+Threshold: writer positives 100% (>= 90%), negatives 0% (<= 5%): the decision's Revisit-if is not triggered on this data, with the
+caveat that the data has no adult in bed and only two plan-line stories. Open from this run: the bed page itself does not name the
+pyjama garments (the clause in scene-briefs-all rule 10), probably because the duvet covers the body; whether that matters for the
+drawing is for the owner (not added to BACKLOG.md: shared registry).
+
 ## Left for the owner
 
 - docs/SETTLED.md: not edited (needs sign-off). Proposed refresh: if a line lists the clothing categories as two

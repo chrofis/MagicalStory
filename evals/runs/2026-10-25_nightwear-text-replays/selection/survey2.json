@@ -1,0 +1,1410 @@
+[
+ {
+  "env": "staging",
+  "id": "job_1792482580699_3iiy0v4dj",
+  "created": "2026-10-20T05:49:40.961Z",
+  "title": "Emma, Noah und der kleine Funkel",
+  "lang": "de",
+  "topic": "space",
+  "np": 10,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1792226018737_lb65hzkqs",
+  "created": "2026-10-17T06:33:39.699Z",
+  "title": "Eliah und die Möwe im Nebel",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 20,
+  "ncr": 2,
+  "bedPages": [
+   5
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1792078014622_uh8tj6ht1",
+  "created": "2026-10-15T13:26:54.878Z",
+  "title": "Eliah und Spaghetti im Nebel",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 20,
+  "ncr": 2,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1791551239260_a0dpn715x",
+  "created": "2026-10-09T11:07:19.831Z",
+  "title": "Das Ei unter der Linde",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 4,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1791531449494_o0kaatvmq",
+  "created": "2026-10-09T05:37:30.277Z",
+  "title": "Vier Freunde und ein Drachenei",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 4,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1791497309909_6quecrr9t",
+  "created": "2026-10-08T20:08:30.276Z",
+  "title": "Ein warmes Ei für Funka",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 4,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1791489793707_2ir6nl5kw",
+  "created": "2026-10-08T18:03:14.168Z",
+  "title": "Vier Freunde wärmen ein Ei",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1791450210539_nwi88y9lr",
+  "created": "2026-10-08T07:03:31.231Z",
+  "title": "Fiona und die krumme Karte",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1791315635053_t0t8qpebu",
+  "created": "2026-10-06T17:40:35.408Z",
+  "title": "Emma und der Brief für Mira",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 14,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1791267520938_essbvehs8",
+  "created": "2026-10-06T04:18:41.341Z",
+  "title": "Emma und das Lied der Meerjungfrau",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 14,
+  "ncr": 5,
+  "bedPages": [
+   13
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1791222889407_ypl33vk8u",
+  "created": "2026-10-05T15:54:49.761Z",
+  "title": "Emma und die fehlende Hälfte",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 14,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1791145238223_50osg2osm",
+  "created": "2026-10-04T18:20:38.453Z",
+  "title": "Emma und der Löwenatem",
+  "lang": "de-ch",
+  "topic": "wilhelm-tell",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": [
+   1,
+   5
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1791040103540_atbttop6w",
+  "created": "2026-10-03T13:08:24.036Z",
+  "title": "Vier Freunde und ein Drachonei",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1790618717512_n9wrh5u0j",
+  "created": "2026-09-28T16:05:17.749Z",
+  "title": "Emma und Noah auf dem Piratenschiff",
+  "lang": "de",
+  "topic": "pirate",
+  "np": 4,
+  "ncr": 5,
+  "bedPages": [
+   2
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1790539784661_6mjcny1c7",
+  "created": "2026-09-27T18:09:45.029Z",
+  "title": "Das Feuer von Funkenherz",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1790536739048_ruynosw80",
+  "created": "2026-09-27T17:18:59.310Z",
+  "title": "Wo ist Pico? Emma und Noah auf dem Piratenschiff",
+  "lang": "de",
+  "topic": "pirate",
+  "np": 4,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1790529840433_ar4u7qry3",
+  "created": "2026-09-27T15:24:00.607Z",
+  "title": "Emma und Noah auf dem Nebelschiff",
+  "lang": "de",
+  "topic": "pirate",
+  "np": 4,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1790508305061_dka3jpog9",
+  "created": "2026-09-27T09:25:05.451Z",
+  "title": "Die Schuppe im Nebel",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1790446348343_z3fw660ie",
+  "created": "2026-09-26T16:12:28.765Z",
+  "title": "Fiona und der Kasten des Kapitäns",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1790373080139_vnx5l8iy7",
+  "created": "2026-09-25T19:51:20.617Z",
+  "title": "Vier Freunde und das Drachenei",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1790277448294_5herh01j7",
+  "created": "2026-09-24T17:17:28.682Z",
+  "title": "Das Ei in den Wurzeln",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1790107559778_fcmlfa8kn",
+  "created": "2026-09-22T18:06:00.087Z",
+  "title": "Lukas und die siebte Zeile",
+  "lang": "de-ch",
+  "topic": "screen-time",
+  "np": 10,
+  "ncr": 3,
+  "bedPages": [
+   10
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1790100385959_1nitlympp",
+  "created": "2026-09-22T16:06:27.437Z",
+  "title": "Das Ei im Laub",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": [
+   13
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1789853503332_riqncqg1i",
+  "created": "2026-09-19T19:31:43.737Z",
+  "title": "Vier Freunde und ein Klopfen",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": [
+   9
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1789759147125_p08djwhbl",
+  "created": "2026-09-18T17:19:07.530Z",
+  "title": "Fünkli darf nicht kalt werden",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": [
+   6
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1789681157795_wkt20ckod",
+  "created": "2026-09-17T19:39:18.175Z",
+  "title": "Das Ei im Lindenhof",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1789584708605_rts4wqupm",
+  "created": "2026-09-16T16:51:49.056Z",
+  "title": "Das Ei unter der Wurzel",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1789506283204_3kxqshifx",
+  "created": "2026-09-15T19:04:43.686Z",
+  "title": "Das Ei unter den Wurzeln",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": [
+   18
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1789420511893_zly5rcdej",
+  "created": "2026-09-14T19:15:12.845Z",
+  "title": "Emma und Noah halten das Schiff",
+  "lang": "de",
+  "topic": "pirate",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1789348171785_9oxos7dwv",
+  "created": "2026-09-13T23:09:32.218Z",
+  "title": "Vier Buben und ein Drachenei",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1789343124794_z2c779f7i",
+  "created": "2026-09-13T21:45:25.256Z",
+  "title": "Funkli muss nach Hause",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": [
+   4
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1789337998754_apslnsq1z",
+  "created": "2026-09-13T20:19:59.130Z",
+  "title": "Flämmli und die vier Buben",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 19,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1789304198359_y3n0euk3z",
+  "created": "2026-09-13T10:56:38.739Z",
+  "title": "Liz, Ayan et la sirène du fond du lac",
+  "lang": "fr-ch",
+  "topic": "",
+  "np": 15,
+  "ncr": 4,
+  "bedPages": [
+   6,
+   15
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1789301291267_ueh8h145m",
+  "created": "2026-09-13T10:08:12.500Z",
+  "title": "Emma und Noah und die Truhe im Sand",
+  "lang": "de",
+  "topic": "pirate",
+  "np": 4,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1789295969263_uwni47awe",
+  "created": "2026-09-13T08:39:30.287Z",
+  "title": "Emma und Noah und die Karte im Dunkeln",
+  "lang": "de",
+  "topic": "pirate",
+  "np": 4,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1789227389389_z18dmvnt6",
+  "created": "2026-09-12T13:36:29.711Z",
+  "title": "Liz, Ayan et les fées du Léman",
+  "lang": "fr-ch",
+  "topic": "",
+  "np": 15,
+  "ncr": 4,
+  "bedPages": [
+   15
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1789207854566_l43qgl34w",
+  "created": "2026-09-12T08:10:54.992Z",
+  "title": "Fiona und das Schiff des verschollenen Kapitäns",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": [
+   2,
+   8,
+   16
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1789163494908_kc2joi4ax",
+  "created": "2026-09-11T19:51:35.352Z",
+  "title": "Acht Hände für Fünkli",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1789147573901_m3uam0nxi",
+  "created": "2026-09-11T15:26:15.808Z",
+  "title": "Der Drache, der nicht fliegen konnte",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": [
+   1,
+   12,
+   16
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1789083667794_17lz946ik",
+  "created": "2026-09-10T21:41:09.604Z",
+  "title": "Der Drache, der nicht fliegen konnte",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": [
+   6
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1789078732136_622wecmhj",
+  "created": "2026-09-10T20:18:53.956Z",
+  "title": "Der Drache, der nicht fliegen konnte",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1788983823620_csjcyp1q9",
+  "created": "2026-09-09T17:57:04.171Z",
+  "title": "Fiona und die Karte aus Kohle",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1788957347999_ijseol49a",
+  "created": "2026-09-09T10:35:49.818Z",
+  "title": "Bimo kann nicht fliegen",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": [
+   2
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1788903616404_iqvhj4l8m",
+  "created": "2026-09-08T19:40:18.226Z",
+  "title": "Der Drache, der nicht fliegen konnte",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": [
+   16,
+   18
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1788820396445_9erw6xc01",
+  "created": "2026-09-07T20:33:16.876Z",
+  "title": "Kapitänin Fiona und der Schatz von Mandelstein",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": [
+   9,
+   10
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1788816451791_25b31uqlp",
+  "created": "2026-09-07T19:27:34.148Z",
+  "title": "Die Drachenschuppe",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1788727233899_1dpnym94p",
+  "created": "2026-09-06T18:40:35.675Z",
+  "title": "Die Schuppe des Drachen",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": [
+   1,
+   8
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1788681313413_xqmtk2gcs",
+  "created": "2026-09-06T05:55:14.011Z",
+  "title": "Lily and Ethan and the Lantern Walk",
+  "lang": "en-gb",
+  "topic": "making-friends",
+  "np": 14,
+  "ncr": 5,
+  "bedPages": [
+   1,
+   7,
+   11
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1788641639919_mpjwlzkf1",
+  "created": "2026-09-05T18:54:00.388Z",
+  "title": "Lily and Ethan and the Count of Twenty",
+  "lang": "en-gb",
+  "topic": "making-friends",
+  "np": 14,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1788614817116_vxnu60yjg",
+  "created": "2026-09-05T11:27:00.078Z",
+  "title": "Vier Buben und ein Drache",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": [
+   18
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1788590495460_d7472jys3",
+  "created": "2026-09-05T04:41:36.262Z",
+  "title": "Emma und Noah und der Sternumhang",
+  "lang": "de-ch",
+  "topic": "telling-truth",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": [
+   10
+  ]
+ },
+ {
+  "env": "staging",
+  "id": "job_1788555701112_99txp8evx",
+  "created": "2026-09-04T19:01:42.069Z",
+  "title": "Emma, der Hase und die Dunkelheit",
+  "lang": "de",
+  "topic": "being-brave",
+  "np": 4,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1788471969309_9cg9dqyirre",
+  "created": "2026-09-03T19:46:11.570Z",
+  "title": "Kapitänin Fiona und die Goldene Möwe",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1788380714660_4p9mr11xszu",
+  "created": "2026-09-02T18:25:17.176Z",
+  "title": "Fiona und der Feigenbaum",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1788378719225_8hpr0mzzh",
+  "created": "2026-09-02T17:52:00.705Z",
+  "title": "Emma und Noah und das grosse Rennen",
+  "lang": "de",
+  "topic": "pirate",
+  "np": 4,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1788295892348_l028ggiq7a",
+  "created": "2026-09-01T18:51:34.739Z",
+  "title": "Kapitänin Fiona und die Insel der leeren Hände",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1788215224103_avu132n7je",
+  "created": "2026-08-31T20:27:07.462Z",
+  "title": "Kapitänin Fiona und der versunkene Schatz",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1788123310558_1yx71oyo1wg",
+  "created": "2026-08-30T18:55:13.526Z",
+  "title": "Fiona und der letzte Schatz",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787991502308_i9ah2221i",
+  "created": "2026-08-29T06:18:24.604Z",
+  "title": "Kapitänin Fiona und die Goldene Möwe",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787984454250_n257i2cmk",
+  "created": "2026-08-29T04:20:56.624Z",
+  "title": "Kapitänin Fiona und die Goldene Möwe",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 4,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787959478282_bz19gm36h",
+  "created": "2026-08-28T21:24:40.407Z",
+  "title": "Kapitänin Fiona und die Schatzhöhle",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787867402809_z9bwoo3yp",
+  "created": "2026-08-27T19:50:06.125Z",
+  "title": "Fiona und die Goldene Möwe",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787863683671_6o3ulhuku",
+  "created": "2026-08-27T18:48:06.280Z",
+  "title": "Emma und Noah stechen in See",
+  "lang": "de",
+  "topic": "pirate",
+  "np": 4,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787812110559_n311ykfmin",
+  "created": "2026-08-27T04:28:31.633Z",
+  "title": "Kapitänin Fiona und die Goldene Möwe",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787777447720_ll5dyf4k8g",
+  "created": "2026-08-26T18:50:49.012Z",
+  "title": "Fiona und die Goldene Möwe",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787693271900_cyc9lol5y",
+  "created": "2026-08-25T19:27:54.433Z",
+  "title": "Emma, die kleine Piratin",
+  "lang": "de",
+  "topic": "pirate",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787690387854_6nc4yo8u8",
+  "created": "2026-08-25T18:39:49.959Z",
+  "title": "Emma und der vergrabene Schatz",
+  "lang": "de",
+  "topic": "pirate",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787689073034_1v6ew0y1kae",
+  "created": "2026-08-25T18:17:53.493Z",
+  "title": "Feurio und die vier Buben",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787638394061_hs70901tfsn",
+  "created": "2026-08-25T04:13:16.682Z",
+  "title": "Fiona und die Goldene Möwe",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787514666616_yw9qsv1vf",
+  "created": "2026-08-23T17:51:11.237Z",
+  "title": "Kapitänin Fiona und die Karte ohne Küste",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787514321173_gvs2ojo4o0n",
+  "created": "2026-08-23T17:45:21.562Z",
+  "title": "Levin und der Drache vom Berg",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787493968756_4fgr5nukroz",
+  "created": "2026-08-23T12:06:13.980Z",
+  "title": "Emma und das grosse Schatzsuchen",
+  "lang": "de",
+  "topic": "treasure-hunt",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787469664089_9e27p42el7l",
+  "created": "2026-08-23T05:21:04.471Z",
+  "title": "Fiona und die Karte, die ins Meer führte",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787423677246_r9llf5yi9",
+  "created": "2026-08-23T04:11:40.269Z",
+  "title": "Kapitänin Fiona und die Goldene Möwe",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787436913379_mfedxinwqd",
+  "created": "2026-08-22T20:15:13.711Z",
+  "title": "Levin und der kleine Drache",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787349305313_hpv76p0rokg",
+  "created": "2026-08-22T08:58:32.823Z",
+  "title": "Levin und der Drache vom Uetliberg",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787262655143_s9zb960muni",
+  "created": "2026-08-20T19:50:55.377Z",
+  "title": "Das Ei im Wurzelnest",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787252581387_6sn8z0nh2",
+  "created": "2026-08-20T17:03:06.685Z",
+  "title": "Emma und der Schatz unter den Stufen",
+  "lang": "de",
+  "topic": "treasure-hunt",
+  "np": 4,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1787250416967_9owpz1j3b",
+  "created": "2026-08-20T16:27:01.730Z",
+  "title": "Die Schatzkarte von Grosspapi Hans",
+  "lang": "de",
+  "topic": "treasure-hunt",
+  "np": 4,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786998860057_o6deqtv5s",
+  "created": "2026-08-17T18:34:20.271Z",
+  "title": "Footprints on the Moon",
+  "lang": "en-gb",
+  "topic": "moon-landing",
+  "np": 14,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786917840874_rur4nskfv",
+  "created": "2026-08-16T20:04:05.276Z",
+  "title": "Die Perlen der Reuss",
+  "lang": "de",
+  "topic": "mermaid",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786829555599_rgzoyoprx",
+  "created": "2026-08-15T19:32:39.121Z",
+  "title": "Liras Perlen und die Reuss",
+  "lang": "de",
+  "topic": "mermaid",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786780194082_s980g4s9a",
+  "created": "2026-08-15T06:09:43.663Z",
+  "title": "Liras verschwundene Perlen",
+  "lang": "de",
+  "topic": "mermaid",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786743927715_kcx0p939w",
+  "created": "2026-08-14T20:02:49.641Z",
+  "title": "Emmas Muschel und das Geheimnis der Reuss",
+  "lang": "de",
+  "topic": "mermaid",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786737619634_d66c7bg9g",
+  "created": "2026-08-14T18:16:26.894Z",
+  "title": "Emmas Wunsch und das Geheimnis der Reuss",
+  "lang": "de",
+  "topic": "mermaid",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786653013328_yhzn4dv5q",
+  "created": "2026-08-13T18:48:20.432Z",
+  "title": "Die Muschel unter der Thurbrücke",
+  "lang": "de",
+  "topic": "mermaid",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786648282940_e6oymm389",
+  "created": "2026-08-13T17:21:08.344Z",
+  "title": "Emmas Schatz am Ende der Karte",
+  "lang": "de",
+  "topic": "pirate",
+  "np": 4,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786571353564_0sgrd0f4g",
+  "created": "2026-08-12T20:11:20.239Z",
+  "title": "Emmas und Noahs Flossenabenteuer",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786567053374_8ktpkfhec",
+  "created": "2026-08-12T18:48:38.311Z",
+  "title": "Die Piraten vom Garten",
+  "lang": "de",
+  "topic": "pirate",
+  "np": 4,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786563358202_vb3f0zy6v",
+  "created": "2026-08-12T17:44:50.485Z",
+  "title": "Die Schatzkarte des Großvaters",
+  "lang": "de",
+  "topic": "pirate",
+  "np": 4,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786484554633_crojok432",
+  "created": "2026-08-11T20:05:52.746Z",
+  "title": "Das Geheimnis von Zauberer Ruedi",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786397108357_q1fjbdzbx",
+  "created": "2026-08-10T19:52:02.785Z",
+  "title": "Die Piratenprüfung von Adlikon",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 14,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786309527338_4zwhrn08y",
+  "created": "2026-08-09T19:36:10.781Z",
+  "title": "Die Schatzkarte vom Dachboden",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 14,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786287569165_7f75jspcz",
+  "created": "2026-08-09T13:27:56.889Z",
+  "title": "Die Schatzkarte von Baden",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 14,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "staging",
+  "id": "job_1786277779744_vorw1f7ve",
+  "created": "2026-08-09T10:46:20.922Z",
+  "title": "Die Schatzkarte des Grossvaters",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 14,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1792859316244_6429d0n83",
+  "created": "2026-10-24T14:28:38.248Z",
+  "title": "Léa, Pompon et la promesse du soir",
+  "lang": "fr-ch",
+  "topic": "going-to-bed",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": [
+   10
+  ]
+ },
+ {
+  "env": "prod",
+  "id": "job_1792767471259_4b7gfwc04",
+  "created": "2026-10-23T12:57:51.638Z",
+  "title": "Léa et le merci pour Salomé",
+  "lang": "fr-ch",
+  "topic": "",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1792312615714_wpz3fzwyy",
+  "created": "2026-10-18T06:36:55.992Z",
+  "title": "Lily and the Grey Sleeper",
+  "lang": "en-gb",
+  "topic": "",
+  "np": 14,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1792251663990_rxjob5qlb",
+  "created": "2026-10-17T13:41:28.223Z",
+  "title": "Eliah und die Möwe im Nebel",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 20,
+  "ncr": 2,
+  "bedPages": [
+   5
+  ]
+ },
+ {
+  "env": "prod",
+  "id": "job_1792078014622_uh8tj6ht1",
+  "created": "2026-10-15T13:26:54.878Z",
+  "title": "Eliah und Spaghetti im Nebel",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 20,
+  "ncr": 2,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1791918618204_ssjxzvmp4",
+  "created": "2026-10-13T17:10:18.764Z",
+  "title": "Léa et le hérisson du jardin",
+  "lang": "fr-ch",
+  "topic": "going-to-bed",
+  "np": 14,
+  "ncr": 5,
+  "bedPages": [
+   8,
+   12,
+   14
+  ]
+ },
+ {
+  "env": "prod",
+  "id": "job_1791786057698_79n8x82wd",
+  "created": "2026-10-12T04:20:58.076Z",
+  "title": "Léa et le merci d'Henri",
+  "lang": "fr-ch",
+  "topic": "",
+  "np": 14,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1791116880928_j905g63bx",
+  "created": "2026-10-04T10:28:01.092Z",
+  "title": "Chris and the Flying Red Car",
+  "lang": "en-us",
+  "topic": "",
+  "np": 15,
+  "ncr": 2,
+  "bedPages": [
+   6,
+   15
+  ]
+ },
+ {
+  "env": "prod",
+  "id": "job_1790747154374_7f2t99tk6",
+  "created": "2026-09-30T03:45:54.849Z",
+  "title": "Noam e Lio cercano Nuvola",
+  "lang": "it-ch",
+  "topic": "sage-heidi",
+  "np": 10,
+  "ncr": 2,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1790719546789_9n47zi342",
+  "created": "2026-09-29T20:05:47.094Z",
+  "title": "Noam e Lio e il gracchio del castello",
+  "lang": "it-ch",
+  "topic": "",
+  "np": 10,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1790702181821_o8ynpdjw6",
+  "created": "2026-09-29T15:16:22.053Z",
+  "title": "Noam e Lio trovano Léon",
+  "lang": "it-ch",
+  "topic": "",
+  "np": 15,
+  "ncr": 7,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1790107559778_fcmlfa8kn",
+  "created": "2026-09-22T18:06:00.087Z",
+  "title": "Lukas und die siebte Zeile",
+  "lang": "de-ch",
+  "topic": "screen-time",
+  "np": 10,
+  "ncr": 3,
+  "bedPages": [
+   10
+  ]
+ },
+ {
+  "env": "prod",
+  "id": "job_1789945743706_8ayo2w19e",
+  "created": "2026-09-20T21:09:04.021Z",
+  "title": "Serena e la notte dell'alfabeto",
+  "lang": "it-it",
+  "topic": "alphabet",
+  "np": 20,
+  "ncr": 2,
+  "bedPages": [
+   3,
+   19,
+   20
+  ]
+ },
+ {
+  "env": "prod",
+  "id": "job_1789227389389_z18dmvnt6",
+  "created": "2026-09-12T13:36:29.711Z",
+  "title": "Liz, Ayan et les fées du Léman",
+  "lang": "fr-ch",
+  "topic": "",
+  "np": 15,
+  "ncr": 4,
+  "bedPages": [
+   15
+  ]
+ },
+ {
+  "env": "prod",
+  "id": "job_1788727233899_1dpnym94p",
+  "created": "2026-09-06T18:40:35.675Z",
+  "title": "Die Schuppe des Drachen",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": [
+   1,
+   8
+  ]
+ },
+ {
+  "env": "prod",
+  "id": "job_1787689073034_1v6ew0y1kae",
+  "created": "2026-08-25T18:17:53.493Z",
+  "title": "Feurio und die vier Buben",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1787638707796_x8272kcs22m",
+  "created": "2026-08-25T04:18:28.177Z",
+  "title": "Levin und der kleine Drache",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1787514321173_gvs2ojo4o0n",
+  "created": "2026-08-23T17:45:21.562Z",
+  "title": "Levin und der Drache vom Berg",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1787469664089_9e27p42el7l",
+  "created": "2026-08-23T05:21:04.471Z",
+  "title": "Fiona und die Karte, die ins Meer führte",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1787436913379_mfedxinwqd",
+  "created": "2026-08-22T20:15:13.711Z",
+  "title": "Levin und der kleine Drache",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1787423677246_r9llf5yi9",
+  "created": "2026-08-22T16:34:37.502Z",
+  "title": "Kapitänin Fiona und die Goldene Möwe",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 16,
+  "ncr": 5,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1787349305313_hpv76p0rokg",
+  "created": "2026-08-21T19:55:05.830Z",
+  "title": "Levin und der Drache vom Uetliberg",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1787262655143_s9zb960muni",
+  "created": "2026-08-20T19:50:55.377Z",
+  "title": "Das Ei im Wurzelnest",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1787161633330_7ik7ac23kex",
+  "created": "2026-08-19T15:47:13.871Z",
+  "title": "Levin und der Drache ohne Schuppe",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1787120984020_pg71z58ba9",
+  "created": "2026-08-19T04:29:44.185Z",
+  "title": "Levin und der Drache vom Berg",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ },
+ {
+  "env": "prod",
+  "id": "job_1787001865052_lehb1p64c",
+  "created": "2026-08-17T19:24:25.280Z",
+  "title": "Levin und der Drache ohne Schuppe",
+  "lang": "de-ch",
+  "topic": "",
+  "np": 18,
+  "ncr": 4,
+  "bedPages": []
+ }
+]
