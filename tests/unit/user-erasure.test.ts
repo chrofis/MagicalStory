@@ -164,6 +164,8 @@ describe('executeErasure', () => {
     expect(idx(s, /^UPDATE credit_transactions SET user_id = \$1, description = NULL, reference_id = NULL/)).toBeLessThan(users);
     expect(idx(s, /^UPDATE referral_payouts SET user_id = \$1, description = NULL/)).toBeLessThan(users);
     expect(idx(s, /^INSERT INTO users/)).toBeLessThan(idx(s, /^UPDATE credit_transactions/));
+    // vouchers keep their row (financial record) but lose every link to the erased person; the FKs would block DELETE FROM users
+    expect(idx(s, /^UPDATE vouchers SET[\s\S]*purchaser_email = CASE/)).toBeLessThan(users);
     expect(idx(s, /^DELETE FROM email_events/)).toBeLessThan(idx(s, /^DELETE FROM email_sends/));
     expect(idx(s, /^DELETE FROM eval_calls/)).toBeLessThan(idx(s, /^DELETE FROM stories/));
     // the receipt is written after the per-user logs sweep and before COMMIT

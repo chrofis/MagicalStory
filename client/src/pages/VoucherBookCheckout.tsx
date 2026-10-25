@@ -22,7 +22,7 @@ interface PickableStory {
 
 const texts = {
   en: {
-    docTitle: 'Your voucher book | MagicalStory',
+    docTitle: 'Your voucher book | Magical Story',
     title: 'Your voucher book',
     subtitle: 'Choose the stories for your printed book. Shipping within Switzerland is included.',
     notAvailable: 'You have no voucher book to order right now.',
@@ -55,7 +55,7 @@ const texts = {
     processing: 'Processing…',
   },
   de: {
-    docTitle: 'Dein Gutschein-Buch | MagicalStory',
+    docTitle: 'Dein Gutschein-Buch | Magical Story',
     title: 'Dein Gutschein-Buch',
     subtitle: 'Wähle die Geschichten für dein gedrucktes Buch. Der Versand innerhalb der Schweiz ist inklusive.',
     notAvailable: 'Du hast im Moment kein Gutschein-Buch offen.',
@@ -88,7 +88,7 @@ const texts = {
     processing: 'Wird verarbeitet…',
   },
   fr: {
-    docTitle: 'Votre livre du bon cadeau | MagicalStory',
+    docTitle: 'Votre livre du bon cadeau | Magical Story',
     title: 'Votre livre du bon cadeau',
     subtitle: 'Choisissez les histoires de votre livre imprimé. La livraison en Suisse est incluse.',
     notAvailable: "Vous n'avez actuellement aucun livre de bon cadeau à commander.",
@@ -121,7 +121,7 @@ const texts = {
     processing: 'Traitement en cours…',
   },
   it: {
-    docTitle: 'Il tuo libro del buono | MagicalStory',
+    docTitle: 'Il tuo libro del buono | Magical Story',
     title: 'Il tuo libro del buono',
     subtitle: 'Scegli le storie per il tuo libro stampato. La spedizione in Svizzera è inclusa.',
     notAvailable: 'Al momento non hai nessun libro del buono da ordinare.',

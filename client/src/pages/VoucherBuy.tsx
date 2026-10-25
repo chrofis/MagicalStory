@@ -10,7 +10,7 @@ import { VOUCHER_PRICE_CHF } from '@/constants/voucher';
 
 const texts = {
   en: {
-    docTitle: 'Gift voucher | MagicalStory',
+    docTitle: 'Gift voucher | Magical Story',
     title: 'Give a story and a printed book',
     subtitle: "The gift voucher for personalised children's books",
     contentsTitle: 'What the gift contains',
@@ -29,7 +29,7 @@ const texts = {
     again: 'Buy another voucher',
   },
   de: {
-    docTitle: 'Geschenkgutschein | MagicalStory',
+    docTitle: 'Geschenkgutschein | Magical Story',
     title: 'Schenke eine Geschichte und ein gedrucktes Buch',
     subtitle: 'Der Geschenkgutschein für personalisierte Kinderbücher',
     contentsTitle: 'Das ist im Geschenk enthalten',
@@ -48,7 +48,7 @@ const texts = {
     again: 'Weiteren Gutschein kaufen',
   },
   fr: {
-    docTitle: 'Bon cadeau | MagicalStory',
+    docTitle: 'Bon cadeau | Magical Story',
     title: 'Offrez une histoire et un livre imprimé',
     subtitle: "Le bon cadeau pour des livres d'enfants personnalisés",
     contentsTitle: 'Ce que contient le cadeau',
@@ -56,18 +56,18 @@ const texts = {
     item2: 'Un livre imprimé à couverture souple de 50 pages au maximum, livraison en Suisse incluse',
     item3: "N'expire jamais",
     item4: "Reçu par e-mail en PDF à imprimer ou à transférer, avec un code QR pour l'utiliser facilement",
-    note: 'Une couverture rigide ou un livre plus long est aussi possible : seule la différence est à payer.',
+    note: 'Une couverture rigide ou un livre plus long est aussi possible : seule la différence est à payer.',
     buy: 'Acheter le bon',
     redirecting: 'Redirection…',
-    haveCode: 'Vous avez déjà un bon ?',
+    haveCode: 'Vous avez déjà un bon ?',
     redeem: "L'utiliser ici",
-    successTitle: 'Merci !',
+    successTitle: 'Merci !',
     successBody: 'Le bon cadeau est en route vers votre e-mail, en PDF à imprimer ou à transférer.',
     cancelled: "Le paiement a été annulé. Rien n'a été débité.",
     again: 'Acheter un autre bon',
   },
   it: {
-    docTitle: 'Buono regalo | MagicalStory',
+    docTitle: 'Buono regalo | Magical Story',
     title: 'Regala una storia e un libro stampato',
     subtitle: 'Il buono regalo per libri personalizzati per bambini',
     contentsTitle: 'Cosa contiene il regalo',

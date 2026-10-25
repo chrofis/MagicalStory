@@ -12,7 +12,7 @@ import { normalizeVoucherCode } from '@/utils/voucherCode';
 
 const texts = {
   en: {
-    docTitle: 'Redeem voucher | MagicalStory',
+    docTitle: 'Redeem voucher | Magical Story',
     title: 'Redeem your gift voucher',
     codeLabel: 'Voucher code',
     codePlaceholder: 'MS-XXXXX-XXXXX-XXXXX-XXXXX',
@@ -33,7 +33,7 @@ const texts = {
     orderBook: 'Order the book',
   },
   de: {
-    docTitle: 'Gutschein einlösen | MagicalStory',
+    docTitle: 'Gutschein einlösen | Magical Story',
     title: 'Löse deinen Geschenkgutschein ein',
     codeLabel: 'Gutscheincode',
     codePlaceholder: 'MS-XXXXX-XXXXX-XXXXX-XXXXX',
@@ -54,7 +54,7 @@ const texts = {
     orderBook: 'Buch bestellen',
   },
   fr: {
-    docTitle: 'Utiliser un bon cadeau | MagicalStory',
+    docTitle: 'Utiliser un bon cadeau | Magical Story',
     title: 'Utilisez votre bon cadeau',
     codeLabel: 'Code du bon',
     codePlaceholder: 'MS-XXXXX-XXXXX-XXXXX-XXXXX',
@@ -68,14 +68,14 @@ const texts = {
     redeeming: 'En cours…',
     loginHint: 'Un compte est nécessaire pour utiliser le bon. Vous reviendrez ensuite sur cette page.',
     status: { redeemed: 'Ce bon cadeau a déjà été utilisé.', void: "Ce bon cadeau n'est plus valable.", expired: 'Ce bon cadeau a expiré.' },
-    successTitle: 'Bon cadeau utilisé !',
-    successBalance: (n: number) => `Votre nouveau solde : ${n} crédits.`,
+    successTitle: 'Bon cadeau utilisé !',
+    successBalance: (n: number) => `Votre nouveau solde : ${n} crédits.`,
     bookNote: 'Votre livre vous attend. Choisissez les histoires et commandez-le ici.',
     createStory: 'Créer une histoire',
     orderBook: 'Commander le livre',
   },
   it: {
-    docTitle: 'Riscatta il buono | MagicalStory',
+    docTitle: 'Riscatta il buono | Magical Story',
     title: 'Riscatta il tuo buono regalo',
     codeLabel: 'Codice del buono',
     codePlaceholder: 'MS-XXXXX-XXXXX-XXXXX-XXXXX',

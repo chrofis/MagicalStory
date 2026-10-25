@@ -120,6 +120,7 @@ const ERASURE_COVERAGE = Object.freeze({
   credit_transactions: 'retain, move to sentinel, scrub description + reference_id (Q1)',
   referral_payouts: 'retain, move to sentinel, scrub description; source_user_id tombstoned (Q1)',
   referral_events: 'cascade from users as referrer; buyer_user_id tombstoned',
+  vouchers: 'retain, detach (purchaser_user_id / redeemed_by_user_id / created_by_user_id and purchaser_email NULLed)',
   // Story-derived, no FK (deleteStoryDerivedRows).
   consolidator_calls: 'story-derived delete',
   story_metrics: 'story-derived delete',
@@ -136,7 +137,7 @@ const ERASURE_COVERAGE = Object.freeze({
 });
 
 /** Tables the transaction must never DELETE FROM (pinned by the unit test). */
-const RETAINED_TABLES = Object.freeze(['orders', 'credit_transactions', 'referral_payouts', 'referral_events']);
+const RETAINED_TABLES = Object.freeze(['orders', 'credit_transactions', 'referral_payouts', 'referral_events', 'vouchers']);
 
 const UUID_RE = "'^[0-9a-fA-F-]{36}$'";
 
@@ -419,6 +420,20 @@ async function executeErasure(client, plan, { actor, environment, onStep = () =>
     const psRes = await client.query('UPDATE referral_payouts SET source_user_id = $1 WHERE source_user_id = $2', [USER_TOMBSTONE, user.id]);
     onStep(`tombstoned ${String(psRes.rowCount).padStart(3)}  referral_payouts.source_user_id`);
 
+    // Vouchers are financial records (Stripe session) and may still be an unredeemed gift someone
+    // else holds, so the row stays; only the links to this person go. purchaser_user_id and
+    // redeemed_by_user_id are FKs to users without ON DELETE, so DELETE FROM users would fail otherwise.
+    const vRes = await client.query(
+      `UPDATE vouchers SET
+         purchaser_email = CASE WHEN purchaser_user_id = $1 THEN NULL ELSE purchaser_email END,
+         purchaser_user_id = CASE WHEN purchaser_user_id = $1 THEN NULL ELSE purchaser_user_id END,
+         redeemed_by_user_id = CASE WHEN redeemed_by_user_id = $1 THEN NULL ELSE redeemed_by_user_id END,
+         created_by_user_id = CASE WHEN created_by_user_id = $1 THEN NULL ELSE created_by_user_id END,
+         updated_at = now()
+       WHERE purchaser_user_id = $1 OR redeemed_by_user_id = $1 OR created_by_user_id = $1`, [user.id],
+    );
+    onStep(`detached   ${String(vRes.rowCount).padStart(3)}  vouchers (retained, unlinked)`);
+
     // Phase C — story-scoped satellites with NO foreign key.
     const derived = await deleteStoryDerivedRows(client, plan.derivedIds);
     for (const [t, n] of Object.entries(derived)) { deleted[t] = n; onStep(`deleted ${String(n).padStart(6)}  ${t}`); }
@@ -461,6 +476,7 @@ async function executeErasure(client, plan, { actor, environment, onStep = () =>
         sentinelUserId: GDPR_SENTINEL_USER_ID, sentinel: sentinelState,
         creditTransactions: ctRes.rowCount, referralPayouts: rpRes.rowCount,
       },
+      anonymisedVouchers: vRes.rowCount,
       referralTombstones: { buyerEvents: beRes.rowCount, payoutSource: psRes.rowCount },
       // Accepted limit (Q2/Q3): the name-bearing code survives here.
       thirdPartyRowsStillCarryingTheCode: { usersReferredBy: plan.referral.referees, ordersReferralCodeUsed: plan.referral.ordersUsingCode },

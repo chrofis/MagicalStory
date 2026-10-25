@@ -165,7 +165,7 @@ export default function Pricing() {
       backToStories: 'Retour à Mes histoires',
       createStory: 'Créer une histoire',
       voucherTitle: 'Bon cadeau',
-      voucherBody: "Offrez une histoire et un livre imprimé pour CHF 59 : des crédits pour deux histoires et un livre à couverture souple, livraison en Suisse incluse. N'expire jamais.",
+      voucherBody: "Offrez une histoire et un livre imprimé pour CHF 59 : des crédits pour deux histoires et un livre à couverture souple, livraison en Suisse incluse. N'expire jamais.",
       voucherCta: 'Acheter un bon',
     },
     it: {

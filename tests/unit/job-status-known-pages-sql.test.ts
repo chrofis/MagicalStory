@@ -52,12 +52,13 @@ describe('migration 046: token + job-sweep indexes', () => {
   const file = files.find(f => f.startsWith('046_'))!;
   const sql = fs.readFileSync(path.join(dir, file), 'utf8');
 
-  it('is numbered 046, the highest file, and no other file shares its number', () => {
+  it('is numbered 046, present once, and no other file shares its number', () => {
     // 045 belongs to a parallel branch (users_marketing_opt_out); the sequence
-    // has historic gaps too, so only the head position is pinned.
+    // has historic gaps too. Later migrations (047_vouchers) may sit above it,
+    // so the head position is not pinned, only that 046 is unique.
     const nums = files.map(f => parseInt(f.slice(0, 3), 10));
-    expect(Math.max(...nums)).toBe(46);
     expect(nums.filter(n => n === 46).length).toBe(1);
+    expect(Math.max(...nums)).toBeGreaterThanOrEqual(46);
   });
 
   it('every statement is idempotent and none is CONCURRENTLY', () => {

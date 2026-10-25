@@ -120,7 +120,8 @@ function App() {
           <Route path="/anlass" element={<Occasions />} />
           <Route path="/anlass/:occasionSlug" element={<OccasionPage />} />
           <Route path="/gutschein/kaufen" element={<VoucherBuy />} />
-          <Route path="/gutschein/einloesen/:code?" element={<VoucherRedeem />} />
+          <Route path="/gutschein/einloesen" element={<VoucherRedeem />} />
+          <Route path="/gutschein/einloesen/:code" element={<VoucherRedeem />} />
           <Route path="/gutschein/buch" element={<VoucherBookCheckout />} />
           <Route path="/geschenk" element={<GiftHub />} />
           <Route path="/geschenk/:giftSlug" element={<GiftPage />} />

@@ -463,6 +463,20 @@ const STATIC_ROUTES = {
       it: 'Libri personalizzati per bambini come regalo: compleanno, Natale, battesimo, inizio scuola e altro. Prima storia gratuita.',
     },
   },
+  '/gutschein/kaufen': {
+    title: {
+      de: 'Geschenkgutschein für ein Kinderbuch | Magical Story',
+      en: "Gift Voucher for a Children's Book | Magical Story",
+      fr: 'Bon cadeau pour un livre pour enfants | Magical Story',
+      it: 'Buono regalo per un libro per bambini | Magical Story',
+    },
+    description: {
+      de: 'Verschenke Geschichten: Mit dem Geschenkgutschein von Magical Story erstellt die beschenkte Person ein personalisiertes Kinderbuch.',
+      en: "Give stories as a gift: with a Magical Story gift voucher the recipient creates a personalized children's book.",
+      fr: 'Offrez des histoires : avec le bon cadeau Magical Story, la personne gâtée crée un livre personnalisé pour enfants.',
+      it: 'Regala storie: con il buono regalo Magical Story chi lo riceve crea un libro personalizzato per bambini.',
+    },
+  },
   '/geschenk': {
     title: {
       de: 'Geschenkideen für Kinder | Personalisierte Kinderbücher | Magical Story',
@@ -483,6 +497,7 @@ const STATIC_ROUTES = {
 const NOINDEX_ROUTES = [
   '/create', '/stories', '/orders', '/account', '/admin', '/book-builder',
   '/welcome', '/trial-generation', '/claim', '/reset-password', '/email-verified',
+  '/gutschein/einloesen', '/gutschein/buch',
 ];
 
 // Client-only routes (App.tsx) that have no prerendered page: the SPA shell is
@@ -491,7 +506,8 @@ const NOINDEX_ROUTES = [
 // URL got the shell with a 200 and the homepage's meta (a soft-404), and the
 // app routes above were served with "index, follow" and a canonical pointing
 // at the homepage because the shell was sent untouched.
-const APP_ROUTES = [...NOINDEX_ROUTES, '/try', '/shared', '/s'];
+// '/gutschein/kaufen' is the public voucher buy page: indexable, shell with its own meta.
+const APP_ROUTES = [...NOINDEX_ROUTES, '/try', '/shared', '/s', '/gutschein/kaufen'];
 
 function isAppRoute(routePath) {
   const p = String(routePath || '').replace(/\/+$/, '') || '/';
