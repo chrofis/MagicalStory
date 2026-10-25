@@ -1,3 +1,4 @@
+import AdminVouchers from '@/components/voucher/AdminVouchers';
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -64,8 +65,8 @@ export default function AdminDashboard() {
   const { language } = useLanguage();
 
   // Read initial tab from URL query parameter
-  const tabFromUrl = searchParams.get('tab') as 'stats' | 'activity' | 'users' | 'products' | 'tokens' | 'jobs' | 'storystats' | null;
-  const initialTab = tabFromUrl && ['stats', 'activity', 'users', 'products', 'tokens', 'jobs', 'storystats'].includes(tabFromUrl) ? tabFromUrl : 'stats';
+  const tabFromUrl = searchParams.get('tab') as 'stats' | 'activity' | 'users' | 'products' | 'tokens' | 'jobs' | 'storystats' | 'vouchers' | null;
+  const initialTab = tabFromUrl && ['stats', 'activity', 'users', 'products', 'tokens', 'jobs', 'storystats', 'vouchers'].includes(tabFromUrl) ? tabFromUrl : 'stats';
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [trialStats, setTrialStats] = useState<TrialStats | null>(null);
@@ -81,7 +82,7 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'stats' | 'activity' | 'users' | 'products' | 'tokens' | 'jobs' | 'storystats'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'stats' | 'activity' | 'users' | 'products' | 'tokens' | 'jobs' | 'storystats' | 'vouchers'>(initialTab);
 
   // Activity feed state
   const [activityFeed, setActivityFeed] = useState<ActivityFeed | null>(null);
@@ -251,7 +252,7 @@ export default function AdminDashboard() {
   }, [isAuthenticated, user, isImpersonating, activeTab]);
 
   // Update URL when tab changes
-  const handleTabChange = (tab: 'stats' | 'activity' | 'users' | 'products' | 'tokens' | 'jobs' | 'storystats') => {
+  const handleTabChange = (tab: 'stats' | 'activity' | 'users' | 'products' | 'tokens' | 'jobs' | 'storystats' | 'vouchers') => {
     setActiveTab(tab);
     setSearchParams(tab === 'stats' ? {} : { tab });
   };
@@ -766,6 +767,16 @@ export default function AdminDashboard() {
           >
             <BarChart3 size={18} />
             Story Stats
+          </button>
+          <button
+            onClick={() => handleTabChange('vouchers')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'vouchers'
+                ? 'bg-indigo-500 text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            Gutscheine
           </button>
           <button
             onClick={() => navigate('/admin/test-lab')}
@@ -1587,6 +1598,11 @@ export default function AdminDashboard() {
         {/* Token Usage Tab */}
         {activeTab === 'tokens' && (
           <TokenUsageTab texts={texts} />
+        )}
+
+        {/* Gift vouchers */}
+        {activeTab === 'vouchers' && (
+          <AdminVouchers />
         )}
 
         {/* Story Stats Tab (story_metrics trends) */}

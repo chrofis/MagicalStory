@@ -15,6 +15,64 @@ import type {
 } from '@/types/character';
 import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneExpansionReport, SceneImage, CoverImages, CoverImageData, RetryAttempt, RepairAttempt, RepairAttemptFrame, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport, SwissStoriesData, BboxSceneDetection, IdeaWorld, IdeaWorldMode, IdeaShapeRef, IdeaPick } from '@/types/story';
 
+export type VoucherStatus = 'active' | 'redeemed' | 'void' | 'expired';
+
+export interface VoucherLookup {
+  status: VoucherStatus;
+  credits: number;
+  bookCents: number;
+  expiresAt: string | null;
+  kind: string;
+}
+
+export interface MyVoucher {
+  id: string | number;
+  role: 'bought' | 'redeemed';
+  status: VoucherStatus;
+  credits: number;
+  bookCents: number;
+  expiresAt: string | null;
+  createdAt: string;
+  redeemedAt: string | null;
+  code: string | null;
+  codePrefix: string;
+  bookUsed: boolean;
+}
+
+export interface VoucherBookCredit {
+  available: boolean;
+  bookCents: number;
+  maxPages?: number;
+  hardcoverSurchargeCents?: number;
+}
+
+export interface AdminVoucher {
+  id: string | number;
+  codePrefix: string;
+  kind: string;
+  status: VoucherStatus;
+  credits: number;
+  bookCents: number;
+  batchLabel: string | null;
+  expiresAt: string | null;
+  purchaserEmail: string | null;
+  redeemedByEmail: string | null;
+  redeemedAt: string | null;
+  bookUsed: boolean;
+  createdAt: string;
+}
+
+function saveBlob(blob: Blob, filename: string): void {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 /**
  * Normalize a cover value from the API to always be CoverImageData | null.
  * The API may return a raw string (legacy) or an object. This ensures
@@ -2347,6 +2405,77 @@ export const storyService = {
       credits,
     });
     return response;
+  },
+
+  // ---- Gift vouchers (Gutscheine) ----
+  async lookupVoucher(code: string): Promise<VoucherLookup> {
+    return api.get(`/api/vouchers/lookup/${encodeURIComponent(code)}`, { skipAuth: true });
+  },
+
+  async redeemVoucher(code: string): Promise<{ ok: boolean; credits: number; balanceAfter: number; bookCents: number }> {
+    return api.post('/api/vouchers/redeem', { code });
+  },
+
+  // No login needed; the token is sent when there is one (api client does that).
+  async createVoucherCheckout(language: string): Promise<{ url: string }> {
+    return api.post('/api/vouchers/checkout', { language });
+  },
+
+  async getMyVouchers(): Promise<{ vouchers: MyVoucher[] }> {
+    return api.get('/api/vouchers/mine');
+  },
+
+  async getVoucherBookCredit(): Promise<VoucherBookCredit> {
+    return api.get('/api/vouchers/book-credit');
+  },
+
+  // Voucher book order: Stripe collects the address; total is CHF 0 (softcover) or the hardcover surcharge.
+  async createVoucherBookCheckout(params: { storyIds: string[]; coverType: 'softcover' | 'hardcover'; bookFormat: 'square' | 'A4'; blankPagesAcknowledged?: boolean }): Promise<{ url: string }> {
+    return api.post('/api/vouchers/book-checkout', params);
+  },
+
+  // Authenticated PDF download as a file save (same blob approach as generatePdf).
+  async downloadVoucherPdf(id: string | number): Promise<void> {
+    const token = localStorage.getItem('auth_token');
+    const response = await fetch(`/api/vouchers/mine/${id}/pdf`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to download voucher PDF');
+    saveBlob(await response.blob(), `Gutschein-${id}.pdf`);
+  },
+
+  async adminCreateVoucherBatch(params: { count: number; label: string; expiresInMonths: number }): Promise<{ vouchers: Array<{ id: string | number; code: string; url: string; expiresAt: string | null }> }> {
+    return api.post('/api/admin/vouchers/batch', params);
+  },
+
+  async adminListVouchers(filters?: { status?: string; kind?: string }): Promise<{ vouchers: AdminVoucher[] }> {
+    const params = new URLSearchParams();
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.kind) params.set('kind', filters.kind);
+    const qs = params.toString();
+    return api.get(`/api/admin/vouchers${qs ? `?${qs}` : ''}`);
+  },
+
+  async adminVoidVoucher(id: string | number): Promise<unknown> {
+    return api.post(`/api/admin/vouchers/${id}/void`);
+  },
+
+  async adminResendVoucher(id: string | number, email: string): Promise<unknown> {
+    return api.post(`/api/admin/vouchers/${id}/resend`, { email });
+  },
+
+  // The PDF needs the admin Bearer token, so it is fetched and saved, not linked.
+  async adminDownloadVoucherPdf(id: string | number): Promise<void> {
+    const token = localStorage.getItem('auth_token');
+    const response = await fetch(this.adminVoucherPdfUrl(id), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to download voucher PDF');
+    saveBlob(await response.blob(), `Gutschein-${id}.pdf`);
+  },
+
+  adminVoucherPdfUrl(id: string | number): string {
+    return `/api/admin/vouchers/${id}/pdf`;
   },
 
   // Get pricing tiers from server (single source of truth)

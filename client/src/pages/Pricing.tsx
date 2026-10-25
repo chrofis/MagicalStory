@@ -96,6 +96,9 @@ export default function Pricing() {
       combineNote: 'You can combine multiple stories into one book!',
       backToStories: 'Back to My Stories',
       createStory: 'Create a Story',
+      voucherTitle: 'Gift voucher',
+      voucherBody: 'Give a story and a printed book for CHF 59: credits for two stories plus a softcover book with shipping in Switzerland. Never expires.',
+      voucherCta: 'Buy a voucher',
     },
     de: {
       title: 'Preise',
@@ -127,6 +130,9 @@ export default function Pricing() {
       combineNote: 'Du kannst mehrere Geschichten zu einem Buch kombinieren!',
       backToStories: 'Zurück zu Meine Geschichten',
       createStory: 'Geschichte erstellen',
+      voucherTitle: 'Geschenkgutschein',
+      voucherBody: 'Schenke eine Geschichte und ein gedrucktes Buch für CHF 59: Credits für zwei Geschichten plus ein Softcover-Buch inklusive Versand in der Schweiz. Läuft nie ab.',
+      voucherCta: 'Gutschein kaufen',
     },
     fr: {
       title: 'Tarifs',
@@ -158,6 +164,9 @@ export default function Pricing() {
       combineNote: 'Vous pouvez combiner plusieurs histoires en un seul livre !',
       backToStories: 'Retour à Mes histoires',
       createStory: 'Créer une histoire',
+      voucherTitle: 'Bon cadeau',
+      voucherBody: "Offrez une histoire et un livre imprimé pour CHF 59 : des crédits pour deux histoires et un livre à couverture souple, livraison en Suisse incluse. N'expire jamais.",
+      voucherCta: 'Acheter un bon',
     },
     it: {
       title: 'Prezzi',
@@ -189,6 +198,9 @@ export default function Pricing() {
       combineNote: 'Puoi combinare più storie in un unico libro!',
       backToStories: 'Torna a Le mie storie',
       createStory: 'Crea una storia',
+      voucherTitle: 'Buono regalo',
+      voucherBody: 'Regala una storia e un libro stampato per CHF 59: crediti per due storie e un libro con copertina morbida, spedizione in Svizzera inclusa. Non scade mai.',
+      voucherCta: 'Acquista un buono',
     },
   };
 
@@ -325,6 +337,21 @@ export default function Pricing() {
               </div>
             ))}
           </div>
+        </section>
+
+        {/* ── Gift voucher card ─────────────────────────────────────────── */}
+        <section className={card}>
+          <div className={sectionHeader}>
+            <Gift size={22} className={sectionIcon} />
+            <h2 className={sectionTitle}>{t.voucherTitle}</h2>
+          </div>
+          <p className="text-gray-600 mb-4">{t.voucherBody}</p>
+          <button
+            onClick={() => navigate('/gutschein/kaufen')}
+            className="px-8 py-3 bg-indigo-500 text-white rounded-lg font-semibold hover:bg-indigo-600 transition-colors"
+          >
+            {t.voucherCta}
+          </button>
         </section>
 
         {/* ── Combine note card ─────────────────────────────────────────── */}

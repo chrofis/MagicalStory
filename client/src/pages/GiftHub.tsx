@@ -13,6 +13,9 @@ const texts: Record<string, {
   ctaTitle: string;
   ctaSubtitle: string;
   ctaButton: string;
+  voucherTitle: string;
+  voucherBody: string;
+  voucherCta: string;
   sections: Record<Category, string>;
 }> = {
   en: {
@@ -21,6 +24,9 @@ const texts: Record<string, {
     ctaTitle: 'Create Your Free Story',
     ctaSubtitle: 'Choose any theme and create a personalized story in minutes. Your first story is completely free.',
     ctaButton: 'Start Creating',
+    voucherTitle: "Gift voucher",
+    voucherBody: "A story and a printed book as a gift, CHF 59. Never expires.",
+    voucherCta: "Buy a voucher",
     sections: {
       recipient: 'For whom?',
       occasion: 'By occasion',
@@ -34,6 +40,9 @@ const texts: Record<string, {
     ctaTitle: 'Erstelle deine Gratis-Geschichte',
     ctaSubtitle: 'Wähle ein Thema und erstelle eine personalisierte Geschichte in wenigen Minuten. Deine erste Geschichte ist komplett kostenlos.',
     ctaButton: 'Jetzt starten',
+    voucherTitle: "Geschenkgutschein",
+    voucherBody: "Eine Geschichte und ein gedrucktes Buch zum Verschenken, CHF 59. Läuft nie ab.",
+    voucherCta: "Gutschein kaufen",
     sections: {
       recipient: 'Für wen?',
       occasion: 'Zum Anlass',
@@ -47,6 +56,9 @@ const texts: Record<string, {
     ctaTitle: 'Créez votre histoire gratuite',
     ctaSubtitle: 'Choisissez un thème et créez une histoire personnalisée en quelques minutes. Votre première histoire est entièrement gratuite.',
     ctaButton: 'Commencer',
+    voucherTitle: "Bon cadeau",
+    voucherBody: "Une histoire et un livre imprimé à offrir, CHF 59. N'expire jamais.",
+    voucherCta: "Acheter un bon",
     sections: {
       recipient: 'Pour qui ?',
       occasion: 'Par occasion',
@@ -60,6 +72,9 @@ const texts: Record<string, {
     ctaTitle: 'Crea la tua storia gratuita',
     ctaSubtitle: 'Scegli un tema e crea una storia personalizzata in pochi minuti. La tua prima storia è completamente gratuita.',
     ctaButton: 'Inizia ora',
+    voucherTitle: "Buono regalo",
+    voucherBody: "Una storia e un libro stampato da regalare, CHF 59. Non scade mai.",
+    voucherCta: "Acquista un buono",
     sections: {
       recipient: 'Per chi?',
       occasion: 'Per occasione',
@@ -131,6 +146,21 @@ export default function GiftHub() {
             </div>
           );
         })}
+
+        {/* Gift voucher */}
+        <Link
+          to={lp('/gutschein/kaufen')}
+          className="bg-white rounded-2xl shadow-sm border border-stone-100 p-5 hover:shadow-md hover:border-indigo-200 transition-all group mb-12 flex items-center gap-4"
+        >
+          <span className="text-4xl">🎁</span>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-title text-lg font-bold text-stone-900 group-hover:text-indigo-500 transition-colors mb-1">{t.voucherTitle}</h3>
+            <p className="text-sm text-stone-500">{t.voucherBody}</p>
+          </div>
+          <span className="inline-flex items-center gap-1 text-sm font-medium text-indigo-500 group-hover:gap-2 transition-all shrink-0">
+            {t.voucherCta} <ArrowRight size={16} />
+          </span>
+        </Link>
 
         {/* CTA Section */}
         <div className="bg-indigo-500 rounded-2xl p-8 md:p-12 text-center text-white">

@@ -9,6 +9,7 @@ import { storyService } from '@/services';
 import { LoadingSpinner, Navigation } from '@/components/common';
 import { checkpointToPercent } from '@/components/generation/GenerationProgress';
 import { MAX_BOOK_PAGES } from '@/utils/bookPricing';
+import VoucherBookBanner from '@/components/voucher/VoucherBookBanner';
 import { INITIAL_USER_CREDITS } from '@/constants/credits';
 import { createLogger } from '@/services/logger';
 import { buildOrderDetailLines } from '@/utils/orderDetails';
@@ -937,6 +938,8 @@ export default function MyStories() {
             </button>
           </div>
         </div>
+
+        <VoucherBookBanner />
 
         {/* Instructions hint - hidden on mobile, shown on desktop */}
         {stories.length > 0 && (

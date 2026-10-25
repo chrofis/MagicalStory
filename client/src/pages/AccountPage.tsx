@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Navigation, LoadingSpinner } from '@/components/common';
 import { storyService } from '@/services';
 import { localizedApiError } from '@/utils/apiErrors';
+import AccountVouchers from '@/components/voucher/AccountVouchers';
 
 const texts = {
   en: {
@@ -401,6 +402,8 @@ export default function AccountPage() {
             </button>
           </div>
         </div>
+
+        <AccountVouchers />
 
         {/* Account info */}
         <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 mb-6">

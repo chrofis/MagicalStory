@@ -62,6 +62,9 @@ const ThemePage = lazy(() => import('./pages/ThemePage'));
 const Occasions = lazy(() => import('./pages/Occasions'));
 const OccasionPage = lazy(() => import('./pages/OccasionPage'));
 const GiftHub = lazy(() => import('./pages/GiftHub'));
+const VoucherBuy = lazy(() => import('./pages/VoucherBuy'));
+const VoucherRedeem = lazy(() => import('./pages/VoucherRedeem'));
+const VoucherBookCheckout = lazy(() => import('./pages/VoucherBookCheckout'));
 const GiftPage = lazy(() => import('./pages/GiftPage'));
 const Comparisons = lazy(() => import('./pages/Comparisons'));
 const ComparisonPage = lazy(() => import('./pages/ComparisonPage'));
@@ -116,6 +119,9 @@ function App() {
           <Route path="/themes/:category/:themeId" element={<ThemePage />} />
           <Route path="/anlass" element={<Occasions />} />
           <Route path="/anlass/:occasionSlug" element={<OccasionPage />} />
+          <Route path="/gutschein/kaufen" element={<VoucherBuy />} />
+          <Route path="/gutschein/einloesen/:code?" element={<VoucherRedeem />} />
+          <Route path="/gutschein/buch" element={<VoucherBookCheckout />} />
           <Route path="/geschenk" element={<GiftHub />} />
           <Route path="/geschenk/:giftSlug" element={<GiftPage />} />
           <Route path="/vergleich" element={<Comparisons />} />
