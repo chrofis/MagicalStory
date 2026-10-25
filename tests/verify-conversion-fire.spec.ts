@@ -4,7 +4,7 @@
  * Captures every outbound request, filters for the conversion endpoint,
  * and asserts the correct conversion label appears.
  *
- *   npx playwright test tests/verify-conversion-fire.spec.ts --project=chromium --workers=1
+ *   npx playwright test tests/verify-conversion-fire.spec.ts --project=chromium --workers=1 --no-deps
  */
 import { test, expect, Page } from '@playwright/test';
 
