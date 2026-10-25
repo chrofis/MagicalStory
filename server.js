@@ -595,7 +595,9 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           expand: ['customer', 'line_items']
         });
 
-        if (fullSession.payment_status !== 'paid') {
+        // A book fully covered by the voucher credit completes with no_payment_required.
+        const coveredByVoucher = fullSession.payment_status === 'no_payment_required' && fullSession.metadata?.voucherBook === '1';
+        if (fullSession.payment_status !== 'paid' && !coveredByVoucher) {
           log.warn(`⏳ [STRIPE WEBHOOK] Session ${fullSession.id} payment_status=${fullSession.payment_status} - nothing granted; waiting for async_payment_succeeded`);
           res.json({ received: true, awaitingPayment: true });
           return;
@@ -603,6 +605,43 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
         log.info('   Email:', fullSession.customer_details?.email || 'N/A');
         log.debug('   Metadata:', JSON.stringify(fullSession.metadata, null, 2));
+
+        // Gift voucher purchase: create the voucher, mail the PDF card. Idempotent on stripe_session_id.
+        if (fullSession.metadata?.type === 'voucher') {
+          const vouchersLib = require('./server/lib/vouchers');
+          const { CREDIT_CONFIG: CC } = require('./server/config/credits');
+          const buyerEmail = fullSession.customer_details?.email;
+          if (!buyerEmail) throw new Error('Voucher purchase without customer email: ' + fullSession.id);
+          const language = fullSession.metadata.language || 'de';
+          let created;
+          try {
+            created = await vouchersLib.createVoucher(dbPool, {
+              kind: 'gift',
+              credits: CC.VOUCHER.GIFT.credits,
+              bookCents: CC.VOUCHER.GIFT.bookCents,
+              purchaserUserId: fullSession.metadata.userId || null,
+              purchaserEmail: buyerEmail,
+              stripeSessionId: fullSession.id,
+              stripeMode: fullSession.metadata.stripeMode === 'test' ? 'test' : 'live',
+              language,
+            });
+          } catch (dupErr) {
+            if (dupErr.code === '23505') {
+              log.warn('⚠️ [STRIPE WEBHOOK] Voucher already created for this session, skipping duplicate:', fullSession.id);
+              res.json({ received: true, type: 'voucher', duplicate: true });
+              return;
+            }
+            throw dupErr;
+          }
+          const url = vouchersLib.redemptionUrl(created.code);
+          const pdfBuffer = await vouchersLib.renderVoucherPdf({
+            code: created.code, url, credits: created.row.credits, expiresAt: null, language,
+          });
+          await email.sendVoucherEmail(buyerEmail, language, { code: created.code, url, pdfBuffer, expiresAt: null, credits: created.row.credits });
+          log.info(`🎁 [STRIPE WEBHOOK] Voucher ${created.id} created and mailed for session ${fullSession.id}`);
+          res.json({ received: true, type: 'voucher' });
+          return;
+        }
 
         // Check if this is a credits purchase
         if (fullSession.metadata?.type === 'credits') {
@@ -763,7 +802,10 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               customerInfo.shippingName,
               address.line1, address.line2,
               address.city, address.state, address.postal_code, address.country,
-              fullSession.amount_total, fullSession.currency, fullSession.payment_status,
+              fullSession.amount_total, fullSession.currency,
+              // A voucher-covered book (no_payment_required) is a paid order: the sweeps and
+              // hasPaidOrder only know 'paid'. The voucher credit is the payment.
+              coveredByVoucher ? 'paid' : fullSession.payment_status,
               orderQuantity, stripeMode
             ]);
 
@@ -1000,6 +1042,16 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         } catch (claimErr) {
           log.error(`❌ [STRIPE WEBHOOK] releaseReferralClaim failed for session ${session.id}:`, claimErr.message);
           await bufferWebhookEvent(dbPool, { eventId: `${event.id}:release_referral_claim`, eventType: 'release_referral_claim_failed', payload: event, error: claimErr });
+        }
+      }
+      if (session.metadata?.voucherBook === '1') {
+        try {
+          if (await require('./server/lib/vouchers').releaseBookCredit(dbPool, { sessionId: session.id })) {
+            log.info(`🎁 [STRIPE WEBHOOK] Released voucher book credit for unpaid session ${session.id}`);
+          }
+        } catch (relErr) {
+          log.error(`❌ [STRIPE WEBHOOK] releaseBookCredit failed for session ${session.id}:`, relErr.message);
+          await bufferWebhookEvent(dbPool, { eventId: `${event.id}:release_voucher_book`, eventType: 'release_voucher_book_failed', payload: event, error: relErr });
         }
       }
       const useBalanceCents = parseInt(session.metadata?.useBalanceCents) || 0;
@@ -1483,6 +1535,7 @@ app.use('/api', aiProxyRoutes);  // /api/claude, /api/gemini
 // based on the order's stripe_mode rather than current user state.
 app.locals.getStripeClientForOrder = getStripeClientForOrder;
 app.use('/api', printRoutes);  // Print provider, PDF generation, Stripe payments, pricing
+app.use('/api', require('./server/routes/vouchers'));  // Gift vouchers: lookup, redeem, purchase, voucher book checkout
 app.use('/api/jobs', express.json({ limit: '50mb' }), jobRoutes);  // Job creation, status, cancellation, checkpoints
 app.use('/api', express.json({ limit: '50mb' }), storyIdeasRoutes);  // Story idea generation
 

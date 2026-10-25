@@ -53,6 +53,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
     xai: !!process.env.XAI_API_KEY,
     openrouter: !!process.env.OPENROUTER_API_KEY,
     runware: !!process.env.RUNWARE_API_KEY,
+    voucherSecret: !!process.env.VOUCHER_SECRET,
   };
 
   // Live 1-token Anthropic ping with the SAME model the ideas call uses —

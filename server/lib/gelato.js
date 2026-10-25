@@ -662,7 +662,8 @@ async function resumeBookOrder(dbPool, orderRow, stripe, { run = processBookOrde
   if (orderRow.gelato_order_id) throw new Error(`Order ${orderRow.id} already has Gelato order ${orderRow.gelato_order_id}`);
   if (!stripe) throw new Error(`No Stripe client for stripe_mode=${orderRow.stripe_mode || 'live'}`);
   const session = await stripe.checkout.sessions.retrieve(orderRow.stripe_session_id, { expand: ['customer', 'line_items'] });
-  if (session.payment_status !== 'paid') throw new Error(`Stripe session ${session.id} is ${session.payment_status}, not paid`);
+  const coveredByVoucher = session.payment_status === 'no_payment_required' && session.metadata?.voucherBook === '1';
+  if (session.payment_status !== 'paid' && !coveredByVoucher) throw new Error(`Stripe session ${session.id} is ${session.payment_status}, not paid`);
   const inp = await resolveBookOrderInputs(dbPool, session);
   const isTestPayment = orderRow.stripe_mode === 'test';
   return run(dbPool, session.id, inp.userId, inp.validatedStoryIds, inp.customerInfo, inp.address,

@@ -1979,3 +1979,6 @@ router.get('/stripe/order-status/:sessionId', async (req, res) => {
 
 module.exports = router;
 module.exports.validateReferralCodeForUser = validateReferralCodeForUser;
+module.exports.getPriceForPages = getPriceForPages;
+module.exports.getStripeForUser = getStripeForUser;
+module.exports.isUserTestMode = isUserTestMode;
