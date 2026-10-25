@@ -353,3 +353,12 @@ Three timestamp behaviors exist; pick the right entry point:
 - **Browser-rendered admin pages**: already local; leave alone.
 
 When searching logs for a time the user named, convert silently in code (Swiss → UTC) — never narrate the conversion, never show the UTC value in the reply.
+
+
+## Requests from Master
+`C:\Users\roger\Master` is the umbrella project (portfolio, company, marketing control). It
+pushes requests into this project as files in `from-master/`. **At session start, read
+`from-master/` and handle every file whose Status is `open`**: do the work in this project
+under its own rules, then set the Status line in that file to `done` (with a one-line result)
+or `blocked` (with the reason). Master reads the status back. Cross-project needs of this
+project go to `C:\Users\roger\Master\inbox\`.
