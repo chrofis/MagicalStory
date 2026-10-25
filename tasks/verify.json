@@ -10699,7 +10699,7 @@
     "ae19f747a"
    ],
    "addedAt": "2026-10-25",
-   "status": "pending",
+   "status": "confirmed",
    "claim": "On staging in Stripe TEST mode: buying a voucher at /gutschein/kaufen creates a vouchers row (kind gift, no expiry) and emails the PDF card with a scannable QR; redeeming the code adds 500 credits once (second attempt answers VOUCHER_REDEEMED); ordering a softcover from stored stories at /gutschein/buch produces a Stripe session with a CHF 0 total that the webhook accepts, an orders row and a Gelato draft; a hardcover charges CHF 10; a book over 50 content pages is refused. No story pipeline code is touched.",
    "runShape": [
     "none"
@@ -10708,8 +10708,15 @@
     "kind": "human",
     "what": "Read the vouchers, credit_transactions and orders rows on staging for the walk-through, the Stripe test session payment_status for the CHF 0 book, and the Gelato draft id on the order; record which payment_status value Stripe reported in docs/decisions.md."
    },
-   "evidence": [],
-   "lastChecked": null
+   "evidence": [
+    {
+     "date": "2026-10-25",
+     "env": "staging",
+     "result": "CONFIRMED",
+     "detail": "vouchers 1-3 on staging; order 1 (cs_test_a1XuDZ..., amount_total 0, payment_status paid, Gelato draft 90708eed-61eb-496a-807e-d0b6ad490849); gift voucher 3 from cs_test_a12opGV... with voucher email id 01a17510...; hardcover session total 1000; expired session released the credit; see docs/decisions.md 2026-10-25 Gift vouchers"
+    }
+   ],
+   "lastChecked": "2026-10-25"
   }
  ],
  "runs": [
