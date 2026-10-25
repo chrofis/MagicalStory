@@ -126,3 +126,12 @@ drawing is for the owner (not added to BACKLOG.md: shared registry).
 - Not changed on purpose: characterPhotos.js (`normalizeAvatarsForResponse` and the avatar slot lists are generic and
   handle a `nightwear` styled key), database.js strip/persist (generic category regex), avatarSlides.js (a pyjama sheet
   becomes a waiting-page slide of a bedtime trial, which is fine).
+
+### Review of the 2026-10-25 run (main session)
+
+- Correction: Jules in `job_1792859316244_6429d0n83` is NOT an over-mark. Plan line 6 reads "Jules, in his pyjamas,
+  walks behind her", so `nightwear.used: true` is right. Writer over-marks: only Emma (Noah story, reconstructed input,
+  2 of 3 samples), which is contaminated input, not a measured fault.
+- Owner, 2026-10-25: the Art Director writing "in her purple pyjamas" on a duvet page without naming top and trousers
+  stays as is (only the top shows under a duvet; the pyjama sheet carries the full outfit). No change.
+- Still open: the pyjama-sheet replay (~USD 0.80) needs an xAI key; the local keys file has only Anthropic and OpenRouter.
