@@ -333,6 +333,14 @@ It plans both layouts (`planLayoutPages`: content count, SKU, snapped Gelato pag
 - Test: `npx vitest run tests/unit/short-book-layout.test.ts tests/unit/book-price-quote.test.ts` and
   `node --test server/lib/gelato.test.js`. Decision: `docs/decisions.md` 2026-10-26.
 
+- Text strip fill (single layout): the strip below the picture is not white. `server/lib/pageFill.js`
+  (`buildFilledPageBackground`) builds the whole page as one 300 dpi JPEG: picture on top, below it the
+  picture's lower half flipped, blurred and lightened with a feathered seam, and a soft white board
+  (opacity raised from 70% until the text zone's mean luminance is >= 0.80). `pdf.js` `drawFilledStripPage`
+  draws it and sets the text on top; `addPictureBookPages` and `generateCombinedBookPdf` both call it, so the
+  print, combined, customer-download and trial-email PDFs all get it. No fallback (throws). Spread and covers
+  untouched. Test: `npx vitest run tests/unit/page-fill.test.ts`. Decision: `docs/decisions.md` 2026-10-26.
+
 ---
 
 ## Shared Story Viewer — Book Spread

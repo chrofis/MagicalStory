@@ -517,6 +517,83 @@ function computeTextBelowRatio(pages, languageLevel) {
 }
 
 /**
+ * Width and height of a text block as doc.text would lay it out (greedy word wrap,
+ * same font state as the caller). Needed to size the board the text sits on.
+ */
+function measureTextBlock(doc, text, width, { fontSize, lineGap = 0, paragraphGap = 0 }) {
+  doc.fontSize(fontSize).font('Helvetica');
+  const h = doc.heightOfString(text, { width, align: 'center', lineGap, paragraphGap });
+  let w = 0;
+  for (const paragraph of text.split('\n')) {
+    let line = '';
+    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
+      const candidate = line ? line + ' ' + word : word;
+      if (line && doc.widthOfString(candidate) > width) {
+        w = Math.max(w, doc.widthOfString(line));
+        line = word;
+      } else {
+        line = candidate;
+      }
+    }
+    w = Math.max(w, doc.widthOfString(line));
+  }
+  return { w: Math.min(w, width), h };
+}
+
+// Print raster resolution of the filled strip background (see pageFill.js).
+const PAGE_FILL_DPI = 300;
+
+/**
+ * Classic single layout page, text below the picture: the page background is the
+ * picture plus a strip filled from the picture's own lower half (mirrored, blurred,
+ * lightened), the text sits on a soft white board over it (decisions.md, "Print page
+ * strip filled by a mirrored, blurred picture", 2026-10-26). One implementation for
+ * the print PDF, the combined book PDF and the view/trial PDFs (all go through
+ * addPictureBookPages / addStoryContentPages). A fill failure throws, no fallback.
+ * A page whose picture is missing or unreadable stays a text-only page, as before.
+ */
+async function drawFilledStripPage(doc, image, g) {
+  const { interiorW, interiorH, imageBottom, pageNumber, text, fontSize, lineGap, paragraphGap, textX, textWidth, padTop, textBudgetHeight, textBottom } = g;
+
+  let imageBuffer = null;
+  if (image?.imageData) {
+    try {
+      imageBuffer = await resolveImageBuffer(image.imageData);
+      if (!imageBuffer) throw new Error('image source unresolvable');
+    } catch (imgErr) {
+      imageBuffer = null;
+      log.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
+    }
+  }
+
+  const block = measureTextBlock(doc, text, textWidth, { fontSize, lineGap, paragraphGap });
+  const textY = imageBottom + padTop + Math.max(0, (textBudgetHeight - block.h) / 2);
+  const drawnHeight = Math.min(block.h, Math.max(0, textBottom - textY));
+
+  if (imageBuffer) {
+    const { buildFilledPageBackground } = require('./pageFill');
+    const s = PAGE_FILL_DPI / 72;
+    const { buffer } = await buildFilledPageBackground({
+      imageBuffer,
+      pageWidthPx: Math.round(interiorW * s),
+      pageHeightPx: Math.round(interiorH * s),
+      imageHeightPx: Math.round(imageBottom * s),
+      textBox: {
+        x: (textX + (textWidth - block.w) / 2) * s,
+        y: textY * s,
+        w: block.w * s,
+        h: drawnHeight * s,
+      },
+    });
+    doc.image(buffer, 0, 0, { width: interiorW, height: interiorH });
+  }
+
+  doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+  // height + ellipsis: never let overflow spill onto an auto-created page.
+  doc.text(text, textX, textY, { width: textWidth, align: 'center', lineGap, paragraphGap, height: Math.max(0, textBottom - textY), ellipsis: true });
+}
+
+/**
  * Add picture book pages (combined image + text on same page)
  * @param {PDFDocument} doc - PDFKit document
  * @param {Object} storyData - Story data
@@ -604,26 +681,18 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       }
 
       if (!overlayDrawn) {
-        // Fallback: draw image in the classic image band + text strip below it.
+        // Fallback: the classic image band + filled text strip below it.
         // Must use classicImageHeight (NOT the overlay full-page imageHeight) so
         // the text lands in the reserved strip, not off the trim edge.
-        try {
-          const imageBuffer = await resolveImageBuffer(image.imageData);
-        if (!imageBuffer) throw new Error('image source unresolvable');
-          await drawImageCovering(doc, imageBuffer, 0, 0, interiorW, bleed + classicImageHeight, { valign: 'top' });
-        } catch (imgErr) {
-          log.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
-        }
-        doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-        const textHeight = doc.heightOfString(flowText, { width: textWidth, align: 'center', lineGap, paragraphGap });
-        const centerOffset = Math.max(0, (effectiveTextHeight - textHeight) / 2);
-        const textY = bleed + classicImageHeight + textPadTop + centerOffset;
-        // height + ellipsis: never let overflow spill onto an auto-created page.
-        const textBudget = Math.max(0, bleed + pageHeight - textY - textPadBottom);
-        doc.text(flowText, bleed + textMargin, textY, { width: textWidth, align: 'center', lineGap, paragraphGap, height: textBudget, ellipsis: true });
+        await drawFilledStripPage(doc, image, {
+          interiorW, interiorH, imageBottom: bleed + classicImageHeight, pageNumber,
+          text: flowText, fontSize, lineGap, paragraphGap,
+          textX: bleed + textMargin, textWidth,
+          padTop: textPadTop, textBudgetHeight: effectiveTextHeight, textBottom: bleed + pageHeight - textPadBottom,
+        });
       }
-    } else if (image && image.imageData) {
-      // Draw image (no text overlay)
+    } else if (textOverlay && image?.imageData) {
+      // Overlay mode but this page has no text: image only, full page height.
       try {
         const imageBuffer = await resolveImageBuffer(image.imageData);
         if (!imageBuffer) throw new Error('image source unresolvable');
@@ -631,19 +700,16 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       } catch (imgErr) {
         log.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
       }
-    }
-
-    if (!textOverlay || !image?.imageData || !cleanText) {
-      // Classic mode: text in white area below image, with one-line breathing
-      // room top (below image) and bottom (above page edge). Use
-      // classicImageHeight so a missing image in overlay mode doesn't place the
-      // text off-page (it equals imageHeight in true classic mode).
-      doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-      const textHeight = doc.heightOfString(flowText, { width: textWidth, align: 'center', lineGap, paragraphGap });
-      const centerOffset = Math.max(0, (effectiveTextHeight - textHeight) / 2);
-      const textY = bleed + classicImageHeight + textPadTop + centerOffset;
-      const textBudget = Math.max(0, bleed + pageHeight - textY - textPadBottom);
-      doc.text(flowText, bleed + textMargin, textY, { width: textWidth, align: 'center', lineGap, paragraphGap, height: textBudget, ellipsis: true });
+    } else {
+      // Classic mode (and overlay mode with no picture): picture band on top, text strip
+      // below filled from the picture, text on a soft white board. One breathing line of
+      // room above and below the text.
+      await drawFilledStripPage(doc, image, {
+        interiorW, interiorH, imageBottom: bleed + classicImageHeight, pageNumber,
+        text: flowText, fontSize, lineGap, paragraphGap,
+        textX: bleed + textMargin, textWidth,
+        padTop: textPadTop, textBudgetHeight: effectiveTextHeight, textBottom: bleed + pageHeight - textPadBottom,
+      });
     }
   }
 }
@@ -904,24 +970,13 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
 
       if (overlayDrawn) continue;
 
-      if (image && image.imageData) {
-        try {
-          const imageBuffer = await resolveImageBuffer(image.imageData);
-        if (!imageBuffer) throw new Error('image source unresolvable');
-          // Scale-to-fill, pinned to the top edge so the image reaches y=0 with
-          // no white bar above it. Vertical overflow (if the source aspect doesn't
-          // match the box) is cropped from the bottom only — keeps heads intact.
-          await drawImageCovering(doc, imageBuffer, 0, 0, interiorPageWidth, bleed + imageHeight, { valign: 'top' });
-        } catch (err) {
-          log.error(`Error adding image for page ${pageNumber}:`, err.message);
-        }
-      }
-
-      doc.fontSize(consistentFont).font('Helvetica').fillColor('#333');
-      const textHeight = doc.heightOfString(flowText, { width: textWidth, align: 'center', lineGap, paragraphGap });
-      const centerOffset = Math.max(0, (effectiveTextHeight - textHeight) / 2);
-      const textY = bleed + imageHeight + padTop + centerOffset;
-      doc.text(flowText, bleed + textMarginMm, textY, { width: textWidth, align: 'center', lineGap, paragraphGap });
+      // Picture on top, text strip below filled from the picture (same helper as generatePrintPdf).
+      await drawFilledStripPage(doc, image, {
+        interiorW: interiorPageWidth, interiorH: interiorPageHeight, imageBottom: bleed + imageHeight, pageNumber,
+        text: flowText, fontSize: consistentFont, lineGap, paragraphGap,
+        textX: bleed + textMarginMm, textWidth,
+        padTop, textBudgetHeight: effectiveTextHeight, textBottom: bleed + pageHeight - padBottom,
+      });
     }
   };
 
