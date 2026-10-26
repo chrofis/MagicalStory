@@ -113,7 +113,8 @@ router.post('/print-provider/order', authenticateToken, async (req, res) => {
       // Generate fresh PDF using the shared print function (same as Buy Book)
       log.debug(`🖨️ [PRINT] Generating fresh print PDF for story: ${storyId}, format: ${bookFormat}`);
       try {
-        const { pdfBuffer, pageCount: generatedPageCount } = await generatePrintPdf(storyData, bookFormat);
+        // Customer download is free: mirror fill (decisions.md 2026-10-26); only the paid order PDF uses Grok.
+        const { pdfBuffer, pageCount: generatedPageCount } = await generatePrintPdf(storyData, bookFormat, { fillMethod: 'mirror' });
         pageCount = generatedPageCount;
 
         // Save PDF temporarily to database for Gelato to fetch
@@ -754,7 +755,8 @@ router.get('/stories/:id/print-pdf', authenticateToken, async (req, res) => {
     log.debug(`🖨️ [ADMIN PRINT PDF] Story has: coverImages=${!!storyData.coverImages}, sceneImages=${storyData.sceneImages?.length || 0}, storyText=${!!storyData.storyText || !!storyData.generatedStory}`);
 
     // Generate print PDF using the shared function (same as Buy Book / Print Book)
-    const { pdfBuffer, pageCount } = await generatePrintPdf(storyData, bookFormat);
+    // Admin preview of the print PDF: mirror fill, no paid Grok call (the order path in gelato.js passes 'grok').
+    const { pdfBuffer, pageCount } = await generatePrintPdf(storyData, bookFormat, { fillMethod: 'mirror' });
 
     log.info(`🖨️ [ADMIN PRINT PDF] PDF generated: ${pageCount} pages, ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB`);
 
@@ -1102,7 +1104,8 @@ router.post('/generate-pdf', authenticateToken, async (req, res) => {
 });
 
 // Generate print-ready book PDF - uses the same generatePrintPdf/generateCombinedBookPdf
-// as the Gelato order flow, ensuring test PDFs are identical to what Gelato receives
+// as the Gelato order flow (layout, sizes, page count). It uses the free mirror strip fill, so it
+// differs from the real order PDF only in the Grok-outpainted strip (decisions.md 2026-10-26).
 router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
   try {
     const { storyIds, bookFormat = 'A4', coverType = 'softcover' } = req.body;
@@ -1165,11 +1168,11 @@ router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
     let pdfBuffer, pageCount;
 
     if (stories.length === 1) {
-      const result = await generatePrintPdf(stories[0].data, bookFormat, { gelatoCoverDims: coverDims, targetGelatoPageCount: snappedPageCount, layout: pageInfo.layout });
+      const result = await generatePrintPdf(stories[0].data, bookFormat, { gelatoCoverDims: coverDims, targetGelatoPageCount: snappedPageCount, layout: pageInfo.layout, fillMethod: 'mirror' });
       pdfBuffer = result.pdfBuffer;
       pageCount = result.pageCount;
     } else {
-      const result = await generateCombinedBookPdf(stories, bookFormat, { gelatoCoverDims: coverDims, targetGelatoPageCount: snappedPageCount, layout: pageInfo.layout });
+      const result = await generateCombinedBookPdf(stories, bookFormat, { gelatoCoverDims: coverDims, targetGelatoPageCount: snappedPageCount, layout: pageInfo.layout, fillMethod: 'mirror' });
       pdfBuffer = result.pdfBuffer;
       pageCount = result.pageCount;
     }

@@ -6,6 +6,11 @@
 
 const { log } = require('../utils/logger');
 const { generatePrintPdf, generateCombinedBookPdf } = require('./pdf');
+const { GROK_FILL_MODEL } = require('./pageFill');
+const { MODEL_PRICING } = require('../config/models');
+
+// Per page USD of the Grok-outpainted print strip (price table: models.js MODEL_PRICING).
+const GROK_STRIP_FILL_USD = MODEL_PRICING[GROK_FILL_MODEL].perImage;
 const { rehydrateStoryImages } = require('../services/database');
 
 /**
@@ -442,6 +447,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
 
     // Step 3c: Generate PDF with actual cover dimensions
     let pdfBuffer, targetPageCount;
+    const fillStats = { grokCalls: 0 };   // filled in by pdf.js, one per Grok-outpainted strip
 
     if (stories.length === 1) {
       log.debug(`📄 [BACKGROUND] Generating single-story PDF (format: ${bookFormat})...`);
@@ -449,6 +455,8 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
         gelatoCoverDims: coverDims,
         targetGelatoPageCount: snappedPageCount,
         layout: pageInfo.layout,
+        fillMethod: 'grok',   // paid order PDF: Grok-outpainted text strip (decisions.md 2026-10-26)
+        fillStats,
       });
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;
@@ -459,13 +467,15 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
         gelatoCoverDims: coverDims,
         targetGelatoPageCount: snappedPageCount,
         layout: pageInfo.layout,
+        fillMethod: 'grok',   // paid order PDF: Grok-outpainted text strip (decisions.md 2026-10-26)
+        fillStats,
       });
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;
     }
 
     const pdfBase64 = pdfBuffer.toString('base64');
-    console.log(`✅ [BACKGROUND] PDF generated: ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB, ${targetPageCount} pages`);
+    console.log(`✅ [BACKGROUND] PDF generated: ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB, ${targetPageCount} pages, Grok strip fill: ${fillStats.grokCalls} pages = USD ${(fillStats.grokCalls * GROK_STRIP_FILL_USD).toFixed(2)}`);
 
     // Step 3.5: Save PDF to database and get public URL
     log.debug('💾 [BACKGROUND] Saving PDF to database...');

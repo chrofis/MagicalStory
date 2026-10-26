@@ -342,6 +342,12 @@ It plans both layouts (`planLayoutPages`: content count, SKU, snapped Gelato pag
   were both rejected by the owner); `addPictureBookPages` and `generateCombinedBookPdf` both call it, so the
   print, combined, customer-download and trial-email PDFs all get it. No fallback (throws). Spread and covers
   untouched. Test: `npx vitest run tests/unit/page-fill.test.ts tests/unit/print-strip-text.test.ts`. Decision: `docs/decisions.md` 2026-10-26.
+  **Two fill methods, no default** (`fillMethod: 'mirror' | 'grok'`, required by `buildFilledPageBackground`,
+  `generatePrintPdf`, `generateCombinedBookPdf`): the PAID order PDF (`gelato.processBookOrder`) passes `'grok'`
+  (Grok outpaints the strip, `prompts/strip-outpaint.txt`, USD 0.02/page, original picture pixels kept on top,
+  4 pages in flight via `prefetchStripBackgrounds`, a failure throws and fails the order loudly); `generateViewPdf`
+  and every `print.js` route pass `'mirror'`. Registry set `print-vs-view-strip-fill`. Decision: `docs/decisions.md`
+  2026-10-26 "Print PDF strip is outpainted by Grok".
 
 ---
 

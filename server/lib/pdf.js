@@ -234,6 +234,8 @@ function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHe
  * @returns {Promise<{pdfBuffer: Buffer, pageCount: number, fontSizeWarning: string|null}>}
  */
 async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options = {}) {
+  // No default: every caller states which strip fill it wants ('mirror' | 'grok', see pageFill.js).
+  requireFillMethod(options.fillMethod, 'generatePrintPdf');
   // Get dimensions for the selected format
   const format = BOOK_FORMATS[bookFormat] || BOOK_FORMATS[DEFAULT_FORMAT];
   const { pageWidth, pageHeight, coverWidth, coverHeight } = format;
@@ -408,6 +410,8 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
       lineGap: fontResult.lineGap,
       textPadding: { top: padTop, bottom: padBottom },
       bookFormat,
+      fillMethod: options.fillMethod,
+      fillStats: options.fillStats,
     });
   } else {
     // Standard 2-page layout (square format only). Text page on left, image on right.
@@ -520,6 +524,83 @@ function computeTextBelowRatio(pages, languageLevel) {
 const PAGE_FILL_DPI = 300;
 
 /**
+ * The filled page raster (picture + strip) for one page, or null when the page has no readable
+ * picture (text-only page). `g.fillMethod` is required ('mirror' | 'grok'); with 'grok' every
+ * page costs one Grok call (USD 0.02), counted in `fillStats.grokCalls`.
+ */
+async function buildStripBackground(image, g, fillStats) {
+  const { interiorW, interiorH, imageBottom, pageNumber, fillMethod } = g;
+  if (!image?.imageData) return null;
+  let imageBuffer;
+  try {
+    imageBuffer = await resolveImageBuffer(image.imageData);
+    if (!imageBuffer) throw new Error('image source unresolvable');
+  } catch (imgErr) {
+    log.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
+    return null;
+  }
+  const { buildFilledPageBackground } = require('./pageFill');
+  const s = PAGE_FILL_DPI / 72;
+  const out = await buildFilledPageBackground({
+    imageBuffer, pageWidthPx: Math.round(interiorW * s), pageHeightPx: Math.round(interiorH * s),
+    imageHeightPx: Math.round(imageBottom * s), fillMethod,
+  });
+  if (out.usedGrok && fillStats) fillStats.grokCalls = (fillStats.grokCalls || 0) + 1;
+  return out.buffer;
+}
+
+const GROK_FILL_CONCURRENCY = 4;   // Grok ~9 s per call: 4 in flight keeps a 25 page book near a minute
+
+/**
+ * Start the page backgrounds of a classic-layout story ahead of the page loop so the Grok calls
+ * run 4 at a time while PDFKit still lays the pages out in order. Returns Map(pageNumber -> Promise).
+ * Only for fillMethod 'grok' (the mirror fill is cheap and runs inline). After the first failure no
+ * further call is started (no money goes into a book that will fail); the failure still surfaces
+ * when the page loop awaits that page. Promises carry a no-op catch so an unawaited rejection
+ * never becomes an unhandledRejection.
+ */
+function prefetchStripBackgrounds(storyData, storyPages, geometry, fillMethod, fillStats) {
+  const map = new Map();
+  if (fillMethod !== 'grok') return map;
+  const jobs = [];
+  storyPages.forEach((pageText, index) => {
+    const pageNumber = index + 1;
+    const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
+    const cleanText = String(pageText).trim().replace(/^-+|-+$/g, '').trim();
+    if (image?.imageData && cleanText) jobs.push({ pageNumber, image });
+  });
+  const settle = new Map();
+  for (const j of jobs) {
+    const p = new Promise((resolve, reject) => settle.set(j.pageNumber, { resolve, reject }));
+    p.catch(() => {});
+    map.set(j.pageNumber, p);
+  }
+  let failed = null;
+  let next = 0;
+  const worker = async () => {
+    while (next < jobs.length) {
+      const j = jobs[next++];
+      const r = settle.get(j.pageNumber);
+      if (failed) { r.reject(failed); continue; }
+      try {
+        r.resolve(await buildStripBackground(j.image, { ...geometry, pageNumber: j.pageNumber, fillMethod }, fillStats));
+      } catch (e) {
+        failed = failed || e;
+        r.reject(e);
+      }
+    }
+  };
+  for (let i = 0; i < Math.min(GROK_FILL_CONCURRENCY, jobs.length); i++) worker();
+  return map;
+}
+
+function requireFillMethod(fillMethod, who) {
+  if (fillMethod !== 'mirror' && fillMethod !== 'grok') {
+    throw new Error(`${who}: options.fillMethod must be 'mirror' or 'grok', got ${fillMethod}`);
+  }
+}
+
+/**
  * Classic single layout page, text below the picture: the page raster is the picture plus
  * a strip filled from the picture's own lower half (mirrored, blurred, lightened;
  * pageFill.js), and the text is rendered into that strip by generateTextOverlay, the ONE
@@ -532,25 +613,15 @@ const PAGE_FILL_DPI = 300;
 async function drawFilledStripPage(doc, image, g) {
   const { interiorW, interiorH, imageBottom, pageNumber, text, fontSize, lineGap, paragraphGap, textX, textWidth, padTop, textBudgetHeight, textBottom, bookFormat, languageLevel } = g;
 
-  let imageBuffer = null;
-  if (image?.imageData) {
-    try {
-      imageBuffer = await resolveImageBuffer(image.imageData);
-      if (!imageBuffer) throw new Error('image source unresolvable');
-    } catch (imgErr) {
-      imageBuffer = null;
-      log.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
-    }
-  }
+  // g.background = this page's prefetched promise (grok); without it the fill is built here.
+  const buffer = await (g.background || buildStripBackground(image, g, g.fillStats));
 
-  if (imageBuffer) {
-    const { buildFilledPageBackground } = require('./pageFill');
+  if (buffer) {
     const { requiredFontPt } = require('../config/textRegion');
     const s = PAGE_FILL_DPI / 72;
     const W = Math.round(interiorW * s);
     const H = Math.round(interiorH * s);
     const IH = Math.round(imageBottom * s);
-    const { buffer } = await buildFilledPageBackground({ imageBuffer, pageWidthPx: W, pageHeightPx: H, imageHeightPx: IH });
     // Same point-size rule as the in-image pages (px = pt * pixels per point).
     const { compositedImage } = await generateTextOverlay(buffer, text, 'bottom-full', {
       pageNumber, bookFormat, languageLevel,
@@ -615,6 +686,13 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
   // rendered text height tracks the fit-time budget instead of drifting.
   const paragraphGap = fontSize * 0.5;
 
+  // Grok fill: start every classic page's strip now so the calls run 4 at a time (overlay mode
+  // draws its text into the picture and needs no strip, so nothing is prefetched for it).
+  requireFillMethod(opts.fillMethod, 'addPictureBookPages');
+  const stripBackgrounds = textOverlay ? new Map()
+    : prefetchStripBackgrounds(storyData, storyPages,
+      { interiorW, interiorH, imageBottom: bleed + classicImageHeight }, opts.fillMethod, opts.fillStats);
+
   for (let index = 0; index < storyPages.length; index++) {
     const pageText = storyPages[index];
     const pageNumber = index + 1;
@@ -661,6 +739,7 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
         // the text lands in the reserved strip, not off the trim edge.
         await drawFilledStripPage(doc, image, {
           interiorW, interiorH, imageBottom: bleed + classicImageHeight, pageNumber,
+          fillMethod: opts.fillMethod, fillStats: opts.fillStats, background: stripBackgrounds.get(pageNumber),
         bookFormat: opts.bookFormat, languageLevel: storyData.languageLevel,
           text: flowText, fontSize, lineGap, paragraphGap,
           textX: bleed + textMargin, textWidth,
@@ -682,6 +761,7 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       // room above and below the text.
       await drawFilledStripPage(doc, image, {
         interiorW, interiorH, imageBottom: bleed + classicImageHeight, pageNumber,
+        fillMethod: opts.fillMethod, fillStats: opts.fillStats, background: stripBackgrounds.get(pageNumber),
         bookFormat: opts.bookFormat, languageLevel: storyData.languageLevel,
         text: flowText, fontSize, lineGap, paragraphGap,
         textX: bleed + textMargin, textWidth,
@@ -803,6 +883,7 @@ async function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZ
  * @returns {Promise<{pdfBuffer: Buffer, pageCount: number}>}
  */
 async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, options = {}) {
+  requireFillMethod(options.fillMethod, 'generateCombinedBookPdf');
   log.debug(`📚 [COMBINED PDF] Generating book with ${stories.length} stories, format: ${bookFormat}`);
 
   const format = BOOK_FORMATS[bookFormat] || BOOK_FORMATS[DEFAULT_FORMAT];
@@ -911,6 +992,11 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
     const paragraphGap = consistentFont * 0.5;
     const effectiveTextHeight = budgetHeight;
 
+    // Grok fill: start the strips ahead of the page loop, 4 at a time (only classic pages use one).
+    const stripBackgrounds = textInImage ? new Map()
+      : prefetchStripBackgrounds(storyData, storyPages,
+        { interiorW: interiorPageWidth, interiorH: interiorPageHeight, imageBottom: bleed + imageHeight }, options.fillMethod, options.fillStats);
+
     for (let index = 0; index < storyPages.length; index++) {
       const pageText = storyPages[index];
       const pageNumber = index + 1;
@@ -950,6 +1036,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       // Picture on top, text strip below filled from the picture (same helper as generatePrintPdf).
       await drawFilledStripPage(doc, image, {
         interiorW: interiorPageWidth, interiorH: interiorPageHeight, imageBottom: bleed + imageHeight, pageNumber,
+        fillMethod: options.fillMethod, fillStats: options.fillStats, background: stripBackgrounds.get(pageNumber),
         bookFormat, languageLevel: storyData.languageLevel,
         text: flowText, fontSize: consistentFont, lineGap, paragraphGap,
         textX: bleed + textMarginMm, textWidth,
@@ -1219,6 +1306,9 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
       lineGap: fontResult.lineGap,
       textPadding: { top: padTop, bottom: padBottom },
       bookFormat,
+      // The free customer download and the trial email PDF keep the mirror fill; only the paid
+      // order PDF is outpainted by Grok (decisions.md 2026-10-26, two routings).
+      fillMethod: 'mirror',
     });
   } else {
     const marginOuter = 20;

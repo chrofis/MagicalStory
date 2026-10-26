@@ -257,6 +257,14 @@
   <td>Same scene-composite pipeline used for pages, adapted for covers via <code>buildCoverCompositeCast</code> in <code>server/lib/compositeCastBuilder.js</code>. Cover text (title / dedication / "magicalstory.ch" branding) renders in the blend step via the <code>scene.textOverlay</code> param. <strong>Manual-only via test-models</strong> — auto-pipeline still uses the cover composite path above. Reachable through TestModelsPanel Method 2 (Uniform) or Method 3 (Stratified) toggles on negative pageNumbers (-1/-2/-3). Inherits the same documented failure modes as scene composite on pages — see Why-not table.</td>
 </tr>
 
+
+<tr>
+  <td><code>buildFilledPageBackground({ …, fillMethod: 'grok', editFn })</code> (call site of <code>editWithGrok</code>)</td>
+  <td><code>server/lib/pageFill.js</code> (<code>grokOutpaint</code>); driven by <code>pdf.js</code> <code>prefetchStripBackgrounds</code></td>
+  <td>Grok edit endpoint, <code>grok-imagine-image</code> ($0.02/page), only on the paid order PDF (<code>gelato.processBookOrder</code> passes <code>fillMethod: 'grok'</code>); free PDFs pass <code>'mirror'</code> (no model)</td>
+  <td>Canvas = original picture on top + mirror-fill hint in the text strip, prompt <code>prompts/strip-outpaint.txt</code>, <code>aspectRatio</code> nearest 3:4, <code>skipOutputCrop: true</code>. <code>fillMethod</code> is required, no default; <code>options.editFn</code> stubs the call in tests.</td>
+  <td>JPEG page raster: ORIGINAL picture pixels on top (the model redraws its whole frame, drift 6-40 of 255, so its upper area is discarded), the model's strip below, 30 px feathered seam. A Grok failure throws, no mirror fallback. decisions.md 2026-10-26.</td>
+</tr>
 </tbody>
 </table>
 

@@ -62,6 +62,17 @@
       "severity": "block"
     },
     {
+      "id": "print-vs-view-strip-fill",
+      "axis": "paid print PDF (Grok strip fill) vs free download / trial email / preview PDFs (mirror strip fill)",
+      "reason": "The printed single layout's text strip is filled by fillMethod 'grok' on the paid order path (gelato.processBookOrder) and 'mirror' everywhere else (generateViewPdf, print.js download / admin / test-PDF routes); every caller of generatePrintPdf / generateCombinedBookPdf must pass fillMethod explicitly and a change to who gets the paid Grok call must be made in all of them (decisions.md 2026-10-26, Print PDF strip is outpainted by Grok).",
+      "members": [
+        "server/lib/pdf.js",
+        "server/lib/gelato.js",
+        "server/routes/print.js"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "art-director-templates",
       "axis": "per-page vs all-pages Art Director",
       "reason": "scene-expansion.txt is the per-page gap-fill/fallback template for the same Art Director contract scene-briefs-all.txt drives on the live beats path; a rule or metadata field on one and not the other silently reads as absent on whichever path runs.",
