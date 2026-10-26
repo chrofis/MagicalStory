@@ -335,9 +335,9 @@ It plans both layouts (`planLayoutPages`: content count, SKU, snapped Gelato pag
 
 - Text strip fill (single layout): the strip below the picture is not white. `server/lib/pageFill.js`
   (`buildFilledPageBackground`) builds the whole page as one 300 dpi JPEG: picture on top, below it the
-  picture's lower half flipped, blurred and lightened with a feathered seam, and a soft white board
-  (opacity raised from 70% until the text zone's mean luminance is >= 0.80). `pdf.js` `drawFilledStripPage`
-  draws it and sets the text on top; `addPictureBookPages` and `generateCombinedBookPdf` both call it, so the
+  picture's lower half flipped, blurred and lightened with a feathered seam, nothing else drawn on it.
+  `pdf.js` `drawFilledStripPage` draws it and sets the text on top with a thin white outline under the
+  glyphs (`TEXT_OUTLINE_PT`; the owner rejected a translucent board as a pale box); `addPictureBookPages` and `generateCombinedBookPdf` both call it, so the
   print, combined, customer-download and trial-email PDFs all get it. No fallback (throws). Spread and covers
   untouched. Test: `npx vitest run tests/unit/page-fill.test.ts`. Decision: `docs/decisions.md` 2026-10-26.
 
