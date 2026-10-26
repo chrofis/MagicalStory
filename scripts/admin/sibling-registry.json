@@ -48,6 +48,20 @@
   ],
   "sets": [
     {
+      "id": "printed-book-layout",
+      "axis": "single-story PDF vs combined PDF vs normal checkout vs voucher book checkout",
+      "reason": "Which layout a printed book uses (single or spread, gelato.chooseBookLayout, decisions.md short-book layout 2026-10-26) and which page count the price is read from (single-layout contentPagesSingle, never the printed count) must hold in every path that lays out or prices a book: generatePrintPdf and generateCombinedBookPdf render it, create-checkout-session and vouchers book-checkout price it, BookBuilder and VoucherBookCheckout show it.",
+      "members": [
+        "server/lib/pdf.js",
+        "server/lib/gelato.js",
+        "server/routes/print.js",
+        "server/routes/vouchers.js",
+        "client/src/pages/BookBuilder.tsx",
+        "client/src/pages/VoucherBookCheckout.tsx"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "art-director-templates",
       "axis": "per-page vs all-pages Art Director",
       "reason": "scene-expansion.txt is the per-page gap-fill/fallback template for the same Art Director contract scene-briefs-all.txt drives on the live beats path; a rule or metadata field on one and not the other silently reads as absent on whichever path runs.",

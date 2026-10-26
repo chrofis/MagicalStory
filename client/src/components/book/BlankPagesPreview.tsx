@@ -64,7 +64,7 @@ export default function BlankPagesPreview({
     if (p.kind === 'cover') return set.frontCover;
     if (p.kind === 'dedication') return set.initialPage;
     if (p.kind === 'backCover') return set.backCover;
-    if (p.kind === 'story' && p.pageNumber) return set.pages[p.pageNumber];
+    if ((p.kind === 'story' || p.kind === 'storyImage') && p.pageNumber) return set.pages[p.pageNumber];
     return undefined;
   };
 
@@ -85,6 +85,12 @@ export default function BlankPagesPreview({
               }`}
             >
               {src && <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />}
+              {/* spread layout: the right-hand page holds the text */}
+              {p.kind === 'storyText' && (
+                <div className="w-full px-1 space-y-1" aria-hidden="true">
+                  <div className="h-px bg-indigo-300" /><div className="h-px bg-indigo-300" /><div className="h-px bg-indigo-300" /><div className="h-px bg-indigo-300 w-2/3" />
+                </div>
+              )}
             </div>
           );
         })}

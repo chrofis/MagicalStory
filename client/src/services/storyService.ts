@@ -1,8 +1,19 @@
 import api from './api';
 
+/** POST /api/book-page-info. `contentPagesSingle` is what the price tier is based on, whatever `layout` prints. */
+export interface BookPageInfo {
+  layout: 'single' | 'spread';
+  contentPages: number;
+  contentPagesSingle: number;
+  printedPages: number;
+  blankPages: number;
+  blankAckFrom: number;
+  sequence: PrintedPage[];
+}
+
 /** One printed page of a book, as laid out by buildPrintedPageSequence (server/lib/gelato.js). */
 export interface PrintedPage {
-  kind: 'cover' | 'insideFront' | 'dedication' | 'title' | 'story' | 'backCover' | 'separator' | 'filler' | 'insideBack';
+  kind: 'cover' | 'insideFront' | 'dedication' | 'title' | 'story' | 'storyImage' | 'storyText' | 'backCover' | 'separator' | 'filler' | 'insideBack';
   storyIndex?: number;
   pageNumber?: number;
 }
@@ -2328,7 +2339,7 @@ export const storyService = {
 
   // Pre-payment preview: printed page count and blank pages, computed by the
   // same server function that pads the print PDF.
-  async getBookPageInfo(storyIds: string[], coverType: 'softcover' | 'hardcover', bookFormat: 'square' | 'A4'): Promise<{ contentPages: number; printedPages: number; blankPages: number; blankAckFrom: number; sequence: PrintedPage[] }> {
+  async getBookPageInfo(storyIds: string[], coverType: 'softcover' | 'hardcover', bookFormat: 'square' | 'A4'): Promise<BookPageInfo> {
     return api.post('/api/book-page-info', { storyIds, coverType, bookFormat });
   },
 

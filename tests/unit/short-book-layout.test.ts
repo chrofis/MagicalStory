@@ -102,3 +102,17 @@ describe('spread sequence', () => {
     });
   });
 });
+
+describe('clients bill the single-layout count', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = (f: string) => fs.readFileSync(path.resolve(__dirname, '../../client/src/pages', f), 'utf8');
+  it('BookBuilder prices contentPagesSingle, never the printed-layout contentPages', () => {
+    expect(src('BookBuilder.tsx')).toContain('pageInfo?.contentPagesSingle');
+    expect(src('BookBuilder.tsx')).not.toMatch(/billedPages = pageInfo\?\.contentPages\b/);
+  });
+  it('both blank-page warnings carry the add-story action', () => {
+    expect(src('BookBuilder.tsx')).toContain('<AddStoryNudge');
+    expect(src('VoucherBookCheckout.tsx')).toContain('<AddStoryNudge');
+  });
+});

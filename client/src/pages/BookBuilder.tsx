@@ -6,7 +6,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Navigation, LoadingSpinner } from '@/components/common';
 import BlankPagesPreview from '@/components/book/BlankPagesPreview';
-import type { PrintedPage } from '@/services/storyService';
+import AddStoryNudge from '@/components/book/AddStoryNudge';
+import type { BookPageInfo } from '@/services/storyService';
 import { storyService } from '@/services';
 import { getPriceForPages, MAX_BOOK_PAGES, SHIPPING_COST_CHF, type PricingTier } from '@/utils/bookPricing';
 import { createLogger } from '@/services/logger';
@@ -149,9 +150,8 @@ export default function BookBuilder() {
       orderBook: 'Order Book',
       tooManyPages: 'Too many pages',
       tooManyPagesDesc: 'Maximum is 100 pages. Please remove some stories.',
-      blankPagesTitle: 'Blank pages in your book',
+      blankPagesTitle: 'Your book has room for another story',
       blankPagesDesc: (printed: number, content: number, blank: number) => `Your book has ${printed} pages. Your story fills ${content} of them – ${blank} ${blank === 1 ? 'page' : 'pages'} will be blank.`,
-      blankPagesHint: 'Consider a longer story, or combine several stories into one book.',
       blankPreviewTitle: 'Your printed book',
       blankPreviewSummary: (f: number, p: number, b: number) => `${f} of ${p} pages filled, ${b} blank`,
       blankLegendFilled: 'Page with content',
@@ -204,9 +204,8 @@ export default function BookBuilder() {
       orderBook: 'Buch bestellen',
       tooManyPages: 'Zu viele Seiten',
       tooManyPagesDesc: 'Maximal 100 Seiten erlaubt. Bitte entferne einige Geschichten.',
-      blankPagesTitle: 'Leere Seiten in deinem Buch',
+      blankPagesTitle: 'In deinem Buch ist Platz für eine weitere Geschichte',
       blankPagesDesc: (printed: number, content: number, blank: number) => `Dein Buch hat ${printed} Seiten. Deine Geschichte füllt ${content} davon – ${blank} ${blank === 1 ? 'Seite' : 'Seiten'} bleiben leer.`,
-      blankPagesHint: 'Erwäge eine längere Geschichte oder kombiniere mehrere Geschichten zu einem Buch.',
       blankPreviewTitle: 'Dein gedrucktes Buch',
       blankPreviewSummary: (f: number, p: number, b: number) => `${f} von ${p} Seiten gefüllt, ${b} leer`,
       blankLegendFilled: 'Seite mit Inhalt',
@@ -259,9 +258,8 @@ export default function BookBuilder() {
       orderBook: 'Commander le livre',
       tooManyPages: 'Trop de pages',
       tooManyPagesDesc: 'Maximum 100 pages. Veuillez retirer quelques histoires.',
-      blankPagesTitle: 'Pages vierges dans votre livre',
+      blankPagesTitle: 'Votre livre a de la place pour une autre histoire',
       blankPagesDesc: (printed: number, content: number, blank: number) => `Votre livre compte ${printed} pages. Votre histoire en remplit ${content} – ${blank} ${blank === 1 ? 'page' : 'pages'} resteront vierges.`,
-      blankPagesHint: 'Pensez à une histoire plus longue ou combinez plusieurs histoires dans un seul livre.',
       blankPreviewTitle: 'Votre livre imprimé',
       blankPreviewSummary: (f: number, p: number, b: number) => `${f} pages sur ${p} remplies, ${b} ${b === 1 ? 'vierge' : 'vierges'}`,
       blankLegendFilled: 'Page avec contenu',
@@ -314,9 +312,8 @@ export default function BookBuilder() {
       orderBook: 'Ordina il libro',
       tooManyPages: 'Troppe pagine',
       tooManyPagesDesc: 'Massimo 100 pagine. Rimuovi alcune storie.',
-      blankPagesTitle: 'Pagine vuote nel tuo libro',
+      blankPagesTitle: 'Nel tuo libro c’è spazio per un’altra storia',
       blankPagesDesc: (printed: number, content: number, blank: number) => `Il tuo libro ha ${printed} pagine. La tua storia ne riempie ${content} – ${blank} ${blank === 1 ? 'pagina' : 'pagine'} resteranno vuote.`,
-      blankPagesHint: 'Valuta una storia più lunga oppure combina più storie in un unico libro.',
       blankPreviewTitle: 'Il tuo libro stampato',
       blankPreviewSummary: (f: number, p: number, b: number) => `${f} pagine su ${p} riempite, ${b} ${b === 1 ? 'vuota' : 'vuote'}`,
       blankLegendFilled: 'Pagina con contenuto',
@@ -372,7 +369,7 @@ export default function BookBuilder() {
   // computeBookPageInfo the order flow pads the PDF with. `contentPages` is the
   // count the checkout picks the price tier from (countBookContentPages), so the
   // quote below is derived from it, never from the client-side scene sum.
-  const [pageInfo, setPageInfo] = useState<{ contentPages: number; printedPages: number; blankPages: number; blankAckFrom: number; sequence: PrintedPage[] } | null>(null);
+  const [pageInfo, setPageInfo] = useState<BookPageInfo | null>(null);
   // Required acknowledgement of the blank pages before checkout is enabled.
   const [blankAck, setBlankAck] = useState(false);
   const storyIdsKey = stories.map(s => s.id).join(',');
@@ -392,7 +389,8 @@ export default function BookBuilder() {
   }, [storyIdsKey, coverType, bookFormat, isOverLimit, language, showToast]);
 
   // Price for the billed page count; null until the server has counted the book.
-  const billedPages = pageInfo?.contentPages ?? null;
+  // contentPagesSingle: the price never moves with the printed layout (decisions.md, short-book layout 2026-10-26).
+  const billedPages = pageInfo?.contentPagesSingle ?? null;
   const price = useMemo(() => {
     return billedPages === null ? null : getPriceForPages(billedPages, coverType === 'hardcover', pricingTiers);
   }, [billedPages, coverType, pricingTiers]);
@@ -401,6 +399,24 @@ export default function BookBuilder() {
   // preview and require the acknowledgement. The checkout endpoint enforces it too.
   const needsBlankAck = !!pageInfo && !isOverLimit && pageInfo.blankPages >= pageInfo.blankAckFrom;
   useEffect(() => { setBlankAck(false); }, [pageInfo?.blankPages, storyIdsKey]);
+
+  // "Add another story": back to the story picker (selection is kept in sessionStorage by
+  // MyStories) when the user has other stories, else straight to the story wizard.
+  const [addingStory, setAddingStory] = useState(false);
+  const handleAddStory = async () => {
+    setAddingStory(true);
+    try {
+      const { stories: all } = await storyService.getStories({ limit: 100 });
+      const inBook = new Set(stories.map(s => s.id));
+      try { sessionStorage.setItem('mystories_selected', JSON.stringify([...inBook])); } catch { /* picker starts empty */ }
+      navigate(all.some(s => !inBook.has(s.id)) ? '/stories' : '/create?new=true');
+    } catch (err) {
+      log.error('Failed to load stories for add-story:', err);
+      showToast({ message: localizedApiError(err, language), variant: 'error' });
+    } finally {
+      setAddingStory(false);
+    }
+  };
 
   // Move story up/down
   const moveStory = (index: number, direction: 'up' | 'down') => {
@@ -652,7 +668,7 @@ export default function BookBuilder() {
                     <div>
                       <div className="font-semibold text-sm">{t.blankPagesTitle}</div>
                       <span className="text-sm">{t.blankPagesDesc(pageInfo.printedPages, pageInfo.contentPages, pageInfo.blankPages)}</span>
-                      <span className="text-sm block mt-1">{t.blankPagesHint}</span>
+                      <AddStoryNudge language={language} layout={pageInfo.layout} onAdd={handleAddStory} busy={addingStory} />
                     </div>
                   </div>
                   <BlankPagesPreview

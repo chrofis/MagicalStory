@@ -6,8 +6,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useLangPath } from '@/hooks/useLangPath';
 import { Navigation, LoadingSpinner } from '@/components/common';
 import BlankPagesPreview from '@/components/book/BlankPagesPreview';
+import AddStoryNudge from '@/components/book/AddStoryNudge';
 import { storyService } from '@/services';
-import type { PrintedPage, VoucherBookCredit } from '@/services/storyService';
+import type { BookPageInfo, VoucherBookCredit } from '@/services/storyService';
 import { createLogger } from '@/services/logger';
 import { localizedApiError } from '@/utils/apiErrors';
 import { VOUCHER_BOOK_MAX_PAGES, VOUCHER_HARDCOVER_SURCHARGE_CHF } from '@/constants/voucher';
@@ -40,9 +41,8 @@ const texts = {
     hardcover: 'Hardcover',
     hardcoverPrice: (chf: string) => `+ CHF ${chf}`,
     size: '21 × 28 cm',
-    blankPagesTitle: 'Blank pages in your book',
+    blankPagesTitle: 'Your book has room for another story',
     blankPagesDesc: (printed: number, content: number, blank: number) => `Your book has ${printed} pages. Your stories fill ${content} of them, ${blank} ${blank === 1 ? 'page' : 'pages'} will stay blank.`,
-    blankPagesHint: 'Consider adding another story to fill the book.',
     blankPreviewTitle: 'Your printed book',
     blankPreviewSummary: (f: number, p: number, b: number) => `${f} of ${p} pages filled, ${b} blank`,
     blankLegendFilled: 'Page with content',
@@ -73,9 +73,8 @@ const texts = {
     hardcover: 'Hardcover',
     hardcoverPrice: (chf: string) => `+ CHF ${chf}`,
     size: '21 × 28 cm',
-    blankPagesTitle: 'Leere Seiten in deinem Buch',
+    blankPagesTitle: 'In deinem Buch ist Platz für eine weitere Geschichte',
     blankPagesDesc: (printed: number, content: number, blank: number) => `Dein Buch hat ${printed} Seiten. Deine Geschichten füllen ${content} davon, ${blank} ${blank === 1 ? 'Seite bleibt' : 'Seiten bleiben'} leer.`,
-    blankPagesHint: 'Überlege dir, eine weitere Geschichte hinzuzufügen, um das Buch zu füllen.',
     blankPreviewTitle: 'Dein gedrucktes Buch',
     blankPreviewSummary: (f: number, p: number, b: number) => `${f} von ${p} Seiten gefüllt, ${b} leer`,
     blankLegendFilled: 'Seite mit Inhalt',
@@ -106,9 +105,8 @@ const texts = {
     hardcover: 'Couverture rigide',
     hardcoverPrice: (chf: string) => `+ CHF ${chf}`,
     size: '21 × 28 cm',
-    blankPagesTitle: 'Pages vierges dans votre livre',
+    blankPagesTitle: 'Votre livre a de la place pour une autre histoire',
     blankPagesDesc: (printed: number, content: number, blank: number) => `Votre livre compte ${printed} pages. Vos histoires en remplissent ${content}, ${blank} ${blank === 1 ? 'page restera vierge' : 'pages resteront vierges'}.`,
-    blankPagesHint: 'Pensez à ajouter une histoire pour remplir le livre.',
     blankPreviewTitle: 'Votre livre imprimé',
     blankPreviewSummary: (f: number, p: number, b: number) => `${f} pages sur ${p} remplies, ${b} ${b === 1 ? 'vierge' : 'vierges'}`,
     blankLegendFilled: 'Page avec contenu',
@@ -139,9 +137,8 @@ const texts = {
     hardcover: 'Copertina rigida',
     hardcoverPrice: (chf: string) => `+ CHF ${chf}`,
     size: '21 × 28 cm',
-    blankPagesTitle: 'Pagine vuote nel tuo libro',
+    blankPagesTitle: 'Nel tuo libro c’è spazio per un’altra storia',
     blankPagesDesc: (printed: number, content: number, blank: number) => `Il tuo libro ha ${printed} pagine. Le tue storie ne riempiono ${content}, ${blank} ${blank === 1 ? 'pagina resterà vuota' : 'pagine resteranno vuote'}.`,
-    blankPagesHint: 'Valuta di aggiungere un’altra storia per riempire il libro.',
     blankPreviewTitle: 'Il tuo libro stampato',
     blankPreviewSummary: (f: number, p: number, b: number) => `${f} pagine su ${p} riempite, ${b} ${b === 1 ? 'vuota' : 'vuote'}`,
     blankLegendFilled: 'Pagina con contenuto',
@@ -168,7 +165,7 @@ export default function VoucherBookCheckout() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string[]>([]);
   const [coverType, setCoverType] = useState<'softcover' | 'hardcover'>('softcover');
-  const [pageInfo, setPageInfo] = useState<{ contentPages: number; printedPages: number; blankPages: number; blankAckFrom: number; sequence: PrintedPage[] } | null>(null);
+  const [pageInfo, setPageInfo] = useState<BookPageInfo | null>(null);
   const [blankAck, setBlankAck] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -228,10 +225,20 @@ export default function VoucherBookCheckout() {
     return () => { cancelled = true; };
   }, [selectedKey, coverType, language]);
 
-  const pageCount = pageInfo?.contentPages ?? listedPages;
+  const pageCount = pageInfo?.contentPagesSingle ?? listedPages;
   const isTooLong = pageCount > maxPages;
   const needsBlankAck = !!pageInfo && !isTooLong && pageInfo.blankPages >= pageInfo.blankAckFrom;
   useEffect(() => { setBlankAck(false); }, [pageInfo?.blankPages, selectedKey]);
+
+  // "Add another story": the picker is this page's own story list. Unselected stories exist ->
+  // scroll to the list; otherwise the user has none left, so go to the story wizard.
+  const handleAddStory = () => {
+    if (stories.some(s => !selected.includes(s.id))) {
+      document.getElementById('voucher-story-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      navigate(lp('/create'));
+    }
+  };
 
   const toggle = (id: string) => {
     setError('');
@@ -313,7 +320,7 @@ export default function VoucherBookCheckout() {
         ) : (
           <>
             <section className={card}>
-              <h2 className="text-xl font-bold text-gray-800 mb-3">{t.storiesTitle}</h2>
+              <h2 id="voucher-story-list" className="text-xl font-bold text-gray-800 mb-3">{t.storiesTitle}</h2>
               {stories.length === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-gray-500 mb-3">{t.noStories}</p>
@@ -361,7 +368,7 @@ export default function VoucherBookCheckout() {
                     <div>
                       <div className="font-semibold text-sm">{t.blankPagesTitle}</div>
                       <span className="text-sm">{t.blankPagesDesc(pageInfo.printedPages, pageInfo.contentPages, pageInfo.blankPages)}</span>
-                      <span className="text-sm block mt-1">{t.blankPagesHint}</span>
+                      <AddStoryNudge language={language} layout={pageInfo.layout} onAdd={handleAddStory} />
                     </div>
                   </div>
                   <BlankPagesPreview
