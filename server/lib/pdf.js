@@ -516,22 +516,21 @@ function computeTextBelowRatio(pages, languageLevel) {
   return ratio;
 }
 
-// Print raster resolution of the filled strip background (see pageFill.js).
+// Print raster resolution of the filled strip page (see pageFill.js).
 const PAGE_FILL_DPI = 300;
-// White outline around the strip text, in points (stroke is centred on the glyph edge, so about half shows).
-const TEXT_OUTLINE_PT = 1.2;
 
 /**
- * Classic single layout page, text below the picture: the page background is the
- * picture plus a strip filled from the picture's own lower half (mirrored, blurred,
- * lightened), the text carries a thin white outline over it (decisions.md, "Print page
- * strip filled by a mirrored, blurred picture", 2026-10-26). One implementation for
- * the print PDF, the combined book PDF and the view/trial PDFs (all go through
- * addPictureBookPages / addStoryContentPages). A fill failure throws, no fallback.
- * A page whose picture is missing or unreadable stays a text-only page, as before.
+ * Classic single layout page, text below the picture: the page raster is the picture plus
+ * a strip filled from the picture's own lower half (mirrored, blurred, lightened;
+ * pageFill.js), and the text is rendered into that strip by generateTextOverlay, the ONE
+ * text-on-picture renderer (white glyphs, black stroke adapted to the luminance behind
+ * them, fixed point size from requiredFontPt). decisions.md, "Print page strip filled by
+ * a mirrored, blurred picture", 2026-10-26. Used by the print PDF, the combined book PDF
+ * and the view/trial PDFs. A fill or overlay failure throws, no fallback. A page whose
+ * picture is missing or unreadable stays a text-only page (dark text on white), as before.
  */
 async function drawFilledStripPage(doc, image, g) {
-  const { interiorW, interiorH, imageBottom, pageNumber, text, fontSize, lineGap, paragraphGap, textX, textWidth, padTop, textBudgetHeight, textBottom } = g;
+  const { interiorW, interiorH, imageBottom, pageNumber, text, fontSize, lineGap, paragraphGap, textX, textWidth, padTop, textBudgetHeight, textBottom, bookFormat, languageLevel } = g;
 
   let imageBuffer = null;
   if (image?.imageData) {
@@ -544,33 +543,29 @@ async function drawFilledStripPage(doc, image, g) {
     }
   }
 
-  doc.fontSize(fontSize).font('Helvetica');
-  const textHeight = doc.heightOfString(text, { width: textWidth, align: 'center', lineGap, paragraphGap });
-  const textY = imageBottom + padTop + Math.max(0, (textBudgetHeight - textHeight) / 2);
-
   if (imageBuffer) {
     const { buildFilledPageBackground } = require('./pageFill');
+    const { requiredFontPt } = require('../config/textRegion');
     const s = PAGE_FILL_DPI / 72;
-    const { buffer } = await buildFilledPageBackground({
-      imageBuffer,
-      pageWidthPx: Math.round(interiorW * s),
-      pageHeightPx: Math.round(interiorH * s),
-      imageHeightPx: Math.round(imageBottom * s),
+    const W = Math.round(interiorW * s);
+    const H = Math.round(interiorH * s);
+    const IH = Math.round(imageBottom * s);
+    const { buffer } = await buildFilledPageBackground({ imageBuffer, pageWidthPx: W, pageHeightPx: H, imageHeightPx: IH });
+    // Same point-size rule as the in-image pages (px = pt * pixels per point).
+    const { compositedImage } = await generateTextOverlay(buffer, text, 'bottom-full', {
+      pageNumber, bookFormat, languageLevel,
+      fontSize: Math.round(requiredFontPt(languageLevel) * s),
+      zonePolygon: [[0, IH], [W, IH], [W, H], [0, H]],
     });
-    doc.image(buffer, 0, 0, { width: interiorW, height: interiorH });
+    doc.image(compositedImage, 0, 0, { width: interiorW, height: interiorH });
+    return;
   }
 
-  // Text: a thin white outline pass first (stroke only, round joins), then the #333 fill on
-  // top, so the stroke sits under the glyphs and cannot thin them. Reads on the coloured
-  // strip without a board (owner 2026-10-26). Same layout options both passes.
-  const textOpts = { width: textWidth, align: 'center', lineGap, paragraphGap, height: Math.max(0, textBottom - textY), ellipsis: true };
-  doc.fontSize(fontSize).font('Helvetica');
-  doc.save();
-  doc.lineWidth(TEXT_OUTLINE_PT).lineJoin('round').strokeColor('white');
-  doc.text(text, textX, textY, { ...textOpts, stroke: true, fill: false });
-  doc.restore();
-  doc.fillColor('#333');
-  doc.text(text, textX, textY, textOpts);
+  // No picture: plain text page.
+  doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+  const textHeight = doc.heightOfString(text, { width: textWidth, align: 'center', lineGap, paragraphGap });
+  const textY = imageBottom + padTop + Math.max(0, (textBudgetHeight - textHeight) / 2);
+  doc.text(text, textX, textY, { width: textWidth, align: 'center', lineGap, paragraphGap, height: Math.max(0, textBottom - textY), ellipsis: true });
 }
 
 /**
@@ -666,6 +661,7 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
         // the text lands in the reserved strip, not off the trim edge.
         await drawFilledStripPage(doc, image, {
           interiorW, interiorH, imageBottom: bleed + classicImageHeight, pageNumber,
+        bookFormat: opts.bookFormat, languageLevel: storyData.languageLevel,
           text: flowText, fontSize, lineGap, paragraphGap,
           textX: bleed + textMargin, textWidth,
           padTop: textPadTop, textBudgetHeight: effectiveTextHeight, textBottom: bleed + pageHeight - textPadBottom,
@@ -686,6 +682,7 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       // room above and below the text.
       await drawFilledStripPage(doc, image, {
         interiorW, interiorH, imageBottom: bleed + classicImageHeight, pageNumber,
+        bookFormat: opts.bookFormat, languageLevel: storyData.languageLevel,
         text: flowText, fontSize, lineGap, paragraphGap,
         textX: bleed + textMargin, textWidth,
         padTop: textPadTop, textBudgetHeight: effectiveTextHeight, textBottom: bleed + pageHeight - textPadBottom,
@@ -953,6 +950,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       // Picture on top, text strip below filled from the picture (same helper as generatePrintPdf).
       await drawFilledStripPage(doc, image, {
         interiorW: interiorPageWidth, interiorH: interiorPageHeight, imageBottom: bleed + imageHeight, pageNumber,
+        bookFormat, languageLevel: storyData.languageLevel,
         text: flowText, fontSize: consistentFont, lineGap, paragraphGap,
         textX: bleed + textMarginMm, textWidth,
         padTop, textBudgetHeight: effectiveTextHeight, textBottom: bleed + pageHeight - padBottom,

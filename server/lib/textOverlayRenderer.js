@@ -208,6 +208,9 @@ function renderStage(width, height, text, clipPath, textPosition, baseFontSize, 
  * @param {string} [options.languageLevel] - '1st-grade' | 'standard' | 'advanced'
  * @param {number} [options.fontSize] - Override font size
  * @param {string} [options.fontFamily] - Override font family
+ * @param {number[][]} [options.zonePolygon] - Explicit text zone (pixel polygon) instead of the
+ *   committed mask shape. The printed single layout puts the text on a strip BELOW the picture;
+ *   its zone is that rectangle (pdf.js drawFilledStripPage).
  * @returns {Promise<{overlayImage: Buffer, compositedImage: Buffer, polygon: number[][]|null, calmRegion: object|null}>}
  */
 async function generateTextOverlay(imageBuffer, text, textPosition, options = {}) {
@@ -223,7 +226,9 @@ async function generateTextOverlay(imageBuffer, text, textPosition, options = {}
   const languageLevel = options.languageLevel || 'standard';
   let polygon = null;
   const calmRegion = null;
-  if (VALID_POSITIONS.includes(textPosition)) {
+  if (options.zonePolygon) {
+    polygon = options.zonePolygon;
+  } else if (VALID_POSITIONS.includes(textPosition)) {
     polygon = getTextZonePolygon(textPosition, languageLevel, width, height);
     if (polygon) {
       console.log(`[TEXT-OVERLAY] Text zone from mask: ${polygon.length} vertices, position ${textPosition}, level ${languageLevel}`);
