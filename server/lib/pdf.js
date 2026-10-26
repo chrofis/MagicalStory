@@ -20,8 +20,10 @@ const PAGE_SIZE = BOOK_FORMATS.square.pageWidth;
 
 // Minimum font size before warning
 const MIN_FONT_SIZE_WARNING = 10;
-// Spread layout text page has the whole page, so a larger start font than the strip layouts.
-const SPREAD_START_FONT = 16;
+// Spread text page (owner 2026-10-26: keep white, big text, upper half).
+const SPREAD_START_FONT = 22;
+const SPREAD_LINE_GAP_RATIO = 0.35; // lineGap on top of Helvetica's ~1.15 line height = about 1.5 spacing
+const SPREAD_TEXT_TOP_RATIO = 0.2;  // text starts 20% down the page
 
 /**
  * Extract image data from cover images (handles both string and object formats)
@@ -661,18 +663,29 @@ async function addSpreadPages(doc, storyData, storyPages, pageWidth, pageHeight,
   const interiorH = pageHeight + 2 * bleed;
   const marginInner = mmToPoints(20);  // gutter side (left of the right-hand page)
   const marginOuter = mmToPoints(14);
-  const marginY = mmToPoints(18);
+  const marginTop = pageHeight * SPREAD_TEXT_TOP_RATIO; // text block starts in the upper half, not centred
+  const marginBottom = mmToPoints(18);
   const textWidth = pageWidth - marginInner - marginOuter;
-  const textHeight = pageHeight - 2 * marginY;
-  const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, textHeight, SPREAD_START_FONT, 10, 'center');
-  const fontSize = fontResult.fontSize;
-  const lineGap = fontResult.lineGap;
+  const textHeight = pageHeight - marginTop - marginBottom;
+  const cleaned = storyPages.map(t => t.trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n'));
+  // One font for the whole story: the largest size (22pt down to a 10pt floor) at which
+  // every page fits at ~1.5 line spacing. Shrinks only when the text does not fit.
+  const gapFor = (f) => f * SPREAD_LINE_GAP_RATIO;
+  const fits = (f) => {
+    doc.fontSize(f).font('Helvetica');
+    return cleaned.every(t => doc.heightOfString(t, { width: textWidth, align: 'left', lineGap: gapFor(f), paragraphGap: f * 0.5 }) <= textHeight);
+  };
+  let fontSize = SPREAD_START_FONT;
+  while (fontSize > 10 && !fits(fontSize)) fontSize -= 0.5;
+  if (!fits(fontSize)) {
+    throw new Error(`Spread text too long even at 10pt (story "${storyData.title || '?'}"). Please shorten the text.`);
+  }
+  const lineGap = gapFor(fontSize);
   const paragraphGap = fontSize * 0.5;
 
   for (let index = 0; index < storyPages.length; index++) {
     const pageNumber = index + 1;
     const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
-    const flowText = storyPages[index].trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n');
 
     // LEFT page: full-bleed scene image
     doc.addPage({ size: [interiorW, interiorH], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
@@ -686,12 +699,10 @@ async function addSpreadPages(doc, storyData, storyPages, pageWidth, pageHeight,
       }
     }
 
-    // RIGHT page: text, vertically centred
+    // RIGHT page: text block starting at the top margin
     doc.addPage({ size: [interiorW, interiorH], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-    const h = doc.heightOfString(flowText, { width: textWidth, align: 'center', lineGap, paragraphGap });
-    const y = bleed + marginY + Math.max(0, (textHeight - h) / 2);
-    doc.text(flowText, bleed + marginInner, y, { width: textWidth, align: 'center', lineGap, paragraphGap, height: textHeight, ellipsis: true });
+    doc.text(cleaned[index], bleed + marginInner, bleed + marginTop, { width: textWidth, align: 'left', lineGap, paragraphGap, height: textHeight, ellipsis: true });
   }
   return storyPages.length * 2;
 }
