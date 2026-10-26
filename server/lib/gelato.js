@@ -75,14 +75,17 @@ function snapToValidPageCount(estimated, product) {
  * Mirrors what generatePrintPdf / generateCombinedBookPdf render.
  *
  * @param {Object[]} storyDatas - stories.data objects, in book order
+ * @param {'single'|'spread'} [layout='single'] - 'spread' prints each scene on two
+ *   pages (image page + facing text page), see chooseBookLayout
  * @returns {number}
  */
-function countBookContentPages(storyDatas) {
+function countBookContentPages(storyDatas, layout = 'single') {
+  const perScene = layout === 'spread' ? 2 : 1;
   const { parseStoryPages } = require('./pdf');
   let storyContentPages = 0;
   for (let si = 0; si < storyDatas.length; si++) {
-    // Picture-book layout for all reading levels: 1 scene = 1 print page
-    storyContentPages += parseStoryPages(storyDatas[si]).length;
+    // Single layout: 1 scene = 1 print page. Spread layout: 1 scene = image page + text page.
+    storyContentPages += parseStoryPages(storyDatas[si]).length * perScene;
     if (si > 0) {
       storyContentPages += 2; // title + dedication page (always)
       if (storyDatas[si]?.coverImages?.backCover) {
@@ -120,10 +123,14 @@ function isBlankPagesAckMissing(blankPages, acknowledged) {
  * page in the Gelato page count (blankPages).
  *
  * @param {Object[]} storyDatas - stories.data objects, in book order
+ * In the 'spread' layout each scene is two entries, `storyImage` (left page) then
+ * `storyText` (right page), instead of one `story` entry.
+ *
  * @param {number} printedPages - Gelato page count (from computeBookPageInfo)
+ * @param {'single'|'spread'} [layout='single']
  * @returns {{kind:string, storyIndex?:number, pageNumber?:number}[]}
  */
-function buildPrintedPageSequence(storyDatas, printedPages) {
+function buildPrintedPageSequence(storyDatas, printedPages, layout = 'single') {
   const { parseStoryPages } = require('./pdf');
   const seq = [{ kind: 'cover' }, { kind: 'insideFront' }, { kind: 'dedication' }];
   for (let si = 0; si < storyDatas.length; si++) {
@@ -131,7 +138,13 @@ function buildPrintedPageSequence(storyDatas, printedPages) {
       seq.push({ kind: 'title', storyIndex: si }, { kind: 'dedication', storyIndex: si });
     }
     const n = parseStoryPages(storyDatas[si]).length;
-    for (let p = 1; p <= n; p++) seq.push({ kind: 'story', storyIndex: si, pageNumber: p });
+    for (let p = 1; p <= n; p++) {
+      if (layout === 'spread') {
+        seq.push({ kind: 'storyImage', storyIndex: si, pageNumber: p }, { kind: 'storyText', storyIndex: si, pageNumber: p });
+      } else {
+        seq.push({ kind: 'story', storyIndex: si, pageNumber: p });
+      }
+    }
     if (si > 0 && storyDatas[si]?.coverImages?.backCover) {
       seq.push({ kind: 'backCover', storyIndex: si });
       if (si < storyDatas.length - 1) seq.push({ kind: 'separator', storyIndex: si });
@@ -145,38 +158,20 @@ function buildPrintedPageSequence(storyDatas, printedPages) {
 }
 
 /**
- * Single source of truth for "how many pages will this book be printed with,
- * and how many of them are blank". Used by the order flow (PDF padding) and
- * by the pre-payment preview in the book builder.
- *
- * @param {import('pg').Pool} dbPool
- * @param {Object[]} storyDatas - stories.data objects, in book order
- * @param {'softcover'|'hardcover'} coverType
- * @param {'A4'|'square'} bookFormat
- * @returns {Promise<{contentPages:number, estimatedPageCount:number,
- *   printedPages:number, blankPages:number, productUid:string|null, product:Object|null}>}
+ * Page plan of one layout: even-padded estimate, the SKU that fits it, the
+ * Gelato page count it snaps to, and how many of those pages are filler.
+ * Pure. With no SKU the plan is just the parity-padded estimate.
  */
-async function computeBookPageInfo(dbPool, storyDatas, coverType, bookFormat) {
-  const contentPages = countBookContentPages(storyDatas);
+function planLayoutPages(productRows, storyDatas, layout) {
+  const contentPages = countBookContentPages(storyDatas, layout);
   // Gelato requires even page counts for double-sided printing
   const estimatedPageCount = contentPages % 2 !== 0 ? contentPages + 1 : contentPages;
-  const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
-  const productsResult = await dbPool.query(
-    `SELECT product_uid, product_name, min_pages, max_pages, available_page_counts
-       FROM gelato_products
-      WHERE is_active = true
-        AND LOWER(product_uid) LIKE $1
-        AND LOWER(product_uid) LIKE $2
-      ORDER BY max_pages ASC NULLS LAST, min_pages ASC NULLS LAST`,
-    [`%${String(coverType).toLowerCase()}%`, `%${formatPattern}%`]
-  );
-  const product = productsResult.rows.find(p =>
+  const product = productRows.find(p =>
     estimatedPageCount <= (p.max_pages || 999)
-  ) || productsResult.rows[0] || null; // any active SKU; snap lifts below min
+  ) || productRows[0] || null; // any active SKU; snap lifts below min
   if (!product) {
-    return { contentPages, estimatedPageCount, printedPages: estimatedPageCount,
-      blankPages: estimatedPageCount - contentPages, productUid: null, product: null,
-      sequence: buildPrintedPageSequence(storyDatas, estimatedPageCount) };
+    return { layout, contentPages, estimatedPageCount, printedPages: estimatedPageCount,
+      blankPages: estimatedPageCount - contentPages, product: null };
   }
   let printedPages;
   try {
@@ -189,9 +184,69 @@ async function computeBookPageInfo(dbPool, storyDatas, coverType, bookFormat) {
       `Check the gelato_products row: min_pages, max_pages, and available_page_counts must be populated.`
     );
   }
-  return { contentPages, estimatedPageCount, printedPages,
-    blankPages: Math.max(0, printedPages - contentPages), productUid: product.product_uid, product,
-    sequence: buildPrintedPageSequence(storyDatas, printedPages) };
+  return { layout, contentPages, estimatedPageCount, printedPages,
+    blankPages: Math.max(0, printedPages - contentPages), product };
+}
+
+/**
+ * THE layout decision (decisions.md, short-book layout 2026-10-26). A short story
+ * on Gelato's 28-page minimum leaves most of the book white. Print it as a
+ * 'spread' (scene image full-bleed on the left page, its text on the facing right
+ * page, two pages per scene) when the single layout would leave
+ * BLANK_PAGES_ACK_FROM or more filler pages AND the spread leaves fewer.
+ * Everything else (PDF, preview, checkout) reads the result of this function.
+ *
+ * @param {{blankPages:number}} singlePlan - planLayoutPages(..., 'single')
+ * @param {{blankPages:number}} spreadPlan - planLayoutPages(..., 'spread')
+ * @returns {'single'|'spread'}
+ */
+function chooseBookLayout(singlePlan, spreadPlan) {
+  return singlePlan.blankPages >= BLANK_PAGES_ACK_FROM && spreadPlan.blankPages < singlePlan.blankPages
+    ? 'spread' : 'single';
+}
+
+/**
+ * Single source of truth for "how many pages will this book be printed with,
+ * and how many of them are blank". Used by the order flow (PDF layout + padding)
+ * and by the pre-payment preview in the book builder.
+ *
+ * `contentPagesSingle` is the content count of the single layout and is what the
+ * price is based on, whatever layout is chosen (spread never moves a book to a
+ * higher price tier; owner 2026-10-26).
+ *
+ * @param {import('pg').Pool} dbPool
+ * @param {Object[]} storyDatas - stories.data objects, in book order
+ * @param {'softcover'|'hardcover'} coverType
+ * @param {'A4'|'square'} bookFormat
+ * @returns {Promise<{layout:'single'|'spread', contentPages:number, contentPagesSingle:number,
+ *   estimatedPageCount:number, printedPages:number, blankPages:number,
+ *   productUid:string|null, product:Object|null, sequence:Object[]}>}
+ */
+async function computeBookPageInfo(dbPool, storyDatas, coverType, bookFormat) {
+  const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
+  const productsResult = await dbPool.query(
+    `SELECT product_uid, product_name, min_pages, max_pages, available_page_counts
+       FROM gelato_products
+      WHERE is_active = true
+        AND LOWER(product_uid) LIKE $1
+        AND LOWER(product_uid) LIKE $2
+      ORDER BY max_pages ASC NULLS LAST, min_pages ASC NULLS LAST`,
+    [`%${String(coverType).toLowerCase()}%`, `%${formatPattern}%`]
+  );
+  const single = planLayoutPages(productsResult.rows, storyDatas, 'single');
+  const spread = planLayoutPages(productsResult.rows, storyDatas, 'spread');
+  const plan = chooseBookLayout(single, spread) === 'spread' ? spread : single;
+  return {
+    layout: plan.layout,
+    contentPages: plan.contentPages,
+    contentPagesSingle: single.contentPages,
+    estimatedPageCount: plan.estimatedPageCount,
+    printedPages: plan.printedPages,
+    blankPages: plan.blankPages,
+    productUid: plan.product ? plan.product.product_uid : null,
+    product: plan.product,
+    sequence: buildPrintedPageSequence(storyDatas, plan.printedPages, plan.layout),
+  };
 }
 
 /**
@@ -393,6 +448,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
       const result = await generatePrintPdf(stories[0].data, bookFormat, {
         gelatoCoverDims: coverDims,
         targetGelatoPageCount: snappedPageCount,
+        layout: pageInfo.layout,
       });
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;
@@ -402,6 +458,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
       const result = await generateCombinedBookPdf(stories, bookFormat, {
         gelatoCoverDims: coverDims,
         targetGelatoPageCount: snappedPageCount,
+        layout: pageInfo.layout,
       });
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;
@@ -740,6 +797,8 @@ module.exports = {
   getCoverDimensions,
   snapToValidPageCount,
   buildPrintedPageSequence,
+  chooseBookLayout,
+  planLayoutPages,
   isBlankPagesAckMissing,
   BLANK_PAGES_ACK_FROM,
   countBookContentPages,

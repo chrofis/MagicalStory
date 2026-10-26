@@ -1165,11 +1165,11 @@ router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
     let pdfBuffer, pageCount;
 
     if (stories.length === 1) {
-      const result = await generatePrintPdf(stories[0].data, bookFormat, { gelatoCoverDims: coverDims, targetGelatoPageCount: snappedPageCount });
+      const result = await generatePrintPdf(stories[0].data, bookFormat, { gelatoCoverDims: coverDims, targetGelatoPageCount: snappedPageCount, layout: pageInfo.layout });
       pdfBuffer = result.pdfBuffer;
       pageCount = result.pageCount;
     } else {
-      const result = await generateCombinedBookPdf(stories, bookFormat, { gelatoCoverDims: coverDims, targetGelatoPageCount: snappedPageCount });
+      const result = await generateCombinedBookPdf(stories, bookFormat, { gelatoCoverDims: coverDims, targetGelatoPageCount: snappedPageCount, layout: pageInfo.layout });
       pdfBuffer = result.pdfBuffer;
       pageCount = result.pageCount;
     }
@@ -1582,7 +1582,9 @@ router.post('/book-page-info', authenticateToken, async (req, res) => {
     }
     const info = await computeBookPageInfo(getDbPool(), storyDatas, coverType, bookFormat);
     res.json({
+      layout: info.layout,
       contentPages: info.contentPages,
+      contentPagesSingle: info.contentPagesSingle, // what the price tier is based on
       printedPages: info.printedPages,
       blankPages: info.blankPages,
       blankAckFrom: BLANK_PAGES_ACK_FROM,
@@ -1636,7 +1638,9 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     }
     // Same counter the print PDF and the book-builder preview use
     // (dedication + story pages + per-extra-story title/dedication/back cover).
-    const totalPages = countBookContentPages(stories.map(s => s.data));
+    // Price tier = single-layout content count, even when the book prints as a spread
+    // (decisions.md short-book layout 2026-10-26).
+    const totalPages = countBookContentPages(stories.map(s => s.data), 'single');
 
     // Blank-page guard: the customer must have ticked the acknowledgement in the
     // book builder (docs/decisions.md, blank-page preview). Not bypassable by

@@ -161,11 +161,13 @@ test('countBookContentPages: dedication + story pages; story 2+ adds title/dedic
     1 + 10 + (2 + 10) + (2 + 10 + 1)); // last story: back cover, no separator
 });
 
-test('computeBookPageInfo: 10-page story on a 30-page minimum hardcover is mostly blank', async () => {
+test('computeBookPageInfo: 10-page story on a 30-page minimum hardcover prints as a spread (9 blank, was 19)', async () => {
   const info = await computeBookPageInfo(poolWith([HARDCOVER_A4]), [storyOf(10)], 'hardcover', 'A4');
-  assert.strictEqual(info.contentPages, 11);
+  assert.strictEqual(info.layout, 'spread');
+  assert.strictEqual(info.contentPagesSingle, 11, 'price tier stays on the single-layout count');
+  assert.strictEqual(info.contentPages, 21);
   assert.strictEqual(info.printedPages, 30);
-  assert.strictEqual(info.blankPages, 19);
+  assert.strictEqual(info.blankPages, 9);
 });
 
 test('computeBookPageInfo: a book that exactly fills an orderable count has no blanks', async () => {
@@ -192,10 +194,11 @@ test('computeBookPageInfo: combined multi-story book is counted with the extra p
 
 test('computeBookPageInfo: discrete page-count list snaps up to the next entry', async () => {
   const sku = { ...HARDCOVER_A4, available_page_counts: [24, 30, 40, 50] };
-  const info = await computeBookPageInfo(poolWith([sku]), [storyOf(34)], 'hardcover', 'A4');
-  assert.strictEqual(info.contentPages, 35);
+  const info = await computeBookPageInfo(poolWith([sku]), [storyOf(36)], 'hardcover', 'A4');
+  assert.strictEqual(info.layout, 'single'); // 3 blank pages: below BLANK_PAGES_ACK_FROM
+  assert.strictEqual(info.contentPages, 37);
   assert.strictEqual(info.printedPages, 40);
-  assert.strictEqual(info.blankPages, 5);
+  assert.strictEqual(info.blankPages, 3);
 });
 
 test('computeBookPageInfo: no matching SKU reports only the parity blank', async () => {
@@ -208,16 +211,18 @@ test('computeBookPageInfo: no matching SKU reports only the parity blank', async
 // Printed-book preview sequence: same layout as generatePrintPdf, same count as computeBookPageInfo.
 const countKind = (seq, k) => seq.filter(s => s.kind === k).length;
 
-test('buildPrintedPageSequence: 6-page trial story on a 30-page SKU has 23 blank filler pages', async () => {
+test('buildPrintedPageSequence: 6-page trial story on a 30-page SKU is a spread with 17 blank filler pages', async () => {
   const stories = [storyOf(6)];
   const info = await computeBookPageInfo(poolWith([HARDCOVER_A4]), stories, 'hardcover', 'A4');
+  assert.strictEqual(info.layout, 'spread');
   assert.strictEqual(info.printedPages, 30);
-  assert.strictEqual(info.blankPages, 23);
+  assert.strictEqual(info.blankPages, 17);
   const seq = info.sequence;
   assert.deepStrictEqual(seq.slice(0, 3).map(s => s.kind), ['cover', 'insideFront', 'dedication']);
-  assert.strictEqual(countKind(seq, 'story'), 6);
-  assert.deepStrictEqual(seq.filter(s => s.kind === 'story').map(s => s.pageNumber), [1, 2, 3, 4, 5, 6]);
-  assert.strictEqual(countKind(seq, 'filler'), 23);
+  assert.strictEqual(countKind(seq, 'story'), 0);
+  assert.deepStrictEqual(seq.slice(3, 7).map(s => s.kind), ['storyImage', 'storyText', 'storyImage', 'storyText']);
+  assert.deepStrictEqual(seq.filter(s => s.kind === 'storyImage').map(s => s.pageNumber), [1, 2, 3, 4, 5, 6]);
+  assert.strictEqual(countKind(seq, 'filler'), 17);
   assert.strictEqual(seq[seq.length - 1].kind, 'insideBack');
   assert.strictEqual(seq.length, 30 + 3); // Gelato pages + cover + inside front + inside back
 });

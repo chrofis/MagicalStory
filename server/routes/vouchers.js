@@ -194,7 +194,9 @@ router.post('/vouchers/book-checkout', authenticateToken, async (req, res) => {
       if (r.rows.length === 0) return res.status(404).json({ error: `Story not found: ${sid}` });
       stories.push({ id: sid, data: typeof r.rows[0].data === 'string' ? JSON.parse(r.rows[0].data) : r.rows[0].data });
     }
-    const totalPages = countBookContentPages(stories.map(s => s.data));
+    // Price tier = single-layout content count, even when the book prints as a spread
+    // (decisions.md short-book layout 2026-10-26).
+    const totalPages = countBookContentPages(stories.map(s => s.data), 'single');
     if (totalPages > V.MAX_BOOK_PAGES) {
       return res.status(400).json({ error: `A voucher book has at most ${V.MAX_BOOK_PAGES} pages`, code: 'VOUCHER_BOOK_TOO_LONG', totalPages, max: V.MAX_BOOK_PAGES });
     }

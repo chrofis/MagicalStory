@@ -20,6 +20,8 @@ const PAGE_SIZE = BOOK_FORMATS.square.pageWidth;
 
 // Minimum font size before warning
 const MIN_FONT_SIZE_WARNING = 10;
+// Spread layout text page has the whole page, so a larger start font than the strip layouts.
+const SPREAD_START_FONT = 16;
 
 /**
  * Extract image data from cover images (handles both string and object formats)
@@ -352,8 +354,9 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   //                   stories shrink the image and grow the text area
   //   - square     → standard 2-page (text on one page, image on next)
   //                   kept for any legacy orders that explicitly chose square
+  const isSpread = options.layout === 'spread';
   const isPictureBook = bookFormat !== 'square';
-  log.debug(`📄 [PRINT PDF] Layout: ${isPictureBook ? 'Picture Book (1 page per scene)' : 'Standard (2 pages per scene)'}`);
+  log.debug(`📄 [PRINT PDF] Layout: ${isSpread ? 'Spread (image page + text page per scene)' : isPictureBook ? 'Picture Book (1 page per scene)' : 'Standard (2 pages per scene)'}`);
 
   // textInImage: text overlay vs text strip below. Read first from per-scene
   // metadata (stamped at expansion time), fall back to layout helper for legacy
@@ -368,7 +371,10 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   let fontSizeWarning = null;
   let consistentFontSize;
 
-  if (isPictureBook) {
+  if (isSpread) {
+    // Short-book spread layout (gelato.chooseBookLayout): image left, text right.
+    await addSpreadPages(doc, storyData, storyPages, pageWidth, pageHeight, bleed);
+  } else if (isPictureBook) {
     // Picture-book text area scales with languageLevel (1st-grade=15%,
     // standard=20%, advanced=35%). Target font: 14pt for 1st-grade, 12pt
     // for the others. Min font: 10pt floor. When textInImage=false the strip
@@ -419,7 +425,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   // Gelato pageCount = interior pages only (dedication + story content).
   // Does NOT count: cover spread, inside front cover blank, inside back cover blank.
   // Gelato expects total PDF pages = pageCount + 3.
-  const storyContentPages = isPictureBook ? storyPages.length : storyPages.length * 2;
+  const storyContentPages = (isPictureBook && !isSpread) ? storyPages.length : storyPages.length * 2;
   let gelatoPageCount = 1 + storyContentPages; // dedication + story content
 
   // Pad up to the orderable Gelato page count (e.g. A4 softcover only ships
@@ -450,7 +456,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   doc.end();
   const pdfBuffer = await pdfPromise;
 
-  console.log(`✅ [PRINT PDF] Generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB), PDF pages: ${actualPdfPages}, Gelato pageCount: ${gelatoPageCount}, font: ${consistentFontSize}pt`);
+  console.log(`✅ [PRINT PDF] Generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB), PDF pages: ${actualPdfPages}, Gelato pageCount: ${gelatoPageCount}, font: ${isSpread ? 'spread' : consistentFontSize + 'pt'}`);
 
   return { pdfBuffer, pageCount: gelatoPageCount, fontSizeWarning };
 }
@@ -641,6 +647,56 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
 }
 
 /**
+ * Spread layout for short books (decisions.md, short-book layout 2026-10-26; chosen
+ * by gelato.chooseBookLayout): every scene becomes TWO interior pages, the scene
+ * image full-bleed on the LEFT (even) page and its text on the facing RIGHT (odd)
+ * page, like a classic picture book. Callers start at a LEFT page: story content
+ * always does (book page 1 is the dedication on the right, story 2+ starts after
+ * its dedication). Always emits both pages so the Gelato count (2 per scene) holds.
+ *
+ * @returns {Promise<number>} number of pages added (2 per scene)
+ */
+async function addSpreadPages(doc, storyData, storyPages, pageWidth, pageHeight, bleed) {
+  const interiorW = pageWidth + 2 * bleed;
+  const interiorH = pageHeight + 2 * bleed;
+  const marginInner = mmToPoints(20);  // gutter side (left of the right-hand page)
+  const marginOuter = mmToPoints(14);
+  const marginY = mmToPoints(18);
+  const textWidth = pageWidth - marginInner - marginOuter;
+  const textHeight = pageHeight - 2 * marginY;
+  const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, textHeight, SPREAD_START_FONT, 10, 'center');
+  const fontSize = fontResult.fontSize;
+  const lineGap = fontResult.lineGap;
+  const paragraphGap = fontSize * 0.5;
+
+  for (let index = 0; index < storyPages.length; index++) {
+    const pageNumber = index + 1;
+    const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
+    const flowText = storyPages[index].trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n');
+
+    // LEFT page: full-bleed scene image
+    doc.addPage({ size: [interiorW, interiorH], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    if (image?.imageData) {
+      try {
+        const imageBuffer = await resolveImageBuffer(image.imageData);
+        if (!imageBuffer) throw new Error('image source unresolvable');
+        await drawImageCovering(doc, imageBuffer, 0, 0, interiorW, interiorH);
+      } catch (imgErr) {
+        log.error(`Error adding image to PDF spread page ${pageNumber}:`, imgErr);
+      }
+    }
+
+    // RIGHT page: text, vertically centred
+    doc.addPage({ size: [interiorW, interiorH], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+    const h = doc.heightOfString(flowText, { width: textWidth, align: 'center', lineGap, paragraphGap });
+    const y = bleed + marginY + Math.max(0, (textHeight - h) / 2);
+    doc.text(flowText, bleed + marginInner, y, { width: textWidth, align: 'center', lineGap, paragraphGap, height: textHeight, ellipsis: true });
+  }
+  return storyPages.length * 2;
+}
+
+/**
  * Add standard 2-page layout (text page + separate image page).
  * Used by the square format only — A4 portrait uses picture-book layout.
  */
@@ -767,6 +823,10 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
   // text is baked into the image using the same renderer as Print Preview —
   // no text strip below. textInImage=false keeps the legacy layout.
   const addStoryContentPages = async (storyData, storyPages) => {
+    if (options.layout === 'spread') {
+      totalStoryPages += await addSpreadPages(doc, storyData, storyPages, pageWidth, pageHeight, bleed);
+      return;
+    }
     const textMarginMm = mmToPoints(3);
     const layoutFromLevel = resolveLayout(storyData.languageLevel);
     const sceneTextInImage = storyData.sceneImages?.[0]?.textInImage;
@@ -1176,6 +1236,7 @@ function pdfContentDisposition(title, suffix = '') {
 }
 
 module.exports = {
+  addSpreadPages,
   pdfContentDisposition,
   resolveImageBuffer,
   generatePrintPdf,
