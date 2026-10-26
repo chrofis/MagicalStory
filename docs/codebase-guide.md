@@ -311,6 +311,30 @@ Decision: `docs/decisions.md` 2026-10-25. Plan: `tasks/vouchers-2026-10-25.md`.
 
 ---
 
+## Printed Books (Gelato) - page count, layout, price
+
+One function decides everything about a printed book's pages: `computeBookPageInfo` in `server/lib/gelato.js`.
+It plans both layouts (`planLayoutPages`: content count, SKU, snapped Gelato page count, filler pages) and
+`chooseBookLayout` picks one:
+- **single**: one scene = one page (image with text strip or baked text). The default.
+- **spread**: one scene = two pages, scene image full-bleed on the LEFT (even) page, text on the facing RIGHT
+  page (`addSpreadPages` in `server/lib/pdf.js`, used by `generatePrintPdf` and `generateCombinedBookPdf` via
+  `options.layout`). Chosen when the single layout leaves `>= BLANK_PAGES_ACK_FROM` (4) filler pages AND the
+  spread leaves fewer. At the 28-page minimum: 6 pages -> spread (15 blank, was 21), 15 -> spread (1 blank, was 12),
+  20 -> spread (1, was 7), 25 -> single (2).
+- **Price never follows the layout.** `getPriceForPages` is fed `countBookContentPages(storyDatas, 'single')`
+  (`contentPagesSingle` in the page info) in `create-checkout-session` and `vouchers/book-checkout`; the builders
+  (`BookBuilder`, `VoucherBookCheckout`) price `contentPagesSingle`.
+- The result carries `layout`, `contentPages` (of the chosen layout), `contentPagesSingle`, `printedPages`, `blankPages`
+  and `sequence` (`buildPrintedPageSequence`: `storyImage` + `storyText` entries for a spread, `story` for single).
+  `POST /api/book-page-info`, the PDF generators and `processBookOrder` all read it; none recompute it.
+- Blank-page warning (`BLANK_PAGES_ACK_FROM`): amber box with "room for another story", the `AddStoryNudge`
+  button (de/en/fr/it), the spread note and the printed-book strip, plus the required acknowledgement.
+- Test: `npx vitest run tests/unit/short-book-layout.test.ts tests/unit/book-price-quote.test.ts` and
+  `node --test server/lib/gelato.test.js`. Decision: `docs/decisions.md` 2026-10-26.
+
+---
+
 ## Shared Story Viewer — Book Spread
 
 Desktop: two-page book spread layout matching a real open book.

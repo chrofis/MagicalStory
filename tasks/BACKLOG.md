@@ -505,7 +505,9 @@ measurement, is lost).
       → `tasks/ads-quality-score.md:21-61`
 - [ ] Support bot for short trial books printed mostly blank (order #100 email SENT 2026-10-17):
       template + sender + detection + owner-approved drafts + digest section;
-      root-cause checkout decision → `tasks/support-bot-2026-10-17.md`
+      root-cause checkout decision DONE 2026-10-26: short books print as a spread, "Add another
+      story" nudge (committed on staging, not pushed) → `tasks/short-book-layout-2026-10-26.md`,
+      `tasks/support-bot-2026-10-17.md`
 - [ ] (2026-10-17) Push to staging, then master on approval: support-email logging + recap
       "Support-Mails" block (e6ddffca1), send.js. Check the recap renders on staging
       → `tasks/support-bot-2026-10-17.md`
@@ -516,7 +518,10 @@ measurement, is lost).
 - [ ] (2026-10-17) Owner: Postmark free DMARC digest signup (email mag.mail.hub@gmail.com), then
       add its rua address to `_dmarc.magicalstory.ch` KEEPING p=quarantine
 - [ ] (2026-10-17) Blank-page acknowledgement checkbox (f8940c187) is staging-only; master needs it
-      so no new mostly-blank trial books are sold unconfirmed → `tasks/support-bot-2026-10-17.md`
+      so no new mostly-blank trial books are sold unconfirmed. Now ships together with the spread
+      layout + add-story nudge (commits 371673636, 3d2c42ba3): validate on staging
+      (`/api/book-page-info` layout 'spread', builder preview), then ask for the master push
+      → `tasks/short-book-layout-2026-10-26.md`, `tasks/support-bot-2026-10-17.md`
 - [ ] (2026-10-17, deferred by owner) kvfit.ch is added in Resend but its 4 DNS records are not
       entered at IONOS (records: Resend dashboard → Domains → kvfit.ch)
 - [ ] Sentry error alerting; Plausible/Umami analytics → `docs/compliance-and-todo.html:87`
