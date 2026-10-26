@@ -516,37 +516,15 @@ function computeTextBelowRatio(pages, languageLevel) {
   return ratio;
 }
 
-/**
- * Width and height of a text block as doc.text would lay it out (greedy word wrap,
- * same font state as the caller). Needed to size the board the text sits on.
- */
-function measureTextBlock(doc, text, width, { fontSize, lineGap = 0, paragraphGap = 0 }) {
-  doc.fontSize(fontSize).font('Helvetica');
-  const h = doc.heightOfString(text, { width, align: 'center', lineGap, paragraphGap });
-  let w = 0;
-  for (const paragraph of text.split('\n')) {
-    let line = '';
-    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
-      const candidate = line ? line + ' ' + word : word;
-      if (line && doc.widthOfString(candidate) > width) {
-        w = Math.max(w, doc.widthOfString(line));
-        line = word;
-      } else {
-        line = candidate;
-      }
-    }
-    w = Math.max(w, doc.widthOfString(line));
-  }
-  return { w: Math.min(w, width), h };
-}
-
 // Print raster resolution of the filled strip background (see pageFill.js).
 const PAGE_FILL_DPI = 300;
+// White outline around the strip text, in points (stroke is centred on the glyph edge, so about half shows).
+const TEXT_OUTLINE_PT = 1.2;
 
 /**
  * Classic single layout page, text below the picture: the page background is the
  * picture plus a strip filled from the picture's own lower half (mirrored, blurred,
- * lightened), the text sits on a soft white board over it (decisions.md, "Print page
+ * lightened), the text carries a thin white outline over it (decisions.md, "Print page
  * strip filled by a mirrored, blurred picture", 2026-10-26). One implementation for
  * the print PDF, the combined book PDF and the view/trial PDFs (all go through
  * addPictureBookPages / addStoryContentPages). A fill failure throws, no fallback.
@@ -566,9 +544,9 @@ async function drawFilledStripPage(doc, image, g) {
     }
   }
 
-  const block = measureTextBlock(doc, text, textWidth, { fontSize, lineGap, paragraphGap });
-  const textY = imageBottom + padTop + Math.max(0, (textBudgetHeight - block.h) / 2);
-  const drawnHeight = Math.min(block.h, Math.max(0, textBottom - textY));
+  doc.fontSize(fontSize).font('Helvetica');
+  const textHeight = doc.heightOfString(text, { width: textWidth, align: 'center', lineGap, paragraphGap });
+  const textY = imageBottom + padTop + Math.max(0, (textBudgetHeight - textHeight) / 2);
 
   if (imageBuffer) {
     const { buildFilledPageBackground } = require('./pageFill');
@@ -578,19 +556,21 @@ async function drawFilledStripPage(doc, image, g) {
       pageWidthPx: Math.round(interiorW * s),
       pageHeightPx: Math.round(interiorH * s),
       imageHeightPx: Math.round(imageBottom * s),
-      textBox: {
-        x: (textX + (textWidth - block.w) / 2) * s,
-        y: textY * s,
-        w: block.w * s,
-        h: drawnHeight * s,
-      },
     });
     doc.image(buffer, 0, 0, { width: interiorW, height: interiorH });
   }
 
-  doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-  // height + ellipsis: never let overflow spill onto an auto-created page.
-  doc.text(text, textX, textY, { width: textWidth, align: 'center', lineGap, paragraphGap, height: Math.max(0, textBottom - textY), ellipsis: true });
+  // Text: a thin white outline pass first (stroke only, round joins), then the #333 fill on
+  // top, so the stroke sits under the glyphs and cannot thin them. Reads on the coloured
+  // strip without a board (owner 2026-10-26). Same layout options both passes.
+  const textOpts = { width: textWidth, align: 'center', lineGap, paragraphGap, height: Math.max(0, textBottom - textY), ellipsis: true };
+  doc.fontSize(fontSize).font('Helvetica');
+  doc.save();
+  doc.lineWidth(TEXT_OUTLINE_PT).lineJoin('round').strokeColor('white');
+  doc.text(text, textX, textY, { ...textOpts, stroke: true, fill: false });
+  doc.restore();
+  doc.fillColor('#333');
+  doc.text(text, textX, textY, textOpts);
 }
 
 /**
@@ -702,7 +682,7 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       }
     } else {
       // Classic mode (and overlay mode with no picture): picture band on top, text strip
-      // below filled from the picture, text on a soft white board. One breathing line of
+      // below filled from the picture, text with a thin white outline. One breathing line of
       // room above and below the text.
       await drawFilledStripPage(doc, image, {
         interiorW, interiorH, imageBottom: bleed + classicImageHeight, pageNumber,

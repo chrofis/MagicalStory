@@ -5,10 +5,10 @@
  * The single layout puts the scene picture on top and the text in a strip below. That
  * strip used to be plain white. It is now the lower half of the picture, flipped
  * vertically, squeezed into the strip, blurred and lightened, with the seam to the
- * picture feathered. The text sits on a small translucent white board whose opacity
- * is raised in 5% steps until the text zone is bright enough to read dark text on.
+ * picture feathered. Nothing else is drawn on it: the text gets a thin white outline in
+ * pdf.js instead (the owner rejected a text board, it looked like a pale box).
  *
- * One raster comes out (picture + fill + board); pdf.js draws it full-bleed and sets
+ * One raster comes out (picture + fill); pdf.js draws it full-bleed and sets
  * the text over it as vector text. No fallback: a failure throws.
  *
  * All sizes below are in "reference pixels" of an 850 px wide page (the width the
@@ -23,17 +23,9 @@ const FILL_LIGHTEN = 0.35;        // uniform lighten towards white
 const FILL_LIGHTEN_RAMP = 0.12;   // share of the strip over which the lighten fades in
 const SEAM_FEATHER = 30;          // rows of the picture blended into the fill
 const SEAM_STRENGTH = 0.9;
-const BOARD_PAD = 16;
-const BOARD_FEATHER = 25;
-const BOARD_RADIUS = 20;
-const BOARD_OPACITY_START = 0.70;
-const BOARD_OPACITY_STEP = 0.05;
-const BOARD_OPACITY_MAX = 1.0;
-const TARGET_LUMINANCE = 0.80;    // mean luminance under the text box
 const JPEG_QUALITY = 92;
 
 const smooth = (t) => t * t * (3 - 2 * t);
-const luma = (r, g, b) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 
 /**
  * @param {Object} p
@@ -41,11 +33,9 @@ const luma = (r, g, b) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
  * @param {number} p.pageWidthPx       full page raster width
  * @param {number} p.pageHeightPx      full page raster height
  * @param {number} p.imageHeightPx     height the picture occupies at the top; the rest is the strip
- * @param {{x:number,y:number,w:number,h:number}} p.textBox  rendered text block, px, page coordinates
- * @returns {Promise<{buffer: Buffer, boardOpacity: number, textZoneLuminance: number|null}>}
- *   buffer is a JPEG of the whole page. boardOpacity is 0 and textZoneLuminance null when the text box is empty.
+ * @returns {Promise<{buffer: Buffer}>} buffer is a JPEG of the whole page
  */
-async function buildFilledPageBackground({ imageBuffer, pageWidthPx, pageHeightPx, imageHeightPx, textBox }) {
+async function buildFilledPageBackground({ imageBuffer, pageWidthPx, pageHeightPx, imageHeightPx }) {
   const W = Math.round(pageWidthPx);
   const H = Math.round(pageHeightPx);
   const IH = Math.round(imageHeightPx);
@@ -112,84 +102,10 @@ async function buildFilledPageBackground({ imageBuffer, pageWidthPx, pageHeightP
     }
   }
 
-  // 5. Text board.
-  let boardOpacity = 0;
-  let textZoneLuminance = null;
-  const bx0 = Math.max(0, Math.floor(textBox.x));
-  const by0 = Math.max(0, Math.floor(textBox.y));
-  const bx1 = Math.min(W, Math.ceil(textBox.x + textBox.w));
-  const by1 = Math.min(H, Math.ceil(textBox.y + textBox.h));
-  if (bx1 > bx0 && by1 > by0) {
-    const pad = BOARD_PAD * u;
-    const feather = BOARD_FEATHER * u;
-    const radius = BOARD_RADIUS * u;
-    const margin = Math.ceil(pad + feather * 1.5);
-    const rx0 = Math.max(0, bx0 - margin);
-    const ry0 = Math.max(0, by0 - margin);
-    const rx1 = Math.min(W, bx1 + margin);
-    const ry1 = Math.min(H, by1 + margin);
-    const rw = rx1 - rx0;
-    const rh = ry1 - ry0;
-
-    // Soft rounded rectangle, rendered small and scaled up (the mask is smooth).
-    const lw = Math.max(2, Math.round(rw * ws));
-    const lh = Math.max(2, Math.round(rh * ws));
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${lw}" height="${lh}">`
-      + `<rect width="${lw}" height="${lh}" fill="black"/>`
-      + `<rect x="${(bx0 - pad - rx0) * ws}" y="${(by0 - pad - ry0) * ws}" `
-      + `width="${(bx1 - bx0 + 2 * pad) * ws}" height="${(by1 - by0 + 2 * pad) * ws}" `
-      + `rx="${radius * ws}" fill="white"/></svg>`;
-    const maskLow = await sharp(Buffer.from(svg))
-      .blur(Math.max(0.3, (feather / 2) * ws))
-      .removeAlpha()
-      .extractChannel(0)
-      .raw()
-      .toBuffer();
-    const mask = await sharp(maskLow, { raw: { width: lw, height: lh, channels: 1 } })
-      .resize(rw, rh, { fit: 'fill', kernel: 'cubic' })
-      .extractChannel(0) // resize returns 3 channels for a 1-channel raw input
-      .raw()
-      .toBuffer();
-
-    // Sample the text box (every few px), raise the opacity until it is bright enough.
-    const st = Math.max(1, Math.round(u));
-    const baseL = [];
-    const maskK = [];
-    for (let y = by0; y < by1; y += st) {
-      for (let x = bx0; x < bx1; x += st) {
-        const o = (y * W + x) * 3;
-        baseL.push(luma(page[o], page[o + 1], page[o + 2]));
-        maskK.push(mask[(y - ry0) * rw + (x - rx0)] / 255);
-      }
-    }
-    const meanAt = (a) => {
-      let s = 0;
-      for (let i = 0; i < baseL.length; i++) { const k = maskK[i] * a; s += baseL[i] * (1 - k) + k; }
-      return s / baseL.length;
-    };
-    boardOpacity = BOARD_OPACITY_START;
-    textZoneLuminance = meanAt(boardOpacity);
-    while (textZoneLuminance < TARGET_LUMINANCE && boardOpacity < BOARD_OPACITY_MAX - 1e-9) {
-      boardOpacity = Math.min(BOARD_OPACITY_MAX, Math.round((boardOpacity + BOARD_OPACITY_STEP) * 100) / 100);
-      textZoneLuminance = meanAt(boardOpacity);
-    }
-
-    for (let y = 0; y < rh; y++) {
-      for (let x = 0; x < rw; x++) {
-        const k = mask[y * rw + x] / 255 * boardOpacity;
-        if (k <= 0) continue;
-        const o = ((ry0 + y) * W + rx0 + x) * 3;
-        page[o] = Math.round(page[o] * (1 - k) + 255 * k);
-        page[o + 1] = Math.round(page[o + 1] * (1 - k) + 255 * k);
-        page[o + 2] = Math.round(page[o + 2] * (1 - k) + 255 * k);
-      }
-    }
-  }
-
   const buffer = await sharp(page, { raw: { width: W, height: H, channels: 3 } })
     .jpeg({ quality: JPEG_QUALITY })
     .toBuffer();
-  return { buffer, boardOpacity, textZoneLuminance };
+  return { buffer };
 }
 
 module.exports = { buildFilledPageBackground };
