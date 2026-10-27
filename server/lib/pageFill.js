@@ -39,12 +39,8 @@ const SEAM_STRENGTH = 0.9;
 const JPEG_QUALITY = 92;
 
 const smooth = (t) => t * t * (3 - 2 * t);
-const STRIP_EDGES = ['top', 'bottom', 'sides'];
-const OUTPAINT_DIRECTION = {
-  top: 'upward into the empty upper band',
-  bottom: 'downward into the empty lower band',
-  sides: 'sideways into the empty left and right bands',
-};
+const STRIP_EDGES = ['top', 'bottom'];
+const OUTPAINT_DIRECTION = { top: 'upward into the empty upper band', bottom: 'downward into the empty lower band' };
 
 // A raw RGB page flipped top-to-bottom (the 'top' edge is built as a 'bottom' page, then flipped).
 const flipRows = (buf, w, h) => sharp(buf, { raw: { width: w, height: h, channels: 3 } }).flip().raw().toBuffer();
@@ -55,10 +51,7 @@ const flipRows = (buf, w, h) => sharp(buf, { raw: { width: w, height: h, channel
  * @param {number} p.pageWidthPx       full page raster width
  * @param {number} p.pageHeightPx      full page raster height
  * @param {number} p.imageHeightPx     height the picture occupies; the rest is the strip
- * @param {'top'|'bottom'|'sides'} [p.edge='bottom']  where the STRIP goes. 'sides': a portrait picture on a
- *   squarer page (covers, dedication): the WHOLE picture is fitted by height and centred, nothing is cropped, and
- *   a band on each side is filled (outermost columns stretched and blurred, or outpainted by Grok); imageHeightPx
- *   is ignored (see buildSidesFilledPage). 'bottom': picture pinned to the top,
+ * @param {'top'|'bottom'} [p.edge='bottom']  where the STRIP goes. 'bottom': picture pinned to the top,
  *   fill below (mirror, blur, eased lighten, feathered seam). 'top': picture pinned to the bottom, fill above
  *   (top TOP_BAND_SHARE rows stretched, blurred, no lighten, no feather). One code path: everything is built as
  *   a bottom-strip page and flipped at the raster boundaries (output, and the Grok canvas / answer, which the
@@ -72,7 +65,6 @@ const flipRows = (buf, w, h) => sharp(buf, { raw: { width: w, height: h, channel
 async function buildFilledPageBackground({ imageBuffer, pageWidthPx, pageHeightPx, imageHeightPx, fillMethod, edge = 'bottom', editFn }) {
   if (!FILL_METHODS.includes(fillMethod)) throw new Error(`pageFill: fillMethod must be one of ${FILL_METHODS.join('|')}, got ${fillMethod}`);
   if (!STRIP_EDGES.includes(edge)) throw new Error(`pageFill: edge must be one of ${STRIP_EDGES.join('|')}, got ${edge}`);
-  if (edge === 'sides') return buildSidesFilledPage({ imageBuffer, pageWidthPx, pageHeightPx, fillMethod, editFn });
   const flipped = edge === 'top';
   const W = Math.round(pageWidthPx);
   const H = Math.round(pageHeightPx);
@@ -166,6 +158,7 @@ async function grokOutpaint({ img, rawLow, Ww, EXTHw, W, H, IH, EXTH, u, editFn,
   const template = PROMPT_TEMPLATES.stripOutpaint;
   if (!template) throw new Error('pageFill: prompts/strip-outpaint.txt not loaded (loadPromptTemplates)');
   const prompt = fillTemplate(template, { DIRECTION: OUTPAINT_DIRECTION[flipped ? 'top' : 'bottom'] });
+  const call = editFn || require('./grok').editWithGrok;
 
   const hw = Math.min(W, GROK_HINT_WIDTH);
   const hh = Math.round(H * hw / W);
@@ -176,7 +169,12 @@ async function grokOutpaint({ img, rawLow, Ww, EXTHw, W, H, IH, EXTH, u, editFn,
   const canvas = await sharp(Buffer.concat([top, strip]), { raw: { width: hw, height: hh, channels: 3 } })
     .flip(flipped).jpeg({ quality: JPEG_QUALITY }).toBuffer();
 
-  const model = await callGrokCanvas({ canvas, prompt, W, H, editFn, flipped });
+  const ratio = W / H;
+  const aspectRatio = GROK_ASPECTS.reduce((best, a) => (Math.abs(a[1] - ratio) < Math.abs(best[1] - ratio) ? a : best))[0];
+  const res = await call(prompt, ['data:image/jpeg;base64,' + canvas.toString('base64')], { model: GROK_FILL_MODEL, aspectRatio, skipOutputCrop: true });
+  if (!res?.imageData) throw new Error('pageFill: Grok returned no image');
+  const model = await sharp(Buffer.from(String(res.imageData).replace(/^data:image\/\w+;base64,/, ''), 'base64'))
+    .resize(W, H, { fit: 'fill' }).flip(flipped).flatten({ background: '#ffffff' }).removeAlpha().raw().toBuffer();
 
   const page = Buffer.allocUnsafe(W * H * 3);
   img.copy(page, 0);                                           // original picture, never the model's
@@ -189,93 +187,4 @@ async function grokOutpaint({ img, rawLow, Ww, EXTHw, W, H, IH, EXTH, u, editFn,
   return sharp(flipped ? await flipRows(page, W, H) : page, { raw: { width: W, height: H, channels: 3 } }).jpeg({ quality: JPEG_QUALITY }).toBuffer();
 }
 
-/**
- * One Grok edit call on a hint canvas; returns the answer as raw RGB stretched to W x H (flipped back
- * to work orientation when `flipped`). Throws when the model returns nothing: no fallback.
- */
-async function callGrokCanvas({ canvas, prompt, W, H, editFn, flipped = false }) {
-  const call = editFn || require('./grok').editWithGrok;
-  const ratio = W / H;
-  const aspectRatio = GROK_ASPECTS.reduce((best, a) => (Math.abs(a[1] - ratio) < Math.abs(best[1] - ratio) ? a : best))[0];
-  const res = await call(prompt, ['data:image/jpeg;base64,' + canvas.toString('base64')], { model: GROK_FILL_MODEL, aspectRatio, skipOutputCrop: true });
-  if (!res?.imageData) throw new Error('pageFill: Grok returned no image');
-  return sharp(Buffer.from(String(res.imageData).replace(/^data:image\/\w+;base64,/, ''), 'base64'))
-    .resize(W, H, { fit: 'fill' }).flip(flipped).flatten({ background: '#ffffff' }).removeAlpha().raw().toBuffer();
-}
-
-/**
- * Sides fill (decisions.md 2026-10-27, portrait covers on square pages): the picture is fitted by HEIGHT,
- * centred, with every pixel kept, and the band on each side is its outermost columns stretched and blurred
- * (mirror, free, no lightening: the same colour as the sky or wall it continues) or outpainted by Grok
- * (original pixels kept, feathered seam). Needs a page wider than the picture; otherwise it throws and the
- * caller covers the page instead (pdf.js drawFittedPicture).
- * @returns {Promise<{buffer: Buffer, usedGrok?: boolean, pictureLeftPx: number, pictureWidthPx: number}>}
- */
-async function buildSidesFilledPage({ imageBuffer, pageWidthPx, pageHeightPx, fillMethod, editFn }) {
-  if (!Buffer.isBuffer(imageBuffer) || !imageBuffer.length) throw new Error('pageFill: imageBuffer missing');
-  const W = Math.round(pageWidthPx);
-  const H = Math.round(pageHeightPx);
-  if (!(W > 0 && H > 0)) throw new Error('pageFill: bad page size');
-  const meta = await sharp(imageBuffer).metadata();
-  if (!(meta.width > 0 && meta.height > 0)) throw new Error('pageFill: picture has no size');
-  const IW = Math.round(H * meta.width / meta.height);
-  if (W - IW < 4) throw new Error(`pageFill: picture width ${IW} leaves no side bands in a ${W}px page`);
-  const LW = Math.floor((W - IW) / 2);
-  const RW = W - IW - LW;
-  const u = W / REF_WIDTH;
-  const ws = Math.min(1, REF_WIDTH / W);
-
-  const img = await sharp(imageBuffer).resize(IW, H, { fit: 'fill' }).flatten({ background: '#ffffff' }).removeAlpha().raw().toBuffer();
-
-  // Band = the picture's outermost TOP_BAND_SHARE columns stretched to the band width, blurred.
-  const n = Math.max(1, Math.round(IW * TOP_BAND_SHARE));
-  const makeBand = async (left, bandW) => {
-    const bw = Math.max(2, Math.round(bandW * ws));
-    const bh = Math.max(2, Math.round(H * ws));
-    const small = await sharp(img, { raw: { width: IW, height: H, channels: 3 } })
-      .extract({ left, top: 0, width: n, height: H })
-      .resize(bw, bh, { fit: 'fill' })
-      .blur(Math.max(0.3, TOP_BLUR_SIGMA * bh / (REF_WIDTH * H / W)))
-      .raw().toBuffer();
-    return sharp(small, { raw: { width: bw, height: bh, channels: 3 } }).resize(bandW, H, { fit: 'fill' }).raw().toBuffer();
-  };
-  const leftFull = await makeBand(0, LW);
-  const rightFull = await makeBand(IW - n, RW);
-
-  const compose = (page) => {
-    for (let y = 0; y < H; y++) {
-      leftFull.copy(page, y * W * 3, y * LW * 3, (y + 1) * LW * 3);
-      img.copy(page, (y * W + LW) * 3, y * IW * 3, (y + 1) * IW * 3);
-      rightFull.copy(page, (y * W + LW + IW) * 3, y * RW * 3, (y + 1) * RW * 3);
-    }
-  };
-  const page = Buffer.allocUnsafe(W * H * 3);
-  const jpeg = (buf) => sharp(buf, { raw: { width: W, height: H, channels: 3 } }).jpeg({ quality: JPEG_QUALITY }).toBuffer();
-  const geometry = { pictureLeftPx: LW, pictureWidthPx: IW };
-  compose(page);
-  if (fillMethod !== 'grok') return { buffer: await jpeg(page), ...geometry };
-
-  const template = PROMPT_TEMPLATES.stripOutpaint;
-  if (!template) throw new Error('pageFill: prompts/strip-outpaint.txt not loaded (loadPromptTemplates)');
-  const prompt = fillTemplate(template, { DIRECTION: OUTPAINT_DIRECTION.sides });
-  const hw = Math.min(W, GROK_HINT_WIDTH);
-  const hh = Math.round(H * hw / W);
-  const canvas = await sharp(page, { raw: { width: W, height: H, channels: 3 } }).resize(hw, hh, { fit: 'fill' }).jpeg({ quality: JPEG_QUALITY }).toBuffer();
-  const model = await callGrokCanvas({ canvas, prompt, W, H, editFn });
-
-  // Original pixels in the middle, the model's bands outside, a feathered seam on each side.
-  model.copy(page);
-  const F = Math.max(1, Math.min(Math.round(GROK_FEATHER * u), Math.floor(IW / 2) - 1));
-  for (let y = 0; y < H; y++) {
-    for (let x = LW; x < LW + IW; x++) {
-      const d = Math.min(x - LW, LW + IW - 1 - x);
-      const a = d >= F ? 1 : smooth(d / F);
-      const o = (y * W + x) * 3;
-      const sIdx = (y * IW + (x - LW)) * 3;
-      for (let c = 0; c < 3; c++) page[o + c] = Math.round(img[sIdx + c] * a + model[o + c] * (1 - a));
-    }
-  }
-  return { buffer: await jpeg(page), usedGrok: true, ...geometry };
-}
-
-module.exports = { buildFilledPageBackground, STRIP_EDGES, FILL_METHODS, GROK_FILL_MODEL };
+module.exports = { buildFilledPageBackground, FILL_METHODS, GROK_FILL_MODEL };

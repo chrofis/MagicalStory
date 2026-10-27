@@ -18,12 +18,6 @@ const COVER_WIDTH = BOOK_FORMATS.square.coverWidth;
 const COVER_HEIGHT = BOOK_FORMATS.square.coverHeight;
 const PAGE_SIZE = BOOK_FORMATS.square.pageWidth;
 
-// Print raster resolution of the filled strip page (see pageFill.js).
-const PAGE_FILL_DPI = 300;
-// A cover box counts as wider than its picture only if its aspect exceeds the picture's by this factor.
-const SIDES_FILL_MIN_ASPECT_GAIN = 1.04;
-// The free view / download PDF never pays for Grok (decisions.md 2026-10-26, two routings).
-const VIEW_COVER_FILL = { fillMethod: 'mirror' };
 // Minimum font size before warning
 const MIN_FONT_SIZE_WARNING = 10;
 // Spread text page (owner 2026-10-26: keep white, big text, upper half).
@@ -127,32 +121,6 @@ async function drawImageCovering(doc, imageBuffer, x, y, boxWidth, boxHeight, op
   doc.rect(x, y, boxWidth, boxHeight).clip();
   doc.image(imageBuffer, drawX, drawY, { width: drawnWidth, height: drawnHeight });
   doc.restore();
-}
-
-/**
- * Draw a cover / dedication picture on a page box WITHOUT cropping it (decisions.md 2026-10-27,
- * portrait covers on square pages). The covers are painted portrait (3:4); the mini book is
- * square, and cover-fit cut the top and bottom (title and dedication text lost). When the box is
- * wider than the picture, the whole picture is fitted by height and the side bands are filled by
- * pageFill ('sides': stretched blurred edge columns for fillMethod 'mirror', Grok outpaint for
- * 'grok'). A box that is not wider than the picture (A4: aspect within a few percent of the
- * picture) is the unchanged cover-fit, which crops only the bleed-sized remainder.
- * @param {{fillMethod: 'mirror'|'grok', fillStats?: Object}} fill
- */
-async function drawFittedPicture(doc, imageBuffer, x, y, boxWidth, boxHeight, fill) {
-  requireFillMethod(fill?.fillMethod, 'drawFittedPicture');
-  const sharp = require('sharp');
-  const meta = await sharp(imageBuffer).metadata();
-  if (!(boxWidth / boxHeight > (meta.width / meta.height) * SIDES_FILL_MIN_ASPECT_GAIN)) {
-    return drawImageCovering(doc, imageBuffer, x, y, boxWidth, boxHeight);
-  }
-  const s = PAGE_FILL_DPI / 72;
-  const out = await require('./pageFill').buildFilledPageBackground({
-    imageBuffer, pageWidthPx: Math.round(boxWidth * s), pageHeightPx: Math.round(boxHeight * s),
-    fillMethod: fill.fillMethod, edge: 'sides',
-  });
-  if (out.usedGrok && fill.fillStats) fill.fillStats.grokCalls = (fill.fillStats.grokCalls || 0) + 1;
-  doc.image(out.buffer, x, y, { width: boxWidth, height: boxHeight });
 }
 
 /**
@@ -348,14 +316,12 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     const frontImgW = frontRight - frontLeft;
     const frontImgH = coverSpreadHeight;
 
-    // Covers go through drawFittedPicture: a portrait picture on a squarer box is extended sideways, never cropped (decisions.md 2026-10-27).
-    // (A4 boxes keep cover-fit.) Older note: cover images use scale-to-fill, meant to reach the page edges,
+    // Cover images use scale-to-fill — they're meant to reach the page edges,
     // a small symmetric crop is acceptable. The previous `fit:` mode produced
     // visible white bars whenever the image's aspect didn't exactly match the
     // page area (always true after bleed math).
-      const coverFill = { fillMethod: options.fillMethod, fillStats: options.fillStats };
-      await drawFittedPicture(doc, backCoverBuffer, backImgX, backImgY, backImgW, backImgH, coverFill);
-      await drawFittedPicture(doc, frontCoverBuffer, frontImgX, frontImgY, frontImgW, frontImgH, coverFill);
+      await drawImageCovering(doc, backCoverBuffer, backImgX, backImgY, backImgW, backImgH);
+      await drawImageCovering(doc, frontCoverBuffer, frontImgX, frontImgY, frontImgW, frontImgH);
     }
   }
 
@@ -370,9 +336,8 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     const initialPageBuffer = await resolveImageBuffer(initialPageImageData);
     if (initialPageBuffer) {
       try {
-        await drawFittedPicture(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight, { fillMethod: options.fillMethod, fillStats: options.fillStats });
+        await drawImageCovering(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
       } catch (err) {
-        if (options.fillMethod === 'grok') throw err;   // a failed paid fill must not ship a blank page
         log.warn(`⚠️ [PRINT PDF] Initial page render failed: ${err.message}`);
       }
     }
@@ -554,6 +519,8 @@ function computeTextBelowRatio(pages, languageLevel) {
   return ratio;
 }
 
+// Print raster resolution of the filled strip page (see pageFill.js).
+const PAGE_FILL_DPI = 300;
 
 /**
  * The filled page raster (picture + strip) for one page and the edge the strip sits on, or null
@@ -929,7 +896,6 @@ async function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZ
  */
 async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, options = {}) {
   requireFillMethod(options.fillMethod, 'generateCombinedBookPdf');
-  const coverFill = { fillMethod: options.fillMethod, fillStats: options.fillStats };
   log.debug(`📚 [COMBINED PDF] Generating book with ${stories.length} stories, format: ${bookFormat}`);
 
   const format = BOOK_FORMATS[bookFormat] || BOOK_FORMATS[DEFAULT_FORMAT];
@@ -1124,12 +1090,12 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
         // Scale-to-fill so covers reach the page edges (no white bars). The
         // small symmetric crop on the long axis is acceptable for cover art.
         if (backCoverBuffer) {
-          try { await drawFittedPicture(doc, backCoverBuffer, backImgX, backImgY, backImgW, backImgH, coverFill); }
-          catch (err) { if (options.fillMethod === 'grok') throw err; log.warn(`⚠️ [COMBINED PDF] Story 1 back cover render failed: ${err.message}`); }
+          try { await drawImageCovering(doc, backCoverBuffer, backImgX, backImgY, backImgW, backImgH); }
+          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story 1 back cover render failed: ${err.message}`); }
         }
         if (frontCoverBuffer) {
-          try { await drawFittedPicture(doc, frontCoverBuffer, frontImgX, frontImgY, frontImgW, frontImgH, coverFill); }
-          catch (err) { if (options.fillMethod === 'grok') throw err; log.warn(`⚠️ [COMBINED PDF] Story 1 front cover render failed: ${err.message}`); }
+          try { await drawImageCovering(doc, frontCoverBuffer, frontImgX, frontImgY, frontImgW, frontImgH); }
+          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story 1 front cover render failed: ${err.message}`); }
         }
       }
 
@@ -1143,8 +1109,8 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       if (initialPageImageData) {
         const initialPageBuffer = await resolveImageBuffer(initialPageImageData);
         if (initialPageBuffer) {
-          try { await drawFittedPicture(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight, coverFill); }
-          catch (err) { if (options.fillMethod === 'grok') throw err; log.warn(`⚠️ [COMBINED PDF] Story 1 initial page render failed: ${err.message}`); }
+          try { await drawImageCovering(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight); }
+          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story 1 initial page render failed: ${err.message}`); }
         }
       }
 
@@ -1165,8 +1131,8 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       if (frontCoverImageData) {
         const frontCoverBuffer = await resolveImageBuffer(frontCoverImageData);
         if (frontCoverBuffer) {
-          try { await drawFittedPicture(doc, frontCoverBuffer, 0, 0, interiorPageWidth, interiorPageHeight, coverFill); }
-          catch (err) { if (options.fillMethod === 'grok') throw err; log.warn(`⚠️ [COMBINED PDF] Story ${storyIndex + 1} front cover render failed: ${err.message}`); }
+          try { await drawImageCovering(doc, frontCoverBuffer, 0, 0, interiorPageWidth, interiorPageHeight); }
+          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story ${storyIndex + 1} front cover render failed: ${err.message}`); }
         }
       }
 
@@ -1177,8 +1143,8 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       if (initialPageImageData) {
         const initialPageBuffer = await resolveImageBuffer(initialPageImageData);
         if (initialPageBuffer) {
-          try { await drawFittedPicture(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight, coverFill); }
-          catch (err) { if (options.fillMethod === 'grok') throw err; log.warn(`⚠️ [COMBINED PDF] Story ${storyIndex + 1} initial page render failed: ${err.message}`); }
+          try { await drawImageCovering(doc, initialPageBuffer, 0, 0, interiorPageWidth, interiorPageHeight); }
+          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story ${storyIndex + 1} initial page render failed: ${err.message}`); }
         }
       }
 
@@ -1193,8 +1159,8 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
         totalStoryPages++;
         const backCoverBuffer = await resolveImageBuffer(backCoverImageData);
         if (backCoverBuffer) {
-          try { await drawFittedPicture(doc, backCoverBuffer, 0, 0, interiorPageWidth, interiorPageHeight, coverFill); }
-          catch (err) { if (options.fillMethod === 'grok') throw err; log.warn(`⚠️ [COMBINED PDF] Story ${storyIndex + 1} back cover render failed: ${err.message}`); }
+          try { await drawImageCovering(doc, backCoverBuffer, 0, 0, interiorPageWidth, interiorPageHeight); }
+          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story ${storyIndex + 1} back cover render failed: ${err.message}`); }
         }
 
         // Blank separator after back cover (if not last story)
@@ -1289,7 +1255,7 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
       const frontCoverBuffer = await resolveImageBuffer(frontCoverImageData);
       if (!frontCoverBuffer) throw new Error('front cover unresolvable');
       // Scale-to-fill so the cover reaches the page edges with no white bars.
-      await drawFittedPicture(doc, frontCoverBuffer, 0, 0, pageWidth, pageHeight, VIEW_COVER_FILL);
+      await drawImageCovering(doc, frontCoverBuffer, 0, 0, pageWidth, pageHeight);
     } catch (err) {
       log.error('Error adding front cover:', err.message);
     }
@@ -1302,7 +1268,7 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
     try {
       const initialPageBuffer = await resolveImageBuffer(initialPageImageData);
       if (!initialPageBuffer) throw new Error('initial page unresolvable');
-      await drawFittedPicture(doc, initialPageBuffer, 0, 0, pageWidth, pageHeight, VIEW_COVER_FILL);
+      await drawImageCovering(doc, initialPageBuffer, 0, 0, pageWidth, pageHeight);
     } catch (err) {
       log.error('Error adding initial page:', err.message);
     }
@@ -1366,7 +1332,7 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
     try {
       const backCoverBuffer = await resolveImageBuffer(backCoverImageData);
       if (!backCoverBuffer) throw new Error('back cover unresolvable');
-      await drawFittedPicture(doc, backCoverBuffer, 0, 0, pageWidth, pageHeight, VIEW_COVER_FILL);
+      await drawImageCovering(doc, backCoverBuffer, 0, 0, pageWidth, pageHeight);
     } catch (err) {
       log.error('Error adding back cover:', err.message);
     }
@@ -1413,7 +1379,6 @@ module.exports = {
   pdfContentDisposition,
   resolveImageBuffer,
   generatePrintPdf,
-  drawFittedPicture,
   generateViewPdf,
   generateCombinedBookPdf,
   parseStoryPages,
