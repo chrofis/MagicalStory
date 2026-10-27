@@ -22,7 +22,7 @@ const FILL_METHODS = ['mirror', 'grok'];
 // Grok edit returns the aspect of the picture it is given; the page canvas is snapped to the
 // nearest ratio xAI documents, then the answer is stretched back to the page size.
 const GROK_ASPECTS = [['1:1', 1], ['3:4', 3 / 4], ['4:3', 4 / 3], ['2:3', 2 / 3], ['3:2', 3 / 2], ['9:16', 9 / 16], ['16:9', 16 / 9]];
-const GROK_HINT_WIDTH = 850;      // width of the canvas sent to Grok (the width the prototype round used)
+const GROK_HINT_WIDTH = 1536;    // width of the canvas sent to Grok; 850 (the prototype width) came back at 850 px and blurred the 300 dpi strip
 const GROK_FILL_MODEL = 'grok-imagine-image';   // USD 0.02 per call
 const GROK_FEATHER = 30;          // reference px: picture melts into the model's strip
 
