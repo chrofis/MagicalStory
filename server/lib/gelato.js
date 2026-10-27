@@ -194,20 +194,30 @@ function planLayoutPages(productRows, storyDatas, layout) {
 }
 
 /**
- * THE layout decision (decisions.md, short-book layout 2026-10-26). A short story
- * on Gelato's 28-page minimum leaves most of the book white. Print it as a
- * 'spread' (scene image full-bleed on the left page, its text on the facing right
- * page, two pages per scene) when the single layout would leave
- * BLANK_PAGES_ACK_FROM or more filler pages AND the spread leaves fewer.
- * Everything else (PDF, preview, checkout) reads the result of this function.
+ * Most scenes a book can have and still print as a 'spread' (owner 2026-10-27, decisions.md,
+ * "Book layout by scene count"). A single story is capped at 25 scenes, so every one-story
+ * book is a spread; a combined book of more than 25 scenes prints one page per scene.
+ */
+const MAX_SPREAD_SCENES = 25;
+
+/** Scene count of a book: every story's parsed pages (no cover, dedication or title pages). */
+function countBookScenes(storyDatas) {
+  const { parseStoryPages } = require('./pdf');
+  return storyDatas.reduce((sum, d) => sum + parseStoryPages(d).length, 0);
+}
+
+/**
+ * THE layout decision. 'spread' (scene image full-bleed on the left page, its text on the
+ * facing right page, two pages per scene) whenever the book has at most MAX_SPREAD_SCENES
+ * scenes; 'single' (one page per scene, the text in the expanded picture, see
+ * pdf.js drawFilledStripPage) above that. Everything else (PDF, preview, price, checkout)
+ * reads the result of this function.
  *
- * @param {{blankPages:number}} singlePlan - planLayoutPages(..., 'single')
- * @param {{blankPages:number}} spreadPlan - planLayoutPages(..., 'spread')
+ * @param {Object[]} storyDatas - stories.data objects, in book order
  * @returns {'single'|'spread'}
  */
-function chooseBookLayout(singlePlan, spreadPlan) {
-  return singlePlan.blankPages >= BLANK_PAGES_ACK_FROM && spreadPlan.blankPages < singlePlan.blankPages
-    ? 'spread' : 'single';
+function chooseBookLayout(storyDatas) {
+  return countBookScenes(storyDatas) <= MAX_SPREAD_SCENES ? 'spread' : 'single';
 }
 
 /**
@@ -215,15 +225,14 @@ function chooseBookLayout(singlePlan, spreadPlan) {
  * and how many of them are blank". Used by the order flow (PDF layout + padding)
  * and by the pre-payment preview in the book builder.
  *
- * `contentPagesSingle` is the content count of the single layout and is what the
- * price is based on, whatever layout is chosen (spread never moves a book to a
- * higher price tier; owner 2026-10-26).
+ * `contentPages` is the PRINTED content count of the chosen layout and is what the
+ * price tier is picked from (owner 2026-10-27, decisions.md "Book layout by scene count").
  *
  * @param {import('pg').Pool} dbPool
  * @param {Object[]} storyDatas - stories.data objects, in book order
  * @param {'softcover'|'hardcover'} coverType
  * @param {'A4'|'square'} bookFormat
- * @returns {Promise<{layout:'single'|'spread', contentPages:number, contentPagesSingle:number,
+ * @returns {Promise<{layout:'single'|'spread', contentPages:number,
  *   estimatedPageCount:number, printedPages:number, blankPages:number,
  *   productUid:string|null, product:Object|null, sequence:Object[]}>}
  */
@@ -238,13 +247,10 @@ async function computeBookPageInfo(dbPool, storyDatas, coverType, bookFormat) {
       ORDER BY max_pages ASC NULLS LAST, min_pages ASC NULLS LAST`,
     [`%${String(coverType).toLowerCase()}%`, `%${formatPattern}%`]
   );
-  const single = planLayoutPages(productsResult.rows, storyDatas, 'single');
-  const spread = planLayoutPages(productsResult.rows, storyDatas, 'spread');
-  const plan = chooseBookLayout(single, spread) === 'spread' ? spread : single;
+  const plan = planLayoutPages(productsResult.rows, storyDatas, chooseBookLayout(storyDatas));
   return {
     layout: plan.layout,
     contentPages: plan.contentPages,
-    contentPagesSingle: single.contentPages,
     estimatedPageCount: plan.estimatedPageCount,
     printedPages: plan.printedPages,
     blankPages: plan.blankPages,
@@ -808,6 +814,8 @@ module.exports = {
   snapToValidPageCount,
   buildPrintedPageSequence,
   chooseBookLayout,
+  countBookScenes,
+  MAX_SPREAD_SCENES,
   planLayoutPages,
   isBlankPagesAckMissing,
   BLANK_PAGES_ACK_FROM,

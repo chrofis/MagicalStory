@@ -11,7 +11,7 @@ const { CREDIT_CONFIG } = require('../config/credits');
 const { getPool } = require('../services/database');
 const { log } = require('../utils/logger');
 const vouchers = require('../lib/vouchers');
-const { countBookContentPages, computeBookPageInfo, isBlankPagesAckMissing } = require('../lib/gelato');
+const { computeBookPageInfo, isBlankPagesAckMissing } = require('../lib/gelato');
 const { getPriceForPages, getStripeForUser, isUserTestMode } = require('./print');
 
 const V = CREDIT_CONFIG.VOUCHER;
@@ -194,13 +194,13 @@ router.post('/vouchers/book-checkout', authenticateToken, async (req, res) => {
       if (r.rows.length === 0) return res.status(404).json({ error: `Story not found: ${sid}` });
       stories.push({ id: sid, data: typeof r.rows[0].data === 'string' ? JSON.parse(r.rows[0].data) : r.rows[0].data });
     }
-    // Price tier = single-layout content count, even when the book prints as a spread
-    // (decisions.md short-book layout 2026-10-26).
-    const totalPages = countBookContentPages(stories.map(s => s.data), 'single');
+    const pageInfo = await computeBookPageInfo(pool, stories.map(s => s.data), coverType, bookFormat);
+    // Price tier and voucher page limit = the PRINTED content page count of the chosen layout
+    // (decisions.md, book layout by scene count).
+    const totalPages = pageInfo.contentPages;
     if (totalPages > V.MAX_BOOK_PAGES) {
       return res.status(400).json({ error: `A voucher book has at most ${V.MAX_BOOK_PAGES} pages`, code: 'VOUCHER_BOOK_TOO_LONG', totalPages, max: V.MAX_BOOK_PAGES });
     }
-    const pageInfo = await computeBookPageInfo(pool, stories.map(s => s.data), coverType, bookFormat);
     if (isBlankPagesAckMissing(pageInfo.blankPages, req.body.blankPagesAcknowledged)) {
       return res.status(400).json({
         error: `This book has ${pageInfo.blankPages} blank pages; the blank pages must be acknowledged before checkout.`,

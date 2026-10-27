@@ -45,9 +45,8 @@ describe('book price quote vs charge', () => {
 
   it('BookBuilder quotes from the server contentPages (what the checkout bills), never the scene sum', () => {
     const src = fs.readFileSync(path.join(ROOT, 'client/src/pages/BookBuilder.tsx'), 'utf8');
-    // contentPagesSingle = the checkout's billed count (countBookContentPages, single layout), not the
-    // printed-layout contentPages that doubles for the spread layout (decisions.md short-book layout)
-    expect(src).toMatch(/const billedPages = pageInfo\?\.contentPagesSingle \?\? null;/);
+    // contentPages = the checkout's billed count: the printed content count of the chosen layout
+    expect(src).toMatch(/const billedPages = pageInfo\?\.contentPages \?\? null;/);
     expect(src).not.toMatch(/getPriceForPages\(totalPages/);
     // every price lookup on the page uses the billed count
     for (const m of src.matchAll(/getPriceForPages\((\w+)/g)) expect(m[1]).toBe('billedPages');

@@ -1,10 +1,9 @@
 import api from './api';
 
-/** POST /api/book-page-info. `contentPagesSingle` is what the price tier is based on, whatever `layout` prints. */
+/** POST /api/book-page-info. `contentPages` is the printed content count of `layout` and is what the price tier is based on. */
 export interface BookPageInfo {
   layout: 'single' | 'spread';
   contentPages: number;
-  contentPagesSingle: number;
   printedPages: number;
   blankPages: number;
   blankAckFrom: number;
