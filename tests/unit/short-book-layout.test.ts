@@ -184,3 +184,12 @@ describe('the layout travels builder -> page info -> checkout -> order -> PDF', 
     expect(read('client/src/pages/VoucherBookCheckout.tsx')).toContain('<AddStoryNudge');
   });
 });
+
+describe('facing text page font size (owner 2026-10-27: 22pt read like a large-print book)', () => {
+  it('starts at the reading-level size, not a fixed large size', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../../server/lib/pdf.js'), 'utf8');
+    expect(src).not.toMatch(/SPREAD_START_FONT/);
+    expect(src).toMatch(/let fontSize = require\('\.\.\/config\/textRegion'\)\.requiredFontPt\(storyData\.languageLevel\)/);
+  });
+});

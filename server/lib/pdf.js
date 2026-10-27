@@ -21,7 +21,6 @@ const PAGE_SIZE = BOOK_FORMATS.square.pageWidth;
 // Minimum font size before warning
 const MIN_FONT_SIZE_WARNING = 10;
 // Spread text page (owner 2026-10-26: keep white, big text, upper half).
-const SPREAD_START_FONT = 22;
 const SPREAD_LINE_GAP_RATIO = 0.35; // lineGap on top of Helvetica's ~1.15 line height = about 1.5 spacing
 const SPREAD_TEXT_TOP_RATIO = 0.2;  // text starts 20% down the page
 
@@ -803,14 +802,15 @@ async function addSpreadPages(doc, storyData, storyPages, pageWidth, pageHeight,
   const textWidth = pageWidth - marginInner - marginOuter;
   const textHeight = pageHeight - marginTop - marginBottom;
   const cleaned = storyPages.map(t => t.trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n'));
-  // One font for the whole story: the largest size (22pt down to a 10pt floor) at which
-  // every page fits at ~1.5 line spacing. Shrinks only when the text does not fit.
+  // One font for the whole story: the reading level's print size (requiredFontPt: 14pt first
+  // readers, 12pt otherwise, the same as the text-in-picture pages), shrunk toward a 10pt floor
+  // only when a page does not fit. Owner 2026-10-27: 22pt read like a large-print book.
   const gapFor = (f) => f * SPREAD_LINE_GAP_RATIO;
   const fits = (f) => {
     doc.fontSize(f).font('Helvetica');
     return cleaned.every(t => doc.heightOfString(t, { width: textWidth, align: 'left', lineGap: gapFor(f), paragraphGap: f * 0.5 }) <= textHeight);
   };
-  let fontSize = SPREAD_START_FONT;
+  let fontSize = require('../config/textRegion').requiredFontPt(storyData.languageLevel);
   while (fontSize > 10 && !fits(fontSize)) fontSize -= 0.5;
   if (!fits(fontSize)) {
     throw new Error(`Spread text too long even at 10pt (story "${storyData.title || '?'}"). Please shorten the text.`);
