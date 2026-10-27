@@ -1,11 +1,10 @@
 /**
- * THE CUSTOMER PICKS THE BOOK LAYOUT (owner 2026-10-26/27, orders 98-101): facing pages or text in the picture.
+ * THE BOOK PRODUCT MODEL (owner 2026-10-27, replaces v3 'customer picks'): mini square facing book, A4 main product, hidden facing exception.
  *
- * Gelato's minimum is 28 pages. Text in the picture is available from 24 scenes (fewer than 4 empty pages), facing
- * pages up to 60 scenes; the price is the one-page tier plus CHF 5 only when facing pages beat an available
- * text-in-picture layout. ONE pure set of functions in gelato.js decides (describeLayouts, chooseBookLayout,
- * facingSurchargeApplies).
- * Plan: tasks/short-book-layout-2026-10-26.md, tasks/strip-edge-by-picture-2026-10-27.md (Part B v3)
+ * Gelato's minimum is 28 pages. A story whose one-page A4 layout leaves 4 or more empty pages (below 24 scenes) is the
+ * MINI book: facing pages, SQUARE, the only option, no surcharge. Every other book is A4, one page per scene; facing pages
+ * (square, +CHF 5) is the exception, up to 60 scenes. The format follows the layout (computeBookPageInfo.bookFormat).
+ * Plan: tasks/short-book-layout-2026-10-26.md, tasks/strip-edge-by-picture-2026-10-27.md (Part B v4)
  */
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
@@ -24,8 +23,13 @@ const SKU28 = {
   product_uid: 'photobooks-hardcover_pf_210x280-mm-portrait_pt_170-gsm',
   product_name: 'Hardcover A4', min_pages: 28, max_pages: 200, available_page_counts: null,
 };
+const SQUARE28 = {
+  product_uid: 'photobooks-hardcover_pf_200x200-mm-square_pt_170-gsm',
+  product_name: 'Hardcover square', min_pages: 28, max_pages: 200, available_page_counts: null,
+};
+// SKU28 stands for "the catalogue": the A4 row plus the square row (the format follows the layout).
 const info = (stories: any[], rows: any[] = [SKU28], options: any = {}) =>
-  computeBookPageInfo({ query: async () => ({ rows }) }, stories, 'hardcover', 'A4', options);
+  computeBookPageInfo({ query: async () => ({ rows: [...rows, SQUARE28] }) }, stories, 'hardcover', options);
 const { CREDIT_CONFIG } = require('../../server/config/credits.js');
 
 describe('layout availability (customer picks; 28-page minimum, 4-blank rule, 60-scene facing cap)', () => {
@@ -100,6 +104,40 @@ describe('layout availability (customer picks; 28-page minimum, 4-blank rule, 60
   });
 });
 
+describe('the format follows the layout (never picked by the customer)', () => {
+  it('6 and 15 scenes: spread, square, the only option, surcharge 0', async () => {
+    for (const n of [6, 15]) {
+      const r = await info([story(n)]);
+      expect(r.layout).toBe('spread');
+      expect(r.bookFormat).toBe('square');
+      expect(r.productUid).toBe(SQUARE28.product_uid);
+      expect(r.layouts.single.available).toBe(false);
+      expect(r.layoutSurchargeChf).toBe(0);
+    }
+  });
+  it('25 scenes: single A4 by default; spread on request is square with +5', async () => {
+    const d = await info([story(25)]);
+    expect(d.layout).toBe('single');
+    expect(d.bookFormat).toBe('A4');
+    expect(d.productUid).toBe(SKU28.product_uid);
+    expect(d.layoutSurchargeChf).toBe(0);
+    const s = await info([story(25)], [SKU28], { layout: 'spread' });
+    expect(s.bookFormat).toBe('square');
+    expect(s.productUid).toBe(SQUARE28.product_uid);
+    expect(s.layoutSurchargeChf).toBe(5);
+  });
+  it('61 scenes: no spread, A4', async () => {
+    const r = await info([story(25), story(25), story(11)]);
+    expect(r.layouts.spread.available).toBe(false);
+    expect(r.bookFormat).toBe('A4');
+  });
+  it('a client-sent format is ignored', async () => {
+    const r = await (computeBookPageInfo as any)({ query: async () => ({ rows: [SKU28, SQUARE28] }) }, [story(25)], 'hardcover', 'square');
+    expect(r.bookFormat).toBe('A4');
+    expect(r.layout).toBe('single');
+  });
+});
+
 describe('price: one-page tier for both layouts, CHF 5 only when facing pages beat an available one-page layout', () => {
   it('BOOK_LAYOUT_SURCHARGE_CHF is the one constant', () => {
     expect(CREDIT_CONFIG.BOOK_LAYOUT_SURCHARGE_CHF).toBe(5);
@@ -167,6 +205,17 @@ describe('the layout travels builder -> page info -> checkout -> order -> PDF', 
       expect(src).toContain("err.name === 'BookLayoutError'");
     }
   });
+  it('the format is derived from the layout: no client format reaches the page info, the checkouts or the metadata', () => {
+    for (const f of ['server/routes/print.js', 'server/routes/vouchers.js']) {
+      const src = read(f);
+      expect(src).toContain('bookFormat: pageInfo.bookFormat');
+      expect(src).not.toMatch(/computeBookPageInfo\([^)]*bookFormat/);
+    }
+    expect(read('server/lib/gelato.js')).not.toMatch(/metadata\?\.bookFormat/);
+    for (const f of ['client/src/pages/BookBuilder.tsx', 'client/src/pages/VoucherBookCheckout.tsx']) {
+      expect(read(f)).not.toMatch(/bookFormat/);
+    }
+  });
   it('the webhook and the resume path hand the session layout to processBookOrder', () => {
     expect(read('server/lib/gelato.js')).toContain('fullSession.metadata?.bookLayout');
     expect(read('server/lib/gelato.js')).toContain('inp.quantity, inp.layout');
@@ -176,8 +225,8 @@ describe('the layout travels builder -> page info -> checkout -> order -> PDF', 
     const b = read('client/src/pages/BookBuilder.tsx');
     expect(b).toContain('pageInfo?.contentPagesSingle');
     expect(b).toContain('layoutSurchargeChf');
-    expect(b).toContain('<BookLayoutPicker');
-    expect(read('client/src/pages/VoucherBookCheckout.tsx')).toContain('<BookLayoutPicker');
+    expect(b).toContain('<BookFacingOption');
+    expect(read('client/src/pages/VoucherBookCheckout.tsx')).toContain('<BookFacingOption');
   });
   it('both blank-page warnings carry the add-story action', () => {
     expect(read('client/src/pages/BookBuilder.tsx')).toContain('<AddStoryNudge');

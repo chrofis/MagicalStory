@@ -8,7 +8,7 @@ import { Navigation, LoadingSpinner } from '@/components/common';
 import BlankPagesPreview from '@/components/book/BlankPagesPreview';
 import AddStoryNudge from '@/components/book/AddStoryNudge';
 import type { BookLayout } from '@/services/storyService';
-import BookLayoutPicker from '@/components/book/BookLayoutPicker';
+import BookFacingOption from '@/components/book/BookFacingOption';
 import { storyService } from '@/services';
 import type { BookPageInfo, VoucherBookCredit } from '@/services/storyService';
 import { createLogger } from '@/services/logger';
@@ -176,7 +176,6 @@ export default function VoucherBookCheckout() {
 
   const maxPages = credit?.maxPages ?? VOUCHER_BOOK_MAX_PAGES;
   const surchargeChf = ((credit?.hardcoverSurchargeCents ?? VOUCHER_HARDCOVER_SURCHARGE_CHF * 100) / 100).toFixed(2);
-  const bookFormat = 'A4' as const;
 
   useEffect(() => { document.title = t.docTitle; }, [t.docTitle]);
 
@@ -220,7 +219,7 @@ export default function VoucherBookCheckout() {
   useEffect(() => {
     if (!selectedKey) { setPageInfo(null); return; }
     let cancelled = false;
-    storyService.getBookPageInfo(selectedKey.split(','), coverType, bookFormat, layoutChoice ?? undefined)
+    storyService.getBookPageInfo(selectedKey.split(','), coverType, layoutChoice ?? undefined)
       .then(info => { if (!cancelled) setPageInfo(info); })
       .catch(err => {
         log.error('Failed to fetch book page info:', err);
@@ -264,7 +263,6 @@ export default function VoucherBookCheckout() {
       const { url } = await storyService.createVoucherBookCheckout({
         storyIds: selected,
         coverType,
-        bookFormat,
         blankPagesAcknowledged: needsBlankAck ? true : undefined,
         layout: pageInfo?.layout,
       });
@@ -372,7 +370,7 @@ export default function VoucherBookCheckout() {
                 </div>
               )}
               {pageInfo && !isTooLong && (
-                <BookLayoutPicker language={language} layouts={pageInfo.layouts} selected={pageInfo.layout} onSelect={setLayoutChoice} />
+                <BookFacingOption language={language} layouts={pageInfo.layouts} selected={pageInfo.layout} onSelect={setLayoutChoice} />
               )}
               {needsBlankAck && pageInfo && (
                 <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">

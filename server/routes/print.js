@@ -1108,14 +1108,14 @@ router.post('/generate-pdf', authenticateToken, async (req, res) => {
 // differs from the real order PDF only in the Grok-outpainted strip (decisions.md 2026-10-26).
 router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
   try {
-    const { storyIds, bookFormat = 'A4', coverType = 'softcover' } = req.body;
+    const { storyIds, coverType = 'softcover' } = req.body; // the print format follows the layout (computeBookPageInfo), a client format is ignored
     const userId = req.user.id;
 
     if (!storyIds || !Array.isArray(storyIds) || storyIds.length === 0) {
       return res.status(400).json({ error: 'Missing or invalid storyIds array' });
     }
 
-    console.log(`📚 [BOOK PDF] Generating book with ${storyIds.length} stories, format: ${bookFormat}, cover: ${coverType}`);
+    console.log(`📚 [BOOK PDF] Generating book with ${storyIds.length} stories, cover: ${coverType}`);
 
     // Fetch all stories from database
     const stories = [];
@@ -1145,8 +1145,8 @@ router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
     // checkout preview (POST /api/book-page-info) and the order flow
     // (processBookOrder) use, so this test PDF is padded to the page count
     // Gelato receives. No product → no SKU to size a cover for: fail loudly.
-    const pageInfo = await computeBookPageInfo(getDbPool(), stories.map(s => s.data), coverType, bookFormat, { layout: req.body.layout });
-    const { estimatedPageCount, printedPages: snappedPageCount, productUid: printProductUid } = pageInfo;
+    const pageInfo = await computeBookPageInfo(getDbPool(), stories.map(s => s.data), coverType, { layout: req.body.layout });
+    const { estimatedPageCount, printedPages: snappedPageCount, productUid: printProductUid, bookFormat } = pageInfo;
     console.log(`📊 [BOOK PDF] Estimated Gelato pageCount: ${estimatedPageCount} (${pageInfo.contentPages} content pages incl. dedication)`);
     if (!pageInfo.product) {
       return res.status(500).json({ error: `No active gelato_products row matches coverType=${coverType}, format=${bookFormat}` });
@@ -1570,14 +1570,14 @@ router.post('/referral/cash-out', authenticateToken, async (req, res) => {
 // flow pads the PDF with — see DECISIONS / commit message.
 router.post('/book-page-info', authenticateToken, async (req, res) => {
   try {
-    const { storyIds, coverType = 'softcover', bookFormat = 'A4' } = req.body;
+    const { storyIds, coverType = 'softcover' } = req.body; // a client bookFormat is ignored: the format follows the layout
     // The customer's requested layout (builder state); absent = the default (text in the picture when available).
     const layout = req.body.layout ?? req.query.layout;
     if (!Array.isArray(storyIds) || storyIds.length === 0) {
       return res.status(400).json({ error: 'Missing or invalid storyIds array' });
     }
-    if (!['softcover', 'hardcover'].includes(coverType) || !['A4', 'square'].includes(bookFormat)) {
-      return res.status(400).json({ error: 'Invalid coverType or bookFormat' });
+    if (!['softcover', 'hardcover'].includes(coverType)) {
+      return res.status(400).json({ error: 'Invalid coverType' });
     }
     const storyDatas = [];
     for (const sid of storyIds) {
@@ -1585,9 +1585,10 @@ router.post('/book-page-info', authenticateToken, async (req, res) => {
       if (r.rows.length === 0) return res.status(404).json({ error: `Story not found: ${sid}` });
       storyDatas.push(typeof r.rows[0].data === 'string' ? JSON.parse(r.rows[0].data) : r.rows[0].data);
     }
-    const info = await computeBookPageInfo(getDbPool(), storyDatas, coverType, bookFormat, { layout });
+    const info = await computeBookPageInfo(getDbPool(), storyDatas, coverType, { layout });
     res.json({
       layout: info.layout,
+      bookFormat: info.bookFormat, // derived from the layout: spread = square, single = A4
       layouts: info.layouts, // both cards of the layout picker: available + reason + printed/blank pages
       layoutSurchargeChf: info.layoutSurchargeChf, // 0 or BOOK_LAYOUT_SURCHARGE_CHF (facingSurchargeApplies)
       contentPages: info.contentPages,
@@ -1608,7 +1609,7 @@ router.post('/book-page-info', authenticateToken, async (req, res) => {
 router.post('/stripe/create-checkout-session', authenticateToken, async (req, res) => {
   try {
     // Support both single storyId and array of storyIds
-    const { storyId, storyIds, coverType = 'softcover', bookFormat = 'A4', referralCode } = req.body;
+    const { storyId, storyIds, coverType = 'softcover', referralCode } = req.body;
     const quantity = Math.max(1, Math.min(5, parseInt(req.body.quantity) || 1));
     const userId = req.user.id;
     // Optional: spend referral balance on this checkout (additional discount beyond referral code)
@@ -1654,7 +1655,7 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     // Blank-page guard: the customer must have ticked the acknowledgement in the
     // book builder (docs/decisions.md, blank-page preview). Not bypassable by
     // calling this endpoint directly.
-    const pageInfo = await computeBookPageInfo(getDbPool(), stories.map(s => s.data), coverType, bookFormat, { layout: req.body.layout });
+    const pageInfo = await computeBookPageInfo(getDbPool(), stories.map(s => s.data), coverType, { layout: req.body.layout });
     if (isBlankPagesAckMissing(pageInfo.blankPages, req.body.blankPagesAcknowledged)) {
       return res.status(400).json({
         error: `This book has ${pageInfo.blankPages} blank pages; the blank pages must be acknowledged before checkout.`,
@@ -1748,7 +1749,7 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         // Blank pages the customer acknowledged (0 when none); no orders column needed.
         blankPagesAcknowledged: pageInfo.blankPages.toString(),
         coverType: coverType,
-        bookFormat: bookFormat,
+        bookFormat: pageInfo.bookFormat, // derived from the layout; a client-sent format is ignored
         // The layout the customer paid for ('single' | 'spread'); resolveBookOrderInputs hands it to processBookOrder.
         bookLayout: pageInfo.layout,
         quantity: quantity.toString(),

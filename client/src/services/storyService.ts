@@ -2,7 +2,7 @@ import api from './api';
 
 /** POST /api/book-page-info. `contentPagesSingle` is what the price tier is based on, whatever `layout` prints; facing pages add layoutSurchargeChf. */
 export type BookLayout = 'single' | 'spread';
-/** One card of the layout picker, from the server (gelato.describeLayouts). `reason` is a code plus numbers, worded by BookLayoutPicker. */
+/** One layout of the book, from the server (gelato.describeLayouts). `reason` is a code plus numbers. */
 export interface BookLayoutOption {
   available: boolean;
   reason: { code: 'TOO_FEW_PAGES'; emptyPages: number } | { code: 'TOO_MANY_PAGES'; printedPages: number; maxPages: number } | null;
@@ -12,6 +12,8 @@ export interface BookLayoutOption {
 }
 export interface BookPageInfo {
   layout: BookLayout;
+  /** Derived by the server from the layout (spread = square, single = A4); never sent by the client. */
+  bookFormat: 'square' | 'A4';
   layouts: Record<BookLayout, BookLayoutOption>;
   /** Surcharge of the layout in `layout` (0 or BOOK_LAYOUT_SURCHARGE_CHF; gelato.facingSurchargeApplies). */
   layoutSurchargeChf: number;
@@ -2334,12 +2336,11 @@ export const storyService = {
   // Stripe checkout for book purchase (supports single story or multiple stories).
   // useBalanceCents: optional, spends from the user's referral balance (in addition
   // to any referralCode discount). Held server-side until session completes/expires.
-  async createCheckoutSession(storyIds: string | string[], coverType?: 'softcover' | 'hardcover', bookFormat?: 'square' | 'A4', quantity?: number, referralCode?: string, useBalanceCents?: number, blankPagesAcknowledged?: boolean, layout?: BookLayout): Promise<{ url: string }> {
+  async createCheckoutSession(storyIds: string | string[], coverType?: 'softcover' | 'hardcover', quantity?: number, referralCode?: string, useBalanceCents?: number, blankPagesAcknowledged?: boolean, layout?: BookLayout): Promise<{ url: string }> {
     const ids = Array.isArray(storyIds) ? storyIds : [storyIds];
     const body: Record<string, unknown> = {
       storyIds: ids,
       coverType: coverType || 'softcover',
-      bookFormat: bookFormat || 'A4',
       quantity: quantity || 1,
     };
     if (referralCode) body.referralCode = referralCode;
@@ -2352,8 +2353,8 @@ export const storyService = {
 
   // Pre-payment preview: printed page count and blank pages, computed by the
   // same server function that pads the print PDF.
-  async getBookPageInfo(storyIds: string[], coverType: 'softcover' | 'hardcover', bookFormat: 'square' | 'A4', layout?: BookLayout): Promise<BookPageInfo> {
-    return api.post('/api/book-page-info', { storyIds, coverType, bookFormat, ...(layout ? { layout } : {}) });
+  async getBookPageInfo(storyIds: string[], coverType: 'softcover' | 'hardcover', layout?: BookLayout): Promise<BookPageInfo> {
+    return api.post('/api/book-page-info', { storyIds, coverType, ...(layout ? { layout } : {}) });
   },
 
   // Referral: get current user's referral code + stats
@@ -2454,7 +2455,7 @@ export const storyService = {
   },
 
   // Voucher book order: Stripe collects the address; total is CHF 0 (softcover) or the hardcover surcharge.
-  async createVoucherBookCheckout(params: { storyIds: string[]; coverType: 'softcover' | 'hardcover'; bookFormat: 'square' | 'A4'; blankPagesAcknowledged?: boolean; layout?: BookLayout }): Promise<{ url: string }> {
+  async createVoucherBookCheckout(params: { storyIds: string[]; coverType: 'softcover' | 'hardcover'; blankPagesAcknowledged?: boolean; layout?: BookLayout }): Promise<{ url: string }> {
     return api.post('/api/vouchers/book-checkout', params);
   },
 

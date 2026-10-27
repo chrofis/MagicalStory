@@ -315,27 +315,31 @@ Decision: `docs/decisions.md` 2026-10-25. Plan: `tasks/vouchers-2026-10-25.md`.
 
 One function decides everything about a printed book's pages: `computeBookPageInfo` in `server/lib/gelato.js`.
 It plans both layouts (`planLayoutPages`: content count, SKU, snapped Gelato page count, filler pages);
-`describeLayouts` says which the customer may choose and why not, and `chooseBookLayout(layouts, requested)` picks:
-the request when available, else text in the picture when available, else facing pages; an unavailable request throws
-`BookLayoutError` (no silent downgrade).
-- **single** ("text in the picture"): one scene = one page, text in the expanded picture at the calmer edge. Available
-  unless it leaves `>= BLANK_PAGES_ACK_FROM` (4) filler pages (23 scenes and fewer on a 28-page SKU).
-- **spread** ("facing pages"): one scene = two pages, scene image on the LEFT (even) page, text on the facing RIGHT
-  page (`addSpreadPages` in `server/lib/pdf.js`, via `options.layout`). Available up to `FACING_PAGES_MAX_SCENES` (60).
+`describeLayouts` says which layouts exist and why not, and `chooseBookLayout(layouts, requested)` picks:
+the request when available, else the main product (single) when available, else the mini book (spread); an unavailable
+request throws `BookLayoutError` (no silent downgrade). **The print format follows the layout and is never an input:**
+`bookFormatForLayout` (spread = square, single = A4) is the one mapping; `computeBookPageInfo(pool, stories, coverType, { layout })`
+plans `single` on the A4 SKUs and `spread` on the square SKUs and returns `bookFormat`. The page-info route, both checkouts, the
+Stripe `bookFormat` metadata, the order, the Gelato product match and the PDF use it; a client-sent format is ignored.
+- **single** (main product, A4): one scene = one page, picture extended to fill the page, text on the extension at the calmer
+  edge. Available unless it leaves `>= BLANK_PAGES_ACK_FROM` (4) filler pages (23 scenes and fewer on a 28-page SKU).
+- **spread** (square, facing pages): one scene = two pages, scene image on the LEFT (even) page, text on the facing RIGHT
+  page (`addSpreadPages` in `server/lib/pdf.js`, via `options.layout`). With `single` unavailable it is the MINI book, the only
+  option, no surcharge; otherwise it is the exception behind the "more options" link, up to `FACING_PAGES_MAX_SCENES` (60).
 - **Price** = the tier of the one-page count (`contentPagesSingle`) for both layouts, plus
   `BOOK_LAYOUT_SURCHARGE_CHF` (`server/config/credits.js`) when `facingSurchargeApplies(pageInfo)`: facing pages chosen
   while text in the picture was available. `layoutSurchargeChf` in the page info is that amount; `create-checkout-session`
   and `vouchers/book-checkout` add it to the Stripe line item (the voucher coupon never covers it) and the builders show it.
 - **The pick travels** builder -> `POST /api/book-page-info {layout}` -> checkout `layout` -> Stripe metadata `bookLayout` ->
-  `resolveBookOrderInputs` -> `processBookOrder(..., layout)` -> PDF. `BookLayoutPicker` (de/en/fr/it) renders both cards
-  from `pageInfo.layouts`.
-- The result carries `layout`, `layouts`, `layoutSurchargeChf`, `contentPages` (of the chosen layout), `contentPagesSingle`, `printedPages`, `blankPages`
+  `resolveBookOrderInputs` -> `processBookOrder(..., layout)` -> PDF. `BookFacingOption` (de/en/fr/it) renders the mini-book note
+  or the small "more options" link with the facing-pages checkbox from `pageInfo.layouts`.
+- The result carries `layout`, `bookFormat`, `layouts`, `layoutSurchargeChf`, `contentPages` (of the chosen layout), `contentPagesSingle`, `printedPages`, `blankPages`
   and `sequence` (`buildPrintedPageSequence`: `storyImage` + `storyText` entries for a spread, `story` for single).
   `POST /api/book-page-info`, the PDF generators and `processBookOrder` all read it; none recompute it.
 - Blank-page warning (`BLANK_PAGES_ACK_FROM`): amber box with "room for another story", the `AddStoryNudge`
   button (de/en/fr/it), the spread note and the printed-book strip, plus the required acknowledgement.
 - Test: `npx vitest run tests/unit/short-book-layout.test.ts tests/unit/book-price-quote.test.ts` and
-  `node --test server/lib/gelato.test.js`. Decision: `docs/decisions.md` 2026-10-26 and 2026-10-27 (the customer picks the layout).
+  `node --test server/lib/gelato.test.js`. Decision: `docs/decisions.md` 2026-10-26 and 2026-10-27 (the book product model replaces "the customer picks the layout and format").
 
 - Text strip fill (single layout): the strip below the picture is not white. `server/lib/pageFill.js`
   (`buildFilledPageBackground`) builds the whole page as one 300 dpi JPEG: picture on top, below it the

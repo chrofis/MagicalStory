@@ -752,7 +752,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           // resume (P2/P8).
           const {
             userId, address, validatedStoryIds,
-            coverType: orderCoverType, bookFormat: orderBookFormat, quantity: orderQuantity, layout: orderLayout,
+            coverType: orderCoverType, quantity: orderQuantity, layout: orderLayout,
             customerInfo,
           } = await resolveBookOrderInputs(dbPool, fullSession);
           log.debug('📦 [STRIPE WEBHOOK] Ship to:', customerInfo.shippingName, JSON.stringify(address));
@@ -854,7 +854,6 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               currency: fullSession.currency,
               quantity: orderQuantity,
               coverType: orderCoverType,
-              bookFormat: orderBookFormat,
               stripeMode,
             });
             if (tokensToCredit > 0) {
@@ -978,7 +977,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           // Trigger background PDF generation and print provider order (don't await - fire and forget)
           // Pass isTestPayment so Gelato knows whether to create draft or real order
           // Now passing array of storyIds for combined book generation
-          processBookOrder(dbPool, fullSession.id, userId, validatedStoryIds, customerInfo, address, isTestPayment, orderCoverType, orderBookFormat, orderQuantity, orderLayout).catch(async (err) => {
+          processBookOrder(dbPool, fullSession.id, userId, validatedStoryIds, customerInfo, address, isTestPayment, orderCoverType, orderQuantity, orderLayout).catch(async (err) => {
             log.error('❌ [BACKGROUND] Error processing book order:', err);
             log.error('   Error stack:', err.stack);
             log.error('   Session ID:', fullSession.id);

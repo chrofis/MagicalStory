@@ -207,16 +207,27 @@ function countBookScenes(storyDatas) {
   return storyDatas.reduce((sum, d) => sum + parseStoryPages(d).length, 0);
 }
 
+/**
+ * The print format FOLLOWS the layout; the customer never picks it (owner 2026-10-27, decisions.md "book
+ * product model"): facing pages (the mini book, or the facing exception) print SQUARE, one page per scene
+ * prints A4 with the picture extended to fill the page. The only place the mapping lives.
+ */
+function bookFormatForLayout(layout) {
+  return layout === 'spread' ? 'square' : 'A4';
+}
+/** Gelato product_uid fragment of each print format. */
+const BOOK_FORMAT_PATTERN = { A4: '210x280', square: '200x200' };
+
 class BookLayoutError extends Error {
   constructor(message, code) { super(message); this.name = 'BookLayoutError'; this.code = code; }
 }
 
 /**
- * Which layouts the customer may choose, with the reason for a greyed-out one (the builder renders
- * both cards from this). 'single' = one printed page per scene, text in the expanded picture at the
- * calmer edge; unavailable when it would leave BLANK_PAGES_ACK_FROM or more empty pages.
- * 'spread' = facing pages, picture left, text right; unavailable above FACING_PAGES_MAX_SCENES scenes.
- * Reasons are codes plus numbers; the client words them in four languages.
+ * Which layouts exist for this book. 'single' = the main product: one A4 page per scene, text in the
+ * extended picture; unavailable when it would leave BLANK_PAGES_ACK_FROM or more empty pages (then the
+ * book is the square facing-pages MINI book, the only option). 'spread' = facing pages, square, picture
+ * left, text right; unavailable above FACING_PAGES_MAX_SCENES scenes. When both are available, 'single'
+ * is the default and 'spread' the "more options" exception. Reasons are codes plus numbers.
  */
 function describeLayouts(singlePlan, spreadPlan, sceneCount) {
   const singleOk = singlePlan.blankPages < BLANK_PAGES_ACK_FROM;
@@ -237,7 +248,7 @@ function describeLayouts(singlePlan, spreadPlan, sceneCount) {
 
 /**
  * THE layout decision. The customer's request wins when that layout is available; no request means
- * text in the picture when available, else facing pages. An unavailable request THROWS (checkout must
+ * the main product (single, A4) when available, else the mini book (facing pages, square). An unavailable request THROWS (checkout must
  * not silently print another layout than the one paid for).
  *
  * @param {Object} layouts - describeLayouts()
@@ -286,25 +297,24 @@ function layoutSurchargeChf(pageInfo) {
  * @param {import('pg').Pool} dbPool
  * @param {Object[]} storyDatas - stories.data objects, in book order
  * @param {'softcover'|'hardcover'} coverType
- * @param {'A4'|'square'} bookFormat
  * @param {{layout?: 'single'|'spread'}} [options] - the customer's requested layout
- * @returns {Promise<{layout:'single'|'spread', layouts:Object, contentPages:number, contentPagesSingle:number,
+ * @returns {Promise<{layout:'single'|'spread', bookFormat:'A4'|'square' (derived from the layout), layouts:Object, contentPages:number, contentPagesSingle:number,
  *   layoutSurchargeChf:number, estimatedPageCount:number, printedPages:number, blankPages:number,
  *   productUid:string|null, product:Object|null, sequence:Object[]}>}
  */
-async function computeBookPageInfo(dbPool, storyDatas, coverType, bookFormat, { layout: requested } = {}) {
-  const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
+async function computeBookPageInfo(dbPool, storyDatas, coverType, { layout: requested } = {}) {
+  // One query for both formats: the A4 SKUs plan the 'single' layout, the square SKUs the 'spread' layout.
   const productsResult = await dbPool.query(
     `SELECT product_uid, product_name, min_pages, max_pages, available_page_counts
        FROM gelato_products
       WHERE is_active = true
         AND LOWER(product_uid) LIKE $1
-        AND LOWER(product_uid) LIKE $2
       ORDER BY max_pages ASC NULLS LAST, min_pages ASC NULLS LAST`,
-    [`%${String(coverType).toLowerCase()}%`, `%${formatPattern}%`]
+    [`%${String(coverType).toLowerCase()}%`]
   );
-  const single = planLayoutPages(productsResult.rows, storyDatas, 'single');
-  const spread = planLayoutPages(productsResult.rows, storyDatas, 'spread');
+  const rowsFor = (format) => productsResult.rows.filter(r => String(r.product_uid).toLowerCase().includes(BOOK_FORMAT_PATTERN[format]));
+  const single = planLayoutPages(rowsFor(bookFormatForLayout('single')), storyDatas, 'single');
+  const spread = planLayoutPages(rowsFor(bookFormatForLayout('spread')), storyDatas, 'spread');
   const layouts = describeLayouts(single, spread, countBookScenes(storyDatas));
   layouts.single.surchargeChf = 0;
   layouts.spread.surchargeChf = facingSurchargeIfChosenChf(layouts);
@@ -312,6 +322,7 @@ async function computeBookPageInfo(dbPool, storyDatas, coverType, bookFormat, { 
   const plan = layout === 'spread' ? spread : single;
   const info = {
     layout,
+    bookFormat: bookFormatForLayout(layout),
     layouts,
     contentPages: plan.contentPages,
     contentPagesSingle: single.contentPages,
@@ -430,18 +441,17 @@ async function getCoverDimensions(productUid, pageCount) {
  * @param {Object} shippingAddress - Shipping address
  * @param {boolean} isTestPayment - Whether this is a test payment (creates draft order)
  * @param {string} coverType - Cover type: 'softcover' or 'hardcover'
- * @param {string} bookFormat - Book format: 'square' (200x200mm) or 'A4' (210x280mm)
  * @param {number} quantity
  * @param {'single'|'spread'} [layout] - the layout the customer paid for (session metadata bookLayout); throws when unavailable
  */
-async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInfo, shippingAddress, isTestPayment = false, coverType = 'softcover', bookFormat = 'square', quantity = 1, layout = undefined) {
+async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInfo, shippingAddress, isTestPayment = false, coverType = 'softcover', quantity = 1, layout = undefined) {
   // Normalize storyIds to array (backwards compatible with single storyId)
   const allStoryIds = Array.isArray(storyIds) ? storyIds : [storyIds];
 
   console.log(`📚 [BACKGROUND] Starting book order processing for session ${sessionId}`);
   log.debug(`   Stories: ${allStoryIds.length} (${allStoryIds.join(', ')})`);
   log.debug(`   Payment mode: ${isTestPayment ? 'TEST (Gelato draft)' : 'LIVE (real Gelato order)'}`);
-  log.debug(`   Cover type: ${coverType}, Book format: ${bookFormat}, Quantity: ${quantity}`);
+  log.debug(`   Cover type: ${coverType}, Quantity: ${quantity}`);
 
   // Determine Gelato order type based on payment mode
   const gelatoOrderType = isTestPayment ? 'draft' : 'order';
@@ -497,8 +507,8 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     // Page count + SKU come from computeBookPageInfo — the same function the
     // checkout preview (POST /api/book-page-info) uses, so the number shown
     // to the customer before payment is the number the PDF is padded to.
-    const pageInfo = await computeBookPageInfo(dbPool, stories.map(s => s.data), coverType, bookFormat, { layout });
-    const { estimatedPageCount, printedPages: snappedPageCount } = pageInfo;
+    const pageInfo = await computeBookPageInfo(dbPool, stories.map(s => s.data), coverType, { layout });
+    const { estimatedPageCount, printedPages: snappedPageCount, bookFormat } = pageInfo; // format derived from the layout, never from the session
     log.debug(`📊 [BACKGROUND] Estimated Gelato page count: ${estimatedPageCount} (${pageInfo.contentPages} content pages incl. dedication)`);
     let printProductUid = pageInfo.productUid;
     if (pageInfo.product) {
@@ -754,7 +764,6 @@ async function resolveBookOrderInputs(dbPool, fullSession) {
   };
   const address = customerInfo.address;
   const coverType = fullSession.metadata?.coverType || 'softcover';
-  const bookFormat = fullSession.metadata?.bookFormat || 'square';
   const quantity = parseInt(fullSession.metadata?.quantity) || 1;
   // The layout the customer paid for; sessions from before the layout choice carry none (-> the default).
   const layout = fullSession.metadata?.bookLayout || undefined;
@@ -792,7 +801,7 @@ async function resolveBookOrderInputs(dbPool, fullSession) {
   }
   if (validatedStoryIds.length === 0) throw new Error('No valid stories found');
 
-  return { userId, customerInfo, address, coverType, bookFormat, quantity, layout, validatedStoryIds };
+  return { userId, customerInfo, address, coverType, quantity, layout, validatedStoryIds };
 }
 
 /**
@@ -810,7 +819,7 @@ async function resumeBookOrder(dbPool, orderRow, stripe, { run = processBookOrde
   const inp = await resolveBookOrderInputs(dbPool, session);
   const isTestPayment = orderRow.stripe_mode === 'test';
   return run(dbPool, session.id, inp.userId, inp.validatedStoryIds, inp.customerInfo, inp.address,
-    isTestPayment, inp.coverType, inp.bookFormat, inp.quantity, inp.layout);
+    isTestPayment, inp.coverType, inp.quantity, inp.layout);
 }
 
 const STUCK_ORDER_IDLE_MINUTES = 30;
@@ -884,6 +893,7 @@ module.exports = {
   snapToValidPageCount,
   buildPrintedPageSequence,
   chooseBookLayout,
+  bookFormatForLayout,
   describeLayouts,
   facingSurchargeApplies,
   layoutSurchargeChf,

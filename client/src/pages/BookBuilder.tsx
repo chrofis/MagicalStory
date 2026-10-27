@@ -7,7 +7,7 @@ import { useToast } from '@/context/ToastContext';
 import { Navigation, LoadingSpinner } from '@/components/common';
 import BlankPagesPreview from '@/components/book/BlankPagesPreview';
 import AddStoryNudge from '@/components/book/AddStoryNudge';
-import BookLayoutPicker from '@/components/book/BookLayoutPicker';
+import BookFacingOption from '@/components/book/BookFacingOption';
 import type { BookPageInfo } from '@/services/storyService';
 import { storyService } from '@/services';
 import type { BookLayout } from '@/services/storyService';
@@ -43,7 +43,6 @@ export default function BookBuilder() {
   const [isLoading, setIsLoading] = useState(true);
   const [coverType, setCoverType] = useState<'softcover' | 'hardcover'>('softcover');
   // Format is locked to A4 portrait (square is hidden in UI but still works in code)
-  const [bookFormat] = useState<'square' | 'A4'>('A4');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   // Back button from Stripe restores this page from the bfcache with the button still disabled.
   useEffect(() => {
@@ -139,11 +138,6 @@ export default function BookBuilder() {
       hardcover: 'Hardcover',
       softcoverSize: '21 × 28 cm',
       hardcoverSize: '21 × 28 cm',
-      bookSize: 'Book Size',
-      squareFormat: 'Square',
-      squareSize: 'A4',
-      portraitFormat: 'Portrait',
-      portraitSize: '21 × 28 cm',
       price: 'Price',
       facingPagesSurcharge: 'Facing pages',
       bookPriceLabel: 'Book',
@@ -194,11 +188,6 @@ export default function BookBuilder() {
       hardcover: 'Hardcover',
       softcoverSize: '21 × 28 cm',
       hardcoverSize: '21 × 28 cm',
-      bookSize: 'Buchgrösse',
-      squareFormat: 'Quadrat',
-      squareSize: 'A4',
-      portraitFormat: 'Hochformat',
-      portraitSize: '21 × 28 cm',
       price: 'Preis',
       facingPagesSurcharge: 'Gegenüberliegende Seiten',
       bookPriceLabel: 'Buch',
@@ -249,11 +238,6 @@ export default function BookBuilder() {
       hardcover: 'Couverture rigide',
       softcoverSize: '21 × 28 cm',
       hardcoverSize: '21 × 28 cm',
-      bookSize: 'Taille du livre',
-      squareFormat: 'Carré',
-      squareSize: 'A4',
-      portraitFormat: 'Portrait',
-      portraitSize: '21 × 28 cm',
       price: 'Prix',
       facingPagesSurcharge: 'Pages en regard',
       bookPriceLabel: 'Livre',
@@ -304,11 +288,6 @@ export default function BookBuilder() {
       hardcover: 'Copertina rigida',
       softcoverSize: '21 × 28 cm',
       hardcoverSize: '21 × 28 cm',
-      bookSize: 'Dimensione del libro',
-      squareFormat: 'Quadrato',
-      squareSize: 'A4',
-      portraitFormat: 'Verticale',
-      portraitSize: '21 × 28 cm',
       price: 'Prezzo',
       facingPagesSurcharge: 'Pagine affiancate',
       bookPriceLabel: 'Libro',
@@ -384,7 +363,7 @@ export default function BookBuilder() {
   useEffect(() => {
     if (!storyIdsKey || isOverLimit) { setPageInfo(null); return; }
     let cancelled = false;
-    storyService.getBookPageInfo(storyIdsKey.split(','), coverType, bookFormat, layoutChoice ?? undefined)
+    storyService.getBookPageInfo(storyIdsKey.split(','), coverType, layoutChoice ?? undefined)
       .then(info => { if (!cancelled) setPageInfo(info); })
       .catch(err => {
         log.error('Failed to fetch book page info:', err);
@@ -396,7 +375,7 @@ export default function BookBuilder() {
         showToast({ message: localizedApiError(err, language), variant: 'error' });
       });
     return () => { cancelled = true; };
-  }, [storyIdsKey, coverType, bookFormat, layoutChoice, isOverLimit, language, showToast]);
+  }, [storyIdsKey, coverType, layoutChoice, isOverLimit, language, showToast]);
 
   // Price for the billed page count; null until the server has counted the book.
   // contentPagesSingle: the tier is read from the one-page count whichever layout prints; facing pages add
@@ -447,11 +426,11 @@ export default function BookBuilder() {
     setIsCheckingOut(true);
     try {
       const storyIds = stories.map(s => s.id);
-      log.info('Creating combined book checkout:', { storyIds, coverType, bookFormat, totalPages, quantity });
+      log.info('Creating combined book checkout:', { storyIds, coverType, totalPages, quantity });
 
       const balanceSpend = useBalance && useBalanceCents > 0 ? useBalanceCents : undefined;
       const { url } = await storyService.createCheckoutSession(
-        storyIds, coverType, bookFormat, quantity,
+        storyIds, coverType, quantity,
         promoValid ? promoCode.trim() : undefined,
         balanceSpend,
         needsBlankAck ? true : undefined,
@@ -484,7 +463,7 @@ export default function BookBuilder() {
     setIsPrintingPdf(true);
     try {
       const storyIds = stories.map(s => s.id);
-      log.info('Downloading print PDF for stories:', { storyIds, bookFormat });
+      log.info('Downloading print PDF for stories:', { storyIds });
 
       const token = localStorage.getItem('auth_token');
       const response = await fetch('/api/generate-book-pdf', {
@@ -493,7 +472,7 @@ export default function BookBuilder() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ storyIds, bookFormat, coverType })
+        body: JSON.stringify({ storyIds, coverType })
       });
 
       if (!response.ok) {
@@ -675,7 +654,7 @@ export default function BookBuilder() {
                 </div>
               )}
               {pageInfo && !isOverLimit && (
-                <BookLayoutPicker language={language} layouts={pageInfo.layouts} selected={pageInfo.layout} onSelect={setLayoutChoice} />
+                <BookFacingOption language={language} layouts={pageInfo.layouts} selected={pageInfo.layout} onSelect={setLayoutChoice} />
               )}
               {needsBlankAck && pageInfo && (
                 <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -765,8 +744,7 @@ export default function BookBuilder() {
               </button>
             </div>
 
-            {/* Book format is fixed to portrait (21 × 28 cm) — square is hidden but
-                still works in code if needed for legacy/admin orders. */}
+            {/* No format choice: the server derives it from the layout (spread = square, single = A4). */}
 
             {/* Quantity selector */}
             {!isOverLimit && price && (

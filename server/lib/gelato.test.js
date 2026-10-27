@@ -152,6 +152,15 @@ const HARDCOVER_A4 = {
   available_page_counts: null,
 };
 
+const HARDCOVER_SQUARE = {
+  product_uid: 'photobooks-hardcover_pf_200x200-mm-square_pt_170-gsm',
+  product_name: 'Hardcover square',
+  min_pages: 30,
+  max_pages: 200,
+  available_page_counts: null,
+};
+const ROWS = [HARDCOVER_A4, HARDCOVER_SQUARE];
+
 test('countBookContentPages: dedication + story pages; story 2+ adds title/dedication/back cover/separator', () => {
   assert.strictEqual(countBookContentPages([storyOf(10)]), 11);
   assert.strictEqual(countBookContentPages([storyOf(10), storyOf(10)]), 1 + 10 + 2 + 10);
@@ -162,7 +171,7 @@ test('countBookContentPages: dedication + story pages; story 2+ adds title/dedic
 });
 
 test('computeBookPageInfo: 10-page story on a 30-page minimum hardcover prints as a spread (9 blank, was 19)', async () => {
-  const info = await computeBookPageInfo(poolWith([HARDCOVER_A4]), [storyOf(10)], 'hardcover', 'A4');
+  const info = await computeBookPageInfo(poolWith(ROWS), [storyOf(10)], 'hardcover');
   assert.strictEqual(info.layout, 'spread');
   assert.strictEqual(info.contentPagesSingle, 11, 'price tier stays on the single-layout count');
   assert.strictEqual(info.contentPages, 21);
@@ -171,22 +180,22 @@ test('computeBookPageInfo: 10-page story on a 30-page minimum hardcover prints a
 });
 
 test('computeBookPageInfo: a book that exactly fills an orderable count has no blanks', async () => {
-  const info = await computeBookPageInfo(poolWith([HARDCOVER_A4]), [storyOf(29)], 'hardcover', 'A4');
+  const info = await computeBookPageInfo(poolWith(ROWS), [storyOf(29)], 'hardcover');
   assert.strictEqual(info.contentPages, 30);
   assert.strictEqual(info.printedPages, 30);
   assert.strictEqual(info.blankPages, 0);
 });
 
 test('computeBookPageInfo: odd content count is padded to even and reported as blank', async () => {
-  const info = await computeBookPageInfo(poolWith([HARDCOVER_A4]), [storyOf(30)], 'hardcover', 'A4');
+  const info = await computeBookPageInfo(poolWith(ROWS), [storyOf(30)], 'hardcover');
   assert.strictEqual(info.contentPages, 31);
   assert.strictEqual(info.printedPages, 32);
   assert.strictEqual(info.blankPages, 1);
 });
 
 test('computeBookPageInfo: combined multi-story book is counted with the extra pages', async () => {
-  const info = await computeBookPageInfo(poolWith([HARDCOVER_A4]),
-    [storyOf(10), storyOf(10, { backCover: true }), storyOf(10)], 'hardcover', 'A4');
+  const info = await computeBookPageInfo(poolWith(ROWS),
+    [storyOf(10), storyOf(10, { backCover: true }), storyOf(10)], 'hardcover');
   assert.strictEqual(info.contentPages, 37);
   assert.strictEqual(info.printedPages, 38);
   assert.strictEqual(info.blankPages, 1);
@@ -194,7 +203,7 @@ test('computeBookPageInfo: combined multi-story book is counted with the extra p
 
 test('computeBookPageInfo: discrete page-count list snaps up to the next entry', async () => {
   const sku = { ...HARDCOVER_A4, available_page_counts: [24, 30, 40, 50] };
-  const info = await computeBookPageInfo(poolWith([sku]), [storyOf(36)], 'hardcover', 'A4');
+  const info = await computeBookPageInfo(poolWith([sku, HARDCOVER_SQUARE]), [storyOf(36)], 'hardcover');
   assert.strictEqual(info.layout, 'single'); // 3 blank pages: below BLANK_PAGES_ACK_FROM
   assert.strictEqual(info.contentPages, 37);
   assert.strictEqual(info.printedPages, 40);
@@ -202,7 +211,7 @@ test('computeBookPageInfo: discrete page-count list snaps up to the next entry',
 });
 
 test('computeBookPageInfo: no matching SKU reports only the parity blank', async () => {
-  const info = await computeBookPageInfo(poolWith([]), [storyOf(10)], 'hardcover', 'A4');
+  const info = await computeBookPageInfo(poolWith([]), [storyOf(10)], 'hardcover');
   assert.strictEqual(info.product, null);
   assert.strictEqual(info.printedPages, 12);
   assert.strictEqual(info.blankPages, 1);
@@ -213,7 +222,7 @@ const countKind = (seq, k) => seq.filter(s => s.kind === k).length;
 
 test('buildPrintedPageSequence: 6-page trial story on a 30-page SKU is a spread with 17 blank filler pages', async () => {
   const stories = [storyOf(6)];
-  const info = await computeBookPageInfo(poolWith([HARDCOVER_A4]), stories, 'hardcover', 'A4');
+  const info = await computeBookPageInfo(poolWith(ROWS), stories, 'hardcover');
   assert.strictEqual(info.layout, 'spread');
   assert.strictEqual(info.printedPages, 30);
   assert.strictEqual(info.blankPages, 17);
@@ -230,7 +239,7 @@ test('buildPrintedPageSequence: 6-page trial story on a 30-page SKU is a spread 
 test('buildPrintedPageSequence: filler count always equals computeBookPageInfo.blankPages', async () => {
   for (const stories of [[storyOf(10)], [storyOf(29)], [storyOf(30)],
     [storyOf(10), storyOf(10, { backCover: true }), storyOf(10)]]) {
-    const info = await computeBookPageInfo(poolWith([HARDCOVER_A4]), stories, 'hardcover', 'A4');
+    const info = await computeBookPageInfo(poolWith(ROWS), stories, 'hardcover');
     assert.strictEqual(countKind(info.sequence, 'filler'), info.blankPages);
     assert.strictEqual(info.sequence.length, info.printedPages + 3);
   }
@@ -254,4 +263,42 @@ test('isBlankPagesAckMissing: requires explicit true from BLANK_PAGES_ACK_FROM b
   assert.strictEqual(isBlankPagesAckMissing(23, false), true);
   assert.strictEqual(isBlankPagesAckMissing(23, 'true'), true, 'only boolean true counts');
   assert.strictEqual(isBlankPagesAckMissing(23, true), false);
+});
+
+// --- The print format follows the layout (owner 2026-10-27): spread = square, single = A4 -----------------
+test('computeBookPageInfo: mini book (6 and 15 scenes) is square, facing pages, the only option, no surcharge', async () => {
+  for (const n of [6, 15]) {
+    const info = await computeBookPageInfo(poolWith(ROWS), [storyOf(n)], 'hardcover');
+    assert.strictEqual(info.layout, 'spread');
+    assert.strictEqual(info.bookFormat, 'square');
+    assert.strictEqual(info.productUid, HARDCOVER_SQUARE.product_uid);
+    assert.strictEqual(info.layouts.single.available, false);
+    assert.strictEqual(info.layoutSurchargeChf, 0);
+  }
+});
+
+test('computeBookPageInfo: 29 scenes (30-page minimum SKU) default to single A4; facing on request is square with the surcharge', async () => {
+  const main = await computeBookPageInfo(poolWith(ROWS), [storyOf(29)], 'hardcover');
+  assert.strictEqual(main.layout, 'single');
+  assert.strictEqual(main.bookFormat, 'A4');
+  assert.strictEqual(main.productUid, HARDCOVER_A4.product_uid);
+  assert.strictEqual(main.layoutSurchargeChf, 0);
+  const facing = await computeBookPageInfo(poolWith(ROWS), [storyOf(29)], 'hardcover', { layout: 'spread' });
+  assert.strictEqual(facing.bookFormat, 'square');
+  assert.strictEqual(facing.productUid, HARDCOVER_SQUARE.product_uid);
+  assert.strictEqual(facing.layoutSurchargeChf, 5);
+});
+
+test('computeBookPageInfo: 61 scenes cannot be printed as facing pages', async () => {
+  const stories = [storyOf(25), storyOf(25), storyOf(11)];
+  const info = await computeBookPageInfo(poolWith(ROWS), stories, 'hardcover');
+  assert.strictEqual(info.layouts.spread.available, false);
+  assert.strictEqual(info.bookFormat, 'A4');
+  await assert.rejects(() => computeBookPageInfo(poolWith(ROWS), stories, 'hardcover', { layout: 'spread' }), /not available/);
+});
+
+test('computeBookPageInfo: a client-sent format (legacy 4th argument) is ignored', async () => {
+  const info = await computeBookPageInfo(poolWith(ROWS), [storyOf(29)], 'hardcover', 'square');
+  assert.strictEqual(info.bookFormat, 'A4');
+  assert.strictEqual(info.layout, 'single');
 });

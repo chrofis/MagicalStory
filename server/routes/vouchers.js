@@ -165,7 +165,7 @@ router.get('/vouchers/book-credit', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/vouchers/book-checkout  { storyIds, coverType, bookFormat, blankPagesAcknowledged }
+// POST /api/vouchers/book-checkout  { storyIds, coverType, layout, blankPagesAcknowledged }
 // Owner rule 2026-10-25: softcover CHF 0, hardcover CHF 10, CH shipping included, up to 50 pages.
 // The Stripe line item carries the normal list price (receipt shows the real value); a one-time
 // coupon takes off everything except the hardcover surcharge.
@@ -173,7 +173,7 @@ router.post('/vouchers/book-checkout', authenticateToken, async (req, res) => {
   try {
     const pool = getPool();
     const userId = req.user.id;
-    const { storyIds, bookFormat = 'A4' } = req.body || {};
+    const { storyIds } = req.body || {}; // a client bookFormat is ignored: the format follows the layout
     const coverType = req.body?.coverType === 'hardcover' ? 'hardcover' : 'softcover';
     if (!Array.isArray(storyIds) || storyIds.length === 0) {
       return res.status(400).json({ error: 'No stories provided' });
@@ -201,7 +201,7 @@ router.post('/vouchers/book-checkout', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: `A voucher book has at most ${V.MAX_BOOK_PAGES} pages`, code: 'VOUCHER_BOOK_TOO_LONG', totalPages, max: V.MAX_BOOK_PAGES });
     }
     // An unavailable requested layout throws BookLayoutError (-> 400 below), no silent downgrade.
-    const pageInfo = await computeBookPageInfo(pool, stories.map(s => s.data), coverType, bookFormat, { layout: req.body.layout });
+    const pageInfo = await computeBookPageInfo(pool, stories.map(s => s.data), coverType, { layout: req.body.layout });
     if (isBlankPagesAckMissing(pageInfo.blankPages, req.body.blankPagesAcknowledged)) {
       return res.status(400).json({
         error: `This book has ${pageInfo.blankPages} blank pages; the blank pages must be acknowledged before checkout.`,
@@ -249,7 +249,7 @@ router.post('/vouchers/book-checkout', authenticateToken, async (req, res) => {
         totalPages: totalPages.toString(),
         blankPagesAcknowledged: pageInfo.blankPages.toString(),
         coverType,
-        bookFormat,
+        bookFormat: pageInfo.bookFormat,
         bookLayout: pageInfo.layout,
         quantity: '1',
         stripeMode: isTestMode ? 'test' : 'live',

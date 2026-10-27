@@ -122,7 +122,7 @@ describe('resumeBookOrder (P2)', () => {
     await resumeBookOrder(dbPool, { id: 1, stripe_session_id: 'cs_9', stripe_mode: 'live' }, stripeFor(session), { run });
     expect(args[3]).toEqual(['s1', 's2']);       // every paid story, not just the first
     expect(args[6]).toBe(false);                 // live order: real Gelato order, even when an admin triggered it
-    expect([args[7], args[8], args[9]]).toEqual(['hardcover', 'A4', 3]);
+    expect([args[7], args[8]]).toEqual(['hardcover', 3]); // the format is derived inside processBookOrder, not passed;
     await resumeBookOrder(dbPool, { id: 2, stripe_session_id: 'cs_9', stripe_mode: 'test' }, stripeFor(session), { run });
     expect(args[6]).toBe(true);
   });
