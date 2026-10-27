@@ -72,45 +72,53 @@ function blockCalmness(grayPixels, width, rows, cols) {
   return calmness;
 }
 
-// Printed text strip: the text goes on the calmer top or bottom edge of the picture
+// Blocks at or above this calmness count as calm (text-region wash and the strip-edge seam rule).
+const TEXT_CALM_THRESHOLD = 0.35;
+
+// Printed text strip: the text goes on the top or bottom edge of the picture
 // (decisions.md, "Text strip on the calmer edge of the picture", 2026-10-27).
 const STRIP_BAND_MIN = 0.15;
 const STRIP_BAND_MAX = 0.5;
 const STRIP_TIE_GAP = 0.05;
+const STRIP_SEAM_SHARE = 0.05;   // outermost share of the picture that gets mirrored / stretched into the strip
 
 /**
- * Which edge of the picture should get the text strip: the one whose outer band is calmer, so
- * the fill that mirrors that edge is clean and the text lands on calm fill. A pure function of
- * the pixels (deterministic per story, nothing is stored). Within STRIP_TIE_GAP the page cycle
- * breaks the tie: odd page -> bottom, even page -> top.
+ * Which edge of the picture should get the text strip. An edge is ELIGIBLE only when its outermost
+ * STRIP_SEAM_SHARE band (the rows the fill is built from) is calm: every block in it at or above
+ * TEXT_CALM_THRESHOLD, so a mast, treetop or head that touches the edge disqualifies it. Of two
+ * eligible edges the calmer outer band (mean block calmness over `bandFraction` of the picture) wins
+ * when it leads by STRIP_TIE_GAP; ties and "neither eligible" go to the bottom. A pure function of the
+ * pixels (deterministic per story, nothing is stored).
  *
  * @param {Buffer} imageBuffer - the scene picture (any format sharp reads)
- * @param {Object} opts
- * @param {number} opts.pageNumber - 1-based, only used for the tie-break
+ * @param {Object} [opts]
  * @param {number} [opts.bandFraction=0.25] - band height as a share of the picture height; the
  *   caller passes (pageHeight - imageHeight) / imageHeight; clamped to [0.15, 0.5]
- * @returns {Promise<{edge:'top'|'bottom', top:number, bottom:number}>} mean calmness per band
+ * @returns {Promise<{edge:'top'|'bottom', top:number, bottom:number, topEligible:boolean, bottomEligible:boolean}>}
  */
-async function chooseStripEdge(imageBuffer, { pageNumber, bandFraction = 0.25 } = {}) {
+async function chooseStripEdge(imageBuffer, { bandFraction = 0.25 } = {}) {
   if (!Buffer.isBuffer(imageBuffer) || !imageBuffer.length) throw new Error('chooseStripEdge: imageBuffer missing');
-  if (!Number.isInteger(pageNumber) || pageNumber < 1) throw new Error(`chooseStripEdge: pageNumber must be a positive integer, got ${pageNumber}`);
   const { data: gray, info } = await sharp(imageBuffer).flatten({ background: '#ffffff' }).greyscale().raw().toBuffer({ resolveWithObject: true });
   const rows = Math.floor(info.height / BLOCK_SIZE);
   const cols = Math.floor(info.width / BLOCK_SIZE);
   if (rows < 4 || cols < 4) throw new Error(`chooseStripEdge: picture ${info.width}x${info.height} too small`);
   const calmness = blockCalmness(gray, info.width, rows, cols);
   const band = Math.max(1, Math.round(rows * Math.min(STRIP_BAND_MAX, Math.max(STRIP_BAND_MIN, bandFraction))));
-  const mean = (r0, r1) => {
-    let sum = 0;
-    for (let i = r0 * cols; i < r1 * cols; i++) sum += calmness[i];
-    return sum / ((r1 - r0) * cols);
+  const seam = Math.max(1, Math.round(rows * STRIP_SEAM_SHARE));
+  const stat = (r0, r1) => {
+    let sum = 0, min = Infinity;
+    for (let i = r0 * cols; i < r1 * cols; i++) { sum += calmness[i]; if (calmness[i] < min) min = calmness[i]; }
+    return { mean: sum / ((r1 - r0) * cols), min };
   };
-  const top = mean(0, band);
-  const bottom = mean(rows - band, rows);
-  let edge;
-  if (Math.abs(top - bottom) < STRIP_TIE_GAP) edge = pageNumber % 2 === 1 ? 'bottom' : 'top';
-  else edge = top > bottom ? 'top' : 'bottom';
-  return { edge, top, bottom };
+  const top = stat(0, band).mean;
+  const bottom = stat(rows - band, rows).mean;
+  const topEligible = stat(0, seam).min >= TEXT_CALM_THRESHOLD;
+  const bottomEligible = stat(rows - seam, rows).min >= TEXT_CALM_THRESHOLD;
+  let edge = 'bottom';
+  if (topEligible && !bottomEligible) edge = 'top';
+  else if (topEligible && bottomEligible && top - bottom >= STRIP_TIE_GAP) edge = 'top';
+  else if (topEligible && bottomEligible && bottom - top >= STRIP_TIE_GAP) edge = 'bottom';
+  return { edge, top, bottom, topEligible, bottomEligible };
 }
 
 /**
@@ -119,8 +127,8 @@ async function chooseStripEdge(imageBuffer, { pageNumber, bandFraction = 0.25 } 
  * modes, text-overlay routes); there is no position cycle.
  * @returns {Promise<'top-full'|'bottom-full'>}
  */
-async function pickFullWidthPosition(imageBuffer, pageNumber) {
-  return `${(await chooseStripEdge(imageBuffer, { pageNumber })).edge}-full`;
+async function pickFullWidthPosition(imageBuffer) {
+  return `${(await chooseStripEdge(imageBuffer)).edge}-full`;
 }
 
 /**
@@ -143,7 +151,7 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
   //   is half the bounding rect's). When provided, we count calm pixels
   //   INSIDE that polygon, which is the only measurement that tells us
   //   whether the rendered overlay will land on a calm area.
-  const { washOpacity = 0.9, calmThreshold = 0.35, overlayPolygon = null } = options;
+  const { washOpacity = 0.9, calmThreshold = TEXT_CALM_THRESHOLD, overlayPolygon = null } = options;
 
   try {
     const base64 = stripDataUriPrefix(imageData);
@@ -341,4 +349,4 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
   }
 }
 
-module.exports = { detectAndLightenTextRegion, chooseStripEdge, pickFullWidthPosition, blockCalmness, STRIP_TIE_GAP };
+module.exports = { detectAndLightenTextRegion, chooseStripEdge, pickFullWidthPosition, blockCalmness, STRIP_TIE_GAP, STRIP_SEAM_SHARE, TEXT_CALM_THRESHOLD };

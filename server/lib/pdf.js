@@ -546,7 +546,7 @@ async function buildStripBackground(image, g, fillStats) {
   const { buildFilledPageBackground } = require('./pageFill');
   const { chooseStripEdge } = require('./textRegion');
   const s = PAGE_FILL_DPI / 72;
-  const { edge } = await chooseStripEdge(imageBuffer, { pageNumber, bandFraction: (interiorH - imageBottom) / imageBottom });
+  const { edge } = await chooseStripEdge(imageBuffer, { bandFraction: (interiorH - imageBottom) / imageBottom });
   const out = await buildFilledPageBackground({
     imageBuffer, pageWidthPx: Math.round(interiorW * s), pageHeightPx: Math.round(interiorH * s),
     imageHeightPx: Math.round(imageBottom * s), fillMethod, edge,
@@ -564,7 +564,7 @@ async function resolveOverlayTextPosition(image, imageBuffer, pageNumber) {
   const { enforceSpreadTextPosition } = require('./storyHelpers');
   const stored = enforceSpreadTextPosition(image.textPosition || null, pageNumber);
   if (stored) return stored;
-  return require('./textRegion').pickFullWidthPosition(imageBuffer, pageNumber);
+  return require('./textRegion').pickFullWidthPosition(imageBuffer);
 }
 
 const GROK_FILL_CONCURRENCY = 4;   // Grok ~9 s per call: 4 in flight keeps a 25 page book near a minute

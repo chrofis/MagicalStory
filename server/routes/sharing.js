@@ -578,7 +578,7 @@ apiRouter.post('/shared/:shareToken/text-overlay/:pageNumber', async (req, res) 
     } catch { /* non-critical */ }
 
     // No stored position: the calmer picture edge (textRegion.pickFullWidthPosition, decisions.md 2026-10-27)
-    if (!textPosition) textPosition = await require('../lib/textRegion').pickFullWidthPosition(imgBuffer, pageNum);
+    if (!textPosition) textPosition = await require('../lib/textRegion').pickFullWidthPosition(imgBuffer);
     const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition, { languageLevel, pageNumber: pageNum });
 
     const overlayBase64 = result.overlayImage.toString('base64');

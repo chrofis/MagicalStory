@@ -3,10 +3,11 @@
  * strip filled by a mirrored, blurred picture", 2026-10-26).
  *
  * The single layout puts the scene picture on one edge of the page and the text in a strip on
- * the other (the calmer picture edge, textRegion.chooseStripEdge, decisions.md 2026-10-27). That
- * strip used to be plain white. It is now the picture's own half next to the strip, flipped
- * vertically, squeezed into the strip, blurred and lightened, with the seam to the
- * picture feathered. Nothing else is drawn on it: the text gets a thin white outline in
+ * the other (textRegion.chooseStripEdge, decisions.md 2026-10-27). That strip used to be plain
+ * white. At the BOTTOM edge it is the picture's lower half, flipped vertically, squeezed into the
+ * strip, blurred and lightened, with the seam to the picture feathered. At the TOP edge it is the
+ * picture's outermost rows stretched to the band height and blurred, with no lightening and no
+ * feathering: the same colour as the sky or wall it continues. Nothing else is drawn on it: the text gets a thin white outline in
  * pdf.js instead (the owner rejected a text board, it looked like a pale box).
  *
  * One raster comes out (picture + fill); pdf.js draws it full-bleed and sets
@@ -29,6 +30,8 @@ const GROK_FEATHER = 30;          // reference px: picture melts into the model'
 
 const REF_WIDTH = 850;
 const FILL_BLUR_SIGMA = 22;
+const TOP_BAND_SHARE = 0.05;      // top edge: share of the picture's outermost rows stretched into the band
+const TOP_BLUR_SIGMA = 16;
 const FILL_LIGHTEN = 0.35;        // uniform lighten towards white
 const FILL_LIGHTEN_RAMP = 0.12;   // share of the strip over which the lighten fades in
 const SEAM_FEATHER = 30;          // rows of the picture blended into the fill
@@ -49,9 +52,10 @@ const flipRows = (buf, w, h) => sharp(buf, { raw: { width: w, height: h, channel
  * @param {number} p.pageHeightPx      full page raster height
  * @param {number} p.imageHeightPx     height the picture occupies; the rest is the strip
  * @param {'top'|'bottom'} [p.edge='bottom']  where the STRIP goes. 'bottom': picture pinned to the top,
- *   fill below. 'top': picture pinned to the bottom, fill above (the mirror/hint comes from the picture's
- *   upper half). One code path: everything is built as a bottom-strip page and flipped at the raster
- *   boundaries (output, and the Grok canvas / answer, which the model must see upright).
+ *   fill below (mirror, blur, eased lighten, feathered seam). 'top': picture pinned to the bottom, fill above
+ *   (top TOP_BAND_SHARE rows stretched, blurred, no lighten, no feather). One code path: everything is built as
+ *   a bottom-strip page and flipped at the raster boundaries (output, and the Grok canvas / answer, which the
+ *   model must see upright); only the band construction differs per edge.
  * @param {'mirror'|'grok'} p.fillMethod  REQUIRED, no default (decisions.md 2026-10-26, print vs view fill).
  *   'mirror': flipped blurred lower half of the picture, free. 'grok': Grok outpaints the strip
  *   (USD 0.02 per call); the original picture pixels stay on top, only the model's strip is used.
@@ -83,15 +87,17 @@ async function buildFilledPageBackground({ imageBuffer, pageWidthPx, pageHeightP
     .toBuffer();
   const img = flipped ? await flipRows(upright, W, IH) : upright;
 
-  // 2. Fill: the picture half next to the strip, flipped, squeezed into the strip, blurred (at working size).
-  const n = Math.max(1, Math.min(IH, Math.round(IH / 2)));
+  // 2. Fill (at working size), by edge. bottom: the picture half next to the strip, flipped, squeezed into the
+  //    strip, blurred. top: the outermost rows stretched to the band height, blurred, nothing else.
+  const n = Math.max(1, Math.min(IH, Math.round(IH * (flipped ? TOP_BAND_SHARE : 0.5))));
   const Ww = Math.max(2, Math.round(W * ws));
   const EXTHw = Math.max(2, Math.round(EXTH * ws));
-  const rawLow = await sharp(img, { raw: { width: W, height: IH, channels: 3 } })
+  let band = sharp(img, { raw: { width: W, height: IH, channels: 3 } })
     .extract({ left: 0, top: IH - n, width: W, height: n })
-    .resize(Ww, EXTHw, { fit: 'fill' })
-    .flip()
-    .blur(Math.max(0.3, FILL_BLUR_SIGMA * Ww / REF_WIDTH))
+    .resize(Ww, EXTHw, { fit: 'fill' });
+  if (!flipped) band = band.flip();
+  const rawLow = await band
+    .blur(Math.max(0.3, (flipped ? TOP_BLUR_SIGMA : FILL_BLUR_SIGMA) * Ww / REF_WIDTH))
     .raw()
     .toBuffer();
 
@@ -104,7 +110,7 @@ async function buildFilledPageBackground({ imageBuffer, pageWidthPx, pageHeightP
   const lightLow = Buffer.from(rawLow);
   for (let y = 0; y < EXTHw; y++) {
     const t = EXTHw > 1 ? y / (EXTHw - 1) : 1;
-    const l = FILL_LIGHTEN * smooth(Math.min(1, t / FILL_LIGHTEN_RAMP));
+    const l = flipped ? 0 : FILL_LIGHTEN * smooth(Math.min(1, t / FILL_LIGHTEN_RAMP));
     for (let i = y * Ww * 3, e = i + Ww * 3; i < e; i++) lightLow[i] = Math.round(rawLow[i] * (1 - l) + 255 * l);
   }
   const ext = await sharp(lightLow, { raw: { width: Ww, height: EXTHw, channels: 3 } })
@@ -123,7 +129,7 @@ async function buildFilledPageBackground({ imageBuffer, pageWidthPx, pageHeightP
   ext.copy(page, W * IH * 3);
 
   // 4. Feathered seam: the picture's last rows melt into the fill.
-  const F = Math.min(Math.round(SEAM_FEATHER * u), IH - 1);
+  const F = flipped ? 0 : Math.min(Math.round(SEAM_FEATHER * u), IH - 1);   // top edge: no feathering beyond the blur
   for (let y = IH - F; y < IH; y++) {
     const a = smooth((y - (IH - F)) / F) * SEAM_STRENGTH;
     for (let x = 0; x < W; x++) {

@@ -4395,7 +4395,7 @@ router.post('/:id/text-overlay/:pageNum', authenticateToken, async (req, res) =>
     } catch { /* default stays */ }
 
     // No stored position: the calmer picture edge (textRegion.pickFullWidthPosition, decisions.md 2026-10-27)
-    if (!textPosition) textPosition = await require('../lib/textRegion').pickFullWidthPosition(imgBuffer, pageNumber);
+    if (!textPosition) textPosition = await require('../lib/textRegion').pickFullWidthPosition(imgBuffer);
     const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition, { pageNumber, languageLevel });
 
     // Return overlay as base64 data URL

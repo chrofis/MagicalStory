@@ -36,44 +36,65 @@ async function pic(busy: 'top' | 'bottom' | 'both' | 'none') {
     .composite(layers).png().toBuffer();
 }
 
+/** A noise patch of w x h px at (left, top) on a flat grey picture. */
+async function patch(items: { left: number; top: number; w: number; h: number }[]) {
+  return sharp({ create: { width: S, height: S, channels: 3, background: { r: 120, g: 130, b: 140 } } })
+    .composite(items.map((i, k) => ({ input: busyRows(i.w, i.h, 31 + k), raw: { width: i.w, height: i.h, channels: 3 }, left: i.left, top: i.top })))
+    .png().toBuffer();
+}
+
 describe('chooseStripEdge', () => {
-  it('busy bottom -> the strip goes on the calm top, whatever the page parity', async () => {
-    for (const pageNumber of [1, 2, 3, 4]) {
-      const r = await chooseStripEdge(await pic('bottom'), { pageNumber, bandFraction: 0.25 });
-      expect(r.edge).toBe('top');
-      expect(r.top).toBeGreaterThan(r.bottom);
-    }
+  it('busy bottom -> the strip goes on the calm top', async () => {
+    const r = await chooseStripEdge(await pic('bottom'), { bandFraction: 0.25 });
+    expect(r.edge).toBe('top');
+    expect(r.topEligible).toBe(true);
+    expect(r.bottomEligible).toBe(false);
   });
-  it('busy top -> bottom, whatever the page parity (regression: the parity lock forced 1,3 top and 2,4 bottom)', async () => {
-    for (const pageNumber of [1, 2, 3, 4]) {
-      expect((await chooseStripEdge(await pic('top'), { pageNumber, bandFraction: 0.25 })).edge).toBe('bottom');
-    }
+  it('busy top -> bottom', async () => {
+    const r = await chooseStripEdge(await pic('top'), { bandFraction: 0.25 });
+    expect(r.edge).toBe('bottom');
+    expect(r.topEligible).toBe(false);
   });
-  it('tie (flat picture, or both edges equally busy): odd page -> bottom, even page -> top', async () => {
+  it('ties and "neither eligible" go to the bottom; the page cycle is gone (no page number is read)', async () => {
     for (const kind of ['none', 'both'] as const) {
-      const buf = await pic(kind);
-      expect((await chooseStripEdge(buf, { pageNumber: 1 })).edge).toBe('bottom');
-      expect((await chooseStripEdge(buf, { pageNumber: 2 })).edge).toBe('top');
-      expect((await chooseStripEdge(buf, { pageNumber: 3 })).edge).toBe('bottom');
+      expect((await chooseStripEdge(await pic(kind))).edge).toBe('bottom');
     }
+    expect((await chooseStripEdge(await pic('both'))).topEligible).toBe(false);
+    expect((await chooseStripEdge(await pic('both'))).bottomEligible).toBe(false);
+  });
+  it('seam rule: a small object touching the top edge disqualifies the top, even though its band is otherwise calm', async () => {
+    // flat picture, one 48x48 noise patch (a mast / treetop) in the outermost rows at the top
+    const r = await chooseStripEdge(await patch([{ left: 300, top: 0, w: 48, h: 48 }]), { bandFraction: 0.25 });
+    expect(r.topEligible).toBe(false);
+    expect(r.bottomEligible).toBe(true);
+    expect(r.edge).toBe('bottom');
+  });
+  it('seam rule: a calm outer edge wins even when its band is busier further in; the other edge is disqualified by an object on it', async () => {
+    // top: calm outermost 5% but busy rows 64..160 (band mean lower); bottom: calm except a patch touching the bottom edge
+    const r = await chooseStripEdge(await patch([
+      { left: 0, top: 64, w: S, h: 96 },
+      { left: 100, top: S - 48, w: 48, h: 48 },
+    ]), { bandFraction: 0.25 });
+    expect(r.bottomEligible).toBe(false);
+    expect(r.topEligible).toBe(true);
+    expect(r.bottom).toBeGreaterThan(r.top);   // the bottom band is calmer on average, but it is not eligible
+    expect(r.edge).toBe('top');
   });
   it('is deterministic and pure', async () => {
     const buf = await pic('bottom');
-    expect(await chooseStripEdge(buf, { pageNumber: 5 })).toEqual(await chooseStripEdge(buf, { pageNumber: 5 }));
+    expect(await chooseStripEdge(buf)).toEqual(await chooseStripEdge(buf));
   });
   it('bandFraction is clamped: a huge band still compares only the outer half', async () => {
-    const buf = await pic('bottom');
-    expect((await chooseStripEdge(buf, { pageNumber: 1, bandFraction: 5 })).edge).toBe('top');
+    expect((await chooseStripEdge(await pic('bottom'), { bandFraction: 5 })).edge).toBe('top');
   });
-  it('throws on a missing buffer, a bad page number and a tiny picture (no fallback)', async () => {
-    await expect(chooseStripEdge(Buffer.alloc(0), { pageNumber: 1 })).rejects.toThrow(/imageBuffer/);
-    await expect(chooseStripEdge(await pic('none'), { pageNumber: 0 })).rejects.toThrow(/pageNumber/);
+  it('throws on a missing buffer and a tiny picture (no fallback)', async () => {
+    await expect(chooseStripEdge(Buffer.alloc(0))).rejects.toThrow(/imageBuffer/);
     const tiny = await sharp({ create: { width: 20, height: 20, channels: 3, background: '#888' } }).png().toBuffer();
-    await expect(chooseStripEdge(tiny, { pageNumber: 1 })).rejects.toThrow(/too small/);
+    await expect(chooseStripEdge(tiny)).rejects.toThrow(/too small/);
   });
   it('pickFullWidthPosition returns top-full / bottom-full', async () => {
-    expect(await pickFullWidthPosition(await pic('bottom'), 1)).toBe('top-full');
-    expect(await pickFullWidthPosition(await pic('top'), 1)).toBe('bottom-full');
+    expect(await pickFullWidthPosition(await pic('bottom'))).toBe('top-full');
+    expect(await pickFullWidthPosition(await pic('top'))).toBe('bottom-full');
   });
   it('blockCalmness is the single formula: flat blocks are calmer than noisy ones', () => {
     const w = 64, h = 32; // 4x2 blocks: left half flat, right half noisy
@@ -105,12 +126,22 @@ describe('buildFilledPageBackground edge', () => {
     expect(redPx[0]).toBeGreaterThan(200); expect(redPx[2]).toBeLessThan(60);
     expect(bluePx[2]).toBeGreaterThan(200); expect(bluePx[0]).toBeLessThan(60);
     const stripPx = await px(buffer, 200, 40);
-    expect(stripPx[0]).toBeGreaterThan(stripPx[2] + 80);
+    expect(stripPx[0]).toBeGreaterThan(240);   // top 5% rows stretched, NOT lightened: still pure red
+    expect(stripPx[1]).toBeLessThan(15);
+    expect(stripPx[2]).toBeLessThan(15);
+  });
+  it('edge top: the band is the picture outermost rows stretched (a blue line in row 0 colours the whole band), not a mirror of its upper half', async () => {
+    const img = await sharp({ create: { width: 600, height: 560, channels: 3, background: { r: 255, g: 0, b: 0 } } })
+      .composite([{ input: { create: { width: 600, height: 20, channels: 3, background: { r: 0, g: 0, b: 255 } } }, left: 0, top: 0 }]).png().toBuffer();
+    const { buffer } = await buildFilledPageBackground({ imageBuffer: img, pageWidthPx: W, pageHeightPx: H, imageHeightPx: IH, fillMethod: 'mirror', edge: 'top' });
+    const stripPx = await px(buffer, 200, 40);
+    expect(stripPx[2]).toBeGreaterThan(stripPx[0] + 100);   // blue outer rows, not the red half
   });
   it('edge bottom (default) is unchanged: picture on top, strip mirrors the bottom (blue) half', async () => {
     const { buffer } = await buildFilledPageBackground({ imageBuffer: await split(), pageWidthPx: W, pageHeightPx: H, imageHeightPx: IH, fillMethod: 'mirror' });
     const stripPx = await px(buffer, 200, H - 40);
     expect(stripPx[2]).toBeGreaterThan(stripPx[0] + 80);
+    expect(stripPx[0]).toBeGreaterThan(30);   // the bottom fill keeps its eased lighten (no pure blue)
     expect((await px(buffer, 200, 20))[0]).toBeGreaterThan(200);
   });
   it('rejects an unknown edge', async () => {

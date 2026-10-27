@@ -352,13 +352,15 @@ the request when available, else text in the picture when available, else facing
   4 pages in flight via `prefetchStripBackgrounds`, a failure throws and fails the order loudly); `generateViewPdf`
   and every `print.js` route pass `'mirror'`. Registry set `print-vs-view-strip-fill`. Decision: `docs/decisions.md`
   2026-10-26 "Print PDF strip is outpainted by Grok".
-  **Which edge gets the strip** (decisions.md 2026-10-27): `textRegion.chooseStripEdge(imageBuffer, {pageNumber, bandFraction})`
-  compares the mean block calmness (the same `blockCalmness` the text-region detector uses) of the picture's top and
-  bottom band; the calmer edge gets the strip, a gap under 0.05 is a tie and the page cycle breaks it (odd page: bottom,
-  even page: top). `buildStripBackground` (pdf.js) chooses once per page and returns `{buffer, edge}`, so the prefetched
-  Grok fill, the inline mirror fill and the text zone agree; `pageFill.buildFilledPageBackground({edge})` builds both
-  edges in one code path (the page is built strip-at-bottom and flipped at the raster boundaries; Grok sees an upright
-  canvas and `{DIRECTION}` in the prompt says upward/downward). Nothing is stored. Pages without a stored `textPosition`
+  **Which edge gets the strip** (decisions.md 2026-10-27 plus its same-day correction): `textRegion.chooseStripEdge(imageBuffer, {bandFraction})`.
+  An edge is eligible only when its outermost 5% band is calm (every block at or above `TEXT_CALM_THRESHOLD`, the
+  threshold the text-region wash uses; same `blockCalmness` formula); of two eligible edges the top needs a 0.05 lead in
+  mean band calmness, ties and "neither eligible" go to the bottom (no page-parity rule). `buildStripBackground` (pdf.js)
+  chooses once per page and returns `{buffer, edge}`, so the prefetched Grok fill, the inline mirror fill and the text zone
+  agree; `pageFill.buildFilledPageBackground({edge})` builds both edges in one code path (the page is built strip-at-bottom
+  and flipped at the raster boundaries; Grok sees an upright canvas and `{DIRECTION}` in the prompt says upward/downward).
+  Bottom edge: mirror of the lower half, blur, eased lighten, feathered seam. Top edge: the outermost 5% rows stretched to
+  the band, blurred, no lighten, no feather. Nothing is stored. Pages without a stored `textPosition`
   (overlay modes in pdf.js, the text-overlay routes in `stories.js` / `sharing.js`) use `pickFullWidthPosition` =
   `top-full` / `bottom-full`; the six-step cycle is deleted everywhere. Test: `npx vitest run tests/unit/strip-edge.test.ts`.
 
