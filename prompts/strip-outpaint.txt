@@ -1,1 +1,1 @@
-Extend the illustration {DIRECTION} so it continues the same scene, style and lighting; leave the rest of the picture unchanged; no text, no characters added.
+Extend the illustration {DIRECTION} as a plain continuation of the surface that is already there at the edge of the picture (sky, ground, water, wall, floor), in the same style, colours and lighting. The new band must stay empty: no objects, no text, no creatures, no people, nothing new in it. Leave the rest of the picture unchanged.

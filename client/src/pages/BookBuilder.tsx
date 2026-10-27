@@ -7,8 +7,10 @@ import { useToast } from '@/context/ToastContext';
 import { Navigation, LoadingSpinner } from '@/components/common';
 import BlankPagesPreview from '@/components/book/BlankPagesPreview';
 import AddStoryNudge from '@/components/book/AddStoryNudge';
+import BookLayoutPicker from '@/components/book/BookLayoutPicker';
 import type { BookPageInfo } from '@/services/storyService';
 import { storyService } from '@/services';
+import type { BookLayout } from '@/services/storyService';
 import { getPriceForPages, MAX_BOOK_PAGES, SHIPPING_COST_CHF, type PricingTier } from '@/utils/bookPricing';
 import { createLogger } from '@/services/logger';
 import { localizedApiError } from '@/utils/apiErrors';
@@ -143,6 +145,7 @@ export default function BookBuilder() {
       portraitFormat: 'Portrait',
       portraitSize: '21 × 28 cm',
       price: 'Price',
+      facingPagesSurcharge: 'Facing pages',
       bookPriceLabel: 'Book',
       shippingLabel: 'Shipping (Switzerland)',
       shippingTime: 'Delivery in 5-7 business days',
@@ -197,6 +200,7 @@ export default function BookBuilder() {
       portraitFormat: 'Hochformat',
       portraitSize: '21 × 28 cm',
       price: 'Preis',
+      facingPagesSurcharge: 'Gegenüberliegende Seiten',
       bookPriceLabel: 'Buch',
       shippingLabel: 'Versand (Schweiz)',
       shippingTime: 'Lieferung in 5-7 Werktagen',
@@ -251,6 +255,7 @@ export default function BookBuilder() {
       portraitFormat: 'Portrait',
       portraitSize: '21 × 28 cm',
       price: 'Prix',
+      facingPagesSurcharge: 'Pages en regard',
       bookPriceLabel: 'Livre',
       shippingLabel: 'Livraison (Suisse)',
       shippingTime: 'Livraison en 5-7 jours ouvrables',
@@ -305,6 +310,7 @@ export default function BookBuilder() {
       portraitFormat: 'Verticale',
       portraitSize: '21 × 28 cm',
       price: 'Prezzo',
+      facingPagesSurcharge: 'Pagine affiancate',
       bookPriceLabel: 'Libro',
       shippingLabel: 'Spedizione (Svizzera)',
       shippingTime: 'Consegna in 5-7 giorni lavorativi',
@@ -370,27 +376,33 @@ export default function BookBuilder() {
   // count the checkout picks the price tier from (countBookContentPages), so the
   // quote below is derived from it, never from the client-side scene sum.
   const [pageInfo, setPageInfo] = useState<BookPageInfo | null>(null);
+  // The customer's layout pick; null = the server default (text in the picture when available, else facing pages).
+  const [layoutChoice, setLayoutChoice] = useState<BookLayout | null>(null);
   // Required acknowledgement of the blank pages before checkout is enabled.
   const [blankAck, setBlankAck] = useState(false);
   const storyIdsKey = stories.map(s => s.id).join(',');
   useEffect(() => {
     if (!storyIdsKey || isOverLimit) { setPageInfo(null); return; }
     let cancelled = false;
-    storyService.getBookPageInfo(storyIdsKey.split(','), coverType, bookFormat)
+    storyService.getBookPageInfo(storyIdsKey.split(','), coverType, bookFormat, layoutChoice ?? undefined)
       .then(info => { if (!cancelled) setPageInfo(info); })
       .catch(err => {
         log.error('Failed to fetch book page info:', err);
-        if (!cancelled) {
-          setPageInfo(null);
-          showToast({ message: localizedApiError(err, language), variant: 'error' });
-        }
+        if (cancelled) return;
+        // The story list changed under a pick that is no longer available: fall back to the default pick
+        // (the effect re-runs), a visible choice change, not a silent one: the picker shows the greyed card.
+        if (layoutChoice && (err as { code?: string } | null)?.code === 'BOOK_LAYOUT_UNAVAILABLE') { setLayoutChoice(null); return; }
+        setPageInfo(null);
+        showToast({ message: localizedApiError(err, language), variant: 'error' });
       });
     return () => { cancelled = true; };
-  }, [storyIdsKey, coverType, bookFormat, isOverLimit, language, showToast]);
+  }, [storyIdsKey, coverType, bookFormat, layoutChoice, isOverLimit, language, showToast]);
 
   // Price for the billed page count; null until the server has counted the book.
-  // contentPagesSingle: the price never moves with the printed layout (decisions.md, short-book layout 2026-10-26).
+  // contentPagesSingle: the tier is read from the one-page count whichever layout prints; facing pages add
+  // layoutSurchargeChf when text in the picture was available (decisions.md 2026-10-27, the customer picks the layout).
   const billedPages = pageInfo?.contentPagesSingle ?? null;
+  const layoutSurcharge = pageInfo?.layoutSurchargeChf ?? 0;
   const price = useMemo(() => {
     return billedPages === null ? null : getPriceForPages(billedPages, coverType === 'hardcover', pricingTiers);
   }, [billedPages, coverType, pricingTiers]);
@@ -443,6 +455,7 @@ export default function BookBuilder() {
         promoValid ? promoCode.trim() : undefined,
         balanceSpend,
         needsBlankAck ? true : undefined,
+        pageInfo?.layout,
       );
       // Stay disabled while the browser navigates to Stripe: re-enabling here let a
       // second click create a second checkout session. Only a failure re-enables.
@@ -661,6 +674,9 @@ export default function BookBuilder() {
                   <span className="text-sm">{t.tooManyPagesDesc}</span>
                 </div>
               )}
+              {pageInfo && !isOverLimit && (
+                <BookLayoutPicker language={language} layouts={pageInfo.layouts} selected={pageInfo.layout} onSelect={setLayoutChoice} />
+              )}
               {needsBlankAck && pageInfo && (
                 <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <div className="flex items-start gap-2 text-amber-700">
@@ -814,7 +830,7 @@ export default function BookBuilder() {
 
             {/* Use referral balance — only when user has CHF in their balance */}
             {!isOverLimit && price && balanceAvailableCents > 0 && (() => {
-              const booksSubtotal = price * quantity;
+              const booksSubtotal = (price + layoutSurcharge) * quantity;
               const promoDisc = promoValid ? promoDiscount : 0;
               const priceAfterPromo = Math.max(0, booksSubtotal + SHIPPING_COST_CHF - promoDisc);
               // Server clamps to (orderTotal - 100) cents to leave CHF 1 for Stripe; mirror here.
@@ -866,7 +882,7 @@ export default function BookBuilder() {
             {!isOverLimit && price && (
               <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 sm:p-6 mb-6">
                 {(() => {
-                  const booksSubtotal = price * quantity;
+                  const booksSubtotal = (price + layoutSurcharge) * quantity;
                   const discount = promoValid ? promoDiscount : 0;
                   const priceAfterPromo = Math.max(0, booksSubtotal + SHIPPING_COST_CHF - discount);
                   const maxSpendCents = Math.max(0, priceAfterPromo * 100 - 100);
@@ -878,8 +894,14 @@ export default function BookBuilder() {
                         <span>
                           {quantity > 1 ? `${quantity} × CHF ${price}.- ${t.perBook}` : t.bookPriceLabel}
                         </span>
-                        <span>CHF {booksSubtotal}.-</span>
+                        <span>CHF {price * quantity}.-</span>
                       </div>
+                      {layoutSurcharge > 0 && (
+                        <div className="flex items-center justify-between mb-1 text-sm text-gray-600">
+                          <span>{quantity > 1 ? `${quantity} × CHF ${layoutSurcharge}.- ` : ''}{t.facingPagesSurcharge}</span>
+                          <span>CHF {layoutSurcharge * quantity}.-</span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between mb-2 text-sm text-gray-600">
                         <span>{t.shippingLabel}</span>
                         <span>CHF {SHIPPING_COST_CHF}.-</span>

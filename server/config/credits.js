@@ -68,6 +68,13 @@ const CREDIT_CONFIG = {
     CODE_CHARS: 20,
   },
 
+  // Printed-book layout (owner 2026-10-27, decisions.md "The customer picks the book layout"): facing pages
+  // (picture left, text right) cost this fixed surcharge on top of the one-page price tier WHEN the customer
+  // chose them over an available text-in-picture layout (gelato.facingSurchargeApplies). One constant: the
+  // quote, both Stripe checkouts and the client price line read it. Gelato's own extra cost for facing pages is
+  // CHF 0.65-0.98 on a 15-page story and CHF 3.84-5.88 on a 25-page story (quoted 2026-10-27).
+  BOOK_LAYOUT_SURCHARGE_CHF: 5,
+
   // Story page limits
   // 1 page = 1 scene = 1 illustration (picture-book layout for all reading levels)
   STORY_PAGES: {

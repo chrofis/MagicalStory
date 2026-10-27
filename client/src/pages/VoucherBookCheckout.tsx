@@ -7,6 +7,8 @@ import { useLangPath } from '@/hooks/useLangPath';
 import { Navigation, LoadingSpinner } from '@/components/common';
 import BlankPagesPreview from '@/components/book/BlankPagesPreview';
 import AddStoryNudge from '@/components/book/AddStoryNudge';
+import type { BookLayout } from '@/services/storyService';
+import BookLayoutPicker from '@/components/book/BookLayoutPicker';
 import { storyService } from '@/services';
 import type { BookPageInfo, VoucherBookCredit } from '@/services/storyService';
 import { createLogger } from '@/services/logger';
@@ -166,6 +168,8 @@ export default function VoucherBookCheckout() {
   const [selected, setSelected] = useState<string[]>([]);
   const [coverType, setCoverType] = useState<'softcover' | 'hardcover'>('softcover');
   const [pageInfo, setPageInfo] = useState<BookPageInfo | null>(null);
+  // The customer's layout pick; null = the server default (text in the picture when available, else facing pages).
+  const [layoutChoice, setLayoutChoice] = useState<BookLayout | null>(null);
   const [blankAck, setBlankAck] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -216,14 +220,17 @@ export default function VoucherBookCheckout() {
   useEffect(() => {
     if (!selectedKey) { setPageInfo(null); return; }
     let cancelled = false;
-    storyService.getBookPageInfo(selectedKey.split(','), coverType, bookFormat)
+    storyService.getBookPageInfo(selectedKey.split(','), coverType, bookFormat, layoutChoice ?? undefined)
       .then(info => { if (!cancelled) setPageInfo(info); })
       .catch(err => {
         log.error('Failed to fetch book page info:', err);
-        if (!cancelled) { setPageInfo(null); setError(localizedApiError(err, language)); }
+        if (cancelled) return;
+        // A pick that stopped being available after the story list changed: back to the default pick.
+        if (layoutChoice && (err as { code?: string } | null)?.code === 'BOOK_LAYOUT_UNAVAILABLE') { setLayoutChoice(null); return; }
+        setPageInfo(null); setError(localizedApiError(err, language));
       });
     return () => { cancelled = true; };
-  }, [selectedKey, coverType, language]);
+  }, [selectedKey, coverType, layoutChoice, language]);
 
   const pageCount = pageInfo?.contentPagesSingle ?? listedPages;
   const isTooLong = pageCount > maxPages;
@@ -245,6 +252,8 @@ export default function VoucherBookCheckout() {
     setSelected(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
   };
 
+  // Due now: the hardcover surcharge plus the facing-pages surcharge; the voucher covers neither (server: vouchers.bookCouponCents).
+  const amountDue = (coverType === 'hardcover' ? Number(surchargeChf) : 0) + (pageInfo?.layoutSurchargeChf ?? 0);
   const canOrder = selected.length > 0 && !!pageInfo && !isTooLong && !busy && (!needsBlankAck || blankAck);
 
   const handleOrder = async () => {
@@ -257,6 +266,7 @@ export default function VoucherBookCheckout() {
         coverType,
         bookFormat,
         blankPagesAcknowledged: needsBlankAck ? true : undefined,
+        layout: pageInfo?.layout,
       });
       // Stay disabled while the browser navigates to Stripe; only a failure re-enables.
       window.location.href = url;
@@ -361,6 +371,9 @@ export default function VoucherBookCheckout() {
                   <span className="text-sm">{t.tooLong(maxPages)}</span>
                 </div>
               )}
+              {pageInfo && !isTooLong && (
+                <BookLayoutPicker language={language} layouts={pageInfo.layouts} selected={pageInfo.layout} onSelect={setLayoutChoice} />
+              )}
               {needsBlankAck && pageInfo && (
                 <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <div className="flex items-start gap-2 text-amber-700">
@@ -406,7 +419,7 @@ export default function VoucherBookCheckout() {
             <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 sm:p-6 mb-6">
               <div className="flex items-center justify-between">
                 <span className="text-gray-700 font-semibold">{t.totalLabel}</span>
-                <span className="text-3xl font-bold text-indigo-700">{coverType === 'hardcover' ? `CHF ${surchargeChf}` : t.free}</span>
+                <span className="text-3xl font-bold text-indigo-700">{amountDue === 0 ? t.free : `CHF ${amountDue.toFixed(2)}`}</span>
               </div>
               <p className="text-sm text-gray-500 mt-2">{t.addressHint}</p>
             </div>

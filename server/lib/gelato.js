@@ -8,6 +8,7 @@ const { log } = require('../utils/logger');
 const { generatePrintPdf, generateCombinedBookPdf } = require('./pdf');
 const { GROK_FILL_MODEL } = require('./pageFill');
 const { MODEL_PRICING } = require('../config/models');
+const { CREDIT_CONFIG } = require('../config/credits');
 
 // Per page USD of the Grok-outpainted print strip (price table: models.js MODEL_PRICING).
 const GROK_STRIP_FILL_USD = MODEL_PRICING[GROK_FILL_MODEL].perImage;
@@ -194,20 +195,84 @@ function planLayoutPages(productRows, storyDatas, layout) {
 }
 
 /**
- * THE layout decision (decisions.md, short-book layout 2026-10-26). A short story
- * on Gelato's 28-page minimum leaves most of the book white. Print it as a
- * 'spread' (scene image full-bleed on the left page, its text on the facing right
- * page, two pages per scene) when the single layout would leave
- * BLANK_PAGES_ACK_FROM or more filler pages AND the spread leaves fewer.
- * Everything else (PDF, preview, checkout) reads the result of this function.
+ * Most scenes a book can have and still print as facing pages (two printed pages per scene, so at
+ * most 120 story pages; owner 2026-10-27: books run up to 100-120 pages). The only place the cap lives.
+ */
+const FACING_PAGES_MAX_SCENES = 60;
+const FACING_PAGES_MAX_PAGES = FACING_PAGES_MAX_SCENES * 2;
+
+/** Scene count of a book: every story's parsed pages (no cover, dedication or title pages). */
+function countBookScenes(storyDatas) {
+  const { parseStoryPages } = require('./pdf');
+  return storyDatas.reduce((sum, d) => sum + parseStoryPages(d).length, 0);
+}
+
+class BookLayoutError extends Error {
+  constructor(message, code) { super(message); this.name = 'BookLayoutError'; this.code = code; }
+}
+
+/**
+ * Which layouts the customer may choose, with the reason for a greyed-out one (the builder renders
+ * both cards from this). 'single' = one printed page per scene, text in the expanded picture at the
+ * calmer edge; unavailable when it would leave BLANK_PAGES_ACK_FROM or more empty pages.
+ * 'spread' = facing pages, picture left, text right; unavailable above FACING_PAGES_MAX_SCENES scenes.
+ * Reasons are codes plus numbers; the client words them in four languages.
+ */
+function describeLayouts(singlePlan, spreadPlan, sceneCount) {
+  const singleOk = singlePlan.blankPages < BLANK_PAGES_ACK_FROM;
+  const spreadOk = sceneCount <= FACING_PAGES_MAX_SCENES;
+  return {
+    single: {
+      available: singleOk,
+      reason: singleOk ? null : { code: 'TOO_FEW_PAGES', emptyPages: singlePlan.blankPages },
+      printedPages: singlePlan.printedPages, blankPages: singlePlan.blankPages, contentPages: singlePlan.contentPages,
+    },
+    spread: {
+      available: spreadOk,
+      reason: spreadOk ? null : { code: 'TOO_MANY_PAGES', printedPages: spreadPlan.printedPages, maxPages: FACING_PAGES_MAX_PAGES },
+      printedPages: spreadPlan.printedPages, blankPages: spreadPlan.blankPages, contentPages: spreadPlan.contentPages,
+    },
+  };
+}
+
+/**
+ * THE layout decision. The customer's request wins when that layout is available; no request means
+ * text in the picture when available, else facing pages. An unavailable request THROWS (checkout must
+ * not silently print another layout than the one paid for).
  *
- * @param {{blankPages:number}} singlePlan - planLayoutPages(..., 'single')
- * @param {{blankPages:number}} spreadPlan - planLayoutPages(..., 'spread')
+ * @param {Object} layouts - describeLayouts()
+ * @param {'single'|'spread'} [requested]
  * @returns {'single'|'spread'}
  */
-function chooseBookLayout(singlePlan, spreadPlan) {
-  return singlePlan.blankPages >= BLANK_PAGES_ACK_FROM && spreadPlan.blankPages < singlePlan.blankPages
-    ? 'spread' : 'single';
+function chooseBookLayout(layouts, requested) {
+  if (requested !== undefined && requested !== null && requested !== 'single' && requested !== 'spread') {
+    throw new BookLayoutError(`Unknown book layout: ${requested}`, 'BOOK_LAYOUT_INVALID');
+  }
+  if (requested) {
+    if (!layouts[requested].available) {
+      throw new BookLayoutError(`Book layout '${requested}' is not available for this book (${layouts[requested].reason?.code})`, 'BOOK_LAYOUT_UNAVAILABLE');
+    }
+    return requested;
+  }
+  if (layouts.single.available) return 'single';
+  if (layouts.spread.available) return 'spread';
+  throw new BookLayoutError('No book layout is available for this book', 'BOOK_LAYOUT_UNAVAILABLE');
+}
+
+/**
+ * The surcharge rule: facing pages cost BOOK_LAYOUT_SURCHARGE_CHF only when the customer chose them
+ * over an AVAILABLE text-in-picture layout; when facing pages is the only layout offered there is no
+ * surcharge (owner 2026-10-27). Quote, both Stripe checkouts and the client price line all read this.
+ */
+function facingSurchargeApplies(pageInfo) {
+  return pageInfo.layout === 'spread' && pageInfo.layouts.single.available;
+}
+/** What facing pages would cost extra if chosen (shown on the picker card): 0 when they are the only layout offered. */
+function facingSurchargeIfChosenChf(layouts) {
+  return layouts.single.available ? CREDIT_CONFIG.BOOK_LAYOUT_SURCHARGE_CHF : 0;
+}
+function layoutSurchargeChf(pageInfo) {
+  return facingSurchargeApplies(pageInfo) ? facingSurchargeIfChosenChf(pageInfo.layouts) : 0;
 }
 
 /**
@@ -215,19 +280,19 @@ function chooseBookLayout(singlePlan, spreadPlan) {
  * and how many of them are blank". Used by the order flow (PDF layout + padding)
  * and by the pre-payment preview in the book builder.
  *
- * `contentPagesSingle` is the content count of the single layout and is what the
- * price is based on, whatever layout is chosen (spread never moves a book to a
- * higher price tier; owner 2026-10-26).
+ * `contentPagesSingle` is the content count of the one-page layout and is what the price tier is
+ * read from whichever layout is chosen; facing pages add layoutSurchargeChf on top.
  *
  * @param {import('pg').Pool} dbPool
  * @param {Object[]} storyDatas - stories.data objects, in book order
  * @param {'softcover'|'hardcover'} coverType
  * @param {'A4'|'square'} bookFormat
- * @returns {Promise<{layout:'single'|'spread', contentPages:number, contentPagesSingle:number,
- *   estimatedPageCount:number, printedPages:number, blankPages:number,
+ * @param {{layout?: 'single'|'spread'}} [options] - the customer's requested layout
+ * @returns {Promise<{layout:'single'|'spread', layouts:Object, contentPages:number, contentPagesSingle:number,
+ *   layoutSurchargeChf:number, estimatedPageCount:number, printedPages:number, blankPages:number,
  *   productUid:string|null, product:Object|null, sequence:Object[]}>}
  */
-async function computeBookPageInfo(dbPool, storyDatas, coverType, bookFormat) {
+async function computeBookPageInfo(dbPool, storyDatas, coverType, bookFormat, { layout: requested } = {}) {
   const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
   const productsResult = await dbPool.query(
     `SELECT product_uid, product_name, min_pages, max_pages, available_page_counts
@@ -240,9 +305,14 @@ async function computeBookPageInfo(dbPool, storyDatas, coverType, bookFormat) {
   );
   const single = planLayoutPages(productsResult.rows, storyDatas, 'single');
   const spread = planLayoutPages(productsResult.rows, storyDatas, 'spread');
-  const plan = chooseBookLayout(single, spread) === 'spread' ? spread : single;
-  return {
-    layout: plan.layout,
+  const layouts = describeLayouts(single, spread, countBookScenes(storyDatas));
+  layouts.single.surchargeChf = 0;
+  layouts.spread.surchargeChf = facingSurchargeIfChosenChf(layouts);
+  const layout = chooseBookLayout(layouts, requested);
+  const plan = layout === 'spread' ? spread : single;
+  const info = {
+    layout,
+    layouts,
     contentPages: plan.contentPages,
     contentPagesSingle: single.contentPages,
     estimatedPageCount: plan.estimatedPageCount,
@@ -250,8 +320,10 @@ async function computeBookPageInfo(dbPool, storyDatas, coverType, bookFormat) {
     blankPages: plan.blankPages,
     productUid: plan.product ? plan.product.product_uid : null,
     product: plan.product,
-    sequence: buildPrintedPageSequence(storyDatas, plan.printedPages, plan.layout),
+    sequence: buildPrintedPageSequence(storyDatas, plan.printedPages, layout),
   };
+  info.layoutSurchargeChf = layoutSurchargeChf(info);
+  return info;
 }
 
 /**
@@ -359,8 +431,10 @@ async function getCoverDimensions(productUid, pageCount) {
  * @param {boolean} isTestPayment - Whether this is a test payment (creates draft order)
  * @param {string} coverType - Cover type: 'softcover' or 'hardcover'
  * @param {string} bookFormat - Book format: 'square' (200x200mm) or 'A4' (210x280mm)
+ * @param {number} quantity
+ * @param {'single'|'spread'} [layout] - the layout the customer paid for (session metadata bookLayout); throws when unavailable
  */
-async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInfo, shippingAddress, isTestPayment = false, coverType = 'softcover', bookFormat = 'square', quantity = 1) {
+async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInfo, shippingAddress, isTestPayment = false, coverType = 'softcover', bookFormat = 'square', quantity = 1, layout = undefined) {
   // Normalize storyIds to array (backwards compatible with single storyId)
   const allStoryIds = Array.isArray(storyIds) ? storyIds : [storyIds];
 
@@ -423,7 +497,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     // Page count + SKU come from computeBookPageInfo — the same function the
     // checkout preview (POST /api/book-page-info) uses, so the number shown
     // to the customer before payment is the number the PDF is padded to.
-    const pageInfo = await computeBookPageInfo(dbPool, stories.map(s => s.data), coverType, bookFormat);
+    const pageInfo = await computeBookPageInfo(dbPool, stories.map(s => s.data), coverType, bookFormat, { layout });
     const { estimatedPageCount, printedPages: snappedPageCount } = pageInfo;
     log.debug(`📊 [BACKGROUND] Estimated Gelato page count: ${estimatedPageCount} (${pageInfo.contentPages} content pages incl. dedication)`);
     let printProductUid = pageInfo.productUid;
@@ -682,6 +756,8 @@ async function resolveBookOrderInputs(dbPool, fullSession) {
   const coverType = fullSession.metadata?.coverType || 'softcover';
   const bookFormat = fullSession.metadata?.bookFormat || 'square';
   const quantity = parseInt(fullSession.metadata?.quantity) || 1;
+  // The layout the customer paid for; sessions from before the layout choice carry none (-> the default).
+  const layout = fullSession.metadata?.bookLayout || undefined;
 
   try {
     const langResult = await dbPool.query('SELECT preferred_language FROM users WHERE id = $1', [userId]);
@@ -716,7 +792,7 @@ async function resolveBookOrderInputs(dbPool, fullSession) {
   }
   if (validatedStoryIds.length === 0) throw new Error('No valid stories found');
 
-  return { userId, customerInfo, address, coverType, bookFormat, quantity, validatedStoryIds };
+  return { userId, customerInfo, address, coverType, bookFormat, quantity, layout, validatedStoryIds };
 }
 
 /**
@@ -734,7 +810,7 @@ async function resumeBookOrder(dbPool, orderRow, stripe, { run = processBookOrde
   const inp = await resolveBookOrderInputs(dbPool, session);
   const isTestPayment = orderRow.stripe_mode === 'test';
   return run(dbPool, session.id, inp.userId, inp.validatedStoryIds, inp.customerInfo, inp.address,
-    isTestPayment, inp.coverType, inp.bookFormat, inp.quantity);
+    isTestPayment, inp.coverType, inp.bookFormat, inp.quantity, inp.layout);
 }
 
 const STUCK_ORDER_IDLE_MINUTES = 30;
@@ -808,6 +884,13 @@ module.exports = {
   snapToValidPageCount,
   buildPrintedPageSequence,
   chooseBookLayout,
+  describeLayouts,
+  facingSurchargeApplies,
+  layoutSurchargeChf,
+  countBookScenes,
+  BookLayoutError,
+  FACING_PAGES_MAX_SCENES,
+  FACING_PAGES_MAX_PAGES,
   planLayoutPages,
   isBlankPagesAckMissing,
   BLANK_PAGES_ACK_FROM,

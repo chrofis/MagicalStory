@@ -187,8 +187,10 @@ async function getBookCreditAvailable(db, userId) {
 
 // Voucher book price rule (owner, 2026-10-25): list price on the receipt, a one-time coupon takes
 // off everything except the hardcover surcharge. Returns the coupon amount in cents.
-function bookCouponCents({ listTotalCents, hardcover }) {
-  const pay = hardcover ? CREDIT_CONFIG.VOUCHER.HARDCOVER_SURCHARGE_CENTS : 0;
+// The facing-pages layout surcharge (layoutSurchargeCents) is part of the list total but is never covered:
+// the customer pays it like the hardcover surcharge (decisions.md 2026-10-27).
+function bookCouponCents({ listTotalCents, hardcover, layoutSurchargeCents = 0 }) {
+  const pay = (hardcover ? CREDIT_CONFIG.VOUCHER.HARDCOVER_SURCHARGE_CENTS : 0) + layoutSurchargeCents;
   return Math.max(0, listTotalCents - pay);
 }
 

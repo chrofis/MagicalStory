@@ -50,7 +50,7 @@
     {
       "id": "printed-book-layout",
       "axis": "single-story PDF vs combined PDF vs normal checkout vs voucher book checkout",
-      "reason": "Which layout a printed book uses (single or spread, gelato.chooseBookLayout, decisions.md short-book layout 2026-10-26) and which page count the price is read from (single-layout contentPagesSingle, never the printed count) must hold in every path that lays out or prices a book: generatePrintPdf and generateCombinedBookPdf render it, create-checkout-session and vouchers book-checkout price it, BookBuilder and VoucherBookCheckout show it.",
+      "reason": "The CUSTOMER picks the printed-book layout (single = text in the picture, spread = facing pages; gelato.computeBookPageInfo with options.layout, availability and reasons from describeLayouts, decisions.md 2026-10-27 'The customer picks the book layout'). The requested layout travels builder -> /api/book-page-info -> Stripe metadata bookLayout -> resolveBookOrderInputs -> processBookOrder -> generatePrintPdf / generateCombinedBookPdf (options.layout); an unavailable request throws (BookLayoutError), never a silent downgrade. The price is the tier of the ONE-PAGE count (contentPagesSingle) plus layoutSurchargeChf (gelato.facingSurchargeApplies, constant BOOK_LAYOUT_SURCHARGE_CHF in config/credits.js) in every path that prices a book: create-checkout-session, vouchers book-checkout (the voucher coupon never covers it), BookBuilder, VoucherBookCheckout. A change to who may choose what, or to the surcharge, must land in all of them.",
       "members": [
         "server/lib/pdf.js",
         "server/lib/gelato.js",

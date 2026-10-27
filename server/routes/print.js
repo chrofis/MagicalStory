@@ -1145,7 +1145,7 @@ router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
     // checkout preview (POST /api/book-page-info) and the order flow
     // (processBookOrder) use, so this test PDF is padded to the page count
     // Gelato receives. No product → no SKU to size a cover for: fail loudly.
-    const pageInfo = await computeBookPageInfo(getDbPool(), stories.map(s => s.data), coverType, bookFormat);
+    const pageInfo = await computeBookPageInfo(getDbPool(), stories.map(s => s.data), coverType, bookFormat, { layout: req.body.layout });
     const { estimatedPageCount, printedPages: snappedPageCount, productUid: printProductUid } = pageInfo;
     console.log(`📊 [BOOK PDF] Estimated Gelato pageCount: ${estimatedPageCount} (${pageInfo.contentPages} content pages incl. dedication)`);
     if (!pageInfo.product) {
@@ -1571,6 +1571,8 @@ router.post('/referral/cash-out', authenticateToken, async (req, res) => {
 router.post('/book-page-info', authenticateToken, async (req, res) => {
   try {
     const { storyIds, coverType = 'softcover', bookFormat = 'A4' } = req.body;
+    // The customer's requested layout (builder state); absent = the default (text in the picture when available).
+    const layout = req.body.layout ?? req.query.layout;
     if (!Array.isArray(storyIds) || storyIds.length === 0) {
       return res.status(400).json({ error: 'Missing or invalid storyIds array' });
     }
@@ -1583,9 +1585,11 @@ router.post('/book-page-info', authenticateToken, async (req, res) => {
       if (r.rows.length === 0) return res.status(404).json({ error: `Story not found: ${sid}` });
       storyDatas.push(typeof r.rows[0].data === 'string' ? JSON.parse(r.rows[0].data) : r.rows[0].data);
     }
-    const info = await computeBookPageInfo(getDbPool(), storyDatas, coverType, bookFormat);
+    const info = await computeBookPageInfo(getDbPool(), storyDatas, coverType, bookFormat, { layout });
     res.json({
       layout: info.layout,
+      layouts: info.layouts, // both cards of the layout picker: available + reason + printed/blank pages
+      layoutSurchargeChf: info.layoutSurchargeChf, // 0 or BOOK_LAYOUT_SURCHARGE_CHF (facingSurchargeApplies)
       contentPages: info.contentPages,
       contentPagesSingle: info.contentPagesSingle, // what the price tier is based on
       printedPages: info.printedPages,
@@ -1594,6 +1598,7 @@ router.post('/book-page-info', authenticateToken, async (req, res) => {
       sequence: info.sequence,
     });
   } catch (err) {
+    if (err.name === 'BookLayoutError') return res.status(400).json({ error: err.message, code: err.code });
     log.error('Error computing book page info:', err);
     res.status(500).json({ error: 'Failed to compute book page info' });
   }
@@ -1641,14 +1646,15 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     }
     // Same counter the print PDF and the book-builder preview use
     // (dedication + story pages + per-extra-story title/dedication/back cover).
-    // Price tier = single-layout content count, even when the book prints as a spread
-    // (decisions.md short-book layout 2026-10-26).
+    // Price tier = one-page content count whichever layout is printed; facing pages add the layout
+    // surcharge when text in the picture was available (decisions.md, the customer picks the book layout 2026-10-27).
     const totalPages = countBookContentPages(stories.map(s => s.data), 'single');
 
+    // The requested layout is validated here: an unavailable one throws (BookLayoutError -> 400), no silent downgrade.
     // Blank-page guard: the customer must have ticked the acknowledgement in the
     // book builder (docs/decisions.md, blank-page preview). Not bypassable by
     // calling this endpoint directly.
-    const pageInfo = await computeBookPageInfo(getDbPool(), stories.map(s => s.data), coverType, bookFormat);
+    const pageInfo = await computeBookPageInfo(getDbPool(), stories.map(s => s.data), coverType, bookFormat, { layout: req.body.layout });
     if (isBlankPagesAckMissing(pageInfo.blankPages, req.body.blankPagesAcknowledged)) {
       return res.status(400).json({
         error: `This book has ${pageInfo.blankPages} blank pages; the blank pages must be acknowledged before checkout.`,
@@ -1660,7 +1666,7 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     // Calculate price based on pages and cover type (using database pricing)
     // Pricing tiers store the BOOK price only — shipping is added once per order.
     const isHardcover = coverType === 'hardcover';
-    const priceInChf = await getPriceForPages(totalPages, isHardcover);
+    const priceInChf = (await getPriceForPages(totalPages, isHardcover)) + pageInfo.layoutSurchargeChf;
     const SHIPPING_COST_CHF = 10; // Flat CHF 10 shipping per order (Switzerland)
     const booksSubtotal = priceInChf * quantity;
     const totalPriceChf = booksSubtotal + SHIPPING_COST_CHF;
@@ -1743,6 +1749,8 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         blankPagesAcknowledged: pageInfo.blankPages.toString(),
         coverType: coverType,
         bookFormat: bookFormat,
+        // The layout the customer paid for ('single' | 'spread'); resolveBookOrderInputs hands it to processBookOrder.
+        bookLayout: pageInfo.layout,
         quantity: quantity.toString(),
         // stripeMode: persisted on orders.stripe_mode at webhook completion so
         // refunds (cashout flow) hit the same Stripe account as the original PI.
@@ -1798,6 +1806,7 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
 
     res.json({ sessionId: session.id, url: session.url });
   } catch (err) {
+    if (err.name === 'BookLayoutError') return res.status(400).json({ error: err.message, code: err.code });
     log.error('❌ Error creating checkout session:', err);
     res.status(500).json({ error: 'Failed to create checkout session' });
   }
