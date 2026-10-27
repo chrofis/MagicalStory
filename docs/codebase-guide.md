@@ -367,6 +367,7 @@ Stripe `bookFormat` metadata, the order, the Gelato product match and the PDF us
   the band, blurred, no lighten, no feather. Nothing is stored. Pages without a stored `textPosition`
   (overlay modes in pdf.js, the text-overlay routes in `stories.js` / `sharing.js`) use `pickFullWidthPosition` =
   `top-full` / `bottom-full`; the six-step cycle is deleted everywhere. Test: `npx vitest run tests/unit/strip-edge.test.ts`.
+- **Covers and dedication on a square page** (decisions.md 2026-10-27): the covers are portrait 3:4, so cover-fit cropped the title on the square mini book. `pdf.js` `drawFittedPicture` fits the whole picture by height and `pageFill.buildFilledPageBackground({edge:'sides'})` fills the side bands (mirror: stretched blurred edge columns; grok: outpainted, original pixels kept). Used for front, back and dedication in the single, combined and view builders; A4 boxes keep cover-fit. Test: `npx vitest run tests/unit/cover-sides-fill.test.ts`.
 
 ---
 
