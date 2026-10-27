@@ -3,23 +3,23 @@ import { Plus } from 'lucide-react';
 type Lang = 'en' | 'de' | 'fr' | 'it';
 
 // Short-book nudge (decisions.md, short-book layout 2026-10-26): a book with blank pages has
-// room for another story, so the warning's main action is adding one.
+// room for another story, so the warning's main action is adding one (no price change).
 const TEXT: Record<Lang, { add: string; spreadNote: string }> = {
   en: {
     add: 'Add another story',
-    spreadNote: 'Stories are printed with the picture on one page and the text on the facing page.',
+    spreadNote: 'Short stories are printed with the picture on one page and the text on the facing page.',
   },
   de: {
     add: 'Weitere Geschichte hinzufügen',
-    spreadNote: 'Geschichten werden mit dem Bild auf einer Seite und dem Text auf der gegenüberliegenden Seite gedruckt.',
+    spreadNote: 'Kurze Geschichten werden mit dem Bild auf einer Seite und dem Text auf der gegenüberliegenden Seite gedruckt.',
   },
   fr: {
     add: 'Ajouter une autre histoire',
-    spreadNote: 'Les histoires sont imprimées avec l’image sur une page et le texte sur la page en face.',
+    spreadNote: 'Les histoires courtes sont imprimées avec l’image sur une page et le texte sur la page en face.',
   },
   it: {
     add: 'Aggiungi un’altra storia',
-    spreadNote: 'Le storie vengono stampate con l’immagine su una pagina e il testo sulla pagina a fronte.',
+    spreadNote: 'Le storie brevi vengono stampate con l’immagine su una pagina e il testo sulla pagina a fronte.',
   },
 };
 

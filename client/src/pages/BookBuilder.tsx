@@ -389,8 +389,8 @@ export default function BookBuilder() {
   }, [storyIdsKey, coverType, bookFormat, isOverLimit, language, showToast]);
 
   // Price for the billed page count; null until the server has counted the book.
-  // contentPages = the printed content count of the chosen layout (decisions.md, book layout by scene count).
-  const billedPages = pageInfo?.contentPages ?? null;
+  // contentPagesSingle: the price never moves with the printed layout (decisions.md, short-book layout 2026-10-26).
+  const billedPages = pageInfo?.contentPagesSingle ?? null;
   const price = useMemo(() => {
     return billedPages === null ? null : getPriceForPages(billedPages, coverType === 'hardcover', pricingTiers);
   }, [billedPages, coverType, pricingTiers]);

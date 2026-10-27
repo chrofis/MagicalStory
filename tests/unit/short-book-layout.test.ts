@@ -1,10 +1,11 @@
 /**
  * SHORT BOOKS PRINT AS A SPREAD (owner decision 2026-10-26, orders 98-101).
  *
- * Up to 25 scenes the book prints with the scene image on the left page and its text on the
- * facing right page; ONE pure function (gelato.chooseBookLayout) decides and the price follows
- * the printed content count (owner 2026-10-27).
- * Plan: tasks/short-book-layout-2026-10-26.md, tasks/strip-edge-by-picture-2026-10-27.md
+ * Gelato's minimum is 28 pages; a 6-15 page story left 14-23 of them white. Below a
+ * threshold the book is printed with the scene image on the left page and its text on the
+ * facing right page. ONE pure function (gelato.chooseBookLayout) decides; the price stays
+ * on the single-layout content count.
+ * Plan: tasks/short-book-layout-2026-10-26.md
  */
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
@@ -12,7 +13,7 @@ const require = createRequire(import.meta.url);
 const database = require('../../server/services/database');
 database.getPool = () => ({});
 const {
-  computeBookPageInfo, countBookContentPages, buildPrintedPageSequence, chooseBookLayout, MAX_SPREAD_SCENES,
+  computeBookPageInfo, countBookContentPages, buildPrintedPageSequence, chooseBookLayout,
   isBlankPagesAckMissing,
 } = require('../../server/lib/gelato.js');
 
@@ -26,19 +27,19 @@ const SKU28 = {
 const info = (stories: any[], rows: any[] = [SKU28]) =>
   computeBookPageInfo({ query: async () => ({ rows }) }, stories, 'hardcover', 'A4');
 
-describe('layout by scene count (spread up to 25 scenes)', () => {
-  // [scenes, layout, printed, blank]   owner 2026-10-27: facing pages whenever it fits
+describe('layout threshold (28-page minimum)', () => {
+  // [story pages, layout, printed, blank]
   const table: [number, string, number, number][] = [
-    [6, 'spread', 28, 15],   // content 13 -> 14 -> 28 minimum
-    [9, 'spread', 28, 9],
-    [15, 'spread', 32, 1],   // 15 scenes -> a 30+ page square book, one side text, other side image
-    [20, 'spread', 42, 1],
-    [25, 'spread', 52, 1],   // the single-story cap still prints as a spread
-    [26, 'single', 28, 1],   // 27 content pages -> 28
+    [6, 'spread', 28, 15],   // single 7/28 = 21 blank
+    [9, 'spread', 28, 9],    // order 98: single 20 blank
+    [10, 'spread', 28, 7],
+    [15, 'spread', 32, 1],   // order 101: single 12 blank
+    [20, 'spread', 42, 1],   // single 7 blank
+    [25, 'single', 28, 2],   // 2 blank: below the ack threshold, stays single
     [27, 'single', 28, 0],
   ];
   for (const [pages, layout, printed, blank] of table) {
-    it(`${pages} scenes -> ${layout}, ${printed} printed, ${blank} blank`, async () => {
+    it(`${pages} story pages -> ${layout}, ${printed} printed, ${blank} blank`, async () => {
       const r = await info([story(pages)]);
       expect(r.layout).toBe(layout);
       expect(r.printedPages).toBe(printed);
@@ -48,16 +49,15 @@ describe('layout by scene count (spread up to 25 scenes)', () => {
     });
   }
 
-  it('chooseBookLayout counts the scenes of ALL stories in the book', () => {
-    expect(MAX_SPREAD_SCENES).toBe(25);
-    expect(chooseBookLayout([story(25)])).toBe('spread');
-    expect(chooseBookLayout([story(13), story(12)])).toBe('spread');
-    expect(chooseBookLayout([story(13), story(13)])).toBe('single');
-    expect(chooseBookLayout([story(26)])).toBe('single');
+  it('chooseBookLayout needs >= 4 single blanks AND fewer spread blanks', () => {
+    expect(chooseBookLayout({ blankPages: 3 }, { blankPages: 0 })).toBe('single');
+    expect(chooseBookLayout({ blankPages: 4 }, { blankPages: 3 })).toBe('spread');
+    expect(chooseBookLayout({ blankPages: 8 }, { blankPages: 8 })).toBe('single');
+    expect(chooseBookLayout({ blankPages: 8 }, { blankPages: 12 })).toBe('single');
   });
 
-  it('no SKU -> still the layout by scene count (nothing to snap)', async () => {
-    expect((await info([story(10)], [])).layout).toBe('spread');
+  it('no SKU -> single (only a parity blank, nothing to improve)', async () => {
+    expect((await info([story(10)], [])).layout).toBe('single');
   });
 
   it('a spread book needs no blank-page acknowledgement once it is nearly full', async () => {
@@ -66,16 +66,16 @@ describe('layout by scene count (spread up to 25 scenes)', () => {
   });
 });
 
-describe('price follows the printed content count', () => {
-  it('contentPages is the chosen layout count: 2 per scene when spread', async () => {
+describe('price stays on the single-layout count', () => {
+  it('contentPagesSingle equals countBookContentPages(single) whatever layout is printed', async () => {
     for (const n of [6, 15, 20, 25]) {
       const r = await info([story(n)]);
-      expect(r.layout).toBe('spread');
-      expect(r.contentPages).toBe(countBookContentPages([story(n)], 'spread'));
-      expect(r.contentPages).toBe(2 * n + 1);
+      expect(r.contentPagesSingle).toBe(countBookContentPages([story(n)]));
+      expect(r.contentPagesSingle).toBe(n + 1);
     }
-    const single = await info([story(26)]);
-    expect(single.contentPages).toBe(27);
+    const spread = await info([story(15)]);
+    expect(spread.layout).toBe('spread');
+    expect(spread.contentPages).toBe(31);
   });
   it('countBookContentPages defaults to single and doubles scenes for spread', () => {
     expect(countBookContentPages([story(6), story(6)])).toBe(1 + 6 + 2 + 6);
@@ -103,19 +103,13 @@ describe('spread sequence', () => {
   });
 });
 
-describe('clients bill the printed content count', () => {
+describe('clients bill the single-layout count', () => {
   const fs = require('node:fs');
   const path = require('node:path');
   const src = (f: string) => fs.readFileSync(path.resolve(__dirname, '../../client/src/pages', f), 'utf8');
-  it('BookBuilder and VoucherBookCheckout price server contentPages; no contentPagesSingle remains', () => {
-    expect(src('BookBuilder.tsx')).toContain('pageInfo?.contentPages ?? null');
-    expect(src('VoucherBookCheckout.tsx')).toContain('pageInfo?.contentPages ?? listedPages');
-    expect(src('BookBuilder.tsx')).not.toContain('contentPagesSingle');
-  });
-  it('both checkouts take the price count from computeBookPageInfo', () => {
-    const root = path.resolve(__dirname, '../../server/routes');
-    expect(fs.readFileSync(path.join(root, 'print.js'), 'utf8')).toContain('const totalPages = pageInfo.contentPages;');
-    expect(fs.readFileSync(path.join(root, 'vouchers.js'), 'utf8')).toContain('const totalPages = pageInfo.contentPages;');
+  it('BookBuilder prices contentPagesSingle, never the printed-layout contentPages', () => {
+    expect(src('BookBuilder.tsx')).toContain('pageInfo?.contentPagesSingle');
+    expect(src('BookBuilder.tsx')).not.toMatch(/billedPages = pageInfo\?\.contentPages\b/);
   });
   it('both blank-page warnings carry the add-story action', () => {
     expect(src('BookBuilder.tsx')).toContain('<AddStoryNudge');

@@ -164,7 +164,8 @@ test('countBookContentPages: dedication + story pages; story 2+ adds title/dedic
 test('computeBookPageInfo: 10-page story on a 30-page minimum hardcover prints as a spread (9 blank, was 19)', async () => {
   const info = await computeBookPageInfo(poolWith([HARDCOVER_A4]), [storyOf(10)], 'hardcover', 'A4');
   assert.strictEqual(info.layout, 'spread');
-    assert.strictEqual(info.contentPages, 21);
+  assert.strictEqual(info.contentPagesSingle, 11, 'price tier stays on the single-layout count');
+  assert.strictEqual(info.contentPages, 21);
   assert.strictEqual(info.printedPages, 30);
   assert.strictEqual(info.blankPages, 9);
 });
@@ -203,7 +204,7 @@ test('computeBookPageInfo: discrete page-count list snaps up to the next entry',
 test('computeBookPageInfo: no matching SKU reports only the parity blank', async () => {
   const info = await computeBookPageInfo(poolWith([]), [storyOf(10)], 'hardcover', 'A4');
   assert.strictEqual(info.product, null);
-  assert.strictEqual(info.printedPages, 22); // 10 scenes print as a spread: 21 content pages -> 22
+  assert.strictEqual(info.printedPages, 12);
   assert.strictEqual(info.blankPages, 1);
 });
 

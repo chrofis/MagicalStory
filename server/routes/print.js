@@ -23,7 +23,7 @@ const { getPool, rehydrateStoryImages, logActivity } = require('../services/data
 
 // Lib modules
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf, pdfContentDisposition } = require('../lib/pdf');
-const { processBookOrder, resumeBookOrder, getCoverDimensions, computeBookPageInfo, isBlankPagesAckMissing, BLANK_PAGES_ACK_FROM, shippingFromSession } = require('../lib/gelato');
+const { processBookOrder, resumeBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo, isBlankPagesAckMissing, BLANK_PAGES_ACK_FROM, shippingFromSession } = require('../lib/gelato');
 const { stripDataUriPrefix } = require('../lib/r2');
 const email = require('../../email');
 
@@ -1587,6 +1587,7 @@ router.post('/book-page-info', authenticateToken, async (req, res) => {
     res.json({
       layout: info.layout,
       contentPages: info.contentPages,
+      contentPagesSingle: info.contentPagesSingle, // what the price tier is based on
       printedPages: info.printedPages,
       blankPages: info.blankPages,
       blankAckFrom: BLANK_PAGES_ACK_FROM,
@@ -1640,6 +1641,10 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     }
     // Same counter the print PDF and the book-builder preview use
     // (dedication + story pages + per-extra-story title/dedication/back cover).
+    // Price tier = single-layout content count, even when the book prints as a spread
+    // (decisions.md short-book layout 2026-10-26).
+    const totalPages = countBookContentPages(stories.map(s => s.data), 'single');
+
     // Blank-page guard: the customer must have ticked the acknowledgement in the
     // book builder (docs/decisions.md, blank-page preview). Not bypassable by
     // calling this endpoint directly.
@@ -1655,8 +1660,6 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     // Calculate price based on pages and cover type (using database pricing)
     // Pricing tiers store the BOOK price only — shipping is added once per order.
     const isHardcover = coverType === 'hardcover';
-    // Price tier = the PRINTED content page count of the chosen layout (decisions.md, book layout by scene count)
-    const totalPages = pageInfo.contentPages;
     const priceInChf = await getPriceForPages(totalPages, isHardcover);
     const SHIPPING_COST_CHF = 10; // Flat CHF 10 shipping per order (Switzerland)
     const booksSubtotal = priceInChf * quantity;

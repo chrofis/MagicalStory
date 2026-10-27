@@ -225,7 +225,7 @@ export default function VoucherBookCheckout() {
     return () => { cancelled = true; };
   }, [selectedKey, coverType, language]);
 
-  const pageCount = pageInfo?.contentPages ?? listedPages;
+  const pageCount = pageInfo?.contentPagesSingle ?? listedPages;
   const isTooLong = pageCount > maxPages;
   const needsBlankAck = !!pageInfo && !isTooLong && pageInfo.blankPages >= pageInfo.blankAckFrom;
   useEffect(() => { setBlankAck(false); }, [pageInfo?.blankPages, selectedKey]);
