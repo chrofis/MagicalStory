@@ -10702,7 +10702,7 @@
    "status": "confirmed",
    "claim": "On staging in Stripe TEST mode: buying a voucher at /gutschein/kaufen creates a vouchers row (kind gift, no expiry) and emails the PDF card with a scannable QR; redeeming the code adds 500 credits once (second attempt answers VOUCHER_REDEEMED); ordering a softcover from stored stories at /gutschein/buch produces a Stripe session with a CHF 0 total that the webhook accepts, an orders row and a Gelato draft; a hardcover charges CHF 10; a book over 50 content pages is refused. No story pipeline code is touched.",
    "runShape": [
-    "none"
+    "any"
    ],
    "check": {
     "kind": "human",
