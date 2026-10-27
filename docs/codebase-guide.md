@@ -271,7 +271,7 @@ Story text is overlaid directly on page images, matching the printed book layout
 
 **Key files:**
 - `server/lib/textRegion.js` — calmness detection + white wash compositing
-- `client/src/utils/textOverlay.ts` — frontend text overlay positioning (6-position cycle + explicit override)
+- `client/src/utils/textOverlay.ts` — frontend text overlay positioning (stored position, else a bottom-edge placeholder until the server PNG arrives; no position cycle)
 - `server/lib/storyHelpers.js` → `buildImagePrompt()` — COPY SPACE instruction injection
 - `server/lib/pdf.js` — PDF text rendering with detected rect support
 
@@ -348,6 +348,15 @@ It plans both layouts (`planLayoutPages`: content count, SKU, snapped Gelato pag
   4 pages in flight via `prefetchStripBackgrounds`, a failure throws and fails the order loudly); `generateViewPdf`
   and every `print.js` route pass `'mirror'`. Registry set `print-vs-view-strip-fill`. Decision: `docs/decisions.md`
   2026-10-26 "Print PDF strip is outpainted by Grok".
+  **Which edge gets the strip** (decisions.md 2026-10-27): `textRegion.chooseStripEdge(imageBuffer, {pageNumber, bandFraction})`
+  compares the mean block calmness (the same `blockCalmness` the text-region detector uses) of the picture's top and
+  bottom band; the calmer edge gets the strip, a gap under 0.05 is a tie and the page cycle breaks it (odd page: bottom,
+  even page: top). `buildStripBackground` (pdf.js) chooses once per page and returns `{buffer, edge}`, so the prefetched
+  Grok fill, the inline mirror fill and the text zone agree; `pageFill.buildFilledPageBackground({edge})` builds both
+  edges in one code path (the page is built strip-at-bottom and flipped at the raster boundaries; Grok sees an upright
+  canvas and `{DIRECTION}` in the prompt says upward/downward). Nothing is stored. Pages without a stored `textPosition`
+  (overlay modes in pdf.js, the text-overlay routes in `stories.js` / `sharing.js`) use `pickFullWidthPosition` =
+  `top-full` / `bottom-full`; the six-step cycle is deleted everywhere. Test: `npx vitest run tests/unit/strip-edge.test.ts`.
 
 ---
 
