@@ -508,6 +508,9 @@ measurement, is lost).
       root-cause checkout decision DONE 2026-10-26: short books print as a spread, "Add another
       story" nudge (committed on staging, not pushed) → `tasks/short-book-layout-2026-10-26.md`,
       `tasks/support-bot-2026-10-17.md`
+- [ ] (2026-10-27) Book rule v2 + text strip on the calmer picture edge: facing pages up to 25 scenes,
+      price by printed pages, text in the expanded picture above that; edge chosen by calmness,
+      six-step position cycle deleted → `tasks/strip-edge-by-picture-2026-10-27.md`
 - [ ] (2026-10-17) Push to staging, then master on approval: support-email logging + recap
       "Support-Mails" block (e6ddffca1), send.js. Check the recap renders on staging
       → `tasks/support-bot-2026-10-17.md`
