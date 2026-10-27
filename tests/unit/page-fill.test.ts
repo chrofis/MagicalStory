@@ -195,3 +195,23 @@ describe('pdf.js strip fill routing', () => {
     expect(calls).toBeLessThan(12);
   }, 60000);
 });
+
+describe('Grok fill, edge top', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+  it('sends an upright canvas with the hint above, keeps the original picture below, prompt says upward', async () => {
+    let prompt = '';
+    const editFn = async (p: string, refs: string[]) => {
+      prompt = p;
+      const meta = await sharp(Buffer.from(refs[0].split(',')[1], 'base64')).metadata();
+      const png = await sharp({ create: { width: meta.width, height: meta.height, channels: 3, background: { r: 0, g: 200, b: 0 } } }).png().toBuffer();
+      return { imageData: 'data:image/png;base64,' + png.toString('base64') };
+    };
+    const r = await buildFilledPageBackground({ imageBuffer: await picture('dark'), pageWidthPx: W, pageHeightPx: H, imageHeightPx: IH, fillMethod: 'grok', edge: 'top', editFn });
+    expect(prompt).toContain('upward');
+    expect(prompt).not.toContain('{DIRECTION}');
+    const { data } = await raw(r.buffer);
+    const px = (x: number, y: number) => { const i = (y * W + x) * 3; return [data[i], data[i + 1], data[i + 2]]; };
+    expect(px(50, 20)[1]).toBeGreaterThan(150);          // the model's strip, at the top
+    expect(px(50, H - 40)[0]).toBeLessThan(25);          // original dark picture at the bottom
+  });
+});

@@ -24,6 +24,106 @@ const { stripDataUriPrefix } = require('./r2');
 const BLOCK_SIZE = 16;
 
 /**
+ * Per-block calmness of a greyscale image (steps 1-2 of the algorithm above), the ONE copy of
+ * the variance/brightness formula: used by detectAndLightenTextRegion and chooseStripEdge.
+ *
+ * @param {Buffer} grayPixels - raw 1-channel pixels, row-major
+ * @param {number} width - image width in px
+ * @param {number} rows - Math.floor(height / BLOCK_SIZE)
+ * @param {number} cols - Math.floor(width / BLOCK_SIZE)
+ * @returns {Float32Array} rows*cols calmness values (0..1, higher = calmer)
+ */
+function blockCalmness(grayPixels, width, rows, cols) {
+  const calmness = new Float32Array(rows * cols);
+  let vMax = 0;
+  const variances = new Float32Array(rows * cols);
+  const means = new Float32Array(rows * cols);
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      let sum = 0, sumSq = 0;
+      const count = BLOCK_SIZE * BLOCK_SIZE;
+      for (let by = 0; by < BLOCK_SIZE; by++) {
+        const rowOff = (r * BLOCK_SIZE + by) * width;
+        for (let bx = 0; bx < BLOCK_SIZE; bx++) {
+          const val = grayPixels[rowOff + c * BLOCK_SIZE + bx];
+          sum += val;
+          sumSq += val * val;
+        }
+      }
+      const mean = sum / count;
+      const std = Math.sqrt(Math.max(0, sumSq / count - mean * mean));
+      means[r * cols + c] = mean;
+      variances[r * cols + c] = std;
+      if (std > vMax) vMax = std;
+    }
+  }
+  if (vMax === 0) vMax = 1;
+
+  for (let i = 0; i < calmness.length; i++) {
+    // Low-variance wins — the primary signal for "is this spot clean?" —
+    // but dark is preferred when variance is tied, since text renders as
+    // white glyphs on a dark gradient. A bright calm patch still scores,
+    // but a dark calm patch scores higher.
+    const vNorm = variances[i] / vMax;
+    const bNorm = means[i] / 255;
+    calmness[i] = (1 - vNorm) * (0.7 + 0.3 * (1 - bNorm));
+  }
+  return calmness;
+}
+
+// Printed text strip: the text goes on the calmer top or bottom edge of the picture
+// (decisions.md, "Text strip on the calmer edge of the picture", 2026-10-27).
+const STRIP_BAND_MIN = 0.15;
+const STRIP_BAND_MAX = 0.5;
+const STRIP_TIE_GAP = 0.05;
+
+/**
+ * Which edge of the picture should get the text strip: the one whose outer band is calmer, so
+ * the fill that mirrors that edge is clean and the text lands on calm fill. A pure function of
+ * the pixels (deterministic per story, nothing is stored). Within STRIP_TIE_GAP the page cycle
+ * breaks the tie: odd page -> bottom, even page -> top.
+ *
+ * @param {Buffer} imageBuffer - the scene picture (any format sharp reads)
+ * @param {Object} opts
+ * @param {number} opts.pageNumber - 1-based, only used for the tie-break
+ * @param {number} [opts.bandFraction=0.25] - band height as a share of the picture height; the
+ *   caller passes (pageHeight - imageHeight) / imageHeight; clamped to [0.15, 0.5]
+ * @returns {Promise<{edge:'top'|'bottom', top:number, bottom:number}>} mean calmness per band
+ */
+async function chooseStripEdge(imageBuffer, { pageNumber, bandFraction = 0.25 } = {}) {
+  if (!Buffer.isBuffer(imageBuffer) || !imageBuffer.length) throw new Error('chooseStripEdge: imageBuffer missing');
+  if (!Number.isInteger(pageNumber) || pageNumber < 1) throw new Error(`chooseStripEdge: pageNumber must be a positive integer, got ${pageNumber}`);
+  const { data: gray, info } = await sharp(imageBuffer).flatten({ background: '#ffffff' }).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const rows = Math.floor(info.height / BLOCK_SIZE);
+  const cols = Math.floor(info.width / BLOCK_SIZE);
+  if (rows < 4 || cols < 4) throw new Error(`chooseStripEdge: picture ${info.width}x${info.height} too small`);
+  const calmness = blockCalmness(gray, info.width, rows, cols);
+  const band = Math.max(1, Math.round(rows * Math.min(STRIP_BAND_MAX, Math.max(STRIP_BAND_MIN, bandFraction))));
+  const mean = (r0, r1) => {
+    let sum = 0;
+    for (let i = r0 * cols; i < r1 * cols; i++) sum += calmness[i];
+    return sum / ((r1 - r0) * cols);
+  };
+  const top = mean(0, band);
+  const bottom = mean(rows - band, rows);
+  let edge;
+  if (Math.abs(top - bottom) < STRIP_TIE_GAP) edge = pageNumber % 2 === 1 ? 'bottom' : 'top';
+  else edge = top > bottom ? 'top' : 'bottom';
+  return { edge, top, bottom };
+}
+
+/**
+ * The full-width text position for a picture that stores none: 'top-full' or 'bottom-full' by
+ * chooseStripEdge. The single place the "no stored textPosition" case is decided (print overlay
+ * modes, text-overlay routes); there is no position cycle.
+ * @returns {Promise<'top-full'|'bottom-full'>}
+ */
+async function pickFullWidthPosition(imageBuffer, pageNumber) {
+  return `${(await chooseStripEdge(imageBuffer, { pageNumber })).edge}-full`;
+}
+
+/**
  * Find the calm region, lighten it, and return the modified image + text rect.
  *
  * @param {string} imageData - base64 data URI
@@ -61,41 +161,7 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
     }
 
     // ── Step 1-2: Compute per-block calmness ──
-    const calmness = new Float32Array(rows * cols);
-    let vMax = 0;
-    const variances = new Float32Array(rows * cols);
-    const means = new Float32Array(rows * cols);
-
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        let sum = 0, sumSq = 0;
-        const count = BLOCK_SIZE * BLOCK_SIZE;
-        for (let by = 0; by < BLOCK_SIZE; by++) {
-          const rowOff = (r * BLOCK_SIZE + by) * width;
-          for (let bx = 0; bx < BLOCK_SIZE; bx++) {
-            const val = grayPixels[rowOff + c * BLOCK_SIZE + bx];
-            sum += val;
-            sumSq += val * val;
-          }
-        }
-        const mean = sum / count;
-        const std = Math.sqrt(Math.max(0, sumSq / count - mean * mean));
-        means[r * cols + c] = mean;
-        variances[r * cols + c] = std;
-        if (std > vMax) vMax = std;
-      }
-    }
-    if (vMax === 0) vMax = 1;
-
-    for (let i = 0; i < calmness.length; i++) {
-      // Low-variance wins — the primary signal for "is this spot clean?" —
-      // but dark is preferred when variance is tied, since text renders as
-      // white glyphs on a dark gradient. A bright calm patch still scores,
-      // but a dark calm patch scores higher.
-      const vNorm = variances[i] / vMax;
-      const bNorm = means[i] / 255;
-      calmness[i] = (1 - vNorm) * (0.7 + 0.3 * (1 - bNorm));
-    }
+    const calmness = blockCalmness(grayPixels, width, rows, cols);
 
     // ── Step 3: Build a per-pixel alpha mask from the calmness map ──
     // Only include blocks on the correct side of the image (spread rule).
@@ -275,4 +341,4 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
   }
 }
 
-module.exports = { detectAndLightenTextRegion };
+module.exports = { detectAndLightenTextRegion, chooseStripEdge, pickFullWidthPosition, blockCalmness, STRIP_TIE_GAP };

@@ -1,1 +1,1 @@
-Extend the illustration downward into the lower area so it continues the same scene, style and lighting; leave the upper picture unchanged; no text, no characters added.
+Extend the illustration {DIRECTION} so it continues the same scene, style and lighting; leave the rest of the picture unchanged; no text, no characters added.

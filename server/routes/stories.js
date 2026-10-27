@@ -4394,7 +4394,9 @@ router.post('/:id/text-overlay/:pageNum', authenticateToken, async (req, res) =>
       if (lvlRows.length > 0 && lvlRows[0].lvl) languageLevel = lvlRows[0].lvl;
     } catch { /* default stays */ }
 
-    const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition || 'bottom-left', { pageNumber, languageLevel });
+    // No stored position: the calmer picture edge (textRegion.pickFullWidthPosition, decisions.md 2026-10-27)
+    if (!textPosition) textPosition = await require('../lib/textRegion').pickFullWidthPosition(imgBuffer, pageNumber);
+    const result = await generateTextOverlay(imgBuffer, text.trim(), textPosition, { pageNumber, languageLevel });
 
     // Return overlay as base64 data URL
     const overlayBase64 = result.overlayImage.toString('base64');

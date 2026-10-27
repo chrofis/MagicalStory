@@ -26,15 +26,10 @@ export const OVERLAY_TEXT_STROKE_STYLE: CSSProperties = {
   color: '#ffffff',
 };
 
-// 6-position cycle
-const POSITION_CYCLE: TextPosition[] = [
-  'top-left',      // Page 1
-  'bottom-full',   // Page 2
-  'top-right',     // Page 3
-  'bottom-left',   // Page 4
-  'top-full',      // Page 5
-  'bottom-right',  // Page 6
-];
+// Pages without a stored position render the CSS placeholder at the bottom edge until the server
+// overlay PNG arrives; the server picks the calmer edge from the picture (textRegion.pickFullWidthPosition).
+const DEFAULT_POSITION: TextPosition = 'bottom-full';
+const VALID_POSITIONS: TextPosition[] = ['top-left', 'top-right', 'top-full', 'bottom-left', 'bottom-right', 'bottom-full'];
 
 export interface TextOverlayLayout {
   position: TextPosition;
@@ -80,9 +75,8 @@ function enforceSpreadParity(position: TextPosition, pageNumber: number): TextPo
 }
 
 export function getTextOverlayPosition(pageNumber: number, text: string, explicitPosition?: TextPosition | null): TextOverlayLayout {
-  // Use explicit position from scene expansion if available, otherwise cycle
-  const posIndex = ((pageNumber - 1) % POSITION_CYCLE.length + POSITION_CYCLE.length) % POSITION_CYCLE.length;
-  const rawPosition = (explicitPosition && POSITION_CYCLE.includes(explicitPosition)) ? explicitPosition : POSITION_CYCLE[posIndex];
+  // Stored position if the page has one, otherwise the bottom-edge placeholder
+  const rawPosition = (explicitPosition && VALID_POSITIONS.includes(explicitPosition)) ? explicitPosition : DEFAULT_POSITION;
   const position = enforceSpreadParity(rawPosition, pageNumber);
   const size = getTextSize(text);
 

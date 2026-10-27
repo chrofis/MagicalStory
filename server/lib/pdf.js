@@ -524,9 +524,13 @@ function computeTextBelowRatio(pages, languageLevel) {
 const PAGE_FILL_DPI = 300;
 
 /**
- * The filled page raster (picture + strip) for one page, or null when the page has no readable
- * picture (text-only page). `g.fillMethod` is required ('mirror' | 'grok'); with 'grok' every
- * page costs one Grok call (USD 0.02), counted in `fillStats.grokCalls`.
+ * The filled page raster (picture + strip) for one page and the edge the strip sits on, or null
+ * when the page has no readable picture (text-only page). The edge is chosen HERE, once per page,
+ * from the picture's own pixels (textRegion.chooseStripEdge, decisions.md 2026-10-27), so the
+ * prefetched Grok fill and the inline mirror fill agree with the text zone drawFilledStripPage
+ * places. `g.fillMethod` is required ('mirror' | 'grok'); with 'grok' every page costs one Grok
+ * call (USD 0.02), counted in `fillStats.grokCalls`.
+ * @returns {Promise<{buffer: Buffer, edge: 'top'|'bottom'}|null>}
  */
 async function buildStripBackground(image, g, fillStats) {
   const { interiorW, interiorH, imageBottom, pageNumber, fillMethod } = g;
@@ -540,13 +544,27 @@ async function buildStripBackground(image, g, fillStats) {
     return null;
   }
   const { buildFilledPageBackground } = require('./pageFill');
+  const { chooseStripEdge } = require('./textRegion');
   const s = PAGE_FILL_DPI / 72;
+  const { edge } = await chooseStripEdge(imageBuffer, { pageNumber, bandFraction: (interiorH - imageBottom) / imageBottom });
   const out = await buildFilledPageBackground({
     imageBuffer, pageWidthPx: Math.round(interiorW * s), pageHeightPx: Math.round(interiorH * s),
-    imageHeightPx: Math.round(imageBottom * s), fillMethod,
+    imageHeightPx: Math.round(imageBottom * s), fillMethod, edge,
   });
   if (out.usedGrok && fillStats) fillStats.grokCalls = (fillStats.grokCalls || 0) + 1;
-  return out.buffer;
+  return { buffer: out.buffer, edge };
+}
+
+/**
+ * Where the text goes on a picture that carries it (overlay modes): the page's stored
+ * textPosition (spread rule applied) when it has one, otherwise the calmer picture edge
+ * ('top-full' / 'bottom-full', textRegion.chooseStripEdge). No position cycle anywhere.
+ */
+async function resolveOverlayTextPosition(image, imageBuffer, pageNumber) {
+  const { enforceSpreadTextPosition } = require('./storyHelpers');
+  const stored = enforceSpreadTextPosition(image.textPosition || null, pageNumber);
+  if (stored) return stored;
+  return require('./textRegion').pickFullWidthPosition(imageBuffer, pageNumber);
 }
 
 const GROK_FILL_CONCURRENCY = 4;   // Grok ~9 s per call: 4 in flight keeps a 25 page book near a minute
@@ -614,19 +632,22 @@ async function drawFilledStripPage(doc, image, g) {
   const { interiorW, interiorH, imageBottom, pageNumber, text, fontSize, lineGap, paragraphGap, textX, textWidth, padTop, textBudgetHeight, textBottom, bookFormat, languageLevel } = g;
 
   // g.background = this page's prefetched promise (grok); without it the fill is built here.
-  const buffer = await (g.background || buildStripBackground(image, g, g.fillStats));
+  const filled = await (g.background || buildStripBackground(image, g, g.fillStats));
 
-  if (buffer) {
+  if (filled) {
+    const { buffer, edge } = filled;
     const { requiredFontPt } = require('../config/textRegion');
     const s = PAGE_FILL_DPI / 72;
     const W = Math.round(interiorW * s);
     const H = Math.round(interiorH * s);
     const IH = Math.round(imageBottom * s);
     // Same point-size rule as the in-image pages (px = pt * pixels per point).
-    const { compositedImage } = await generateTextOverlay(buffer, text, 'bottom-full', {
+    // The text zone is the strip: [0..H-IH] at the top edge, [IH..H] at the bottom edge.
+    const zonePolygon = edge === 'top' ? [[0, 0], [W, 0], [W, H - IH], [0, H - IH]] : [[0, IH], [W, IH], [W, H], [0, H]];
+    const { compositedImage } = await generateTextOverlay(buffer, text, `${edge}-full`, {
       pageNumber, bookFormat, languageLevel,
       fontSize: Math.round(requiredFontPt(languageLevel) * s),
-      zonePolygon: [[0, IH], [W, IH], [W, H], [0, H]],
+      zonePolygon,
     });
     doc.image(compositedImage, 0, 0, { width: interiorW, height: interiorH });
     return;
@@ -677,11 +698,6 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
   // Effective vertical budget for text after carving out top/bottom breathing room.
   const effectiveTextHeight = Math.max(0, availableTextHeight - textPadTop - textPadBottom);
 
-  // Text overlay: 6-position cycle (same as browser)
-  const OVERLAY_POSITIONS = [
-    'top-left', 'bottom-full', 'top-right', 'bottom-left', 'top-full', 'bottom-right'
-  ];
-
   // paragraphGap matches what calculateConsistentFontSize measured with, so the
   // rendered text height tracks the fit-time budget instead of drifting.
   const paragraphGap = fontSize * 0.5;
@@ -713,13 +729,9 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       // PDF has no uncovered strip at the bottom edge.
       let overlayDrawn = false;
       try {
-        const { enforceSpreadTextPosition } = require('./storyHelpers');
-        const storedPos = enforceSpreadTextPosition(image.textPosition || null, pageNumber);
-        const posIndex = ((pageNumber - 1) % OVERLAY_POSITIONS.length + OVERLAY_POSITIONS.length) % OVERLAY_POSITIONS.length;
-        const textPos = (storedPos && OVERLAY_POSITIONS.includes(storedPos)) ? storedPos : OVERLAY_POSITIONS[posIndex];
-
         const imageBuffer = await resolveImageBuffer(image.imageData);
         if (!imageBuffer) throw new Error('image source unresolvable');
+        const textPos = await resolveOverlayTextPosition(image, imageBuffer, pageNumber);
         const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber, bookFormat: opts.bookFormat, languageLevel: storyData?.languageLevel });
 
         // Crop the opposite side of the text so the text is never in the
@@ -947,11 +959,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
     }
   };
 
-  const OVERLAY_POSITIONS = [
-    'top-left', 'bottom-full', 'top-right', 'bottom-left', 'top-full', 'bottom-right'
-  ];
   const { resolveLayout } = require('./layout');
-  const { enforceSpreadTextPosition } = require('./storyHelpers');
 
   // Helper: Add story content pages (picture-book layout, adaptive ratio per language level).
   // When the story was generated with textInImage=true (calm-zone reserved),
@@ -1013,12 +1021,9 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       let overlayDrawn = false;
       if (textInImage && image?.imageData && cleanText) {
         try {
-          const storedPos = enforceSpreadTextPosition(image.textPosition || null, pageNumber);
-          const posIndex = ((pageNumber - 1) % OVERLAY_POSITIONS.length + OVERLAY_POSITIONS.length) % OVERLAY_POSITIONS.length;
-          const textPos = (storedPos && OVERLAY_POSITIONS.includes(storedPos)) ? storedPos : OVERLAY_POSITIONS[posIndex];
-
           const imageBuffer = await resolveImageBuffer(image.imageData);
-        if (!imageBuffer) throw new Error('image source unresolvable');
+          if (!imageBuffer) throw new Error('image source unresolvable');
+          const textPos = await resolveOverlayTextPosition(image, imageBuffer, pageNumber);
           const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber, bookFormat, languageLevel: storyData?.languageLevel });
           // Fill the full interior page incl. top AND bottom bleed. Crop the
           // opposite side from the text so the scale-to-fill overflow never
