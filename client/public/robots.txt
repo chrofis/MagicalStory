@@ -8,6 +8,7 @@ Disallow: /stories
 Disallow: /orders
 Disallow: /account
 Disallow: /book-builder
+Disallow: /book-preview
 Disallow: /welcome
 Disallow: /trial-generation
 Disallow: /claim/
