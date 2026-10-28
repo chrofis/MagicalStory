@@ -495,7 +495,7 @@ const STATIC_ROUTES = {
 
 // Routes that should have noindex
 const NOINDEX_ROUTES = [
-  '/create', '/stories', '/orders', '/account', '/admin', '/book-builder',
+  '/create', '/stories', '/orders', '/account', '/admin', '/book-builder', '/book-preview',
   '/welcome', '/trial-generation', '/claim', '/reset-password', '/email-verified',
   '/gutschein/einloesen', '/gutschein/buch',
 ];

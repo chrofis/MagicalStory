@@ -10,6 +10,19 @@ export interface BookLayoutOption {
   blankPages: number;
   surchargeChf: number;
 }
+export interface BookPreviewManifest {
+  layout: BookLayout;
+  coverType: 'softcover' | 'hardcover';
+  bookFormat: string;
+  printedPages: number;
+  /** pages[i] is PDF page i + 1: cover spread, inside front blank, interior pages..., inside back blank. */
+  pages: { url: string; width: number; height: number }[];
+}
+export type BookPreviewState =
+  | { state: 'ready'; manifest: BookPreviewManifest }
+  | { state: 'running'; stage: 'preparing' | 'covers' | 'painting' | 'rendering'; done: number; total: number }
+  | { state: 'error'; error: string };
+
 export interface BookPageInfo {
   layout: BookLayout;
   /** Derived by the server from the layout (spread = square, single = A4); never sent by the client. */
@@ -2361,6 +2374,12 @@ export const storyService = {
   // returns their R2 URLs, so the book builder can show them before payment.
   async makeSquareCovers(storyId: string): Promise<{ covers: Partial<Record<'frontCover' | 'backCover' | 'initialPage', string>> }> {
     return api.post(`/api/stories/${encodeURIComponent(storyId)}/square-covers`, {});
+  },
+
+  // Full-book preview: the print PDF as page images (server/lib/bookPreview.js). Idempotent start-or-status: poll it
+  // until state is 'ready' (pages in PDF order) or 'error'. The first call paints the A4 text strips (about CHF 0.60).
+  async requestBookPreview(storyIds: string[], layout: BookLayout, coverType: 'softcover' | 'hardcover', retry = false): Promise<BookPreviewState> {
+    return api.post('/api/book-preview', { storyIds, layout, coverType, retry });
   },
 
   // Referral: get current user's referral code + stats

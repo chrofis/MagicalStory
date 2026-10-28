@@ -73,6 +73,21 @@
       "severity": "block"
     },
     {
+      "id": "book-preview-vs-print",
+      "axis": "the book preview (page images of the print PDF) vs the paid order PDF",
+      "reason": "The preview IS the print PDF: bookPreview.js calls gelato.buildBookPrintPdf (the same function processBookOrder calls, fillMethod 'grok') and rasterises it with pdfRaster.js; the Grok-painted strips are stored per page by pdf.js buildStripBackground (content-keyed R2 object) so the order reuses what the preview painted. A change to how the print PDF is built, filled or cached must keep both callers on that one function, and the client viewer (BookPreview.tsx, utils/bookSpreads.ts) must follow the PDF page order (cover spread, blank left page, dedication...) (decisions.md 2026-10-28, Book preview).",
+      "members": [
+        "server/lib/bookPreview.js",
+        "server/lib/pdfRaster.js",
+        "server/lib/gelato.js",
+        "server/lib/pdf.js",
+        "server/lib/pageFill.js",
+        "client/src/pages/BookPreview.tsx",
+        "client/src/utils/bookSpreads.ts"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "square-book-covers",
       "axis": "every path that builds a SQUARE book PDF vs the square cover maker",
       "reason": "A square book (mini / facing pages) prints square covers made by squareCovers.js (one Grok edit each, stored in R2 by source hash) and handed to the PDF on storyData.squareCovers; pdf.js throws when one is missing, there is no crop fallback. Every caller that builds a square PDF (processBookOrder, print.js order / admin / generate-book-pdf) must call attachSquareCovers first, and the book builder and voucher checkout must show and wait for the covers before payment (decisions.md 2026-10-28, Square covers).",

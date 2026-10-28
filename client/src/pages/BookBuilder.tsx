@@ -9,6 +9,7 @@ import BlankPagesPreview from '@/components/book/BlankPagesPreview';
 import AddStoryNudge from '@/components/book/AddStoryNudge';
 import BookFacingOption from '@/components/book/BookFacingOption';
 import BookSquareCovers from '@/components/book/BookSquareCovers';
+import BookPreviewButton from '@/components/book/BookPreviewButton';
 import type { BookPageInfo } from '@/services/storyService';
 import { storyService } from '@/services';
 import type { BookLayout } from '@/services/storyService';
@@ -134,7 +135,7 @@ export default function BookBuilder() {
       moveDown: 'Move down',
       pages: 'pages',
       totalPages: 'Total Pages',
-      chooseFormat: 'Choose Format',
+      chooseCover: 'Choose cover',
       softcover: 'Softcover',
       hardcover: 'Hardcover',
       softcoverSize: '21 × 28 cm',
@@ -184,7 +185,7 @@ export default function BookBuilder() {
       moveDown: 'Nach unten',
       pages: 'Seiten',
       totalPages: 'Seiten insgesamt',
-      chooseFormat: 'Format wählen',
+      chooseCover: 'Einband wählen',
       softcover: 'Softcover',
       hardcover: 'Hardcover',
       softcoverSize: '21 × 28 cm',
@@ -234,7 +235,7 @@ export default function BookBuilder() {
       moveDown: 'Descendre',
       pages: 'pages',
       totalPages: 'Pages totales',
-      chooseFormat: 'Choisir le format',
+      chooseCover: 'Choisir la couverture',
       softcover: 'Couverture souple',
       hardcover: 'Couverture rigide',
       softcoverSize: '21 × 28 cm',
@@ -284,7 +285,7 @@ export default function BookBuilder() {
       moveDown: 'Sposta giù',
       pages: 'pagine',
       totalPages: 'Pagine totali',
-      chooseFormat: 'Scegli il formato',
+      chooseCover: 'Scegli la copertina',
       softcover: 'Copertina morbida',
       hardcover: 'Copertina rigida',
       softcoverSize: '21 × 28 cm',
@@ -699,7 +700,7 @@ export default function BookBuilder() {
 
           {/* Right: Format & Price */}
           <div>
-            <h2 className="text-xl font-bold text-gray-800 mb-3">{t.chooseFormat}</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-3">{t.chooseCover}</h2>
 
             {/* Format selection */}
             <div className="space-y-3 mb-6">
@@ -912,6 +913,11 @@ export default function BookBuilder() {
                 <p className="text-sm text-gray-500 mt-2">{t.shippingTime}</p>
                 <p className="text-sm text-green-600 mt-1 font-medium">{t.creditsRefund}</p>
               </div>
+            )}
+
+            {/* Full-book preview in its own tab: the print PDF as page images, before paying */}
+            {pageInfo && !isOverLimit && (
+              <BookPreviewButton language={language} storyIds={stories.map(st => st.id)} layout={pageInfo.layout} coverType={coverType} />
             )}
 
             {/* Order button */}

@@ -187,4 +187,20 @@ async function grokOutpaint({ img, rawLow, Ww, EXTHw, W, H, IH, EXTH, u, editFn,
   return sharp(flipped ? await flipRows(page, W, H) : page, { raw: { width: W, height: H, channels: 3 } }).jpeg({ quality: JPEG_QUALITY }).toBuffer();
 }
 
-module.exports = { buildFilledPageBackground, FILL_METHODS, GROK_FILL_MODEL };
+/**
+ * R2 key of a stored Grok-painted page (picture + strip). Named by CONTENT (r2.contentKey): the picture's bytes, the
+ * page geometry, the strip edge, the prompt text and the model. Any change to one of them is a new key, so a stored
+ * page can never be reused for a different picture or prompt. Used by pdf.js buildStripBackground so the book preview
+ * and the later paid order share ONE painting per page (docs/decisions.md 2026-10-28 "Book preview").
+ */
+function grokFillKey({ imageBuffer, pageWidthPx, pageHeightPx, imageHeightPx, edge }) {
+  const r2 = require('./r2');
+  const template = PROMPT_TEMPLATES.stripOutpaint;
+  if (!template) throw new Error('pageFill: prompts/strip-outpaint.txt not loaded (loadPromptTemplates)');
+  const geometry = `${Math.round(pageWidthPx)}x${Math.round(pageHeightPx)}x${Math.round(imageHeightPx)}-${edge}`;
+  return r2.contentKey('printStripFill', geometry, Buffer.concat([imageBuffer, Buffer.from(`
+${GROK_FILL_MODEL}
+${template}`)]));
+}
+
+module.exports = { buildFilledPageBackground, grokFillKey, FILL_METHODS, GROK_FILL_MODEL };

@@ -42,6 +42,7 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const TestLab = lazy(() => import('./pages/TestLab'));
 const Pricing = lazy(() => import('./pages/Pricing'));
 const BookBuilder = lazy(() => import('./pages/BookBuilder'));
+const BookPreview = lazy(() => import('./pages/BookPreview'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const EmailVerified = lazy(() => import('./pages/EmailVerified'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
@@ -102,6 +103,7 @@ function App() {
           <Route path="/account" element={<AccountPage />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/book-builder" element={<BookBuilder />} />
+          <Route path="/book-preview" element={<BookPreview />} />
           <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
           <Route path="/admin/test-lab" element={<AdminRoute><TestLab /></AdminRoute>} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />

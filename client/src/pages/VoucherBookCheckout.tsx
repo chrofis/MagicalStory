@@ -11,6 +11,7 @@ import type { BookLayout } from '@/services/storyService';
 import { bookSizeLabel } from '@/utils/bookPricing';
 import BookFacingOption from '@/components/book/BookFacingOption';
 import BookSquareCovers from '@/components/book/BookSquareCovers';
+import BookPreviewButton from '@/components/book/BookPreviewButton';
 import { storyService } from '@/services';
 import type { BookPageInfo, VoucherBookCredit } from '@/services/storyService';
 import { createLogger } from '@/services/logger';
@@ -428,6 +429,10 @@ export default function VoucherBookCheckout() {
               </div>
               <p className="text-sm text-gray-500 mt-2">{t.addressHint}</p>
             </div>
+
+            {pageInfo && !isTooLong && selected.length > 0 && (
+              <BookPreviewButton language={language} storyIds={selected} layout={pageInfo.layout} coverType={coverType} />
+            )}
 
             <button
               onClick={handleOrder}

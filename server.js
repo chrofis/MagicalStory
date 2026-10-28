@@ -1533,6 +1533,7 @@ app.use('/api', aiProxyRoutes);  // /api/claude, /api/gemini
 // Expose order-aware Stripe picker so the referral cashout route can pick test/live
 // based on the order's stripe_mode rather than current user state.
 app.locals.getStripeClientForOrder = getStripeClientForOrder;
+app.use('/api', express.json({ limit: '1mb' }), require('./server/routes/bookPreview'));  // Full-book preview (the print PDF as page images)
 app.use('/api', printRoutes);  // Print provider, PDF generation, Stripe payments, pricing
 app.use('/api', require('./server/routes/vouchers'));  // Gift vouchers: lookup, redeem, purchase, voucher book checkout
 app.use('/api/jobs', express.json({ limit: '50mb' }), jobRoutes);  // Job creation, status, cancellation, checkpoints

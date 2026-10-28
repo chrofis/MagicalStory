@@ -561,11 +561,27 @@ async function buildStripBackground(image, g, fillStats) {
   const { chooseStripEdge } = require('./textRegion');
   const s = PAGE_FILL_DPI / 72;
   const { edge } = await chooseStripEdge(imageBuffer, { bandFraction: (interiorH - imageBottom) / imageBottom });
-  const out = await buildFilledPageBackground({
+  const fill = {
     imageBuffer, pageWidthPx: Math.round(interiorW * s), pageHeightPx: Math.round(interiorH * s),
     imageHeightPx: Math.round(imageBottom * s), fillMethod, edge,
-  });
+  };
+  // A Grok-painted page is stored in R2 by content: the book preview paints it once, the paid order PDF (and a second
+  // preview) read it back, so no page is ever paid for twice (docs/decisions.md 2026-10-28 "Book preview"). The mirror
+  // fill is free and is never stored. Without R2 (local dev) there is nowhere to store it and every call paints.
+  const r2 = require('./r2');
+  const cacheKey = fillMethod === 'grok' && r2.isConfigured() ? require('./pageFill').grokFillKey(fill) : null;
+  if (cacheKey && await r2.objectExists(cacheKey)) {
+    const stored = await r2.fetchImageBytes(r2.publicUrlForKey(cacheKey));
+    if (!stored) throw new Error(`stored Grok page ${cacheKey} exists but could not be read`);
+    if (fillStats) fillStats.reused = (fillStats.reused || 0) + 1;
+    return { buffer: stored, edge };
+  }
+  const out = await buildFilledPageBackground({ ...fill, editFn: g.editFn });
   if (out.usedGrok && fillStats) fillStats.grokCalls = (fillStats.grokCalls || 0) + 1;
+  // A failed store does not change what prints (the page is right), it only costs a repaint next time: logged as an error.
+  if (cacheKey && out.usedGrok && !(await r2.uploadImage(out.buffer, cacheKey))) {
+    log.error(`❌ [PRINT FILL] page ${pageNumber}: the paid Grok page could not be stored in R2 (${cacheKey}); a later order will paint it again`);
+  }
   return { buffer: out.buffer, edge };
 }
 
@@ -1403,6 +1419,7 @@ module.exports = {
   getCoverImageData,
   printCoverSource,
   mmToPoints,
+  buildStripBackground,
   COVER_WIDTH,
   COVER_HEIGHT,
   PAGE_SIZE,

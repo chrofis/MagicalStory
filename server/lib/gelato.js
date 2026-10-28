@@ -431,6 +431,120 @@ async function getCoverDimensions(productUid, pageCount) {
 }
 
 /**
+ * Build the print PDF of a book: the ONE function the paid order (processBookOrder) and the book preview
+ * (bookPreview.js) both call, so the preview is the printed file itself (docs/decisions.md 2026-10-28 "Book preview").
+ * Loads the stories, asks computeBookPageInfo for page count / SKU / format, fetches the Gelato cover size, makes the
+ * square covers of a square book, and draws the PDF.
+ *
+ * @param {Object} dbPool
+ * @param {string[]} allStoryIds   in book order
+ * @param {'softcover'|'hardcover'} coverType
+ * @param {'single'|'spread'|undefined} layout  the layout the customer chose (throws when unavailable)
+ * @param {{fillMethod: 'mirror'|'grok', fillStats?: Object, onStage?: Function}} options  fillStats is filled in by pdf.js
+ * @returns {Promise<{pdfBuffer: Buffer, targetPageCount: number, estimatedPageCount: number, printProductUid: string, pageInfo: Object, stories: Object[]}>}
+ */
+async function buildBookPrintPdf(dbPool, allStoryIds, coverType, layout, { fillMethod, fillStats = { grokCalls: 0 }, onStage = () => {} }) {
+  // Step 2: Fetch all stories from database (batch query for performance)
+  const storyResult = await dbPool.query(
+    'SELECT id, data FROM stories WHERE id = ANY($1::text[])',
+    [allStoryIds]
+  );
+
+  // Check all stories were found
+  if (storyResult.rows.length !== allStoryIds.length) {
+    const foundIds = storyResult.rows.map(r => r.id);
+    const missingIds = allStoryIds.filter(id => !foundIds.includes(id));
+    throw new Error(`Stories not found: ${missingIds.join(', ')}`);
+  }
+
+  // Parse and preserve order from allStoryIds
+  const storiesMap = new Map();
+  for (const row of storyResult.rows) {
+    let storyData = row.data;
+    if (typeof storyData === 'string') {
+      storyData = JSON.parse(storyData);
+    }
+    // Rehydrate images from story_images table (images stripped from data blob)
+    storyData = await rehydrateStoryImages(row.id, storyData);
+    storiesMap.set(row.id, { id: row.id, data: storyData });
+  }
+  const stories = allStoryIds.map(id => storiesMap.get(id));
+
+  console.log(`✅ [BACKGROUND] Fetched ${stories.length} stories`);
+  log.debug('📊 [BACKGROUND] Titles:', stories.map(s => s.data.title).join(', '));
+
+  // Step 3: Estimate page count and get product/spine info BEFORE generating PDF
+  // This allows us to use actual spine width in PDF generation
+  const printApiKey = process.env.GELATO_API_KEY;
+  if (!printApiKey) {
+    throw new Error('GELATO_API_KEY not configured');
+  }
+
+  // Page count + SKU come from computeBookPageInfo — the same function the
+  // checkout preview (POST /api/book-page-info) uses, so the number shown
+  // to the customer before payment is the number the PDF is padded to.
+  const pageInfo = await computeBookPageInfo(dbPool, stories.map(s => s.data), coverType, { layout });
+  const { estimatedPageCount, printedPages: snappedPageCount, bookFormat } = pageInfo; // format derived from the layout, never from the session
+  log.debug(`📊 [BACKGROUND] Estimated Gelato page count: ${estimatedPageCount} (${pageInfo.contentPages} content pages incl. dedication)`);
+  let printProductUid = pageInfo.productUid;
+  if (pageInfo.product) {
+    if (snappedPageCount !== estimatedPageCount) {
+      log.info(`📐 [BACKGROUND] Snapping ${estimatedPageCount} → ${snappedPageCount} pages for ${pageInfo.product.product_name} (${pageInfo.blankPages} blank of ${snappedPageCount})`);
+    }
+  } else {
+    printProductUid = process.env.GELATO_PHOTOBOOK_UID;
+    log.warn(`⚠️ [BACKGROUND] No active product matches format=${bookFormat}, coverType=${coverType}. Using GELATO_PHOTOBOOK_UID=${printProductUid}`);
+  }
+
+  // Step 3b: Get cover dimensions from Gelato API
+  let coverDims = null;
+  if (printProductUid) {
+    coverDims = await getCoverDimensions(printProductUid, snappedPageCount);
+    if (coverDims) {
+      log.debug(`📏 [BACKGROUND] Gelato cover: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
+    }
+  }
+
+  // Step 3b2: a SQUARE book prints square covers (made once per cover, normally already made while the customer
+  // looked at them in the book builder; the stored ones are reused). Throws rather than print a crop.
+  if (bookFormat === 'square') {
+    onStage('covers');
+    await Promise.all(stories.map(s => attachSquareCovers(s.id, s.data)));
+  }
+
+  // Step 3c: Generate PDF with actual cover dimensions
+  let pdfBuffer, targetPageCount;
+  onStage('pdf');
+
+  if (stories.length === 1) {
+    log.debug(`📄 [BACKGROUND] Generating single-story PDF (format: ${bookFormat})...`);
+    const result = await generatePrintPdf(stories[0].data, bookFormat, {
+      gelatoCoverDims: coverDims,
+      targetGelatoPageCount: snappedPageCount,
+      layout: pageInfo.layout,
+      fillMethod,
+      fillStats,
+    });
+    pdfBuffer = result.pdfBuffer;
+    targetPageCount = result.pageCount;
+  } else {
+    // Multiple stories - generate combined book PDF
+    log.debug(`📄 [BACKGROUND] Generating combined multi-story PDF...`);
+    const result = await generateCombinedBookPdf(stories, bookFormat, {
+      gelatoCoverDims: coverDims,
+      targetGelatoPageCount: snappedPageCount,
+      layout: pageInfo.layout,
+      fillMethod,
+      fillStats,
+    });
+    pdfBuffer = result.pdfBuffer;
+    targetPageCount = result.pageCount;
+  }
+
+  return { pdfBuffer, targetPageCount, estimatedPageCount, printProductUid, pageInfo, stories };
+}
+
+/**
  * Process a book order after successful Stripe payment
  * Creates print order with Gelato and updates order status
  *
@@ -469,104 +583,13 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     `, [sessionId]);
     console.log('✅ [BACKGROUND] Order status updated to processing');
 
-    // Step 2: Fetch all stories from database (batch query for performance)
-    const storyResult = await dbPool.query(
-      'SELECT id, data FROM stories WHERE id = ANY($1::text[])',
-      [allStoryIds]
-    );
-
-    // Check all stories were found
-    if (storyResult.rows.length !== allStoryIds.length) {
-      const foundIds = storyResult.rows.map(r => r.id);
-      const missingIds = allStoryIds.filter(id => !foundIds.includes(id));
-      throw new Error(`Stories not found: ${missingIds.join(', ')}`);
-    }
-
-    // Parse and preserve order from allStoryIds
-    const storiesMap = new Map();
-    for (const row of storyResult.rows) {
-      let storyData = row.data;
-      if (typeof storyData === 'string') {
-        storyData = JSON.parse(storyData);
-      }
-      // Rehydrate images from story_images table (images stripped from data blob)
-      storyData = await rehydrateStoryImages(row.id, storyData);
-      storiesMap.set(row.id, { id: row.id, data: storyData });
-    }
-    const stories = allStoryIds.map(id => storiesMap.get(id));
-
-    console.log(`✅ [BACKGROUND] Fetched ${stories.length} stories`);
-    log.debug('📊 [BACKGROUND] Titles:', stories.map(s => s.data.title).join(', '));
-
-    // Step 3: Estimate page count and get product/spine info BEFORE generating PDF
-    // This allows us to use actual spine width in PDF generation
-    const printApiKey = process.env.GELATO_API_KEY;
-    if (!printApiKey) {
-      throw new Error('GELATO_API_KEY not configured');
-    }
-
-    // Page count + SKU come from computeBookPageInfo — the same function the
-    // checkout preview (POST /api/book-page-info) uses, so the number shown
-    // to the customer before payment is the number the PDF is padded to.
-    const pageInfo = await computeBookPageInfo(dbPool, stories.map(s => s.data), coverType, { layout });
-    const { estimatedPageCount, printedPages: snappedPageCount, bookFormat } = pageInfo; // format derived from the layout, never from the session
-    log.debug(`📊 [BACKGROUND] Estimated Gelato page count: ${estimatedPageCount} (${pageInfo.contentPages} content pages incl. dedication)`);
-    let printProductUid = pageInfo.productUid;
-    if (pageInfo.product) {
-      if (snappedPageCount !== estimatedPageCount) {
-        log.info(`📐 [BACKGROUND] Snapping ${estimatedPageCount} → ${snappedPageCount} pages for ${pageInfo.product.product_name} (${pageInfo.blankPages} blank of ${snappedPageCount})`);
-      }
-    } else {
-      printProductUid = process.env.GELATO_PHOTOBOOK_UID;
-      log.warn(`⚠️ [BACKGROUND] No active product matches format=${bookFormat}, coverType=${coverType}. Using GELATO_PHOTOBOOK_UID=${printProductUid}`);
-    }
-
-    // Step 3b: Get cover dimensions from Gelato API
-    let coverDims = null;
-    if (printProductUid) {
-      coverDims = await getCoverDimensions(printProductUid, snappedPageCount);
-      if (coverDims) {
-        log.debug(`📏 [BACKGROUND] Gelato cover: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
-      }
-    }
-
-    // Step 3b2: a SQUARE book prints square covers (made once per cover, normally already made while the customer
-    // looked at them in the book builder; the stored ones are reused). Throws rather than print a crop.
-    if (bookFormat === 'square') {
-      await Promise.all(stories.map(s => attachSquareCovers(s.id, s.data)));
-    }
-
-    // Step 3c: Generate PDF with actual cover dimensions
-    let pdfBuffer, targetPageCount;
     const fillStats = { grokCalls: 0 };   // filled in by pdf.js, one per Grok-outpainted strip
-
-    if (stories.length === 1) {
-      log.debug(`📄 [BACKGROUND] Generating single-story PDF (format: ${bookFormat})...`);
-      const result = await generatePrintPdf(stories[0].data, bookFormat, {
-        gelatoCoverDims: coverDims,
-        targetGelatoPageCount: snappedPageCount,
-        layout: pageInfo.layout,
-        fillMethod: 'grok',   // paid order PDF: Grok-outpainted text strip (decisions.md 2026-10-26)
-        fillStats,
-      });
-      pdfBuffer = result.pdfBuffer;
-      targetPageCount = result.pageCount;
-    } else {
-      // Multiple stories - generate combined book PDF
-      log.debug(`📄 [BACKGROUND] Generating combined multi-story PDF...`);
-      const result = await generateCombinedBookPdf(stories, bookFormat, {
-        gelatoCoverDims: coverDims,
-        targetGelatoPageCount: snappedPageCount,
-        layout: pageInfo.layout,
-        fillMethod: 'grok',   // paid order PDF: Grok-outpainted text strip (decisions.md 2026-10-26)
-        fillStats,
-      });
-      pdfBuffer = result.pdfBuffer;
-      targetPageCount = result.pageCount;
-    }
+    // paid order PDF: Grok-outpainted text strip, stored per page so a preview that already painted it is reused (decisions.md 2026-10-26, 2026-10-28)
+    const { pdfBuffer, targetPageCount, estimatedPageCount, printProductUid } = await buildBookPrintPdf(
+      dbPool, allStoryIds, coverType, layout, { fillMethod: 'grok', fillStats });
 
     const pdfBase64 = pdfBuffer.toString('base64');
-    console.log(`✅ [BACKGROUND] PDF generated: ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB, ${targetPageCount} pages, Grok strip fill: ${fillStats.grokCalls} pages = USD ${(fillStats.grokCalls * GROK_STRIP_FILL_USD).toFixed(2)}`);
+    console.log(`✅ [BACKGROUND] PDF generated: ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB, ${targetPageCount} pages, Grok strip fill: ${fillStats.grokCalls} painted now = USD ${(fillStats.grokCalls * GROK_STRIP_FILL_USD).toFixed(2)}, ${fillStats.reused || 0} reused from the preview/earlier order`);
 
     // Step 3.5: Save PDF to database and get public URL
     log.debug('💾 [BACKGROUND] Saving PDF to database...');
@@ -898,6 +921,7 @@ module.exports = {
   processBookOrder,
   getCoverDimensions,
   snapToValidPageCount,
+  buildBookPrintPdf,
   buildPrintedPageSequence,
   chooseBookLayout,
   bookFormatForLayout,
