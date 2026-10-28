@@ -638,6 +638,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
 
     // Use CHF currency for print orders
     const currency = 'CHF';
+    const printApiKey = process.env.GELATO_API_KEY; // buildBookPrintPdf already refused to run without it
 
     // Create order reference using first story ID or combined if multiple
     const orderRefId = storyIds.length === 1 ? storyIds[0] : `multi-${storyIds.length}-${storyIds[0]}`;
