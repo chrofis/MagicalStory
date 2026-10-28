@@ -4424,7 +4424,7 @@
       "rootCause": "bookPreview.js set job.stage 'painting' but nothing updated job.done/total until the rasterise loop.",
       "fix": "pdf.js createStripPainter reports every scheduled/finished strip through fillStats.onProgress; runJob maps it to job.done/total; BookPreview.tsx shows 'n of m'. tests/unit/strip-painter.test.ts.",
       "status": "fixed",
-      "fixedIn": "HASH"
+      "fixedIn": "8d9e594c9"
     }
   ]
 }
