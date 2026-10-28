@@ -88,12 +88,15 @@ async function readManifest(deps, key) {
 
 /** Build the PDF, rasterise it, store the pages and the manifest. Updates `job` as it goes. */
 async function runJob(deps, job) {
-  const fillStats = { grokCalls: 0 };
+  // pdf.js reports every strip it schedules / finishes through fillStats.onProgress: the customer sees "n of m"
+  // while painting (before this, done/total stayed 0 for the whole painting stage).
+  const fillStats = { grokCalls: 0, onProgress: (done, total) => { job.done = done; job.total = total; } };
   job.stage = 'preparing';
   const built = await deps.buildBookPrintPdf(deps.dbPool, job.storyIds, job.coverType, job.layout, {
     fillMethod: 'grok', fillStats, onStage: (s) => { job.stage = s === 'pdf' ? 'painting' : s; },
   });
   job.stage = 'rendering';
+  job.done = 0; job.total = 0;
   const pages = [];
   for await (const p of deps.rasterisePdfPages(built.pdfBuffer)) {
     const url = await deps.r2.uploadImage(p.jpeg, pageKey(job.key, p.index));

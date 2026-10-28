@@ -597,48 +597,68 @@ async function resolveOverlayTextPosition(image, imageBuffer, pageNumber) {
   return require('./textRegion').pickFullWidthPosition(imageBuffer);
 }
 
-const GROK_FILL_CONCURRENCY = 4;   // Grok ~9 s per call: 4 in flight keeps a 25 page book near a minute
+// xAI's published limit for grok-imagine-image is 6 requests/second at the lowest tier (docs.x.ai,
+// consumption-and-rate-limits). Every strip call of a book is started, one every 200 ms (5/s), instead of
+// a small worker pool: a 40 strip book is all in flight after 8 s. 429/503 are waited out by fetchGrokWithRetry.
+const GROK_FILL_START_INTERVAL_MS = 200;
+
+/**
+ * One painter per book: it owns the start-rate throttle, the "first failure stops new starts" flag and the
+ * progress count (fillStats.onProgress(done, total), total = every strip scheduled so far), so strips of
+ * several stories share them. `paint` / `intervalMs` are test seams.
+ */
+function createStripPainter(fillStats, { paint = buildStripBackground, intervalMs = GROK_FILL_START_INTERVAL_MS } = {}) {
+  let failed = null;
+  let nextSlot = 0;
+  let total = 0;
+  let done = 0;
+  const progress = () => { if (fillStats && typeof fillStats.onProgress === 'function') fillStats.onProgress(done, total); };
+  return {
+    /** Schedule one call; the returned promise carries a no-op catch (failure surfaces when awaited). */
+    schedule(image, g) {
+      total++;
+      progress();
+      const slot = Math.max(Date.now(), nextSlot);
+      nextSlot = slot + intervalMs;
+      const p = (async () => {
+        const wait = slot - Date.now();
+        if (wait > 0) await new Promise(r => setTimeout(r, wait));
+        try {
+          if (failed) throw failed;
+          return await paint(image, g, fillStats);
+        } catch (e) {
+          failed = failed || e;
+          throw e;
+        } finally {
+          done++;
+          progress();
+        }
+      })();
+      p.catch(() => {});
+      return p;
+    },
+  };
+}
 
 /**
  * Start the page backgrounds of a classic-layout story ahead of the page loop so the Grok calls
- * run 4 at a time while PDFKit still lays the pages out in order. Returns Map(pageNumber -> Promise).
- * Only for fillMethod 'grok' (the mirror fill is cheap and runs inline). After the first failure no
- * further call is started (no money goes into a book that will fail); the failure still surfaces
- * when the page loop awaits that page. Promises carry a no-op catch so an unawaited rejection
- * never becomes an unhandledRejection.
+ * run together (throttled starts, createStripPainter) while PDFKit still lays the pages out in order.
+ * Returns Map(pageNumber -> Promise). Only for fillMethod 'grok' (the mirror fill is cheap and runs inline).
+ * After the first failure no further call is started (no money goes into a book that will fail); the
+ * failure still surfaces when the page loop awaits that page. Pass the book's painter to share the
+ * throttle, failure flag and progress across stories.
  */
-function prefetchStripBackgrounds(storyData, storyPages, geometry, fillMethod, fillStats) {
+function prefetchStripBackgrounds(storyData, storyPages, geometry, fillMethod, fillStats, painter = createStripPainter(fillStats)) {
   const map = new Map();
   if (fillMethod !== 'grok') return map;
-  const jobs = [];
   storyPages.forEach((pageText, index) => {
     const pageNumber = index + 1;
     const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
     const cleanText = String(pageText).trim().replace(/^-+|-+$/g, '').trim();
-    if (image?.imageData && cleanText) jobs.push({ pageNumber, image });
-  });
-  const settle = new Map();
-  for (const j of jobs) {
-    const p = new Promise((resolve, reject) => settle.set(j.pageNumber, { resolve, reject }));
-    p.catch(() => {});
-    map.set(j.pageNumber, p);
-  }
-  let failed = null;
-  let next = 0;
-  const worker = async () => {
-    while (next < jobs.length) {
-      const j = jobs[next++];
-      const r = settle.get(j.pageNumber);
-      if (failed) { r.reject(failed); continue; }
-      try {
-        r.resolve(await buildStripBackground(j.image, { ...geometry, pageNumber: j.pageNumber, fillMethod }, fillStats));
-      } catch (e) {
-        failed = failed || e;
-        r.reject(e);
-      }
+    if (image?.imageData && cleanText) {
+      map.set(pageNumber, painter.schedule(image, { ...geometry, pageNumber, fillMethod }));
     }
-  };
-  for (let i = 0; i < Math.min(GROK_FILL_CONCURRENCY, jobs.length); i++) worker();
+  });
   return map;
 }
 
@@ -732,7 +752,7 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
   // rendered text height tracks the fit-time budget instead of drifting.
   const paragraphGap = fontSize * 0.5;
 
-  // Grok fill: start every classic page's strip now so the calls run 4 at a time (overlay mode
+  // Grok fill: start every classic page's strip now so the calls run together (overlay mode
   // draws its text into the picture and needs no strip, so nothing is prefetched for it).
   requireFillMethod(opts.fillMethod, 'addPictureBookPages');
   const stripBackgrounds = textOverlay ? new Map()
@@ -999,19 +1019,24 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
   // When the story was generated with textInImage=true (calm-zone reserved),
   // text is baked into the image using the same renderer as Print Preview —
   // no text strip below. textInImage=false keeps the legacy layout.
-  const addStoryContentPages = async (storyData, storyPages) => {
-    if (options.layout === 'spread') {
-      totalStoryPages += await addSpreadPages(doc, storyData, storyPages, pageWidth, pageHeight, bleed);
-      return;
-    }
-    const textMarginMm = mmToPoints(3);
+  // Per-story geometry shared by the up-front strip prefetch and the page layout.
+  const contentGeometry = (storyData, storyPages) => {
     const layoutFromLevel = resolveLayout(storyData.languageLevel);
     const sceneTextInImage = storyData.sceneImages?.[0]?.textInImage;
     const textInImageForRatio = typeof sceneTextInImage === 'boolean' ? sceneTextInImage : layoutFromLevel.textInImage;
     const textRatio = textInImageForRatio
       ? getPictureBookTextRatio(storyData.languageLevel)
       : computeTextBelowRatio(storyPages, storyData.languageLevel);
-    const imageHeight = pageHeight * (1 - textRatio);
+    return { textInImageForRatio, textRatio, imageHeight: pageHeight * (1 - textRatio) };
+  };
+
+  const addStoryContentPages = async (storyData, storyPages, stripBackgrounds) => {
+    if (options.layout === 'spread') {
+      totalStoryPages += await addSpreadPages(doc, storyData, storyPages, pageWidth, pageHeight, bleed);
+      return;
+    }
+    const textMarginMm = mmToPoints(3);
+    const { textInImageForRatio, textRatio, imageHeight } = contentGeometry(storyData, storyPages);
     const textAreaHeight = pageHeight * textRatio;
     const textWidth = pageWidth - (textMarginMm * 2);
     const availableTextHeight = textAreaHeight - textMarginMm;
@@ -1033,11 +1058,6 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
     const lineGap = fontResult.lineGap;
     const paragraphGap = consistentFont * 0.5;
     const effectiveTextHeight = budgetHeight;
-
-    // Grok fill: start the strips ahead of the page loop, 4 at a time (only classic pages use one).
-    const stripBackgrounds = textInImage ? new Map()
-      : prefetchStripBackgrounds(storyData, storyPages,
-        { interiorW: interiorPageWidth, interiorH: interiorPageHeight, imageBottom: bleed + imageHeight }, options.fillMethod, options.fillStats);
 
     for (let index = 0; index < storyPages.length; index++) {
       const pageText = storyPages[index];
@@ -1083,6 +1103,19 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       });
     }
   };
+
+  // Grok fill: start the strips of EVERY story now, before the first page is laid out, so all calls of the
+  // book are in flight together (one painter = one throttle, one failure flag, one progress count).
+  requireFillMethod(options.fillMethod, 'generateCombinedBookPdf');
+  const stripPainter = createStripPainter(options.fillStats);
+  const storyStrips = stories.map(({ data: storyData }) => {
+    if (options.layout === 'spread') return new Map();
+    const storyPages = parseStoryPages(storyData);
+    const { textInImageForRatio, imageHeight } = contentGeometry(storyData, storyPages);
+    return textInImageForRatio ? new Map() : prefetchStripBackgrounds(storyData, storyPages,
+      { interiorW: interiorPageWidth, interiorH: interiorPageHeight, imageBottom: bleed + imageHeight },
+      options.fillMethod, options.fillStats, stripPainter);
+  });
 
   // Process each story
   for (let storyIndex = 0; storyIndex < stories.length; storyIndex++) {
@@ -1148,7 +1181,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
         }
       }
 
-      await addStoryContentPages(storyData, storyPages);
+      await addStoryContentPages(storyData, storyPages, storyStrips[storyIndex]);
       padContentParity();
 
     } else {
@@ -1182,7 +1215,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
         }
       }
 
-      await addStoryContentPages(storyData, storyPages);
+      await addStoryContentPages(storyData, storyPages, storyStrips[storyIndex]);
       padContentParity();
 
       // Back cover (LEFT) + blank separator (RIGHT) — only if story has a back cover
@@ -1420,6 +1453,8 @@ module.exports = {
   printCoverSource,
   mmToPoints,
   buildStripBackground,
+  createStripPainter,
+  prefetchStripBackgrounds,
   COVER_WIDTH,
   COVER_HEIGHT,
   PAGE_SIZE,

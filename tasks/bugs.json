@@ -4415,6 +4415,16 @@
       "fix": "bookSizeLabel(layout, a4Label) in client/src/utils/bookPricing.ts returns 20 x 20 cm (the 200x200 mm Gelato product) for spread.",
       "status": "fixed",
       "fixedIn": "4df706356"
+    },
+    {
+      "id": "book-preview-painting-progress-zero",
+      "title": "The book preview showed no progress while the Grok text strips were painted (about 2 minutes): done/total stayed 0 until the rendering stage",
+      "reportedAt": "2026-10-28",
+      "source": "Owner/main session 2026-10-28",
+      "rootCause": "bookPreview.js set job.stage 'painting' but nothing updated job.done/total until the rasterise loop.",
+      "fix": "pdf.js createStripPainter reports every scheduled/finished strip through fillStats.onProgress; runJob maps it to job.done/total; BookPreview.tsx shows 'n of m'. tests/unit/strip-painter.test.ts.",
+      "status": "fixed",
+      "fixedIn": "HASH"
     }
   ]
 }

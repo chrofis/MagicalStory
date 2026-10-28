@@ -15,34 +15,34 @@ const log = createLogger('BookPreview');
 // and returns one image per PDF page; this page only lays them out as spreads. docs/decisions.md 2026-10-28 "Book preview".
 type Lang = 'en' | 'de' | 'fr' | 'it';
 const TEXT: Record<Lang, {
-  title: string; preparing: string; covers: string; painting: string; rendering: (done: number, total: number) => string;
+  title: string; preparing: string; covers: string; painting: (done: number, total: number) => string; rendering: (done: number, total: number) => string;
   failed: string; retry: string; prev: string; next: string; cover: string; spread: (n: number, total: number) => string;
   badLink: string;
 }> = {
   en: {
     title: 'Book preview', preparing: 'Getting your book ready…', covers: 'Preparing the square covers…',
-    painting: 'Painting the text pages exactly as they will be printed. The first time takes 1 to 2 minutes, please keep this tab open.',
+    painting: (d, t) => `Painting the text pages exactly as they will be printed${t ? ` (${d} of ${t})` : ''}. The first time takes a short while, please keep this tab open.`,
     rendering: (d, t) => (t ? `Rendering the pages (${d} of ${t})…` : 'Rendering the pages…'),
     failed: 'The preview could not be prepared.', retry: 'Try again', prev: 'Back', next: 'Next', cover: 'Cover (back, spine, front)',
     spread: (n, t) => `Spread ${n} of ${t}`, badLink: 'This preview link is incomplete.',
   },
   de: {
     title: 'Buchvorschau', preparing: 'Dein Buch wird vorbereitet…', covers: 'Die quadratischen Umschläge werden vorbereitet…',
-    painting: 'Die Textseiten werden genau so gemalt, wie sie gedruckt werden. Beim ersten Mal dauert das 1 bis 2 Minuten, bitte lass diesen Tab offen.',
+    painting: (d, t) => `Die Textseiten werden genau so gemalt, wie sie gedruckt werden${t ? ` (${d} von ${t})` : ''}. Beim ersten Mal dauert das einen Moment, bitte lass diesen Tab offen.`,
     rendering: (d, t) => (t ? `Die Seiten werden gerendert (${d} von ${t})…` : 'Die Seiten werden gerendert…'),
     failed: 'Die Vorschau konnte nicht erstellt werden.', retry: 'Erneut versuchen', prev: 'Zurück', next: 'Weiter', cover: 'Umschlag (Rückseite, Rücken, Vorderseite)',
     spread: (n, t) => `Doppelseite ${n} von ${t}`, badLink: 'Dieser Vorschau-Link ist unvollständig.',
   },
   fr: {
     title: 'Aperçu du livre', preparing: 'Préparation de votre livre…', covers: 'Préparation des couvertures carrées…',
-    painting: 'Les pages de texte sont peintes exactement comme elles seront imprimées. La première fois, comptez 1 à 2 minutes et gardez cet onglet ouvert.',
+    painting: (d, t) => `Les pages de texte sont peintes exactement comme elles seront imprimées${t ? ` (${d} sur ${t})` : ''}. La première fois, cela prend un moment, gardez cet onglet ouvert.`,
     rendering: (d, t) => (t ? `Création des pages (${d} sur ${t})…` : 'Création des pages…'),
     failed: 'L’aperçu n’a pas pu être préparé.', retry: 'Réessayer', prev: 'Précédent', next: 'Suivant', cover: 'Couverture (dos, tranche, face)',
     spread: (n, t) => `Double page ${n} sur ${t}`, badLink: 'Ce lien d’aperçu est incomplet.',
   },
   it: {
     title: 'Anteprima del libro', preparing: 'Preparazione del tuo libro…', covers: 'Preparazione delle copertine quadrate…',
-    painting: 'Le pagine di testo vengono dipinte esattamente come saranno stampate. La prima volta ci vogliono 1 o 2 minuti, tieni aperta questa scheda.',
+    painting: (d, t) => `Le pagine di testo vengono dipinte esattamente come saranno stampate${t ? ` (${d} di ${t})` : ''}. La prima volta ci vuole un po', tieni aperta questa scheda.`,
     rendering: (d, t) => (t ? `Creazione delle pagine (${d} di ${t})…` : 'Creazione delle pagine…'),
     failed: 'Non è stato possibile preparare l’anteprima.', retry: 'Riprova', prev: 'Indietro', next: 'Avanti', cover: 'Copertina (retro, dorso, fronte)',
     spread: (n, t) => `Doppia pagina ${n} di ${t}`, badLink: 'Questo link all’anteprima è incompleto.',
@@ -131,7 +131,7 @@ export default function BookPreview() {
   const stageText = (s: BookPreviewState | null) => {
     if (!s || s.state !== 'running') return t.preparing;
     if (s.stage === 'covers') return t.covers;
-    if (s.stage === 'painting') return t.painting;
+    if (s.stage === 'painting') return t.painting(s.done, s.total);
     if (s.stage === 'rendering') return t.rendering(s.done, s.total);
     return t.preparing;
   };

@@ -136,7 +136,7 @@ describe('buildFilledPageBackground, fillMethod grok', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// pdf.js routing: view/trial PDFs stay on the mirror, the order PDF takes the Grok fill 4 at a time.
+// pdf.js routing: view/trial PDFs stay on the mirror, the order PDF takes the Grok fill with throttled starts, all in flight together.
 // ---------------------------------------------------------------------------------------------
 describe('pdf.js strip fill routing', () => {
   const pageFill = cjs('../../server/lib/pageFill.js');
@@ -170,12 +170,12 @@ describe('pdf.js strip fill routing', () => {
     await expect(generatePrintPdf(await story(1), 'A4', {})).rejects.toThrow(/fillMethod/);
   });
 
-  it('grok: one call per picture page, at most 4 in flight, calls are counted', async () => {
+  it('grok: one call per picture page, calls overlap (no small pool), calls are counted', async () => {
     const real = pageFill.buildFilledPageBackground;
     let inflight = 0, peak = 0;
     vi.spyOn(pageFill, 'buildFilledPageBackground').mockImplementation(async (a: any) => {
       inflight++; peak = Math.max(peak, inflight);
-      await new Promise(r => setTimeout(r, 30));
+      await new Promise(r => setTimeout(r, 450));   // longer than the 200 ms start interval, so calls overlap
       inflight--;
       const out = await real({ ...a, fillMethod: 'mirror' });
       return { buffer: out.buffer, usedGrok: true };
@@ -183,8 +183,7 @@ describe('pdf.js strip fill routing', () => {
     const fillStats = { grokCalls: 0 };
     const { pageCount } = await generatePrintPdf(await story(9), 'A4', { fillMethod: 'grok', fillStats });
     expect(fillStats.grokCalls).toBe(9);
-    expect(peak).toBeLessThanOrEqual(4);
-    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeGreaterThan(2);
     expect(pageCount).toBeGreaterThan(9);
   }, 60000);
 
