@@ -4395,6 +4395,26 @@
       "fix": "keepPageGridElements/buildPageVbGrid take plateCarriesElements (default true: the story run paints its plate from the element grid); the trial passes false, so a plated trial page keeps its vehicle / large-element cell in the page state. The trial plate is also split per element state. docs/decisions.md 2026-10-23; tests/unit/plate-splits-at-element-state-2026-10-23.test.ts.",
       "status": "fixed",
       "fixedIn": "66fdd39c1"
+    },
+    {
+      "id": "spread-text-page-not-vertically-centred",
+      "title": "On the facing-pages (spread) book the text block started 20% down the right-hand page instead of being centred up/down",
+      "reportedAt": "2026-10-28",
+      "source": "Owner report 2026-10-28",
+      "rootCause": "server/lib/pdf.js addSpreadPages started every text block at pageHeight * SPREAD_TEXT_TOP_RATIO (0.2).",
+      "fix": "Block measured with the final font and centred between equal 18 mm safe margins; tests/unit/spread-text-centering.test.ts.",
+      "status": "fixed",
+      "fixedIn": "4df706356"
+    },
+    {
+      "id": "square-book-shows-a4-size-label",
+      "title": "BookBuilder and VoucherBookCheckout labelled a square (layout spread) book 21 x 28 cm",
+      "reportedAt": "2026-10-28",
+      "source": "Owner report 2026-10-28",
+      "rootCause": "The size strings were per-language A4 constants, not tied to pageInfo.layout.",
+      "fix": "bookSizeLabel(layout, a4Label) in client/src/utils/bookPricing.ts returns 20 x 20 cm (the 200x200 mm Gelato product) for spread.",
+      "status": "fixed",
+      "fixedIn": "4df706356"
     }
   ]
 }
