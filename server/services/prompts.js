@@ -254,6 +254,9 @@ async function loadPromptTemplates() {
     ['coverComposition', 'cover-composition.txt'],
     // Printed page: Grok outpaints the text strip below the picture (server/lib/pageFill.js).
     ['stripOutpaint', 'strip-outpaint.txt'],
+    // Square book (mini / facing pages): each portrait cover is redrawn square with ONE Grok edit
+    // (server/lib/squareCovers.js, decisions.md 2026-10-28). Plain text, no placeholders.
+    ['squareCover', 'square-cover.txt'],
     // The cover CRITIC's three notes — the cover-only preamble evaluateImageQuality
     // prepends to the evaluator prompt. String literals in evalPipeline.js until
     // 2026-09-15; a template file so the generator/critic sibling set can name a

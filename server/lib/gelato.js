@@ -7,6 +7,7 @@
 const { log } = require('../utils/logger');
 const { generatePrintPdf, generateCombinedBookPdf } = require('./pdf');
 const { GROK_FILL_MODEL } = require('./pageFill');
+const { attachSquareCovers } = require('./squareCovers');
 const { MODEL_PRICING } = require('../config/models');
 const { CREDIT_CONFIG } = require('../config/credits');
 
@@ -527,6 +528,12 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
       if (coverDims) {
         log.debug(`📏 [BACKGROUND] Gelato cover: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
       }
+    }
+
+    // Step 3b2: a SQUARE book prints square covers (made once per cover, normally already made while the customer
+    // looked at them in the book builder; the stored ones are reused). Throws rather than print a crop.
+    if (bookFormat === 'square') {
+      await Promise.all(stories.map(s => attachSquareCovers(s.id, s.data)));
     }
 
     // Step 3c: Generate PDF with actual cover dimensions

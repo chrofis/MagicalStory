@@ -73,6 +73,21 @@
       "severity": "block"
     },
     {
+      "id": "square-book-covers",
+      "axis": "every path that builds a SQUARE book PDF vs the square cover maker",
+      "reason": "A square book (mini / facing pages) prints square covers made by squareCovers.js (one Grok edit each, stored in R2 by source hash) and handed to the PDF on storyData.squareCovers; pdf.js throws when one is missing, there is no crop fallback. Every caller that builds a square PDF (processBookOrder, print.js order / admin / generate-book-pdf) must call attachSquareCovers first, and the book builder and voucher checkout must show and wait for the covers before payment (decisions.md 2026-10-28, Square covers).",
+      "members": [
+        "server/lib/squareCovers.js",
+        "server/lib/pdf.js",
+        "server/lib/gelato.js",
+        "server/routes/print.js",
+        "server/routes/stories.js",
+        "client/src/pages/BookBuilder.tsx",
+        "client/src/pages/VoucherBookCheckout.tsx"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "art-director-templates",
       "axis": "per-page vs all-pages Art Director",
       "reason": "scene-expansion.txt is the per-page gap-fill/fallback template for the same Art Director contract scene-briefs-all.txt drives on the live beats path; a rule or metadata field on one and not the other silently reads as absent on whichever path runs.",

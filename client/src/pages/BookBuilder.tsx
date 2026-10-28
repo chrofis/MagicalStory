@@ -8,6 +8,7 @@ import { Navigation, LoadingSpinner } from '@/components/common';
 import BlankPagesPreview from '@/components/book/BlankPagesPreview';
 import AddStoryNudge from '@/components/book/AddStoryNudge';
 import BookFacingOption from '@/components/book/BookFacingOption';
+import BookSquareCovers from '@/components/book/BookSquareCovers';
 import type { BookPageInfo } from '@/services/storyService';
 import { storyService } from '@/services';
 import type { BookLayout } from '@/services/storyService';
@@ -360,6 +361,8 @@ export default function BookBuilder() {
   // Required acknowledgement of the blank pages before checkout is enabled.
   const [blankAck, setBlankAck] = useState(false);
   const storyIdsKey = stories.map(s => s.id).join(',');
+  // A square book (layout 'spread') prints square covers; the order button waits until they are made and shown.
+  const [squareCoversReady, setSquareCoversReady] = useState(true);
   useEffect(() => {
     if (!storyIdsKey || isOverLimit) { setPageInfo(null); return; }
     let cancelled = false;
@@ -421,7 +424,7 @@ export default function BookBuilder() {
 
   // Handle checkout
   const handleCheckout = async () => {
-    if (isOverLimit || !price || (needsBlankAck && !blankAck)) return;
+    if (isOverLimit || !price || (needsBlankAck && !blankAck) || !squareCoversReady) return;
 
     setIsCheckingOut(true);
     try {
@@ -655,6 +658,9 @@ export default function BookBuilder() {
               )}
               {pageInfo && !isOverLimit && (
                 <BookFacingOption language={language} layouts={pageInfo.layouts} selected={pageInfo.layout} onSelect={setLayoutChoice} />
+              )}
+              {pageInfo && !isOverLimit && (
+                <BookSquareCovers language={language} active={pageInfo.layout === 'spread'} stories={stories} onReadyChange={setSquareCoversReady} />
               )}
               {needsBlankAck && pageInfo && (
                 <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -911,7 +917,7 @@ export default function BookBuilder() {
             {/* Order button */}
             <button
               onClick={handleCheckout}
-              disabled={isOverLimit || isCheckingOut || (needsBlankAck && !blankAck)}
+              disabled={isOverLimit || isCheckingOut || (needsBlankAck && !blankAck) || !squareCoversReady}
               className="w-full py-4 bg-gradient-to-r from-indigo-600 to-indigo-600 text-white rounded-xl font-bold text-lg hover:from-indigo-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isCheckingOut ? (

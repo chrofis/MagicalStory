@@ -265,6 +265,13 @@
   <td>Canvas = original picture on top + mirror-fill hint in the text strip, prompt <code>prompts/strip-outpaint.txt</code>, <code>aspectRatio</code> nearest 3:4, <code>skipOutputCrop: true</code>. <code>fillMethod</code> is required, no default; <code>options.editFn</code> stubs the call in tests.</td>
   <td>JPEG page raster: ORIGINAL picture pixels on top (the model redraws its whole frame, drift 6-40 of 255, so its upper area is discarded), the model's strip below, 30 px feathered seam. A Grok failure throws, no mirror fallback. decisions.md 2026-10-26.</td>
 </tr>
+<tr>
+  <td><code>ensureSquareCovers(storyId, coverImages)</code> (call site of <code>editWithGrok</code>)</td>
+  <td><code>server/lib/squareCovers.js</code>; called by <code>POST /api/stories/:id/square-covers</code> and <code>attachSquareCovers</code> (<code>gelato.processBookOrder</code>, <code>print.js</code>)</td>
+  <td>Grok edit endpoint, <code>grok-imagine-image</code> ($0.02 per cover, up to 3 per square book), only for SQUARE books (mini / facing pages); A4 prints the covers as generated.</td>
+  <td>Slot 0 = the portrait cover, <code>padInputWithExtension: true</code> (magenta padding plus the extension instruction), <code>aspectRatio: '1:1'</code>, prompt <code>prompts/square-cover.txt</code>. Plain white <code>padInput</code> is never used here (white bars survived in 10 of 16 back/dedication covers).</td>
+  <td>Square JPEG in R2 (<code>stories/{id}/squareCover/{cover}-{source hash}.jpg</code>), validated: square, no edge band over 20% white or holding magenta. Measured 23/24 clean. Failure throws; no crop fallback. decisions.md 2026-10-28.</td>
+</tr>
 </tbody>
 </table>
 

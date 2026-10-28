@@ -31,7 +31,7 @@ const TEXT: Record<Lang, {
     surcharge: chf => `+ CHF ${chf}`,
   },
   fr: {
-    mini: 'Histoire courte : imprimée en petit livre carré, image sur la page de gauche et texte sur la page de droite.',
+    mini: 'Histoire courte : imprimée en petit livre carré, image sur la page de gauche et texte sur la page de droite.',
     more: 'Plus d’options', less: 'Moins d’options',
     facing: 'Pages en regard',
     facingDesc: 'Livre carré avec l’image sur la page de gauche et le texte sur la page de droite.',

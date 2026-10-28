@@ -30,6 +30,22 @@ const SPREAD_TEXT_TOP_RATIO = 0.2;  // text starts 20% down the page
 const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
 
 /**
+ * The picture a PRINT page draws for one cover. A4 books draw the cover as generated. SQUARE books
+ * (mini / facing pages) draw the square version made by squareCovers.js, handed in on
+ * `storyData.squareCovers`; a square book whose cover has no square version throws, there is no crop
+ * fallback (docs/decisions.md 2026-10-28 "Square covers"). Returns undefined when the story has no such cover.
+ */
+function printCoverSource(storyData, coverKey, bookFormat) {
+  const original = getCoverImageData(storyData.coverImages?.[coverKey]);
+  if (bookFormat !== 'square' || !original) return original;
+  const square = storyData.squareCovers?.[coverKey];
+  if (!square) {
+    throw new Error(`Square book needs a square ${coverKey} but none was prepared (story ${storyData.id || storyData.title || '?'}); call attachSquareCovers() first`);
+  }
+  return square;
+}
+
+/**
  * Resolve any image-data string into a Buffer. Handles:
  *   - data URI base64 ("data:image/png;base64,...")
  *   - https/http URL on our R2 bucket (fetched, post-R2-migration covers); any other host throws
@@ -288,8 +304,8 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   // PAGE 1: Cover spread - use exact Gelato dimensions
   doc.addPage({ size: [coverSpreadWidth, coverSpreadHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-  const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
-  const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
+  const backCoverImageData = printCoverSource(storyData, 'backCover', bookFormat);
+  const frontCoverImageData = printCoverSource(storyData, 'frontCover', bookFormat);
 
   if (backCoverImageData && frontCoverImageData) {
     const backCoverBuffer = await resolveImageBuffer(backCoverImageData);
@@ -330,7 +346,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
 
   // Page 3: Initial/dedication page (right side of first spread).
   // Image fills the entire page including bleed (outer 3mm gets trimmed off).
-  const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
+  const initialPageImageData = printCoverSource(storyData, 'initialPage', bookFormat);
   doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
   if (initialPageImageData) {
     const initialPageBuffer = await resolveImageBuffer(initialPageImageData);
@@ -1063,14 +1079,14 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       doc.addPage({ size: [coverSpreadWidth, coverSpreadHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
       // If first story has no back cover (e.g. trial), borrow from another story
-      let backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
+      let backCoverImageData = printCoverSource(storyData, 'backCover', bookFormat);
       if (!backCoverImageData) {
         for (let i = stories.length - 1; i > 0; i--) {
-          backCoverImageData = getCoverImageData(stories[i].data.coverImages?.backCover);
+          backCoverImageData = printCoverSource(stories[i].data, 'backCover', bookFormat);
           if (backCoverImageData) break;
         }
       }
-      const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
+      const frontCoverImageData = printCoverSource(storyData, 'frontCover', bookFormat);
 
       if (backCoverImageData && frontCoverImageData) {
         const backCoverBuffer = await resolveImageBuffer(backCoverImageData);
@@ -1104,7 +1120,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
 
       // Introduction/dedication page (right side of first spread) — blank if missing (e.g. trial)
       // Image fills entire page including bleed
-      const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
+      const initialPageImageData = printCoverSource(storyData, 'initialPage', bookFormat);
       doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       if (initialPageImageData) {
         const initialPageBuffer = await resolveImageBuffer(initialPageImageData);
@@ -1127,7 +1143,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       // Image fills entire page including bleed.
       doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       totalStoryPages++;
-      const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
+      const frontCoverImageData = printCoverSource(storyData, 'frontCover', bookFormat);
       if (frontCoverImageData) {
         const frontCoverBuffer = await resolveImageBuffer(frontCoverImageData);
         if (frontCoverBuffer) {
@@ -1139,7 +1155,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       // Dedication/initial page (RIGHT) — same side as story 1's dedication
       doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       totalStoryPages++;
-      const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
+      const initialPageImageData = printCoverSource(storyData, 'initialPage', bookFormat);
       if (initialPageImageData) {
         const initialPageBuffer = await resolveImageBuffer(initialPageImageData);
         if (initialPageBuffer) {
@@ -1153,7 +1169,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
 
       // Back cover (LEFT) + blank separator (RIGHT) — only if story has a back cover
       // If no back cover, skip both pages (reduces page count by 2, preserves alignment)
-      const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
+      const backCoverImageData = printCoverSource(storyData, 'backCover', bookFormat);
       if (backCoverImageData) {
         doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         totalStoryPages++;
@@ -1383,6 +1399,7 @@ module.exports = {
   generateCombinedBookPdf,
   parseStoryPages,
   getCoverImageData,
+  printCoverSource,
   mmToPoints,
   COVER_WIDTH,
   COVER_HEIGHT,

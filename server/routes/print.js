@@ -25,6 +25,7 @@ const { getPool, rehydrateStoryImages, logActivity } = require('../services/data
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf, pdfContentDisposition } = require('../lib/pdf');
 const { processBookOrder, resumeBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo, isBlankPagesAckMissing, BLANK_PAGES_ACK_FROM, shippingFromSession } = require('../lib/gelato');
 const { stripDataUriPrefix } = require('../lib/r2');
+const { attachSquareCovers } = require('../lib/squareCovers');
 const email = require('../../email');
 
 function getDbPool() { return getPool(); }
@@ -113,6 +114,7 @@ router.post('/print-provider/order', authenticateToken, async (req, res) => {
       // Generate fresh PDF using the shared print function (same as Buy Book)
       log.debug(`🖨️ [PRINT] Generating fresh print PDF for story: ${storyId}, format: ${bookFormat}`);
       try {
+        if (bookFormat === 'square') await attachSquareCovers(storyId, storyData);
         // Customer download is free: mirror fill (decisions.md 2026-10-26); only the paid order PDF uses Grok.
         const { pdfBuffer, pageCount: generatedPageCount } = await generatePrintPdf(storyData, bookFormat, { fillMethod: 'mirror' });
         pageCount = generatedPageCount;
@@ -755,6 +757,7 @@ router.get('/stories/:id/print-pdf', authenticateToken, async (req, res) => {
     log.debug(`🖨️ [ADMIN PRINT PDF] Story has: coverImages=${!!storyData.coverImages}, sceneImages=${storyData.sceneImages?.length || 0}, storyText=${!!storyData.storyText || !!storyData.generatedStory}`);
 
     // Generate print PDF using the shared function (same as Buy Book / Print Book)
+    if (bookFormat === 'square') await attachSquareCovers(storyId, storyData);
     // Admin preview of the print PDF: mirror fill, no paid Grok call (the order path in gelato.js passes 'grok').
     const { pdfBuffer, pageCount } = await generatePrintPdf(storyData, bookFormat, { fillMethod: 'mirror' });
 
@@ -1163,6 +1166,9 @@ router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
     } else {
       console.log(`⚠️ [BOOK PDF] getCoverDimensions returned null for product=${printProductUid}, pages=${snappedPageCount}`);
     }
+
+    // A square book prints square covers, made once per cover and reused afterwards (squareCovers.js)
+    if (bookFormat === 'square') await Promise.all(stories.map(s => attachSquareCovers(s.id, s.data)));
 
     // Use the SAME PDF generation functions as the Gelato order flow
     let pdfBuffer, pageCount;

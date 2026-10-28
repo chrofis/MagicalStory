@@ -2838,6 +2838,27 @@ router.post('/:id/restamp-covers', authenticateToken, async (req, res) => {
   }
 });
 
+// POST /api/stories/:id/square-covers - the square versions of the story's covers, for SQUARE books
+// (mini / facing pages). Cached in R2 per cover picture, so a repeat call costs nothing; the first call
+// makes up to three (about USD 0.02 each, one Grok edit per cover). The book builder calls it before
+// payment so the customer sees what will be printed. docs/decisions.md 2026-10-28 "Square covers".
+router.post('/:id/square-covers', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Owner only (it spends money): a write endpoint, so no read-any-story admin path.
+    const rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Story not found' });
+    let storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    storyData = await rehydrateStoryImages(id, storyData);
+    const { ensureSquareCovers } = require('../lib/squareCovers');
+    const out = await ensureSquareCovers(id, storyData.coverImages);
+    res.json({ success: true, covers: out.urls, made: out.made, reused: out.reused, costUsd: out.cost });
+  } catch (err) {
+    log.error(`[SQUARE COVER] ${req.params.id}: ${err.message}`);
+    res.status(500).json({ error: 'Failed to make square covers: ' + err.message });
+  }
+});
+
 // GET /api/stories/:id/title-paint — developer-mode evidence for the painted
 // cover title: the WHITE PLATE that was sent to the model, the model's RAW
 // output, and the outcome (ok / reason / metrics). Without this a flat title is

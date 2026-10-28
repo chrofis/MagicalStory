@@ -2357,6 +2357,12 @@ export const storyService = {
     return api.post('/api/book-page-info', { storyIds, coverType, ...(layout ? { layout } : {}) });
   },
 
+  // Square books print square covers. Makes them (about 10 s the first time, cached per cover afterwards) and
+  // returns their R2 URLs, so the book builder can show them before payment.
+  async makeSquareCovers(storyId: string): Promise<{ covers: Partial<Record<'frontCover' | 'backCover' | 'initialPage', string>> }> {
+    return api.post(`/api/stories/${encodeURIComponent(storyId)}/square-covers`, {});
+  },
+
   // Referral: get current user's referral code + stats
   async getMyReferralCode(): Promise<{ code: string; credits: number; referredBy: string | null; referrals: number; creditsEarned: number }> {
     return api.get('/api/referral/my-code');
