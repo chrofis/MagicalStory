@@ -12,7 +12,7 @@ import BookSquareCovers from '@/components/book/BookSquareCovers';
 import type { BookPageInfo } from '@/services/storyService';
 import { storyService } from '@/services';
 import type { BookLayout } from '@/services/storyService';
-import { getPriceForPages, MAX_BOOK_PAGES, SHIPPING_COST_CHF, type PricingTier } from '@/utils/bookPricing';
+import { getPriceForPages, bookSizeLabel, MAX_BOOK_PAGES, SHIPPING_COST_CHF, type PricingTier } from '@/utils/bookPricing';
 import { createLogger } from '@/services/logger';
 import { localizedApiError } from '@/utils/apiErrors';
 
@@ -716,7 +716,7 @@ export default function BookBuilder() {
                   <Book size={32} className={`shrink-0 ${coverType === 'softcover' ? 'text-indigo-500' : 'text-gray-400'}`} />
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-800">{t.softcover}</div>
-                    <div className="text-sm text-gray-500">{t.softcoverSize}</div>
+                    <div className="text-sm text-gray-500">{bookSizeLabel(pageInfo?.layout, t.softcoverSize)}</div>
                   </div>
                   {!isOverLimit && billedPages !== null && (
                     <div className="text-lg sm:text-xl font-bold text-gray-800 shrink-0">
@@ -739,7 +739,7 @@ export default function BookBuilder() {
                   <BookOpen size={32} className={`shrink-0 ${coverType === 'hardcover' ? 'text-indigo-500' : 'text-gray-400'}`} />
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-800">{t.hardcover}</div>
-                    <div className="text-sm text-gray-500">{t.hardcoverSize}</div>
+                    <div className="text-sm text-gray-500">{bookSizeLabel(pageInfo?.layout, t.hardcoverSize)}</div>
                   </div>
                   {!isOverLimit && billedPages !== null && (
                     <div className="text-lg sm:text-xl font-bold text-indigo-700 shrink-0">

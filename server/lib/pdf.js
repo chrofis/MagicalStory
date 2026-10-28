@@ -22,7 +22,6 @@ const PAGE_SIZE = BOOK_FORMATS.square.pageWidth;
 const MIN_FONT_SIZE_WARNING = 10;
 // Spread text page (owner 2026-10-26: keep white, big text, upper half).
 const SPREAD_LINE_GAP_RATIO = 0.35; // lineGap on top of Helvetica's ~1.15 line height = about 1.5 spacing
-const SPREAD_TEXT_TOP_RATIO = 0.2;  // text starts 20% down the page
 
 /**
  * Extract image data from cover images (handles both string and object formats)
@@ -813,7 +812,9 @@ async function addSpreadPages(doc, storyData, storyPages, pageWidth, pageHeight,
   const interiorH = pageHeight + 2 * bleed;
   const marginInner = mmToPoints(20);  // gutter side (left of the right-hand page)
   const marginOuter = mmToPoints(14);
-  const marginTop = pageHeight * SPREAD_TEXT_TOP_RATIO; // text block starts in the upper half, not centred
+  // Equal top and bottom safe margins: the text block is centred up/down inside them, i.e. on the page
+  // (owner 2026-10-28: "The text must be centered up down"; it used to start 20% down the page).
+  const marginTop = mmToPoints(18);
   const marginBottom = mmToPoints(18);
   const textWidth = pageWidth - marginInner - marginOuter;
   const textHeight = pageHeight - marginTop - marginBottom;
@@ -850,10 +851,11 @@ async function addSpreadPages(doc, storyData, storyPages, pageWidth, pageHeight,
       }
     }
 
-    // RIGHT page: text block starting at the top margin
+    // RIGHT page: text block centred vertically inside the safe area (measured with the final font)
     doc.addPage({ size: [interiorW, interiorH], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-    doc.text(cleaned[index], bleed + marginInner, bleed + marginTop, { width: textWidth, align: 'left', lineGap, paragraphGap, height: textHeight, ellipsis: true });
+    const blockHeight = Math.min(textHeight, doc.heightOfString(cleaned[index], { width: textWidth, align: 'left', lineGap, paragraphGap }));
+    doc.text(cleaned[index], bleed + marginInner, bleed + marginTop + (textHeight - blockHeight) / 2, { width: textWidth, align: 'left', lineGap, paragraphGap, height: textHeight, ellipsis: true });
   }
   return storyPages.length * 2;
 }

@@ -8,6 +8,7 @@ import { Navigation, LoadingSpinner } from '@/components/common';
 import BlankPagesPreview from '@/components/book/BlankPagesPreview';
 import AddStoryNudge from '@/components/book/AddStoryNudge';
 import type { BookLayout } from '@/services/storyService';
+import { bookSizeLabel } from '@/utils/bookPricing';
 import BookFacingOption from '@/components/book/BookFacingOption';
 import BookSquareCovers from '@/components/book/BookSquareCovers';
 import { storyService } from '@/services';
@@ -298,7 +299,7 @@ export default function VoucherBookCheckout() {
       className={`text-left p-4 rounded-xl border-2 transition-all ${coverType === type ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white hover:border-indigo-200'}`}
     >
       <div className="flex items-center gap-2 mb-1 text-gray-800 font-semibold">{icon}{label}</div>
-      <div className="text-xs text-gray-500 mb-2">{t.size}</div>
+      <div className="text-xs text-gray-500 mb-2">{bookSizeLabel(pageInfo?.layout, t.size)}</div>
       <div className="font-bold text-indigo-700">{price}</div>
     </button>
   );

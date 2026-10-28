@@ -40,3 +40,11 @@ export function getPriceForPages(pageCount: number, isHardcover: boolean, tiers?
   if (!tier) return null; // Exceeds maximum
   return isHardcover ? tier.hardcover : tier.softcover;
 }
+
+// Trim size of the book that will print, as the customer reads it. The layout decides the format
+// (gelato.bookFormatForLayout): 'spread' (facing pages) prints the square 200x200 mm Gelato product
+// (BOOK_FORMAT_PATTERN.square), 'single' the A4 210x280 mm one. The language texts carry the A4 size
+// only, so the square size is a number, not a translation.
+export const SQUARE_BOOK_SIZE_LABEL = '20 × 20 cm';
+export const bookSizeLabel = (layout: 'single' | 'spread' | undefined, a4Label: string): string =>
+  layout === 'spread' ? SQUARE_BOOK_SIZE_LABEL : a4Label;
