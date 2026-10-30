@@ -20,6 +20,14 @@ Two separate orchestrators share the same repair primitives:
 2. **Manual repair workflow** — `useRepairWorkflow.ts → runFullWorkflow()` (~1154), triggered
    from `RepairWorkflowPanel`. Orchestrates the HTTP endpoints in `server/routes/regeneration.js`.
 
+**Book-review mode (STAGING ONLY, 2026-10-29)** — runtime `pageJudgeMode` = `book_review` (staging; production `per_page`) turns the per-page picture judges off
+(quality/inventory/semantic/absence/identity arbiter, entity consistency, eval consolidation, parent-shared, re-evals, style check; `plate_qc`, `vb_cell_gate` and
+Phase 5b-pre detection stay) and replaces the round loop with `bookReview.runBookReviewRounds`: one `auditStoryBook` call (`MODEL_DEFAULTS.bookReviewModel`, Opus 5.5) reads every
+page and cover and tags each IMG fault `[TOUCHUP|NEW|CHAR:<Name>]`; the tag picks inpaint / iterate / char-fix through the shared `runRepairMethod` closure and `buildRoundVersion`
+(the same ones the per-page loop uses). Re-reviews show each repaired page's previous and new picture and read `BETTER: pN — NEW|PREVIOUS|SAME`; the loser is charged a MAJOR so
+pick-best follows it. Scores come from the review's findings via `applyScore` (source `book_review`); a review that fails twice ships the book unrepaired with
+`notEvaluated` `book_review: review_failed`. Free replay over a stored book: `scripts/analysis/replay-book-review-routes.js`. Why and what it reverses: docs/decisions.md 2026-10-29.
+
 **Admission and routing additions (2026-10-15)** — `findBadPages` also admits a page whose current version carries a MAJOR-or-worse
 finding the book-audit READER filed (`findReaderMajorFinding`: structured `severity` + `sources`, any type, still under `applyRoundCap`);
 `AUDIT_ADMIT_SEVERITIES` is MAJOR/CRITICAL/CATASTROPHIC, so a late reader finding gets the extra round. `wrong_action` (a different action
