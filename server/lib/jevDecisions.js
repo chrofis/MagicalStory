@@ -569,7 +569,7 @@ const NEEDED_DEF = n => `${n} is needed in the picture of the page to judge: its
  * @param {Object<string,number[]>} [input.focalPages]
  * @param {string[]} [input.listed]      the character list (coverage floor applies)
  * @param {number} [input.floor]         castCoverage().appearances.min
- * @param {string|null} [input.mainName]
+ * @param {string[]} [input.mainNames] every main character (each is kept at half the pages)
  * @param {string[]|null} [input.centralFigure]
  * @param {number[]|null} [input.centralPages]
  * @param {Object|null} [input.castTable] the planner's CAST block (castCoverage.parsePlanCastBlock):
@@ -605,7 +605,7 @@ async function decideGroupCuts(input, opts = {}) {
   const listed = input.listed || [];
   const floor = Number(input.floor) || 0;
   const isListed = name => listed.some(l => sameName(l, name));
-  const isMain = name => input.mainName && sameName(input.mainName, name);
+  const isMain = name => (input.mainNames || []).some(m => sameName(m, name));
   const central = (input.centralFigure || []).filter(Boolean);
   const isCentral = name => central.some(c => sameName(c, name));
   const thirds = (() => { const a = Math.round(pageCount / 3), b = Math.round(2 * pageCount / 3); return [[1, a], [a + 1, b], [b + 1, pageCount]]; })();
@@ -636,7 +636,7 @@ async function decideGroupCuts(input, opts = {}) {
       if (promisedOn(n).some(p => sameName(p, name))) why.push('the CAST block promises them on this page');
       const pagesIn = inFrame.get(name) || new Set();
       if (isListed(name) && floor > 0 && pagesIn.size - 1 < floor) why.push(`would fall below ${floor} page(s) in frame`);
-      if (isMain(name) && (pagesIn.size - 1) * 2 < pageCount) why.push('the main character would be in frame on fewer than half the pages');
+      if (isMain(name) && (pagesIn.size - 1) * 2 < pageCount) why.push('a main character would be in frame on fewer than half the pages');
       if (isCentral(name) && Array.isArray(input.centralPages)) {
         const [lo, hi] = thirdOf(n) || [n, n];
         const others = input.centralPages.map(Number).filter(p => p !== n && p >= lo && p <= hi);

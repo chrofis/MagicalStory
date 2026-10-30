@@ -335,10 +335,10 @@ function histogram(values) {
  * Jev reading (judgePlanPages), as one JSON-safe object. `simplicity` is
  * P(simple) = 1 - the SIMPLE fault score.
  *
- * @param {{rows:Array, jevResult:Object, listed:string[], commissionedNames?:string[], arcNames?:string[], mainName?:string|null, maxCharactersPerScene:number}} args
+ * @param {{rows:Array, jevResult:Object, listed:string[], commissionedNames?:string[], arcNames?:string[], mainNames?:string[], maxCharactersPerScene:number}} args
  */
-function measurePlan({ rows, jevResult, listed, commissionedNames = null, arcNames = [], mainName = null, maxCharactersPerScene }) {
-  const counted = countPlanTargets({ rows, listedNames: listed, commissionedNames, arcNames, mainName, maxCharactersPerScene });
+function measurePlan({ rows, jevResult, listed, commissionedNames = null, arcNames = [], mainNames = [], maxCharactersPerScene }) {
+  const counted = countPlanTargets({ rows, listedNames: listed, commissionedNames, arcNames, mainNames, maxCharactersPerScene });
   const st = counted.stats;
   const simple = Object.values(jevResult.pages).map(p => p.scores.SIMPLE).filter(v => typeof v === 'number').map(v => +(1 - v).toFixed(3));
   const mean = simple.length ? +(simple.reduce((a, b) => a + b, 0) / simple.length).toFixed(3) : null;
@@ -361,7 +361,7 @@ function measurePlan({ rows, jevResult, listed, commissionedNames = null, arcNam
     flagCount: Object.values(jevResult.flagged).reduce((n, pgs) => n + pgs.length, 0),
     coverage,
     coverageTarget: st.targets.appearancesMin,
-    mainShare: st.mainCharacter ? { name: st.mainCharacter.name, pages: st.mainCharacter.pages.length, target: st.mainCharacter.target } : null,
+    mainShares: (st.mainCharacters || []).map(m => ({ name: m.name, pages: m.pages.length, target: m.target })),
     groupPages: st.groupPages.length,
     groupBudget: st.groupBudget,
     peopledPages: rows.filter(r => r.names.length > 0).length,
@@ -507,8 +507,9 @@ function replanScope({ rows, findings, jevPages, castTable = null, targets, cali
   const soleFocalFull = r => r.names.length >= 2 && r.names.some(n => focalCount.get(n.toLowerCase()) === 1);
   const commissionedIn = r => r.names.some(n => classOf(n) === 'commissioned');
   const nameOf = f => (f.detail.match(/^(.+?) (?:is in frame|never has)/) || [])[1];
-  const mainFinding = findings.find(f => f.code === 'MAIN_UNDER_HALF');
-  const mainName = mainFinding ? nameOf(mainFinding) : null;
+  // EVERY main holds the floor (owner, 2026-10-30): one MAIN_UNDER_HALF finding per main, each names its own.
+  const mainNames = findings.filter(f => f.code === 'MAIN_UNDER_HALF').map(nameOf).filter(Boolean);
+  const isMainName = n => mainNames.some(m => m.toLowerCase() === String(n).toLowerCase());
   // Scarce pages first: an invented figure leaves its page, then a focal page (it needs a page holding at most one figure, which a coverage add would take).
   const urgency = f => (f.code === 'TYPED_INVENTED_FIGURE' ? 0 : f.code === 'TYPED_NO_FACE_PAGE' ? 0.5 : f.code === 'NO_FOCAL_PAGE' ? 1 : 2);
   const facePagesTaken = new Set(); // the page a face nomination took: no figure is added to it (a face page is one figure)
@@ -561,6 +562,7 @@ function replanScope({ rows, findings, jevPages, castTable = null, targets, cali
     } else if (f.code === 'MAIN_UNDER_HALF') {
       pool = wide.filter(r => !f.pages.includes(r.pageNumber) && !soleFocalFull(r) && !(out.get(r.pageNumber) || { adds: [] }).adds.length && !facePagesTaken.has(r.pageNumber));
       k = Math.max(1, targets.mainMin - f.pages.length) + 1; // the shortfall plus one: a page may fail the acceptance
+      const mainName = nameOf(f);
       what = `put ${mainName || 'the main character'} in frame here, taking part in the page's one action`;
       if (mainName) add = [mainName];
     } else continue;
@@ -572,7 +574,7 @@ function replanScope({ rows, findings, jevPages, castTable = null, targets, cali
       // TAKE a two-figure page, one of its figures leaving. The acceptance refuses a swap that costs a coverage or a focal page.
       // Only a figure the book can spare may leave: one above its coverage floor (the main character above his), or one that is not commissioned.
       const appears = n => rows.filter(r => has(r, n)).length;
-      const leavers = r => r.names.filter(n => classOf(n) !== 'commissioned' || appears(n) > (mainName && n.toLowerCase() === mainName.toLowerCase() ? targets.mainMin : targets.appearancesMin));
+      const leavers = r => r.names.filter(n => classOf(n) !== 'commissioned' || appears(n) > (isMainName(n) ? targets.mainMin : targets.appearancesMin));
       const swap = wide.filter(r => r.names.length === 2 && !has(r, add[0]) && !soleFocalFull(r) && leavers(r).length && !(out.get(r.pageNumber) || { adds: [] }).adds.length && !facePagesTaken.has(r.pageNumber) && !chosen.includes(r.pageNumber));
       for (const r of spread(swap.map(x => x.pageNumber), k - chosen.length)) give(r, `${f.detail} — give ${add[0]} a focal page here: ${add[0]}'s own action is the page's subject, ${add[0]} alone or with one companion (${leavers(rowOf(r)).join(' or ')} may leave the page)`, { relax: { type: true, who: true }, add });
     }
@@ -583,7 +585,7 @@ function replanScope({ rows, findings, jevPages, castTable = null, targets, cali
     const r = rowOf(page);
     if (!r) continue;
     const stay = [...(promised.stay.get(page) || [])];
-    if (mainName && has(r, mainName) && !stay.includes(mainName)) stay.push(mainName);
+    for (const mainName of mainNames) if (has(r, mainName) && !stay.includes(mainName)) stay.push(mainName);
     o.stay = stay;
     o.keep = keepList(r, { relax: o.relax, stay, adds: o.adds });
   }
@@ -705,13 +707,13 @@ const sumStats = (...ss) => ({ calls: ss.reduce((a, x) => a + (x ? x.calls : 0),
  *
  * @returns {Promise<Object>} the report the Lab stores (see the return below)
  */
-async function runTypedPlan({ inputData, pageCount, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, commission, maxCast, mainName, arcNames = [], readPlan, callModel, parseCastTable, labPromptOptions = {}, planEffort = null, firstOnly = false, calibration = CALIBRATION }) {
+async function runTypedPlan({ inputData, pageCount, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, commission, maxCast, mainNames = [], arcNames = [], readPlan, callModel, parseCastTable, labPromptOptions = {}, planEffort = null, firstOnly = false, calibration = CALIBRATION }) {
   const t0 = Date.now();
   const listed = commission.listed;
   const known = commission.all;
   const targets = typedPlanTargets({ pageCount, listed, maxCharactersPerScene: maxCast });
-  const count = pages => typedPlanCounters({ pages, listedNames: listed, commissionedNames: known, arcNames, mainName, maxCharactersPerScene: maxCast });
-  const metricsOf = (rows, jevResult) => measurePlan({ rows, jevResult, listed, commissionedNames: known, arcNames, mainName, maxCharactersPerScene: maxCast });
+  const count = pages => typedPlanCounters({ pages, listedNames: listed, commissionedNames: known, arcNames, mainNames, maxCharactersPerScene: maxCast });
+  const metricsOf = (rows, jevResult) => measurePlan({ rows, jevResult, listed, commissionedNames: known, arcNames, mainNames, maxCharactersPerScene: maxCast });
   const callOpts = planEffort ? { effort: planEffort } : {};
 
   // 1. THE PLAN: one call, the typed variant of story-beats.txt.
@@ -799,7 +801,7 @@ async function runTypedPlan({ inputData, pageCount, approvedArc, arcHints, arcSt
   const finalMetrics = metricsOf(finalRows, jevFinal);
   // The neighbour rule (owner 2026-10-06): no two neighbouring pages the same SHOT with the same CAST — known only
   // now that Jev has picked the shots, so it is reported here (never a re-plan reason).
-  const shotFindings = countPlanTargets({ rows: finalRows, listedNames: listed, commissionedNames: known, arcNames, mainName, maxCharactersPerScene: maxCast })
+  const shotFindings = countPlanTargets({ rows: finalRows, listedNames: listed, commissionedNames: known, arcNames, mainNames, maxCharactersPerScene: maxCast })
     .lines.filter(l => l.startsWith('PLAN[CONSECUTIVE_SAME_SHOT_CAST]'));
   unmet.push(...shotFindings);
 

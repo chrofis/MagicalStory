@@ -749,7 +749,7 @@ describe('beats_replan: no params = the run\'s plan check and re-plan rounds', (
       inputData: STORY, approvedArc: ARC, arcHints: '', arcStoryLogic: LOGIC, arcCentralFigure: ['Mira'], castTable,
       commission: inputs.commission, commissionedNames: inputs.commissionedNames, placeNames: inputs.placeNames, maxCast: inputs.maxCast,
       arcInventedNames: logic.invented, arcInventedLimit: PB.arcInventedAllowance(STORY),
-      mainName: PB.pickMainCharacters(STORY).focus?.name || null, planCheckModel: inputs.planCheckModel, onChunk: null, gl,
+      mainNames: PB.pickMainNames(STORY), planCheckModel: inputs.planCheckModel, onChunk: null, gl,
     });
     const check1 = await runCheck('plan_check', plan.pages, plan.pagePlan);
     expect(check1.lines.length).toBeGreaterThan(0);

@@ -73,7 +73,7 @@ describe('CAST_PROMISE_BROKEN: the counters hold each plan line to the table', (
     { key: 'Levin', sentence: 3, page: 3 }, { key: 'Julian', sentence: 4, page: 4 },
     { key: 'Max', sentence: 6, page: 6 }, { key: 'Kiaan', sentence: 5, page: 5 },
   ];
-  const run = (extra: any = {}) => runPlanCounters({ pages, roster, commissionedNames: LISTED, listedNames: LISTED, mainName: 'Levin', castTable: table, actions, ...extra });
+  const run = (extra: any = {}) => runPlanCounters({ pages, roster, commissionedNames: LISTED, listedNames: LISTED, mainNames: ['Levin'], castTable: table, actions, ...extra });
 
   it('names the page whose instant is another character\'s', () => {
     const lines = run().lines.filter((l: string) => l.startsWith('PLAN[CAST_PROMISE_BROKEN]'));
@@ -119,9 +119,9 @@ describe('MAIN_UNDER_HALF holds the story\'s declared main, not the first name o
     const pages = [1, 2, 3, 4].map(n => ({ pageNumber: n, planLine: `medium — ${n <= 3 ? 'Fiona' : 'Sarah'} — acts — changes` }));
     const roster = new Map(pages.map(p => [p.pageNumber, { people: [p.pageNumber <= 3 ? 'Fiona' : 'Sarah'], things: [], covers: [] }]));
     const names = input.characters.map(c => c.name);
-    const r = runPlanCounters({ pages, roster, commissionedNames: names, listedNames: names, mainName });
+    const r = runPlanCounters({ pages, roster, commissionedNames: names, listedNames: names, mainNames: [mainName] });
     expect(r.findings.map((f: any) => f.code)).not.toContain('MAIN_UNDER_HALF');
-    expect(r.stats.mainCharacter).toBe('Fiona');
+    expect(r.stats.mainCharacters).toEqual(['Fiona']);
   });
 });
 

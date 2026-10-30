@@ -71,7 +71,7 @@ describe('the lead rule: a page leads with one character', () => {
     ...[5, 6, 7, 8].map(n => ({ pageNumber: n, planLine: 'wide — Emma, Noah, Daniel — they walk — after' })),
   ];
   const roster = new Map(pages.map((p: any) => [p.pageNumber, { people: p.planLine.split(' — ')[1].split(', '), things: [], covers: [] }]));
-  const run = (actions: any) => PC.runPlanCounters({ pages, roster, commissionedNames: LISTED, listedNames: LISTED, mainName: 'Emma', actions });
+  const run = (actions: any) => PC.runPlanCounters({ pages, roster, commissionedNames: LISTED, listedNames: LISTED, mainNames: ['Emma'], actions });
   const noFocal = (r: any) => r.findings.filter((f: any) => f.code === 'NO_FOCAL_PAGE').map((f: any) => f.detail.split(' ')[0]);
 
   it('a small page that stages another character\'s action is not the companion\'s lead page', () => {

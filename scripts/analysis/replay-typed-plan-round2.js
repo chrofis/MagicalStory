@@ -23,7 +23,7 @@ for (const f of fs.readdirSync(dir).filter(x => /^full-.*rv[34]/.test(x))) {
   const kept = new Set((t.replan.decisions || []).filter(d => d.keep).map(d => d.pageNumber));
   const replyLine = n => (t.replan.reply.match(new RegExp(String.raw`^\s*(?:\*\*)?Page ${n}\s*:\s*(.+)$`, 'm')) || [])[1];
   const pages = t.first.plan.map(p => (kept.has(p.pageNumber) ? { pageNumber: p.pageNumber, planLine: replyLine(p.pageNumber).trim() } : p));
-  const c = PC.typedPlanCounters({ pages, listedNames: listed, commissionedNames: listed, arcNames, mainName: listed[0], maxCharactersPerScene: 6 });
+  const c = PC.typedPlanCounters({ pages, listedNames: listed, commissionedNames: listed, arcNames, mainNames: [listed[0]], maxCharactersPerScene: 6 });
   const targets = typedPlanTargets({ pageCount: pages.length, listed, maxCharactersPerScene: 6 });
   const jevPages = Object.fromEntries(Object.entries(t.final.jev).map(([n, o]) => [n, { scores: o.scores, flags: tp.flagsOf(o.scores, tp.CALIBRATION) }]));
   const scope = tp.replanScope({ rows: c.rows, findings: c.findings, jevPages, castTable: t.castTable, targets, commissionedNames: listed, arcNames, jevMax: 0 });

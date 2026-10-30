@@ -233,7 +233,7 @@ describe('runPlanCounters', () => {
       page(3, line('wide', 'Ben')),
       page(4, line('wide', 'Cara')),
     ];
-    const r = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: CAST, mainName: 'Ana' });
+    const r = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: CAST, mainNames: ['Ana'] });
     expect(r.findings.map((f: any) => f.code)).toContain('MAIN_UNDER_HALF');
   });
 
@@ -606,7 +606,7 @@ describe('the roster decides, not the shape of the sentence (replaces the acts-l
     const cast = resolveCast(REAL, COMMISSIONED, places, rosterFor(REAL, ['Grossmünster', 'Sturmfeder', 'Krummhafen']));
     expect(cast.invented).toEqual(['Malva Grimm']);
     expect(cast.places).toEqual(['Grossmünster', 'Sturmfeder', 'Krummhafen']);
-    const res = runPlanCounters({ roster: rosterFor(REAL, ['Grossmünster', 'Sturmfeder', 'Krummhafen']), pages: REAL, commissionedNames: COMMISSIONED, placeNames: places, declaredInvented: ['Malva Grimm'], mainName: 'Fiona' });
+    const res = runPlanCounters({ roster: rosterFor(REAL, ['Grossmünster', 'Sturmfeder', 'Krummhafen']), pages: REAL, commissionedNames: COMMISSIONED, placeNames: places, declaredInvented: ['Malva Grimm'], mainNames: ['Fiona'] });
     // SHOT_NO_CAMERA_POSITION joined 2026-09-19: every one of this book's
     // eighteen plan lines declares a camera DISTANCE, so the whole book is shot
     // at eye level. That is true of every story stored before the vocabulary

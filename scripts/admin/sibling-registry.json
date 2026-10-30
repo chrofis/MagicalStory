@@ -616,7 +616,7 @@
     {
       "id": "plan-cast-table-prod-vs-lab",
       "axis": "Test Lab stage vs production call site",
-      "reason": "The planner's CAST block (owner, 2026-09-25, Lab #1495/#1496) is read off the first division by castCoverage.parsePlanCastBlock and threaded into the plan check, the counters (CAST_PROMISE_BROKEN, with the check's ACTION lines and the focus character from pickMainCharacters) and the re-plan — in production by beatsPipeline.js and in the Lab's beats_replan stage by testlab.js runBeatsReplanStage. A table threaded on one side only makes the Lab measure a round production never runs.",
+      "reason": "The planner's CAST block (owner, 2026-09-25, Lab #1495/#1496) is read off the first division by castCoverage.parsePlanCastBlock and threaded into the plan check, the counters (CAST_PROMISE_BROKEN, with the check's ACTION lines and every main character from pickMainNames) and the re-plan — in production by beatsPipeline.js and in the Lab's beats_replan stage by testlab.js runBeatsReplanStage. A table threaded on one side only makes the Lab measure a round production never runs.",
       "members": [
         "server/lib/beatsPipeline.js",
         "server/lib/testlab.js"
@@ -626,7 +626,7 @@
         "anchors": [
           "parsePlanCastBlock",
           "castTable",
-          "pickMainCharacters"
+          "pickMainNames"
         ]
       }
     },

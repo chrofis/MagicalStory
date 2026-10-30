@@ -638,15 +638,15 @@ function centralFigureAbsentThirds(rows, centralPages, centralFigure) {
  *   (`parsePlanCheckCentralPages`); null = the check gave none
  * @returns {{findings: Array, lines: string[], stats: Object, cast: Object|null, skipped?: string}}
  */
-// `mainName`: the book's focus character (promptBuilders.pickMainCharacters —
-//   the ONE place that decides it). MAIN_UNDER_HALF runs only when it is given.
+// `mainNames`: EVERY main character (promptBuilders.pickMainNames — the ONE place that decides it;
+//   two mains are equal stars, owner 2026-10-30). MAIN_UNDER_HALF runs once per main, only when given.
 // `castTable`: the CAST block the planner wrote (castCoverage.parsePlanCastBlock);
 //   `actions`: the check's Q12 ACTION lines. CAST_PROMISE_BROKEN runs only
 //   when a table is given.
 // `legacyShots`: the Jev-outage BACKUP (owner exception, 2026-09-27) — the
 //   planner wrote real shot words, so the shot counters that measured them run
 //   again (the pre-Jev block below, one copy). Off on every Jev-authored story.
-function runPlanCounters({ pages = [], commissionedNames = [], listedNames = null, placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null, peoplelessPick = null, centralFigure = null, centralPages = null, mainName = null, castTable = null, actions = null, legacyShots = false } = {}) {
+function runPlanCounters({ pages = [], commissionedNames = [], listedNames = null, placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null, peoplelessPick = null, centralFigure = null, centralPages = null, mainNames = [], castTable = null, actions = null, legacyShots = false } = {}) {
   const findings = [];
   const add = (code, pageList, detail) => findings.push({ code, pages: pageList, detail });
 
@@ -891,12 +891,12 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   //    `cast.commissioned[0]`, and on staging job_1789207854566_l43qgl34w —
   //    whose declared main is the fourth child on the list — it held the first
   //    child to half the book (Lab #1496: "Sarah is in frame on 3/16 pages").
-  const main = mainName ? (namesIn(mainName, cast.commissioned, cast.aliases)[0] || null) : null;
-  if (main) {
+  const mains = [...new Set((mainNames || []).map(n => namesIn(n, cast.commissioned, cast.aliases)[0]).filter(Boolean))];
+  for (const main of mains) {
     const mainPages = rows.filter(r => r.present.includes(main)).map(r => r.pageNumber);
     if (pageCount > 0 && mainPages.length * 2 < pageCount) {
       add('MAIN_UNDER_HALF', mainPages,
-        `${main} is in frame on ${mainPages.length}/${pageCount} pages — the main character belongs in at least half`);
+        `${main} is in frame on ${mainPages.length}/${pageCount} pages — a main character belongs in at least half`);
     }
   }
 
@@ -1172,7 +1172,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
       castCoverage: coverageRule,
       // The pages holding more than three, and the budget they were counted against.
       groupPages: { pages: groupPages, budget: groupBudget ? groupBudget.max : null },
-      mainCharacter: main,
+      mainCharacters: mains,
       // The table's promises as counted: null when no table was given.
       castTable: castTableResult ? { kept: castTableResult.kept, broken: castTableResult.broken.length, unanswered: castTableResult.unanswered, sharedLead: castTableResult.sharedLead } : null,
       // Only when the arc named a central figure: the pages the check said
@@ -1794,11 +1794,11 @@ const isScenery = t => t === 'landscape' || t === 'object' || t === 'scenery';
  * @param {Array<{pageNumber:number, type:string, names:string[], shot?:string|null}>} args.rows
  * @param {string[]} args.listedNames the commission's character list
  * @param {string[]} [args.commissionedNames] every commissioned name (listed + supplied)
- * @param {string|null} [args.mainName]
+ * @param {string[]} [args.mainNames] every main character (each holds the floor)
  * @param {number} args.maxCharactersPerScene
  * @returns {{findings:Array, lines:string[], stats:Object}}
  */
-function countPlanTargets({ rows, listedNames = [], commissionedNames = null, arcNames = [], mainName = null, maxCharactersPerScene = 3 } = {}) {
+function countPlanTargets({ rows, listedNames = [], commissionedNames = null, arcNames = [], mainNames = [], maxCharactersPerScene = 3 } = {}) {
   const findings = [];
   const add = (code, pages, detail) => findings.push({ code, pages, detail });
   const P = rows.length;
@@ -1854,10 +1854,10 @@ function countPlanTargets({ rows, listedNames = [], commissionedNames = null, ar
       if (targets.focalEach && focal[name].length === 0) add('NO_FOCAL_PAGE', [], `${name} never has a focal page. ${noFocalFix(name)}`);
     }
   }
-  let main = null;
-  if (mainName) {
+  const mains = [];
+  for (const mainName of [...new Set((mainNames || []).filter(Boolean))]) {
     const pages = rows.filter(r => has(r, mainName)).map(r => r.pageNumber);
-    main = { name: mainName, pages, target: targets.mainMin };
+    mains.push({ name: mainName, pages, target: targets.mainMin });
     if (pages.length < targets.mainMin) add('MAIN_UNDER_HALF', pages, `${mainName} is in frame on ${pages.length} of ${P} page(s), target ${targets.mainMin}`);
   }
   if (groupPages.length > targets.groupMax) add('GROUP_PAGES_OVER_BUDGET', groupPages, `${groupPages.length} page(s) hold more than ${GROUP_STAGING_MAX} characters, budget ${targets.groupMax}`);
@@ -1874,7 +1874,7 @@ function countPlanTargets({ rows, listedNames = [], commissionedNames = null, ar
       groupPages, groupBudget: targets.groupMax, noCommissionedPages: noCommissioned, inventedPages: inventedPages.map(r => r.pageNumber),
       whoClasses: Object.fromEntries(rows.map(r => [r.pageNumber, Object.fromEntries(r.names.map(n => [n, classOf(n)]))])),
       neighbourSameShotCast: neighbourShot,
-      coveragePages: coverage, focalPages: focal, mainCharacter: main,
+      coveragePages: coverage, focalPages: focal, mainCharacters: mains,
       sceneryMixed: rows.some(r => r.type === 'landscape') && rows.some(r => r.type === 'object'),
       castPerPage: rows.map(r => ({ pageNumber: r.pageNumber, names: r.names })),
     },
@@ -1891,10 +1891,10 @@ function countPlanTargets({ rows, listedNames = [], commissionedNames = null, ar
  * @param {Array<{pageNumber:number, planLine:string}>} args.pages
  * @param {string[]} args.listedNames
  * @param {string[]} [args.commissionedNames]
- * @param {string|null} [args.mainName]
+ * @param {string[]} [args.mainNames] every main character (each holds the floor)
  * @param {number} [args.maxCharactersPerScene]
  */
-function typedPlanCounters({ pages = [], listedNames = [], commissionedNames = null, arcNames = [], mainName = null, maxCharactersPerScene = 3 } = {}) {
+function typedPlanCounters({ pages = [], listedNames = [], commissionedNames = null, arcNames = [], mainNames = [], maxCharactersPerScene = 3 } = {}) {
   const pre = [];
   const addPre = (code, pageList, detail) => pre.push({ code, pages: pageList, detail });
   const known = commissionedNames || listedNames;
@@ -1916,7 +1916,7 @@ function typedPlanCounters({ pages = [], listedNames = [], commissionedNames = n
   });
   // One finding per page here: the typed re-plan accepts or refuses a page by its own findings (typedPlan.PAGE_LEVEL_CODES).
   for (const p of longInstantPages(pages)) addPre('PLAN_INSTANT_TOO_LONG', [p.pageNumber], longInstantDetail([p]));
-  const counted = countPlanTargets({ rows, listedNames, commissionedNames, arcNames, mainName, maxCharactersPerScene });
+  const counted = countPlanTargets({ rows, listedNames, commissionedNames, arcNames, mainNames, maxCharactersPerScene });
   const findings = [...pre, ...counted.findings];
   return {
     findings,

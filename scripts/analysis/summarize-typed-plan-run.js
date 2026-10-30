@@ -23,7 +23,7 @@ for (const f of process.argv.slice(2)) {
     codeFindingsLeft: m.codeFindings || [],
     flagCount: m.flagCount,
     flagsByQuestion: m.flagsByQuestion,
-    main: m.mainShare,
+    main: m.mainShares,
     coverage: m.coverage,
     cost: r.cost,
   }));

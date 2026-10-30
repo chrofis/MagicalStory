@@ -24,7 +24,7 @@ for (const f of fs.readdirSync(dir).sort()) {
   const listed = names ? names.split(',').map(s => s.trim()).filter(Boolean) : [];
   const storyId = run.storyId;
   const plan = t.first.plan;
-  const rows = PC.typedPlanCounters({ pages: plan, listedNames: listed, commissionedNames: listed, mainName: listed[0], maxCharactersPerScene: 6 }).rows;
+  const rows = PC.typedPlanCounters({ pages: plan, listedNames: listed, commissionedNames: listed, mainNames: [listed[0]], maxCharactersPerScene: 6 }).rows;
   for (const p of plan) {
     const key = `${storyId}|${p.planLine}`;
     if (seen.has(key)) continue;

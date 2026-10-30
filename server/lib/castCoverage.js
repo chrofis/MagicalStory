@@ -177,14 +177,33 @@ function typedPlanTargets({ pageCount, listed = [], maxCharactersPerScene } = {}
 }
 
 /**
- * The main character's floor, as the planner is told it in BOTH modes
- * (story-beats.txt {MAIN_FLOOR}); the number is typedPlanTargets.mainMin, the one the
- * counter MAIN_UNDER_HALF measures.
- * @param {number} mainMin
- * @param {string|null} mainName
+ * WHO holds the main-character floor, as a subject + verb. EVERY main character holds it, each
+ * separately (owner, 2026-10-30: two mains are equal stars; the oldest main's age picks the story
+ * shape and nothing else). No main named -> the generic singular.
+ * @param {string[]} mainNames
  */
-function mainFloorRule(mainMin, mainName = null) {
-  return `${mainName || 'The main character'} is in frame on at least ${pagesWord(mainMin)};`;
+function mainFloorSubject(mainNames = []) {
+  const names = (mainNames || []).filter(Boolean);
+  if (names.length >= 2) return `${names.join(' and ')} are each in frame`;
+  return `${names[0] || 'The main character'} is in frame`;
+}
+
+/**
+ * The main characters' floor, as the planner is told it in BOTH modes
+ * (story-beats.txt {MAIN_FLOOR}); the number is typedPlanTargets.mainMin, the one the
+ * counter MAIN_UNDER_HALF measures, once per main character.
+ * @param {number} mainMin
+ * @param {string[]} mainNames
+ */
+function mainFloorRule(mainMin, mainNames = []) {
+  return `${mainFloorSubject(mainNames)} on at least ${pagesWord(mainMin)};`;
+}
+
+/** The typed planner's requirements line pointing back to the floor in THE BOOK'S TARGETS. */
+function mainFloorPointer(mainNames = []) {
+  const names = (mainNames || []).filter(Boolean);
+  if (names.length >= 2) return `${names.map(n => `${n}'s`).join(' and ')} floors stand in THE BOOK'S TARGETS above;`;
+  return `${names[0] ? `${names[0]}'s` : "The main character's"} floor stands in THE BOOK'S TARGETS above;`;
 }
 
 /** The peopled-page-without-a-commissioned-character budget, for the planner in both modes. */
@@ -204,12 +223,12 @@ function planInstantRule(maxWords = PLAN_INSTANT_MAX_WORDS) {
  * requirements (2026-10-06, the planner review). The main character's floor is the exception:
  * the typed mode states it here and the requirements line points back to it.
  */
-function typedTargetsRule(t, mainName = null) {
+function typedTargetsRule(t, mainNames = []) {
   // The main character's floor stands HERE, with the targets (typed plan only, 2026-10-06: it was one sentence
   // among thirty rules and the planner stopped at 6-8 of 9 at every effort). The number is t.mainMin, the one
   // MAIN_UNDER_HALF counts; every appearance shares the page's one action (never a bystander).
   const lines = [
-    `- ${mainName || 'The main character'} is in frame on at least ${pagesWord(t.mainMin)} of ${t.pageCount}, each time taking part in that page's one action; count them as you plan.`,
+    `- ${mainFloorSubject(mainNames)} on at least ${pagesWord(t.mainMin)} of ${t.pageCount}, each time taking part in that page's one action; count them as you plan.`,
     `- At least ${pagesWord(t.faceMin)} of type face, and a face page shows a commissioned character.`,
     `- At least ${pagesWord(t.sceneryMin)} of type landscape or object; two are fine, ideally one of each.`,
     `- At most ${pagesWord(t.groupMax)} of type group.`,
@@ -548,6 +567,8 @@ module.exports = {
   typedPlanTargets,
   typedTargetsRule,
   mainFloorRule,
+  mainFloorPointer,
+  mainFloorSubject,
   noCommissionedRule,
   planInstantRule,
   NO_COMMISSIONED_PAGES_MAX,

@@ -123,7 +123,7 @@ describe('runReplanRounds: code writes the who column; a rewrite naming a remove
     const check = (findings: any[]) => ({
       findings, lines: findings.map(f => f.line), modelFindings: [], obstacles: new Map(), wanted: [], actions: [], reply: '', rosterLines: [], prompt: '',
       counters: { lines: findings.map(f => f.line), findings: findings.map(f => ({ code: f.code, pages: [] })), cast: { all: KIDS, aliases: {} },
-        stats: { castPerPage, groupPages: { pages: [1, 3, 6], budget: 1 }, focalPages: {}, mainCharacter: 'Ana' } },
+        stats: { castPerPage, groupPages: { pages: [1, 3, 6], budget: 1 }, focalPages: {}, mainCharacters: ['Ana'] } },
     });
     const check1 = check([{ kind: 'counter', code: 'GROUP_PAGES_OVER_BUDGET', line: 'PLAN[GROUP_PAGES_OVER_BUDGET] page 1, 3, 6: 3 pages hold more than three' }]);
     const REPLY = [

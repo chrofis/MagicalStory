@@ -117,7 +117,7 @@ async function extract() {
     items.push({
       id: sfx, lang: d.language, level: d.languageLevel, pageCount: b.briefsIn.length,
       sentences: arcSentences(arc), logic: String(a?.logic || ''), centralFigure: a?.centralFigure || [],
-      cast: b.cast?.commissioned || [], castAll: b.cast?.all || [], mainCharacter: b.counterStats?.mainCharacter || null,
+      cast: b.cast?.commissioned || [], castAll: b.cast?.all || [], mainCharacters: b.counterStats?.mainCharacters || [],
       firstPlan: b.briefsIn.map(x => ({ page: x.pageNumber, ...parsePlanLine(x.brief) })).sort((x, y) => x.page - y.page),
       finalPlan: (d.sceneImages || []).map(p => ({ page: p.pageNumber, ...parsePlanLine(p.outlineExtract || '') })).sort((x, y) => x.page - y.page),
       pageText: (d.sceneImages || []).map(p => ({ page: p.pageNumber, words: words(p.text), text: String(p.text || '').trim() })).sort((x, y) => x.page - y.page),

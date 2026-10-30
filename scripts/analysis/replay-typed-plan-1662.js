@@ -48,15 +48,15 @@ const firstPlan = typed.typed.first.plan;
 const kept = typed.typed.replan.decisions.filter(d => d.keep).map(d => d.pageNumber);
 const replyLine = n => (typed.typed.replan.reply.match(new RegExp(String.raw`^\s*(?:\*\*)?Page ${n}\s*:\s*(.+)$`, 'm')) || [])[1];
 const finalPlan = firstPlan.map(p => (kept.includes(p.pageNumber) && replyLine(p.pageNumber) ? { pageNumber: p.pageNumber, planLine: replyLine(p.pageNumber).trim() } : p));
-const cFirst = typedPlanCounters({ pages: firstPlan, listedNames: listed, commissionedNames: known, arcNames, mainName, maxCharactersPerScene: maxCast });
+const cFirst = typedPlanCounters({ pages: firstPlan, listedNames: listed, commissionedNames: known, arcNames, mainNames: [mainName], maxCharactersPerScene: maxCast });
 show('typed first plan (OLD counter said: 6 pages with no commissioned character: 2, 4, 7, 14, 16, 17)', cFirst);
-show('typed shipped plan (OLD counter said: 5 pages: 2, 4, 7, 16, 17)', typedPlanCounters({ pages: finalPlan, listedNames: listed, commissionedNames: known, arcNames, mainName, maxCharactersPerScene: maxCast }));
+show('typed shipped plan (OLD counter said: 5 pages: 2, 4, 7, 16, 17)', typedPlanCounters({ pages: finalPlan, listedNames: listed, commissionedNames: known, arcNames, mainNames: [mainName], maxCharactersPerScene: maxCast }));
 
 // 2. the stored shipped plan read by the SAME who reader; luna's head count only cross-checks
 const present = new Map(story.luna.map(r => [r.pageNumber, r.names]));
 const storedPages = stored.standingPlan.map(p => ({ pageNumber: p.pageNumber, planLine: p.planLine }));
 const rows = tp.rowsOfUntypedPlan(storedPages, present, { commissionedNames: known, arcNames });
-show('stored shipped plan, who column read by parseTypedWho', countPlanTargets({ rows, listedNames: listed, commissionedNames: known, arcNames, mainName, maxCharactersPerScene: maxCast }));
+show('stored shipped plan, who column read by parseTypedWho', countPlanTargets({ rows, listedNames: listed, commissionedNames: known, arcNames, mainNames: [mainName], maxCharactersPerScene: maxCast }));
 const cross = tp.crossCheckRows(rows);
 console.log(`  luna cross-check: ${cross.length} page(s) differ from the code reading: ${cross.map(x => `p${x.page} code[${x.code}] luna[${x.luna}]${x.unreadable.length ? ` unreadable[${x.unreadable}]` : ''}`).join(' | ')}`);
 

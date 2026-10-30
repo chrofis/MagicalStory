@@ -24,7 +24,7 @@ const { SCALE_CLASS_SPEC, ANIMAL_ANATOMY_SPEC, GROWN_CREATURE_SCALE_CLASSES, bui
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, CLOSEUP_KEPT_FIXED_SHOT_RULE, FOOTING_RULE, FOOTING_FIELD, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE, GROUP_STAGING_FIXED_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { SLOP_RULES } = require('./proseSlop');
-const { castCoverage, castCoverageRule, castActionRule, FLOOR_REFUSED_ONLOOKER_RULE, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule, typedPlanTargets, typedTargetsRule, mainFloorRule, noCommissionedRule, planInstantRule } = require('./castCoverage');
+const { castCoverage, castCoverageRule, castActionRule, FLOOR_REFUSED_ONLOOKER_RULE, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule, typedPlanTargets, typedTargetsRule, mainFloorRule, mainFloorPointer, noCommissionedRule, planInstantRule } = require('./castCoverage');
 const { PLAN_TYPE_IDS } = require('./shotVocabulary');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
 // clause and the judges' TEXT RULES block. Safe as a top-level require --
@@ -6720,6 +6720,18 @@ function pickMainCharacters(inputData = {}) {
 }
 
 /**
+ * The names of EVERY main character, oldest first: who holds the "in frame on at least half the
+ * pages" floor (planner rule + MAIN_UNDER_HALF counter, one list for both). Two mains are equal
+ * stars (owner, 2026-10-30); only the story SHAPE keys off the oldest (`focus`). With nobody
+ * declared main the focus fallback (the first character) is the one main, as before.
+ * @returns {string[]}
+ */
+function pickMainNames(inputData = {}) {
+  const { mains, focus } = pickMainCharacters(inputData);
+  return (mains.length ? mains : [focus]).map(c => c && c.name).filter(Boolean);
+}
+
+/**
  * Does this character carry any usable trait at all?
  *
  * `traits` is either a flat array of strings or the structured
@@ -7244,7 +7256,12 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false, challengeLi
   const topic = String(inputData.storyTopic || inputData.storyTheme || '').trim();
 
   const band = resolveAgeBand(inputData);
-  const mainName = focus ? `${focus.name}${focus.age ? ` (${focus.age})` : ''}` : 'the main character';
+  // EVERY main character is named (owner, 2026-10-30: two mains are equal stars); the band itself still
+  // keys off the oldest (resolveAgeBand, focus).
+  const starList = mains.length ? mains : (focus ? [focus] : []);
+  const mainName = starList.length ? starList.map(c => `${c.name}${c.age ? ` (${c.age})` : ''}`).join(' and ') : 'the main character';
+  const mainLabel = starList.length >= 2 ? 'Main characters' : 'Main character';
+  const equalStars = starList.length >= 2 ? ' Both are equal stars.' : '';
   const othersNames = others.map(c => c.name).join(', ');
   const shapeHeader = '# STORY SHAPE (fixed by the age of the main character — not yours to change)';
   const alongside = othersNames
@@ -7263,13 +7280,13 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false, challengeLi
       topic
         ? `Subject: the ${topic} is what this book is about. It is in full view from the first page, stays present throughout, and looks friendly and fun.`
         : '',
-      `Main character: ${mainName} — every page is theirs to enjoy, none is theirs to solve.`,
+      `${mainLabel}: ${mainName} — every page is theirs to enjoy, none is theirs to solve.${equalStars}`,
       'Challenges: one, small. Something is taken, dropped or will not work, the main character minds, and it is put right within a page or two. Nothing they must work out, nothing frightening.',
       'Feelings: three different ones across the book, plain on the face — delight, surprise, and a moment of being upset. The last page is happy.',
       // Traits are optional — plenty of characters carry none (owner,
       // 2026-08-25). Asking for "a page per trait" against an empty list plans
       // nothing, so say what to fall back on instead of leaving it implied.
-      hasAnyTraits(focus)
+      starList.some(hasAnyTraits)
         ? 'Their traits are the page plan: give each one a page of its own, in the form a child this age can do it.'
         : 'No traits are recorded for them, so the pages come from what every small child is: hungry, sleepy, curious, delighted, grumpy.',
       alongside,
@@ -7291,7 +7308,7 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false, challengeLi
       topic
         ? `Subject: the ${topic} is what this book is about. It is in full view from the first page, stays present throughout, and looks friendly and fun.`
         : '',
-      `Main character: ${mainName} — they do the looking and they do the finding.`,
+      `${mainLabel}: ${mainName} — they do the looking and they do the finding.${equalStars}`,
       'Goal: one tiny thing, named on the first page and found near the end. No second goal, no subplot, no twist.',
       `Search pattern: look in ${searchPages} places, one per page, each a new place with a new thing to see there. The same call or question is repeated word for word at every one of them.`,
       'Feelings: friendly throughout — no danger, no villain, nobody unkind. The last page is happy.',
@@ -7315,7 +7332,7 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false, challengeLi
       topic
         ? `Subject: the ${topic} is what this book is about. It is in full view from the first page, stays present throughout, and looks friendly and fun.`
         : '',
-      `Main character: ${mainName} — the problem is theirs and the solving is theirs.`,
+      `${mainLabel}: ${mainName} — the problem is theirs and the solving is theirs.${equalStars}`,
       'Challenges: one, met three times — each try a different kind of attempt, the first two fail, the third succeeds because the main character notices something about the problem the earlier tries missed. Never luck, never a grown-up doing it for them.',
       CAUSAL_COHERENCE_RULE,
       'Feelings: named plainly, one per turn of the story — sad, then helped, then happy.',
@@ -9039,11 +9056,11 @@ const TYPED_PLAN_TYPES_RULE = [
   'The who column holds names only, or the word nobody: never a count, a group word or a description.',
 ].join('\n');
 
-function plannerTypedFills(targets, mainName = null) {
+function plannerTypedFills(targets, mainNames = []) {
   return {
-    TYPED_TARGETS: `${typedTargetsRule(targets, mainName)}\n\n${TYPED_PLAN_TYPES_RULE}\n\n`,
+    TYPED_TARGETS: `${typedTargetsRule(targets, mainNames)}\n\n${TYPED_PLAN_TYPES_RULE}\n\n`,
     // The floor is stated once, in THE BOOK'S TARGETS; the requirements line only points back to it.
-    MAIN_FLOOR: `${mainName ? `${mainName}'s` : "The main character's"} floor stands in THE BOOK'S TARGETS above;`,
+    MAIN_FLOOR: mainFloorPointer(mainNames),
     SHOT_PLANNING: '',
     PLAN_SHOT_FIELD: 'type',
     PLAN_SHOT_FORMAT: '<type>',
@@ -9096,7 +9113,7 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     CHARACTER_DETAILS: ctx.CHARACTER_DETAILS,
     // The commissioned list, one term for both modes (plan-check.txt opens with the same line).
     CHARACTER_NAMES: ctx.CHARACTER_NAMES,
-    MAIN_FLOOR: mainFloorRule(targets.mainMin, pickMainCharacters(inputData).focus?.name || null),
+    MAIN_FLOOR: mainFloorRule(targets.mainMin, pickMainNames(inputData)),
     NO_COMMISSIONED_DEF: noCommissionedRule(targets.noCommissionedMax),
     // 'arc', not the default 'premise': this stage divides a story that is
     // already settled ("divide it, never retell or repair it"), so the document
@@ -9117,7 +9134,7 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // (SHOT_DISTRIBUTION, SHOT_POSITIONS, OTS_NO_CONTACT, the close-up waist
     // sentence) went with the authorship.
     ...(typedPlan
-      ? plannerTypedFills(targets, pickMainCharacters(inputData).focus?.name || null)
+      ? plannerTypedFills(targets, pickMainNames(inputData))
       : { TYPED_TARGETS: '', ...plannerShotFills(pageCount, legacyShots) }),
     PAGE_COUNT: pageCount,
     // HOW MUCH OF THE BOOK EACH COMMISSIONED CHARACTER GETS (owner,
@@ -14398,6 +14415,7 @@ module.exports = {
   faultsByCategory,
   buildStoryShapeSection,
   pickMainCharacters,
+  pickMainNames,
   resolveAgeBand,
   resolvePacingBand,
   focusAge,

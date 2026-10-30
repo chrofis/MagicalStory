@@ -25,7 +25,7 @@ const { loadPromptTemplates } = req('../../server/services/prompts');
 const LISTED = ['Ana', 'Ben', 'Cy', 'Dora'];
 const line = (type: string, who: string, moment = 'they do one thing here', after = 'something changed') => `${type} — ${who} — ${moment} — ${after}`;
 const pagesOf = (lines: string[]) => lines.map((l, i) => ({ pageNumber: i + 1, planLine: l }));
-const count = (lines: string[], extra: any = {}) => PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: LISTED, mainName: 'Ana', maxCharactersPerScene: 6, ...extra });
+const count = (lines: string[], extra: any = {}) => PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: LISTED, mainNames: ['Ana'], maxCharactersPerScene: 6, ...extra });
 const codes = (r: any) => r.findings.map((f: any) => f.code);
 
 function stubJev(noul: (q: string, state: string) => number = () => 0.9) {
@@ -88,7 +88,7 @@ describe('every book target is counted, from the object the planner is told', ()
   const book = (n: number) => Array.from({ length: n }, (_, i) => line('medium', i % 2 ? 'Ana, Ben' : 'Ana, Cy'));
   it('the planner and the counters read ONE target object', () => {
     const t = CC.typedPlanTargets({ pageCount: 16, listed: LISTED, maxCharactersPerScene: 6 });
-    const rule = CC.typedTargetsRule(t, 'Ana');
+    const rule = CC.typedTargetsRule(t, ['Ana']);
     const cov = CC.castCoverage({ pageCount: 16, castCount: 4 });
     expect(t.appearancesMin).toBe(cov.appearances.min);
     expect(t.groupMax).toBe(CC.groupPageBudget({ pageCount: 16, castCount: 4, maxCharactersPerScene: 6 }).max);
@@ -99,7 +99,7 @@ describe('every book target is counted, from the object the planner is told', ()
     // does not repeat them. The MAIN character's floor is the typed mode's exception: it stands in THE BOOK'S
     // TARGETS (the planner stopped at 6-8 of 9 when it was one sentence among thirty rules), the number being the
     // one MAIN_UNDER_HALF counts; the production requirements line still carries it.
-    expect(CC.mainFloorRule(t.mainMin, 'Ana')).toContain('Ana is in frame on at least 8 pages');
+    expect(CC.mainFloorRule(t.mainMin, ['Ana'])).toContain('Ana is in frame on at least 8 pages');
     expect(CC.noCommissionedRule(t.noCommissionedMax)).toContain(`At most ${t.noCommissionedMax} page`);
     expect(rule).toContain('Ana is in frame on at least 8 pages of 16');
     expect(CC.typedTargetsRule(t)).toContain('The main character is in frame on at least 8 pages');
@@ -163,7 +163,7 @@ describe('every book target is counted, from the object the planner is told', ()
       { pageNumber: 4, type: PC.deriveRowType(4, 'wide'), names: ['Ana', 'Ben', 'Cy', 'Dora'], shot: 'wide' },
     ];
     expect(rows.map(r => r.type)).toEqual(['scenery', 'face', 'medium', 'group']);
-    const c = PC.countPlanTargets({ rows, listedNames: LISTED, mainName: 'Ana', maxCharactersPerScene: 6 });
+    const c = PC.countPlanTargets({ rows, listedNames: LISTED, mainNames: ['Ana'], maxCharactersPerScene: 6 });
     expect(c.stats.closeUpOnMultiFigurePages).toEqual([3]);
     expect(c.stats.facePages).toEqual([2]);
     expect(c.stats.sceneryPages).toEqual([1]);
@@ -183,7 +183,7 @@ describe('the planner prompt', () => {
     const p = PB.buildBeatsPrompt(input, 12, { finalArc: 'An arc.', typedPlan: true });
     const t = CC.typedPlanTargets({ pageCount: 12, listed: LISTED, maxCharactersPerScene: 6 });
     expect(p.indexOf("THE BOOK'S TARGETS")).toBeLessThan(p.indexOf('Before dividing'));
-    expect(p).toContain(CC.typedTargetsRule(t, 'Ana'));
+    expect(p).toContain(CC.typedTargetsRule(t, ['Ana']));
     // the main character's floor stands IN the targets block (before the planning question), once; the requirements line points back
     expect(p.indexOf('Ana is in frame on at least 6 pages of 12')).toBeGreaterThan(-1);
     expect(p.indexOf('Ana is in frame on at least 6 pages of 12')).toBeLessThan(p.indexOf('Before dividing'));
@@ -312,7 +312,7 @@ describe('the targeted re-plan', () => {
   });
   it('sends at most four Jev flags, the largest margin first; an uncalibrated question sends none', () => {
     const lines = Array.from({ length: 12 }, (_, i) => line('medium', i % 2 ? 'Ana, Ben' : 'Ana, Cy'));
-    const c = PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: LISTED, mainName: 'Ana', maxCharactersPerScene: 6 });
+    const c = PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: LISTED, mainNames: ['Ana'], maxCharactersPerScene: 6 });
     const t12 = CC.typedPlanTargets({ pageCount: 12, listed: LISTED, maxCharactersPerScene: 6 });
     const scores: any = {};
     for (let n = 2; n <= 11; n++) scores[n] = { DEED: 0.55 + n / 100 };
@@ -363,7 +363,7 @@ describe('the targeted re-plan', () => {
   const sc = (v: number) => ({ SIMPLE: v });
   it('keeps a page only when it fixes something and breaks nothing', () => {
     const c = base();
-    const countOf = (rows: any[]) => PC.typedPlanCounters({ pages: rows.map(r => ({ pageNumber: r.pageNumber, planLine: r.planLine })), listedNames: LISTED, mainName: 'Ana', maxCharactersPerScene: 6 }).findings;
+    const countOf = (rows: any[]) => PC.typedPlanCounters({ pages: rows.map(r => ({ pageNumber: r.pageNumber, planLine: r.planLine })), listedNames: LISTED, mainNames: ['Ana'], maxCharactersPerScene: 6 }).findings;
     const retRows = (l: string, n: number) => count([...Array(n - 1).fill(line('medium', 'Ana, Ben')), l]).rows[n - 1];
     const J = (v: number) => ({ 2: { scores: sc(v), flags: v >= 0.5 ? ['SIMPLE'] : [] } });
     // page 2 becomes a face page of a listed child: fixes TYPED_NO_FACE_PAGE, breaks nothing
@@ -429,7 +429,7 @@ describe('the re-plan scope reaches the main-character floor (fix 1)', () => {
     line('medium', 'Ben, Dora'), line('medium', 'Cy, Dora'), line('medium', 'Ana, Cy'), line('medium', 'Ben'), line('medium', 'Dora'),
     line('medium', 'Cy, Ben'), line('medium', 'Ana, Ben'), line('medium', 'Ana, Dora, Cy'),
   ];
-  const c = PC.typedPlanCounters({ pages: pagesOf(book), listedNames: L4, commissionedNames: L4, mainName: 'Ana', maxCharactersPerScene: 6 });
+  const c = PC.typedPlanCounters({ pages: pagesOf(book), listedNames: L4, commissionedNames: L4, mainNames: ['Ana'], maxCharactersPerScene: 6 });
   const t = CC.typedPlanTargets({ pageCount: 18, listed: L4, maxCharactersPerScene: 6 });
   const castTable = { characters: [
     { name: 'Ana', deedPage: 4, alsoOn: [7, 13] }, { name: 'Ben', deedPage: 2, alsoOn: [6, 14] },
@@ -442,7 +442,7 @@ describe('the re-plan scope reaches the main-character floor (fix 1)', () => {
     expect(c.findings.map((f: any) => f.code)).toContain('MAIN_UNDER_HALF');
     const scope = TP.replanScope({ rows: c.rows, findings: c.findings, jevPages: flaggedAll, castTable, targets: t, calibration: CAL, commissionedNames: L4, arcNames: [] });
     const asked = [...scope.entries()].filter(([, o]: any) => o.reasons.some((w: string) => /in frame here, taking part/.test(w) && /Ana/.test(w)));
-    const need = t.mainMin - c.stats.mainCharacter.pages.length;
+    const need = t.mainMin - c.stats.mainCharacters[0].pages.length;
     expect(need).toBeGreaterThan(0);
     expect(asked.length).toBeGreaterThanOrEqual(need + 1);
     for (const [n, o] of asked as any[]) {
@@ -539,7 +539,7 @@ describe('calibration v2 on typed lines (fix 4)', () => {
 
 describe('the neighbour rule is a SHOT + CAST rule counted after the shots (owner decision)', () => {
   const row = (n: number, names: string[], shot: string | null, type = 'medium') => ({ pageNumber: n, type, names, shot });
-  const run = (rows: any[]) => PC.countPlanTargets({ rows, listedNames: LISTED, mainName: 'Ana', maxCharactersPerScene: 6 });
+  const run = (rows: any[]) => PC.countPlanTargets({ rows, listedNames: LISTED, mainNames: ['Ana'], maxCharactersPerScene: 6 });
   const has = (rows: any[]) => run(rows).findings.map((f: any) => f.code).includes('CONSECUTIVE_SAME_SHOT_CAST');
   it('same shot and same cast on neighbours is a finding; same type and same cast with another shot is not', () => {
     expect(has([row(1, ['Ana', 'Ben'], 'medium'), row(2, ['Ben', 'Ana'], 'medium')])).toBe(true);
@@ -581,7 +581,7 @@ describe('a page is asked to take ONE added figure (Lab 1680-1685: Sarah and Han
   it('two characters without a focal page are sent to different pages, each holding at most one figure before the add', () => {
     const L = ['Ana', 'Ben', 'Cy', 'Dora'];
     const lines = [line('medium', 'Ana, Ben'), line('medium', 'Ana'), line('medium', 'Ana, Ben'), line('landscape', 'nobody'), line('face', 'Ben'), line('medium', 'Ana'), line('medium', 'Ana, Ben'), line('medium', 'Ana'), line('medium', 'Ben, Ana'), line('medium', 'Ana, Ben'), line('medium', 'Ana')];
-    const c = PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: L, commissionedNames: L, mainName: 'Ana', maxCharactersPerScene: 6 });
+    const c = PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: L, commissionedNames: L, mainNames: ['Ana'], maxCharactersPerScene: 6 });
     expect(c.findings.filter((f: any) => f.code === 'NO_FOCAL_PAGE').length).toBeGreaterThanOrEqual(2);
     const t = CC.typedPlanTargets({ pageCount: 11, listed: L, maxCharactersPerScene: 6 });
     const scope = TP.replanScope({ rows: c.rows, findings: c.findings, jevPages: {}, castTable: null, targets: t, commissionedNames: L, arcNames: [] });
@@ -620,7 +620,7 @@ describe('a second, code-triggered re-plan round (BACKLOG 2026-10-06; 50osg2osm 
     const orig = JD.runJevRequests;
     JD.runJevRequests = async (reqs: any[]) => new Map(reqs.map(r => [r.key, [{ [Object.keys(r.questions)[0]]: { noul: r.key.endsWith(':V') ? 0.9 : r.key.endsWith(':F') ? 0.1 : 0.5 } }]]));
     try {
-      return await TP.runTypedPlan({ inputData: input, pageCount: 11, approvedArc: 'An arc.', arcHints: null, arcStoryLogic: null, arcCentralFigure: null, commission: { listed: L, all: L }, maxCast: 6, mainName: 'Ana', readPlan, callModel: makeCall(log), parseCastTable: () => null });
+      return await TP.runTypedPlan({ inputData: input, pageCount: 11, approvedArc: 'An arc.', arcHints: null, arcStoryLogic: null, arcCentralFigure: null, commission: { listed: L, all: L }, maxCast: 6, mainNames: ['Ana'], readPlan, callModel: makeCall(log), parseCastTable: () => null });
     } finally { JD.runJevRequests = orig; }
   };
   it('runs a second round when a code target is still unmet after round 1, and it answers code findings only', async () => {
@@ -638,7 +638,7 @@ describe('a second, code-triggered re-plan round (BACKLOG 2026-10-06; 50osg2osm 
 describe('two characters that each need a focal page on a short book (50osg2osm)', () => {
   const L = ['Emma', 'Noah', 'Daniel', 'Sarah', 'Hans'];
   const lines = [line('medium', 'Emma, Sarah, Hans'), line('medium', 'Daniel, Noah'), line('medium', 'Emma, Sarah, Hans'), line('medium', 'Emma'), line('medium', 'Emma, Daniel'), line('medium', 'Noah, Daniel'), line('medium', 'Emma, Noah'), line('medium', 'Daniel'), line('object', 'nobody'), line('group', 'Emma, Noah, Daniel, Sarah, Hans')];
-  const c = PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: L, commissionedNames: L, mainName: 'Emma', maxCharactersPerScene: 6 });
+  const c = PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: L, commissionedNames: L, mainNames: ['Emma'], maxCharactersPerScene: 6 });
   const t = CC.typedPlanTargets({ pageCount: 10, listed: L, maxCharactersPerScene: 6 });
   const scope = TP.replanScope({ rows: c.rows, findings: c.findings, jevPages: {}, castTable: null, targets: t, commissionedNames: L, arcNames: [] });
   it('both are sent to pages, and no page takes two added figures', () => {
@@ -657,7 +657,7 @@ describe('two characters that each need a focal page on a short book (50osg2osm)
 describe('the face-page nomination names WHO takes the close-up (Lab 1686, 50osg2osm: offered only a page, ignored twice)', () => {
   const L = ['Emma', 'Noah', 'Daniel', 'Sarah', 'Hans'];
   const lines = [line('medium', 'Emma, Sarah, Hans'), line('medium', 'Daniel, Noah'), line('medium', 'Emma, Sarah, Hans'), line('medium', 'Emma'), line('medium', 'Emma, Daniel'), line('medium', 'Noah, Daniel'), line('medium', 'Emma, Noah'), line('medium', 'Daniel'), line('object', 'nobody'), line('group', 'Emma, Noah, Daniel, Sarah, Hans')];
-  const c = PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: L, commissionedNames: L, mainName: 'Emma', maxCharactersPerScene: 6 });
+  const c = PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: L, commissionedNames: L, mainNames: ['Emma'], maxCharactersPerScene: 6 });
   const t = CC.typedPlanTargets({ pageCount: 10, listed: L, maxCharactersPerScene: 6 });
   const scope = TP.replanScope({ rows: c.rows, findings: c.findings, jevPages: {}, castTable: null, targets: t, commissionedNames: L, arcNames: [] });
   const faceEntries = [...scope.entries()].filter(([, o]: any) => o.reasons.some((r: string) => /face page of /.test(r)));

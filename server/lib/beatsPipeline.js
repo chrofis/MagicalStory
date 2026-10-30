@@ -140,7 +140,7 @@ const {
   acceptAddedWardrobeCategory,
   applyClothingFix,
   parsePlanResponse,
-  pickMainCharacters,
+  pickMainNames,
   buildSceneExpansionPrompt,
   buildVisualBibleCallPrompt,
   buildSceneBriefsAllPrompt,
@@ -817,11 +817,11 @@ function planCheckInputs(inputData, { arcPremiseNames = [], modelOverrides = {} 
 // first any more: who is on a page is a question about English, the model
 // call answers it as a ROSTER, and the counters do arithmetic on that answer
 // instead of re-deriving the cast from the prose with a grammar heuristic.
-function createPlanCheckRunner({ inputData, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, placeNames, maxCast, arcInventedNames, arcInventedLimit, mainName, planCheckModel, onChunk, gl, labPromptOptions = {}, onCall = null, jevReport = null, jevCall = null }) {
+function createPlanCheckRunner({ inputData, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, placeNames, maxCast, arcInventedNames, arcInventedLimit, mainNames, planCheckModel, onChunk, gl, labPromptOptions = {}, onCall = null, jevReport = null, jevCall = null }) {
   // The counters over one division's parsed check facts — shared by the real
   // check below and `compose` (a division mixing two checks' pages, judged
   // without a model call: replanSalvage.js).
-  const countersFor = (pages, p) => runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster: p.roster, peoplelessPick: p.peoplelessPick, centralFigure: arcCentralFigure, centralPages: p.centralPages, mainName, castTable, actions: p.actions, legacyShots: !!labPromptOptions.legacyShots });
+  const countersFor = (pages, p) => runPlanCounters({ pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster: p.roster, peoplelessPick: p.peoplelessPick, centralFigure: arcCentralFigure, centralPages: p.centralPages, mainNames, castTable, actions: p.actions, legacyShots: !!labPromptOptions.legacyShots });
   const structure = (counters, modelFindings) => [
     ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),
     ...modelFindings.map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
@@ -1094,7 +1094,7 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
           focalPages: st.focalPages || {},
           listed: commission.listed,
           floor: coverageRule ? coverageRule.appearances.min : 0,
-          mainName: st.mainCharacter || null,
+          mainNames: st.mainCharacters || [],
           centralFigure: arcCentralFigure,
           centralPages: st.centralFigure ? st.centralFigure.pages : null,
           castTable,
@@ -2929,9 +2929,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       gl.error('beats_cast_table_unreadable', `The planner's CAST block could not be read: ${err.message}. CAST_PROMISE_BROKEN does not run this run.`, null, { error: err.message });
     }
   }
-  // The book's focus character, from the one place that decides it — never
-  // the first name on the character list (MAIN_UNDER_HALF, 2026-09-25).
-  const mainName = pickMainCharacters(inputData).focus?.name || null;
+  // EVERY main character, from the one place that decides it (MAIN_UNDER_HALF, 2026-09-25; each main holds the floor, owner 2026-10-30).
+  const mainNames = pickMainNames(inputData);
 
   // ── Step 2: THE PLAN CHECK — counters, one cheap call, ONE re-plan ────────
   //
@@ -2961,7 +2960,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
 
   const runCheck = createPlanCheckRunner({
     inputData, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, placeNames,
-    maxCast, arcInventedNames, arcInventedLimit, mainName, planCheckModel, onChunk, gl,
+    maxCast, arcInventedNames, arcInventedLimit, mainNames, planCheckModel, onChunk, gl,
     labPromptOptions: legacyShotsOf(jevReport) ? { legacyShots: true } : {},
     jevReport,
   });

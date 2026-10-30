@@ -50,7 +50,7 @@ beforeAll(async () => {
     arcCentralFigure: resolveReplayCentralFigure(storyData), castTable, commission: inputs.commission,
     commissionedNames: inputs.commissionedNames, placeNames: inputs.placeNames, maxCast: inputs.maxCast,
     arcInventedNames: logic.invented, arcInventedLimit: PB.arcInventedAllowance(storyData),
-    mainName: PB.pickMainCharacters(storyData).focus?.name || null, planCheckModel: 'unused', onChunk: null, gl,
+    mainNames: PB.pickMainNames(storyData), planCheckModel: 'unused', onChunk: null, gl,
   });
   const readPlan = BP.makePlanReader(Array.from({ length: Number(storyData.pages) }, (_, i) => i + 1), approvedArc);
   standing = readPlan(b.plannerReply).parsed.pages;
@@ -76,7 +76,10 @@ describe('the stored round, replayed', () => {
       .filter(l => !/^PLAN\[NO_COMMISSIONED_ON_PAGE\] page \d+:/.test(l))
       // The focal variant of a broken promise has its own code since 2026-10-07 (a removal answers it).
       .map(l => (/deed page, alone or with one companion/.test(l) ? 'CAST_PROMISE_FOCAL_BROKEN' : (l.match(/^PLAN\[([A-Z_]+)\]/) || [])[1])).sort();
-    const nowCodes = (c: any) => codes(c).filter((x: string) => x !== 'PLAN_INSTANT_TOO_LONG');
+    // 2026-10-30: every main holds the floor, so the SECOND main (Julian) files its own MAIN_UNDER_HALF; the stored
+    // round (2026-09) counted the focus main only, so that finding is set aside here and pinned in two-mains-equal-floor.
+    const focus = PB.pickMainNames(resolveReplayInputData(fx))[0];
+    const nowCodes = (c: any) => c.counters.findings.filter((f: any) => !(f.code === 'MAIN_UNDER_HALF' && !f.detail.startsWith(`${focus} `))).map((f: any) => f.code).filter((x: string) => x !== 'PLAN_INSTANT_TOO_LONG').sort();
     expect(nowCodes(given)).toEqual(stored(fx.beatsReviewReport.counterFindings));
     expect(nowCodes(recheck)).toEqual(stored(round.recheck.counterFindings));
   });
@@ -84,7 +87,7 @@ describe('the stored round, replayed', () => {
   it('the whole round regresses 5 → 7 (6 → 8 before one commissioned-free page was allowed), and the guard discards it', () => {
     const v = PB.replanRoundRegressed(given, recheck, round.changedPages, { round: 1 });
     // 6 → 8 when stored; the one page without a commissioned character is now allowed, so 5 → 7.
-    expect([v.before, v.after, v.discard]).toEqual([4, 7, true]);  // 5 before 2026-10-07: Levin's "also on 16" is a lead page's, no finding
+    expect([v.before, v.after, v.discard]).toEqual([5, 8, true]);  // 4 → 7 before 2026-10-30: the second main (Julian, 7/18 pages) now files his own MAIN_UNDER_HALF in both checks;   // 5 before 2026-10-07: Levin's "also on 16" is a lead page's, no finding
     expect(whoOf(returned, 4)).toMatch(/Levin/);
     expect(whoOf(returned, 7)).toMatch(/Levin/);
   });

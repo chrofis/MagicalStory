@@ -10004,7 +10004,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   await loadPromptTemplates();
   const {
     buildBeatsPrompt, parsePlanCheckObstacles, parsePlanCheckActions, replanKeepPages,
-    parseStoryLogic, arcInventedAllowance, pickMainCharacters,
+    parseStoryLogic, arcInventedAllowance, pickMainNames,
   } = require('./promptBuilders');
   const { parsePlanCastBlock, commissionedCast } = require('./castCoverage');
   const { parseBeats } = require('./storyHelpers');
@@ -10153,7 +10153,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   if (!plan || plan.pages.length === 0) throw new Error('the first division has no parseable plan lines');
   const pagePlan = plan.pagePlan;
   // The focus character, as production passes it (MAIN_UNDER_HALF, 2026-09-25).
-  const mainName = pickMainCharacters(storyData).focus?.name || null;
+  const mainNames = pickMainNames(storyData);
 
   const inputs = planCheckInputs(storyData, { arcPremiseNames, modelOverrides: storyData.modelOverrides });
   const { commission, commissionedNames, maxCast } = inputs;
@@ -10161,7 +10161,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   for (const m of [checkModel, planModel]) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
   const runCheck = createPlanCheckRunner({
     inputData: storyData, approvedArc, arcHints, arcStoryLogic: storyLogic, arcCentralFigure: centralFigure, castTable,
-    commission, commissionedNames, placeNames: inputs.placeNames, maxCast, arcInventedNames, arcInventedLimit, mainName,
+    commission, commissionedNames, placeNames: inputs.placeNames, maxCast, arcInventedNames, arcInventedLimit, mainNames,
     planCheckModel: checkModel, onChunk: null, gl, labPromptOptions, onCall,
   });
   const costOf = r => priceUsage(r.modelId || '', r.usage || {});
@@ -10266,7 +10266,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   }) : null;
   const { appliedPlan, ...complianceFields } = verdict || {};
   const typedMeasure = planFresh ? await measureUntypedDivision({
-    pages: shot.beats, check: shippedDivision.check, approvedArc, commission, arcNames: arcInventedNames || [], mainName, maxCast,
+    pages: shot.beats, check: shippedDivision.check, approvedArc, commission, arcNames: arcInventedNames || [], mainNames, maxCast,
     replanned: shipped.changedPages.length, startedAt: t0,
   }) : null;
   const roundsOut = replanRounds.map(r => ({
@@ -10301,7 +10301,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
  * code + Jev reading as the typed arm (typedPlan.measurePlan). `present` is the
  * plan check's head count of the division (planCounters castPerPage).
  */
-async function measureUntypedDivision({ pages, check, present = null, approvedArc, commission, arcNames = [], mainName, maxCast, replanned = null, startedAt = null }) {
+async function measureUntypedDivision({ pages, check, present = null, approvedArc, commission, arcNames = [], mainNames, maxCast, replanned = null, startedAt = null }) {
   const { presentOf } = require('./beatsPipeline');
   const tp = require('./typedPlan');
   const head = present || presentOf(check);
@@ -10310,7 +10310,7 @@ async function measureUntypedDivision({ pages, check, present = null, approvedAr
   const rows = tp.rowsOfUntypedPlan(pages, head, { commissionedNames: commission.all, arcNames });
   const jevResult = await tp.judgePlanPages({ arc: approvedArc, pages, rows, listed: commission.listed });
   return {
-    metrics: tp.measurePlan({ rows, jevResult, listed: commission.listed, commissionedNames: commission.all, arcNames, mainName, maxCharactersPerScene: maxCast }),
+    metrics: tp.measurePlan({ rows, jevResult, listed: commission.listed, commissionedNames: commission.all, arcNames, mainNames, maxCharactersPerScene: maxCast }),
     jev: jevResult.pages,
     jevStats: jevResult.stats,
     rows: rows.map(r => ({ pageNumber: r.pageNumber, type: r.type, shot: r.shot, names: r.names })),
@@ -10331,14 +10331,14 @@ const TYPED_ASKED_CHECKS = new Set([1, 3, 5, 6, 9, 10, 11, 17]);
  */
 async function runTypedPlanArm({ target, params, storyData, approvedArc, arcHints, centralFigure, storyLogic, arcPremiseNames, arcInventedNames, arcInventedLimit, pageCount, planModel, readPlan, readCastTable, labPromptOptions, typedPlan, calls, onCall, events, gl }) {
   const { planCheckInputs, createPlanCheckRunner, shippedReplanState } = require('./beatsPipeline');
-  const { pickMainCharacters, parsePlanResponse } = require('./promptBuilders');
+  const { pickMainNames, parsePlanResponse } = require('./promptBuilders');
   const { callTextModelStreaming } = require('./textModels');
   const { TEXT_MODELS, priceUsage } = require('../config/models');
   const tp = require('./typedPlan');
   const t0 = Date.now();
   const inputs = planCheckInputs(storyData, { arcPremiseNames, modelOverrides: storyData.modelOverrides });
   const { commission, commissionedNames, maxCast } = inputs;
-  const mainName = pickMainCharacters(storyData).focus?.name || null;
+  const mainNames = pickMainNames(storyData);
   const costOf = r => priceUsage(r.modelId || '', r.usage || {});
   const textCost = () => calls.reduce((a, r) => a + costOf(r), 0);
 
@@ -10353,7 +10353,7 @@ async function runTypedPlanArm({ target, params, storyData, approvedArc, arcHint
     const perPage = (rep.recheck && rep.recheck.counterStats && rep.recheck.counterStats.castPerPage) || (rep.counterStats && rep.counterStats.castPerPage);
     if (!perPage) throw new Error(`story ${target.storyId} stores no head count for its shipped plan`);
     const present = new Map(perPage.map(r => [Number(r.pageNumber), r.names || []]));
-    const m = await measureUntypedDivision({ pages: parsed.pages, present, approvedArc, commission, arcNames: arcInventedNames || [], mainName, maxCast, replanned: (rep.changedPages || []).length, startedAt: t0 });
+    const m = await measureUntypedDivision({ pages: parsed.pages, present, approvedArc, commission, arcNames: arcInventedNames || [], mainNames, maxCast, replanned: (rep.changedPages || []).length, startedAt: t0 });
     return {
       storyId: target.storyId, pages: pageCount, arm: 'stored-shipped-plan', typedMeasure: m,
       standingPlan: parsed.pages, cost: m.jevStats.costUsd, usage: { input_tokens: 0, output_tokens: 0 },
@@ -10373,7 +10373,7 @@ async function runTypedPlanArm({ target, params, storyData, approvedArc, arcHint
   const callLog = [];
   const result = await tp.runTypedPlan({
     inputData: storyData, pageCount, approvedArc, arcHints, arcStoryLogic: storyLogic, arcCentralFigure: centralFigure,
-    commission, maxCast, mainName, arcNames: arcInventedNames || [], readPlan, parseCastTable: readCastTable, labPromptOptions,
+    commission, maxCast, mainNames, arcNames: arcInventedNames || [], readPlan, parseCastTable: readCastTable, labPromptOptions,
     planEffort, firstOnly,
     callModel: async (prompt, label, callOpts = {}) => {
       const t = Date.now();
@@ -10400,7 +10400,7 @@ async function runTypedPlanArm({ target, params, storyData, approvedArc, arcHint
   const checkModel = params.checkModel || inputs.planCheckModel;
   const runCheck = advisoryOff ? null : createPlanCheckRunner({
     inputData: storyData, approvedArc, arcHints, arcStoryLogic: storyLogic, arcCentralFigure: centralFigure, castTable: result.castTable,
-    commission, commissionedNames, placeNames: inputs.placeNames, maxCast, arcInventedNames, arcInventedLimit, mainName,
+    commission, commissionedNames, placeNames: inputs.placeNames, maxCast, arcInventedNames, arcInventedLimit, mainNames,
     planCheckModel: checkModel, onChunk: null, gl, labPromptOptions, onCall,
   });
   const check = !runCheck ? null : await runCheck('plan_check', result.pages, result.pages.map(p => `Page ${p.pageNumber}: ${p.planLine}`).join('\n'));
