@@ -10717,6 +10717,45 @@
     }
    ],
    "lastChecked": "2026-10-25"
+  },
+  {
+   "id": "opus-book-review-staging-2026-10-30",
+   "title": "Staging: one Opus review of the whole book finds the defects and picks the fix per page",
+   "commits": [
+    "b0f530a58",
+    "5b436da02"
+   ],
+   "addedAt": "2026-10-30",
+   "status": "pending",
+   "claim": "On a staging story with pageJudgeMode book_review: no per-page picture judge runs (no quality/semantic/entity/consolidation eval_calls for pages; notEvaluated rows instead), ONE Opus 5.5 call reviews all pages and covers, every FAULT line carries a route tag TOUCHUP|NEW|CHAR:<Name>, each tagged page is repaired by that method, repaired pages are re-reviewed with BETTER verdicts, at most 2 repair rounds, and a page with no characters that fits the text gets no finding. A failed review is retried once, then the book ships unrepaired and marked not reviewed.",
+   "runShape": [
+    "full-story"
+   ],
+   "check": {
+    "kind": "human",
+    "what": "In eval_calls for the story: count book-review calls (1 + re-reviews, max 3) and confirm no per-page judge kinds; read each FAULT line route tag and the repair method that ran for that page (story_images versions); eye-check every final page against the findings; record the Opus cost from tokenUsage.byFunction."
+   },
+   "evidence": [],
+   "lastChecked": null
+  },
+  {
+   "id": "own-story-jev-check-2026-10-30",
+   "title": "Wizard Own story box: Jev says which story parts the parent text still needs",
+   "commits": [
+    "a694150d9"
+   ],
+   "addedAt": "2026-10-30",
+   "status": "pending",
+   "claim": "On staging, typing at least 40 characters into the Own story box calls POST /api/analyze-own-story after a ~5 s pause (only when the text changed, rate-limited), and the checklist shows who / where / problem / want / ending as present or missing plus the tip for the first missing part, in the UI language; a text unsuitable for the age shows the warning. Stored-text check 2026-10-30: 87/90 flags right on 18 labelled texts, unsuitable 2/2, USD 0.00033.",
+   "runShape": [
+    "any"
+   ],
+   "check": {
+    "kind": "human",
+    "what": "On staging.magicalstory.ch open the wizard idea step, pick Own story, type a text missing an ending, wait 5 s: network shows one analyze-own-story call and the checklist marks ending missing; finish the text and see it turn present."
+   },
+   "evidence": [],
+   "lastChecked": null
   }
  ],
  "runs": [
