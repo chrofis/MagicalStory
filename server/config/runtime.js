@@ -146,6 +146,27 @@ const SETTINGS = {
   // watching the result, not the convergence.
   repairMaxPasses: perEnvironment({ default: 3, staging: 1, local: 1 }),
 
+  // ── Who judges the pictures ────────────────────────────────────────────
+  // 'per_page' (production): every page is judged by the per-page checks
+  // (quality, inventory, semantic, absence, entity, consolidation, parent_shared)
+  // and repaired by the method decideRepairMethod picks.
+  // 'book_review' (STAGING ONLY, owner 2026-10-29, docs/decisions.md): those
+  // per-page judges are OFF. When the pages and covers are done, ONE Claude
+  // Opus review of the whole book (bookAudit.auditStoryBook, model
+  // MODEL_DEFAULTS.bookReviewModel) finds the faults AND names the fix per
+  // fault (touch-up / new picture / character repair); repaired pages are
+  // re-reviewed. Evidence: prod job_1793216785179_ve47ncy55 v0, Opus 8/8 real
+  // defects with 0 false alarms at $0.20 against ~3/8 and 5 false horn
+  // findings at ~$1.15/story for the per-page checks (one story; tasks/
+  // opus-book-review-2026-10-29.md). Production stays per_page until a staging
+  // run set says otherwise.
+  pageJudgeMode: perEnvironment({ default: 'per_page', staging: 'book_review' }),
+
+  // Repair rounds of the book review: review -> repair -> re-review -> repair ->
+  // final review (owner decision D4). Only read when pageJudgeMode is
+  // 'book_review'; production's budget stays repairMaxPasses.
+  bookReviewRepairRounds: 2,
+
   // ── Verification registry auto-check ───────────────────────────────────
   // Staging only (owner, 2026-09-27). When a story completes, the server
   // judges it against tasks/verify.json (server/lib/verifyAutoCheck.js) and

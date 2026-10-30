@@ -97,7 +97,7 @@ describe('stage-1 inventory model', () => {
 });
 
 describe('remaining per-environment differences', () => {
-  it('repairMaxPasses and verifyAutoCheck are the only ones left', async () => {
+  it('repairMaxPasses, pageJudgeMode and verifyAutoCheck are the only ones left', async () => {
     // runtime.js:119 claims this in a comment. Pin it, so the comment cannot
     // quietly become false the way the inventory split made it false.
     const perEnvKeys: string[] = [];
@@ -107,6 +107,7 @@ describe('remaining per-environment differences', () => {
         perEnvKeys.push(name);
       }
     }
-    expect(perEnvKeys).toEqual(['repairMaxPasses', 'verifyAutoCheck']);
+    // pageJudgeMode joined 2026-10-29: staging runs the whole-book review, production the per-page judges.
+    expect(perEnvKeys).toEqual(['repairMaxPasses', 'pageJudgeMode', 'verifyAutoCheck']);
   });
 });

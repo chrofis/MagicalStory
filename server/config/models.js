@@ -834,8 +834,14 @@ const MODEL_DEFAULTS = {
   // Lived as a constant in jevAudit.js until 2026-09-30.
   jevModel: process.env.JEV_MODEL || 'typesafe/jev-1.13',
 
+  // The staging BOOK REVIEW (runtime pageJudgeMode 'book_review'): the one vision
+  // model that reads the whole finished book and routes each fault to its fix.
+  // OpenRouter id, verified 2026-10-29; billed the same as Anthropic direct
+  // ($4 in / $20 out per 1M). See docs/decisions.md 2026-10-29.
+  bookReviewModel: 'anthropic/claude-opus-5.5',
+
   // Utility models (inspection, visual bible, etc.)
-  utility: 'gemini-2.5-flash',         // Fast utility tasks. 2.0-flash RETIRED by Google
+  utility: 'gemini-2.5-flash',        // Fast utility tasks. 2.0-flash RETIRED by Google
                                        // (404 "no longer available", found 2026-07-18 when the
                                        // Test Lab style gate silently skipped) — every
                                        // compareImageStyles/analyzeImageStyle/VB-utility call

@@ -685,6 +685,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const { runEntityConsistencyChecks, getStyledAvatarForClothing } = require('./entityConsistency');
   const { extractSceneMetadata } = getStoryHelpers();
 
+  // STAGING ONLY (runtime pageJudgeMode 'book_review', docs/decisions.md 2026-10-29): the
+  // per-page picture judges are off and one whole-book review (bookReview.js) finds the
+  // faults and picks the fix. Production reads 'per_page' and runs every line below as it
+  // always has.
+  const bookReview = require('./bookReview');
+  const bookReviewMode = bookReview.bookReviewActive();
+
   // Story identity for the eval's own bookkeeping. evaluateImageBatch defaults
   // `storyId` to null, and evalPipeline keys every runMetrics counter it records
   // (presence_*, eval_matches_missing) off it — so with no caller passing it,
@@ -842,7 +849,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const imageCheckData = buildEntityCheckData(imagesWithData);
 
   // Run both in parallel
-  const [evaluations, entityReport] = await Promise.all([
+  // In book-review mode neither judge runs: no evaluations, and an entity report that says it
+  // was not run (never a clean pass).
+  const [evaluations, entityReport] = bookReviewMode ? [[], bookReview.notRunEntityReport()] : await Promise.all([
     images().evaluateImageBatch(evalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta }),
     runEntityConsistencyChecks(imageCheckData, characters, {
       checkCharacters: true,
@@ -970,7 +979,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     });
   }
   const baselineEvalsByPage = new Map();
-  if (baselineEvalInputs.length > 0) {
+  if (baselineEvalInputs.length > 0 && !bookReviewMode) {
     const baselineEvals = await images().evaluateImageBatch(baselineEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta });
     for (const ev of baselineEvals) {
       baselineEvalsByPage.set(ev.pageNumber, ev);
@@ -1962,7 +1971,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // audit may grant ONE extra round (owner, 2026-09-13) -- and never past
   // `maxRegenAttempts`, the configured budget (2026-09-17). See
   // planBookAuditRound.
-  let roundLimit = maxRegenAttempts;
+  // Book-review mode runs no per-page round: its repair rounds follow the loop (runBookReviewRounds).
+  let roundLimit = bookReviewMode ? 0 : maxRegenAttempts;
   let extraAuditRoundUsed = false;
   // Pages the final audit re-admitted to repair. Consumed by the next round's
   // bad-page list, then cleared — it can only ever be filled once.
@@ -2157,6 +2167,221 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       }
     }
   };
+  // The version object a repair result becomes — ONE field list for the per-page
+  // round loop and the staging book review (bookReview.js), so a field added to
+  // one cannot be missing from the other (the "second whitelist" bugs below were
+  // exactly that). `score`, `evaluation`, `entityIssues` and `repairPlan` are the
+  // only fields the two callers decide differently.
+  const buildRoundVersion = (repairResult, { score, evaluation, entityIssues, repairPlan }) => {
+    return {
+      imageData: repairResult.imageData,
+      score,
+      source: repairResult.source,
+      evaluation,
+      modelId: repairResult.modelId,
+      grokRefImages: repairResult.grokRefImages || null,
+      referencePhotos: repairResult.referencePhotos || null,
+      inpaintInstruction: repairResult.inpaintInstruction || null,
+      inpaintReferenceImages: repairResult.inpaintReferenceImages || null,
+      // Per-version prompt/description for iterate results — passes
+      // through to buildVersionEntry so dev panel shows what was
+      // actually sent to Grok, not the stale original page prompt.
+      prompt: repairResult.prompt || null,
+      // ...and the prose that prompt was SHRUNK to before it was sent.
+      // THE SECOND WHITELIST (2026-09-17): 434ea1e89 wired
+      // `compressedScene` through the round result, the eval inputs, the
+      // page OUTPUT whitelist and buildVersionEntry -- but this object,
+      // the one that actually becomes the version, dropped it again. So
+      // originals and inpaint/char-fix lineage stamped correctly while
+      // every iterate version stored null: on staging
+      // job_1789584708605_rts4wqupm all six rewrites built prompts of
+      // 7,981-9,233 chars against Grok's 7,900 cap, and their judges then
+      // scored 4 of the 18 shipped pages against the untruncated brief
+      // (resolveVersionCompressedScene falls back to `description`).
+      compressedScene: repairResult.compressedScene || null,
+      // Lineage breadcrumb stamped by inheritSceneContract -- which
+      // version's pixels this one edited. Dropped here it occurred zero
+      // times in the stored story, so no repair chain was auditable.
+      parentSource: repairResult.parentSource || null,
+      description: repairResult.description || null,
+      // THE REWRITTEN CONTRACT TRAVELS WITH THE VERSION (2026-09-13).
+      // executeIterateAction already returns the cast it re-derived from
+      // the rewritten brief (images.js iteratePageCore → newSceneCharacters,
+      // newSceneMetadata) and buildVersionEntry / final assembly already
+      // read `v.sceneCharacters` / `v.sceneMetadata` — but this object,
+      // the one that becomes the version, never copied them across. So
+      // the rewrite's description was promoted to the page and its CAST
+      // was not: on job_1789207854566_l43qgl34w p15 the iterate rewrite
+      // named six people and the page record kept `[Fiona]`, leaving the
+      // final image judged against a roster of 2 against 6 drawn figures
+      // and taking an `extra_character` CRITICAL for its own cast.
+      // Declared-or-unknown: `|| null` would swallow a rewrite that
+      // legitimately empties the cast, so the array passes through as-is.
+      sceneCharacters: Array.isArray(repairResult.sceneCharacters) ? repairResult.sceneCharacters : null,
+      sceneMetadata: repairResult.sceneMetadata || null,
+      // Detection is part of every image version (owner decision
+      // 2026-07-31): the ONE detection made on this result's bytes
+      // (iterate's internal or the round pre-detect), stamped directly
+      // so detectionForVersion resolves it even if the eval failed.
+      bboxDetection: repairResult.bboxDetection || null,
+      entityIssues,
+      evaluatedAt: new Date().toISOString(),
+      // Composite-cover 2-pass debug bundle from executeIterateAction
+      // (cover iterates only). buildVersionEntry reads v.compositeAttempts
+      // and v.method to populate the version row so the modal can render
+      // the pass-1/pass-2 plates. Without these two lines the source
+      // label still says 'composite-iterate-round-N' but the version
+      // has compositeAttempts:null → modal shows score+prompt but no
+      // intermediate thumbnails. Verified missing on staging job
+      // job_1779382004213_idu0axofe initialPage v1.
+      compositeAttempts: repairResult.compositeAttempts || null,
+      method: repairResult.method || null,
+      charRepairGrokRaw: repairResult.charRepairGrokRaw || null,
+      charRepairBlendMask: repairResult.charRepairBlendMask || null,
+      charRepairWhiteout: repairResult.charRepairWhiteout || null,
+      // THE PLAN THIS REPAIR EXECUTED, frozen at creation (B1, 2026-10-07).
+      // `consolidatedPlan` above is the plan of THIS version's own evaluation, and a later
+      // book-audit re-consolidation (rescoreWithReaderFindings) overwrites it, so nothing
+      // stored said what the round actually asked for. The inpaint result carries the plan it
+      // re-derived; every other method ran from the round's page evaluation.
+      repairPlan,
+    };
+  };
+
+  // ONE dispatch of a repair method on a page, shared by the per-page round loop
+  // and the staging book review (bookReview.js) so the two can never run a
+  // method differently: iterate / inpaint (with its no-op re-route) / char-fix,
+  // each returning the round-result shape the version builders read.
+  // `failed(error, extra)` builds the caller's failure result.
+  const runRepairMethod = async ({ img, method, latestEval, decision, round, recolourInput, failed }) => {
+    const pageNumber = img.pageNumber;
+    const iterateOutcome = async () => {
+      const result = await executeIterateAction(img, latestEval);
+      if (result?.imageData) {
+        // For composite-cover iterate the bottom-line "result" hides a
+        // 2-pass workflow with 4 intermediate buffers and 2 distinct
+        // prompts. Carry that detail forward so the version row records
+        // exactly what went to the image model on each pass — without
+        // this the dev panel can't distinguish a composite iterate from
+        // a legacy iterate, and there's no way to inspect why pass 1
+        // produced the wrong arms or why pass 2 lost the gaze.
+        // Single source of truth for composite-debug → version shape.
+        // Defined once in coverComposite; both this unified-pipeline
+        // call site and the user-triggered iterate endpoint use it.
+        const { buildCompositeAttemptsFromDebug } = require('./coverComposite');
+        const compositeAttempts = buildCompositeAttemptsFromDebug(result.compositeDebug);
+        return {
+          pageNumber,
+          imageData: result.imageData,
+          source: compositeAttempts ? `composite-iterate-round-${round}` : `iterate-round-${round}`,
+          method: compositeAttempts ? 'composite' : undefined,
+          modelId: result.modelId,
+          grokRefImages: result.grokRefImages || null,
+          referencePhotos: result.referencePhotos || null,
+          // O6: direct-path covers — iterateCover returns these; they
+          // were dropped here, leaving the landmark/VB-grid refs
+          // unviewable after reload.
+          landmarkPhotos: result.landmarkPhotos || null,
+          visualBibleGrid: result.visualBibleGrid || null,
+          // Capture the iterate's actual image prompt — this is the
+          // feedback-augmented prompt that was sent to Grok (built in
+          // iteratePageCore line ~7250 + appended evaluation feedback at
+          // line ~7253). Without this, the persisted version at
+          // buildVersionEntry falls back to img.prompt (the ORIGINAL
+          // page prompt), which makes the dev panel + audit trail show
+          // the wrong text and hides whether feedback was actually
+          // appended.
+          //
+          // THREE BRANCHES, NOT ONE (2026-09-19). executeIterateAction
+          // dispatches to iteratePage (returns `imagePrompt`, plus
+          // `promptSent` — the post-shrink string the model really got),
+          // to iterateCover (returns `prompt`) and to a plain
+          // generateImageOnly regen (also `prompt`). Reading only
+          // `imagePrompt` meant EVERY cover iterate stored null and
+          // inherited the original cover prompt — measured on staging
+          // job_1789759147125_p08djwhbl initialPage v1.
+          prompt: result.promptSent || result.imagePrompt || result.prompt || null,
+          // The rewrite's own post-shrink prose, when ITS prompt went over
+          // the model's cap. Its brief differs from the page's, so the
+          // page's sent prose can never stand in for it.
+          compressedScene: result.compressedScene || null,
+          description: result.newScene || null,
+          // The iterate's rewritten scene contract — evaluation of this
+          // version MUST use these, not the original page metadata (a
+          // rewrite that re-includes a character the plan dropped was
+          // evaluated against the old plan, flagged as "extra character",
+          // and inpaint-removed; see docs/decisions.md).
+          sceneMetadata: result.newSceneMetadata || null,
+          sceneCharacters: result.newSceneCharacters || null,
+          compositeAttempts,
+          // Fresh detection of THIS redraw (iterate re-detects internally
+          // on its accepted image). Carried so the per-round garment-hue
+          // pass can normalize the redraw BEFORE it is scored, reusing this
+          // detection's mask (no extra detect). inpaint/char-fix don't
+          // produce a full-image detection → those redraws are skipped.
+          bboxDetection: result.bboxDetection || null,
+        };
+      }
+      return { pageNumber, imageData: null, method: 'iterate', error: 'iterate produced no result' };
+    };
+
+    if (method === 'inpaint') {
+      const inpaintResult = await executeInpaintAction(img, latestEval, round, recolourInput);
+      // NO-OP ON THE TARGET (owner, 2026-10-07): the edit came back and the
+      // region it was asked to change is, pixel for pixel, unchanged. A
+      // second inpaint repeats it; the page redo is the other method. Once
+      // per page, and only while no iterate has been tried on it.
+      if (inpaintResult?.noop) {
+        const triedIterate = (pageVersions.get(pageNumber) || []).some(v => String(v?.source || '').startsWith('iterate-') || String(v?.source || '').startsWith('composite-iterate-'));
+        if (!triedIterate) {
+          log.warn(`🪃 [UNIFIED PIPELINE] Round ${round} page ${pageNumber}: the inpaint changed nothing inside its target — re-routing to iterate`);
+          require('./runMetrics').forJob(storyData?.id || jobId).count('inpaint_noop_rerouted');
+          return await iterateOutcome();
+        }
+        log.warn(`🚫 [UNIFIED PIPELINE] Round ${round} page ${pageNumber}: the inpaint changed nothing inside its target, and an iterate was already tried`);
+      }
+      if (inpaintResult.repaired && inpaintResult.imageData) {
+        return {
+          pageNumber,
+          imageData: inpaintResult.imageData,
+          source: `inpaint-round-${round}`,
+          modelId: inpaintResult.usage?.model || 'grok-text-edit',
+          // The full string handed to the editor for THIS render
+          // (`instruction` is the un-wrapped core of it). Stamped so the
+          // version stops falling back to the original page prompt.
+          prompt: inpaintResult.promptSent || inpaintResult.instruction || null,
+          inpaintInstruction: inpaintResult.instruction,
+          inpaintReferenceImages: inpaintResult.referenceImages || null,
+          inpaintReferenceSources: inpaintResult.referenceImageSources || null,
+          consolidatedPlan: inpaintResult.consolidatedPlan || null,
+          grokRefImages: null,
+        };
+      }
+      // SAY WHICH OF THE THREE IT WAS. "inpaint produced no result" reads
+      // as an image-model failure and was recorded for all of them, so a
+      // page that never reached a model, one whose editor errored, and one
+      // whose editor returned nothing were indistinguishable in the round
+      // record — on job_1789853503332_riqncqg1i three of four failed
+      // repairs carried that one string and none of the causes survived.
+      return failed(
+        inpaintResult.noop ? 'inpaint no-op: the target region came back unchanged'
+          : inpaintResult.error ? `inpaint edit failed: ${inpaintResult.error}`
+          : inpaintResult.instruction ? 'inpaint editor returned no image'
+            : 'inpaint had no instruction to send (every finding was filtered or the plan left it empty)'
+      );
+    }
+    if (method === 'iterate') return await iterateOutcome();
+    if (method === 'char-fix') {
+      const result = await executeCharFixAction(img, decision, round, recolourInput);
+      if (result?.imageData) {
+        return result;
+      }
+      return failed(result?.error || 'char-fix produced no result',
+        { charName: result?.charName || null, attemptFrames: result?.attemptFrames || [] });
+    }
+    return { pageNumber, imageData: null, method, error: `unknown method ${method}` };
+  };
+
   for (let round = 1; round <= roundLimit; round++) {
     // Build eval map for this round using best versions so far. Each entry now
     // carries explicit visualScore / semanticPenalty / imageScore / entityPenalty /
@@ -2645,131 +2870,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             return { pageNumber, imageData: null, skipped: true };
           }
 
-          const iterateOutcome = async () => {
-            const result = await executeIterateAction(img, latestEval);
-            if (result?.imageData) {
-              // For composite-cover iterate the bottom-line "result" hides a
-              // 2-pass workflow with 4 intermediate buffers and 2 distinct
-              // prompts. Carry that detail forward so the version row records
-              // exactly what went to the image model on each pass — without
-              // this the dev panel can't distinguish a composite iterate from
-              // a legacy iterate, and there's no way to inspect why pass 1
-              // produced the wrong arms or why pass 2 lost the gaze.
-              // Single source of truth for composite-debug → version shape.
-              // Defined once in coverComposite; both this unified-pipeline
-              // call site and the user-triggered iterate endpoint use it.
-              const { buildCompositeAttemptsFromDebug } = require('./coverComposite');
-              const compositeAttempts = buildCompositeAttemptsFromDebug(result.compositeDebug);
-              return {
-                pageNumber,
-                imageData: result.imageData,
-                source: compositeAttempts ? `composite-iterate-round-${round}` : `iterate-round-${round}`,
-                method: compositeAttempts ? 'composite' : undefined,
-                modelId: result.modelId,
-                grokRefImages: result.grokRefImages || null,
-                referencePhotos: result.referencePhotos || null,
-                // O6: direct-path covers — iterateCover returns these; they
-                // were dropped here, leaving the landmark/VB-grid refs
-                // unviewable after reload.
-                landmarkPhotos: result.landmarkPhotos || null,
-                visualBibleGrid: result.visualBibleGrid || null,
-                // Capture the iterate's actual image prompt — this is the
-                // feedback-augmented prompt that was sent to Grok (built in
-                // iteratePageCore line ~7250 + appended evaluation feedback at
-                // line ~7253). Without this, the persisted version at
-                // buildVersionEntry falls back to img.prompt (the ORIGINAL
-                // page prompt), which makes the dev panel + audit trail show
-                // the wrong text and hides whether feedback was actually
-                // appended.
-                //
-                // THREE BRANCHES, NOT ONE (2026-09-19). executeIterateAction
-                // dispatches to iteratePage (returns `imagePrompt`, plus
-                // `promptSent` — the post-shrink string the model really got),
-                // to iterateCover (returns `prompt`) and to a plain
-                // generateImageOnly regen (also `prompt`). Reading only
-                // `imagePrompt` meant EVERY cover iterate stored null and
-                // inherited the original cover prompt — measured on staging
-                // job_1789759147125_p08djwhbl initialPage v1.
-                prompt: result.promptSent || result.imagePrompt || result.prompt || null,
-                // The rewrite's own post-shrink prose, when ITS prompt went over
-                // the model's cap. Its brief differs from the page's, so the
-                // page's sent prose can never stand in for it.
-                compressedScene: result.compressedScene || null,
-                description: result.newScene || null,
-                // The iterate's rewritten scene contract — evaluation of this
-                // version MUST use these, not the original page metadata (a
-                // rewrite that re-includes a character the plan dropped was
-                // evaluated against the old plan, flagged as "extra character",
-                // and inpaint-removed; see docs/decisions.md).
-                sceneMetadata: result.newSceneMetadata || null,
-                sceneCharacters: result.newSceneCharacters || null,
-                compositeAttempts,
-                // Fresh detection of THIS redraw (iterate re-detects internally
-                // on its accepted image). Carried so the per-round garment-hue
-                // pass can normalize the redraw BEFORE it is scored, reusing this
-                // detection's mask (no extra detect). inpaint/char-fix don't
-                // produce a full-image detection → those redraws are skipped.
-                bboxDetection: result.bboxDetection || null,
-              };
-            }
-            return { pageNumber, imageData: null, method: 'iterate', error: 'iterate produced no result' };
-          };
-
-          if (method === 'inpaint') {
-            const inpaintResult = await executeInpaintAction(img, latestEval, round, recolourInput);
-            // NO-OP ON THE TARGET (owner, 2026-10-07): the edit came back and the
-            // region it was asked to change is, pixel for pixel, unchanged. A
-            // second inpaint repeats it; the page redo is the other method. Once
-            // per page, and only while no iterate has been tried on it.
-            if (inpaintResult?.noop) {
-              const triedIterate = (pageVersions.get(pageNumber) || []).some(v => String(v?.source || '').startsWith('iterate-') || String(v?.source || '').startsWith('composite-iterate-'));
-              if (!triedIterate) {
-                log.warn(`🪃 [UNIFIED PIPELINE] Round ${round} page ${pageNumber}: the inpaint changed nothing inside its target — re-routing to iterate`);
-                require('./runMetrics').forJob(storyData?.id || jobId).count('inpaint_noop_rerouted');
-                return await iterateOutcome();
-              }
-              log.warn(`🚫 [UNIFIED PIPELINE] Round ${round} page ${pageNumber}: the inpaint changed nothing inside its target, and an iterate was already tried`);
-            }
-            if (inpaintResult.repaired && inpaintResult.imageData) {
-              return {
-                pageNumber,
-                imageData: inpaintResult.imageData,
-                source: `inpaint-round-${round}`,
-                modelId: inpaintResult.usage?.model || 'grok-text-edit',
-                // The full string handed to the editor for THIS render
-                // (`instruction` is the un-wrapped core of it). Stamped so the
-                // version stops falling back to the original page prompt.
-                prompt: inpaintResult.promptSent || inpaintResult.instruction || null,
-                inpaintInstruction: inpaintResult.instruction,
-                inpaintReferenceImages: inpaintResult.referenceImages || null,
-                inpaintReferenceSources: inpaintResult.referenceImageSources || null,
-                consolidatedPlan: inpaintResult.consolidatedPlan || null,
-                grokRefImages: null,
-              };
-            }
-            // SAY WHICH OF THE THREE IT WAS. "inpaint produced no result" reads
-            // as an image-model failure and was recorded for all of them, so a
-            // page that never reached a model, one whose editor errored, and one
-            // whose editor returned nothing were indistinguishable in the round
-            // record — on job_1789853503332_riqncqg1i three of four failed
-            // repairs carried that one string and none of the causes survived.
-            return failed(
-              inpaintResult.noop ? 'inpaint no-op: the target region came back unchanged'
-                : inpaintResult.error ? `inpaint edit failed: ${inpaintResult.error}`
-                : inpaintResult.instruction ? 'inpaint editor returned no image'
-                  : 'inpaint had no instruction to send (every finding was filtered or the plan left it empty)'
-            );
-          }
-          if (method === 'iterate') return await iterateOutcome();
-          if (method === 'char-fix') {
-            const result = await executeCharFixAction(img, decision, round, recolourInput);
-            if (result?.imageData) {
-              return result;
-            }
-            return failed(result?.error || 'char-fix produced no result',
-              { charName: result?.charName || null, attemptFrames: result?.attemptFrames || [] });
-          }
-          return { pageNumber, imageData: null, method, error: `unknown method ${method}` };
+          return await runRepairMethod({ img, method, latestEval, decision, round, recolourInput, failed });
         } catch (err) {
           log.error(`❌ [UNIFIED PIPELINE] Round ${round} ${method} failed for page ${pageNumber}: ${err.message}`);
           return { pageNumber, imageData: null, method, error: err.message };
@@ -2994,82 +3095,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             ? getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport)
             : { issues: [], penalty: 0 }; // never the previous image's report (D4)
           const { applyScore } = require('./scoring');
-          const newVersion = {
-            imageData: repairResult.imageData,
+          const newVersion = buildRoundVersion(repairResult, {
             score: evScore,
-            source: repairResult.source,
             evaluation: ev,
-            modelId: repairResult.modelId,
-            grokRefImages: repairResult.grokRefImages || null,
-            referencePhotos: repairResult.referencePhotos || null,
-            inpaintInstruction: repairResult.inpaintInstruction || null,
-            inpaintReferenceImages: repairResult.inpaintReferenceImages || null,
-            // Per-version prompt/description for iterate results — passes
-            // through to buildVersionEntry so dev panel shows what was
-            // actually sent to Grok, not the stale original page prompt.
-            prompt: repairResult.prompt || null,
-            // ...and the prose that prompt was SHRUNK to before it was sent.
-            // THE SECOND WHITELIST (2026-09-17): 434ea1e89 wired
-            // `compressedScene` through the round result, the eval inputs, the
-            // page OUTPUT whitelist and buildVersionEntry -- but this object,
-            // the one that actually becomes the version, dropped it again. So
-            // originals and inpaint/char-fix lineage stamped correctly while
-            // every iterate version stored null: on staging
-            // job_1789584708605_rts4wqupm all six rewrites built prompts of
-            // 7,981-9,233 chars against Grok's 7,900 cap, and their judges then
-            // scored 4 of the 18 shipped pages against the untruncated brief
-            // (resolveVersionCompressedScene falls back to `description`).
-            compressedScene: repairResult.compressedScene || null,
-            // Lineage breadcrumb stamped by inheritSceneContract -- which
-            // version's pixels this one edited. Dropped here it occurred zero
-            // times in the stored story, so no repair chain was auditable.
-            parentSource: repairResult.parentSource || null,
-            description: repairResult.description || null,
-            // THE REWRITTEN CONTRACT TRAVELS WITH THE VERSION (2026-09-13).
-            // executeIterateAction already returns the cast it re-derived from
-            // the rewritten brief (images.js iteratePageCore → newSceneCharacters,
-            // newSceneMetadata) and buildVersionEntry / final assembly already
-            // read `v.sceneCharacters` / `v.sceneMetadata` — but this object,
-            // the one that becomes the version, never copied them across. So
-            // the rewrite's description was promoted to the page and its CAST
-            // was not: on job_1789207854566_l43qgl34w p15 the iterate rewrite
-            // named six people and the page record kept `[Fiona]`, leaving the
-            // final image judged against a roster of 2 against 6 drawn figures
-            // and taking an `extra_character` CRITICAL for its own cast.
-            // Declared-or-unknown: `|| null` would swallow a rewrite that
-            // legitimately empties the cast, so the array passes through as-is.
-            sceneCharacters: Array.isArray(repairResult.sceneCharacters) ? repairResult.sceneCharacters : null,
-            sceneMetadata: repairResult.sceneMetadata || null,
-            // Detection is part of every image version (owner decision
-            // 2026-07-31): the ONE detection made on this result's bytes
-            // (iterate's internal or the round pre-detect), stamped directly
-            // so detectionForVersion resolves it even if the eval failed.
-            bboxDetection: repairResult.bboxDetection || null,
             entityIssues: evEntityResult.issues,
-            evaluatedAt: new Date().toISOString(),
-            // Composite-cover 2-pass debug bundle from executeIterateAction
-            // (cover iterates only). buildVersionEntry reads v.compositeAttempts
-            // and v.method to populate the version row so the modal can render
-            // the pass-1/pass-2 plates. Without these two lines the source
-            // label still says 'composite-iterate-round-N' but the version
-            // has compositeAttempts:null → modal shows score+prompt but no
-            // intermediate thumbnails. Verified missing on staging job
-            // job_1779382004213_idu0axofe initialPage v1.
-            compositeAttempts: repairResult.compositeAttempts || null,
-            method: repairResult.method || null,
-            charRepairGrokRaw: repairResult.charRepairGrokRaw || null,
-            charRepairBlendMask: repairResult.charRepairBlendMask || null,
-            charRepairWhiteout: repairResult.charRepairWhiteout || null,
-            // THE PLAN THIS REPAIR EXECUTED, frozen at creation (B1, 2026-10-07).
-            // `consolidatedPlan` above is the plan of THIS version's own evaluation, and a later
-            // book-audit re-consolidation (rescoreWithReaderFindings) overwrites it, so nothing
-            // stored said what the round actually asked for. The inpaint result carries the plan it
-            // re-derived; every other method ran from the round's page evaluation.
             repairPlan: (() => {
               const plan = repairResult.consolidatedPlan || roundEvalPages[ev.pageNumber]?.consolidatedPlan || null;
               return plan ? JSON.parse(JSON.stringify(plan)) : null;
             })(),
-          };
+          });
           // Canonical stamp AT CREATION (single scale): the same applyScore
           // math the persist path uses, so Step-3 selectBestVersion and
           // findBadPages decide on the SAME numbers that get persisted and
@@ -3172,6 +3206,60 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   }
 
   // =========================================================================
+  // BOOK REVIEW (staging, pageJudgeMode 'book_review') — replaces Step 1's judges and
+  // the round loop above. ONE vision review of the whole finished book (every page
+  // and cover, with its text) finds the faults and names the fix per fault; the
+  // repair runs through the SAME dispatch the round loop uses (runRepairMethod);
+  // repaired pages are re-reviewed with the old and the new picture side by side.
+  // docs/decisions.md 2026-10-29; the flow and its failure rule live in bookReview.js.
+  // =========================================================================
+  let bookReviewOutcome = null;
+  if (bookReviewMode) {
+    await updateProgress(64, 'Reviewing the finished book...');
+    // A version whose bytes are the page's own carries the page's shared detection (the
+    // scale-repair version has none stamped, and a character repair needs its boxes).
+    for (const img of rawImages) {
+      for (const v of pageVersions.get(img.pageNumber) || []) {
+        if (!images().detectionForVersion(v) && v.imageData === img.imageData && img.sharedBboxDetection) v.bboxDetection = img.sharedBboxDetection;
+      }
+    }
+    const bookTitle = String(storyData?.title || '').trim();
+    const reviewBook = async (versionByPage, previousByPage) => {
+      const { auditStoryBook, buildAuditPages } = require('./bookAudit');
+      const auditPages = buildAuditPages(rawImages, (pageNumber) => versionByPage.get(pageNumber) || null);
+      for (const pg of auditPages) {
+        const prev = previousByPage.get(pg.pageNumber);
+        if (prev?.imageData) pg.previousImageData = prev.imageData;
+      }
+      if (auditPages.length === 0) return null;
+      return auditStoryBook(
+        { id: consolidatorStoryId, visualBible: storyData?.visualBible || visualBible || null, characters: storyData?.characters || [], sceneImages: auditPages },
+        { usageTracker, modelId: MODEL_DEFAULTS.bookReviewModel, bookReview: { title: bookTitle } });
+    };
+    // maxRegenAttempts 0 = an evaluate-only run: the book is reviewed and nothing is repaired.
+    bookReviewOutcome = await bookReview.runBookReviewRounds({
+      rawImages, pageVersions, selectBestVersion,
+      maxRepairRounds: maxRegenAttempts === 0 ? 0 : require('../config/runtime').runtime('bookReviewRepairRounds'),
+      reviewBook,
+      runRepairMethod,
+      buildRoundVersion,
+      redetect: redetectVersionImage,
+      nameMapFor: (img, version) => require('./repairLogic').buildPageRepairNameMap({
+        storyData,
+        sceneDescription: version?.description || img.sceneDescription || img.description || '',
+        detectedFigures: images().detectionForVersion(version)?.figures || null,
+        pageNumber: img.pageNumber,
+        artStyle,
+      }),
+      inheritSceneContract,
+      auditRecord,
+      onProgress: (round, pages) => updateProgress(68 + Math.floor((round - 1) * 10), `Book review round ${round}: repairing ${pages} page(s)...`),
+    });
+    bookAuditRounds.push(...bookReviewOutcome.auditRecords);
+    repairRounds.push(...bookReviewOutcome.repairRounds);
+  }
+
+  // =========================================================================
   // Step 3: Pick best version per page across all rounds + original
   // =========================================================================
   // Single pick-best pass. Sees every version produced by the round loop
@@ -3207,7 +3295,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // the unscored original stayed unscored and silently unbeatable. There is no
   // threshold now. If an image is a candidate, it is scored; if it is not
   // scored, it is not a candidate.
-  try {
+  // Book-review mode: a version is scored from the review's findings, never by a per-page eval.
+  if (!bookReviewMode) try {
     const { computeFinalScore: rescueScoreOf, applyScore: rescueApplyScore } = require('./scoring');
     const rescueEntries = [];
     for (const [pageNumber, versions] of pageVersions) {
@@ -3288,7 +3377,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // ensureCalmZone (the same helper used at initial gen) on the active
   // version of each repaired page. If the recovery produces a better
   // candidate, push it as a new version and re-point finalBestPerPage.
-  try {
+  // Book-review mode: the recovery's re-render is judged by a per-page eval, which is off.
+  if (bookReviewMode && storyData?.layout?.textInImage) {
+    log.warn(`⚠️ [POST-REPAIR-TEXT] book-review mode: the overlay calm-zone recovery after repair did not run (its candidates are judged by the per-page eval)`);
+  }
+  if (!bookReviewMode) try {
     const { ensureCalmZone } = require('./textSpaceRepair');
     const langLevel = storyData?.languageLevel || 'standard';
 
@@ -3447,7 +3540,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // issue list = the PICKED versions' stamped entityIssues (exactly what the
   // scores charged), grid images = a grids-only rebuild of the picked crops
   // (pure compositing, no model call).
-  try {
+  // Book-review mode: no entity check ran, so there is nothing to assemble (the report says it was not run).
+  if (!bookReviewMode) try {
     await updateProgress(92, 'Assembling final entity report from picked versions...');
     const pickedEntries = rawImages.filter(img => img.imageData && img.pageNumber != null).map(img => {
       const best = finalBestPerPage.get(img.pageNumber);
@@ -3540,7 +3634,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // a button to discover that page 4 is in a different art style.
   await updateProgress(94, 'Style consistency audit...');
   let styleConsistency = null;
-  try {
+  // Book-review mode: the style check is one of the switched-off per-page/cross-page judges.
+  if (!bookReviewMode) try {
     const { checkStoryStyleConsistency, buildStyleAuditInput } = require('./styleConsistency');
     // Build a storyData-shaped object from finalBestPerPage so we never
     // accidentally feed pre-repair pixels to the audit.
