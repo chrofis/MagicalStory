@@ -4455,6 +4455,16 @@
       "fix": "Summary reads t.firstGrade/standard/advanced. tests/unit/client-wizard-summary-fixes.test.ts",
       "status": "fixed",
       "fixedIn": "7b0ff959d"
+    },
+    {
+      "id": "premise-card-flag-on-parent-text",
+      "title": "A premise the parent wrote counted as a generated idea card whenever idea cards were on screen",
+      "reportedAt": "2026-10-30",
+      "source": "Own story binding work 2026-10-30; reproduced by tests/unit/replan-focal-promise-and-arc-fact.test.ts (premiseIsIdeaCard({ideaPick:{index:null}}) returned true)",
+      "rootCause": "premiseIsIdeaCard tested only whether ideaPick/ideaGeneration existed; the wizard sends them with index null for the Own story card and the custom theme.",
+      "fix": "A card counts only with an integer card index.",
+      "status": "fixed",
+      "fixedIn": "e1f59d74a"
     }
   ]
 }
