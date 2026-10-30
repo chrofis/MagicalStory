@@ -106,4 +106,14 @@ describe('an idea card\'s invented figure is new, a customer-written premise fig
     expect(PB.premiseIsIdeaCard({ ideaGeneration: { selectedIndex: 0 } })).toBe(true);
     expect(PB.premiseIsIdeaCard(base)).toBe(false);
   });
+  // Regression (2026-10-30): with cards on screen the wizard sends ideaPick /
+  // ideaGeneration even when the parent wrote the premise (Own story card or the
+  // custom theme, index null) — those figures are the parent's, not the generator's.
+  it('a premise written while cards were on screen (no card index) stays customer-written', () => {
+    expect(PB.premiseIsIdeaCard({ ...base, ideaPick: { index: null }, ownStory: true })).toBe(false);
+    expect(PB.premiseIsIdeaCard({ ...base, ideaPick: { index: null } })).toBe(false);
+    expect(PB.premiseIsIdeaCard({ ...base, ideaGeneration: { selectedIndex: null } })).toBe(false);
+    expect(PB.premiseIsIdeaCard({ ...base, ideaPick: { index: 0 }, ideaGeneration: { selectedIndex: 0 } })).toBe(true);
+    expect(PB.arcLogicSpec({ ...base, ideaPick: { index: null }, ownStory: true }, 18)).toContain(PB.COMMISSIONED_CAST_DEF);
+  });
 });

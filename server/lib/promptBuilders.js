@@ -10902,9 +10902,15 @@ const COMMISSIONED_CAST_DEF = "the character list plus any named figure the prem
  */
 const COMMISSIONED_CAST_DEF_CARD = "the character list plus any named figure a character's saved details name — a sibling, a friend, a pet, a companion. The premise below was written by an idea generator, not by the customer, so a figure only the premise names is new";
 
-/** True when the premise on this input is an idea card the customer picked, not text the customer wrote. */
+/**
+ * True when the premise on this input is an idea card the customer picked, not text the customer wrote.
+ * A card counts only with its index: with cards on screen the wizard also sends ideaPick /
+ * ideaGeneration when the parent wrote the premise (Own story card, custom theme), index null.
+ */
 function premiseIsIdeaCard(inputData) {
-  return !!(inputData && (inputData.ideaPick || inputData.ideaGeneration));
+  if (!inputData) return false;
+  const index = inputData.ideaPick ? inputData.ideaPick.index : inputData.ideaGeneration?.selectedIndex;
+  return Number.isInteger(index);
 }
 
 /** The one definition of "commissioned" the arc is shown for THIS input. */
