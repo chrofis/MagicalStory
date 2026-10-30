@@ -3370,6 +3370,8 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     // The Jev decision layer's fixed fields (2026-09-27) — one constant for the
     // brief authors and the scene review (jevDecisions.JEV_FIXED_FIELDS_RULE).
     JEV_FIXED_FIELDS: require('./jevDecisions').fixedFieldsRule(jevBackup),
+    // The shared permission/verdict for a page with nobody in it (rule 10b; the book review reads the same string).
+    EMPTY_PAGE_FITS: EMPTY_PAGE_FITS_RULE,
     // No TEXT_NOT_A_CHECKLIST: the page text is written AFTER these briefs, so
     // this call never sees it and a rule about it cannot apply (owner,
     // 2026-09-23). The per-page Art Director and both iterate templates see
@@ -3900,6 +3902,8 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // The Jev decision layer's fixed fields (2026-09-27) — one constant for the
     // brief authors and the scene review (jevDecisions.JEV_FIXED_FIELDS_RULE).
     JEV_FIXED_FIELDS: require('./jevDecisions').fixedFieldsRule(jevBackup),
+    // The shared permission/verdict for a page with nobody in it (rule 10b; the book review reads the same string).
+    EMPTY_PAGE_FITS: EMPTY_PAGE_FITS_RULE,
     // ONE rule for every template that authors or judges a page against its
     // text — see TEXT_NOT_A_CHECKLIST_RULE. The brief author's half is the
     // PERMISSION: the page text may name more than the frame stages.
@@ -10476,6 +10480,20 @@ function textNotAChecklistRule({ role = 'judge' } = {}) {
 const TEXT_NOT_A_CHECKLIST_RULE = textNotAChecklistRule({ role: 'judge' });
 
 /**
+ * A PAGE WITH NO CHARACTER IN IT IS NOT A DEFECT (owner, 2026-10-29).
+ *
+ * ONE string, two readers: the Art Director's rule 10b ("Subject page", both
+ * scene-briefs-all.txt and scene-expansion.txt) permits staging a subject, a
+ * place or an object alone, and the book review (book-audit.txt) must not
+ * charge such a page for the absence. A permission the author holds and the
+ * judge does not is exactly how a judge calls an intended page a defect, so
+ * both read this constant (sibling set text-not-a-checklist /
+ * art-director-templates; pinned in tests/unit/built-prompt-values.test.ts).
+ * Generic wording only: no story, name or setting from a test run.
+ */
+const EMPTY_PAGE_FITS_RULE = "A page whose picture shows no character is not a defect when what it shows fits the story at that point: the subject, a place or an object may carry the page alone. Nothing needs adding to fill it.";
+
+/**
  * What may become of an animal a character cares about. ONE constant, two
  * consumers: the trial idea template (both arms, via {ANIMAL_FATE}) and
  * {TELLING_RULES} for the arc authors — the two places a story's EVENTS are
@@ -14299,6 +14317,7 @@ module.exports = {
   // read the same string, never a copy of it; prompts.js deliberately does
   // not fill it (its own comment says why).
   TEXT_NOT_A_CHECKLIST_RULE,
+  EMPTY_PAGE_FITS_RULE,
   textNotAChecklistRule,
   ELEMENT_ENTRY_PAGE_RULE,
   TRUE_RELATIVE_SIZE_RULE,

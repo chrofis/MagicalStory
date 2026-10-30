@@ -365,6 +365,10 @@ async function loadPromptTemplates() {
     // page's TEXT followed by that page's SHIPPED IMAGE, in reading order, and
     // routes each fault to the artefact that would fix it (IMG or TEXT).
     ['bookAudit', 'book-audit.txt'],
+    // The staging-only book REVIEW rules appended to the audit prompt: the fix route per
+    // IMG fault, the cover-title check, and (re-review rounds) the previous/new comparison.
+    ['bookReviewRules', 'book-review-rules.txt'],
+    ['bookReviewRereview', 'book-review-rereview.txt'],
     // The other half of the arc audit: a listener, not an editor. Runs in
     // parallel with storyArcAudit and its faults join the same review ledger.
     ['storyChildCritic', 'story-child-critic.txt'],

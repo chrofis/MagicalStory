@@ -1,0 +1,3 @@
+
+
+This is a re-review after a repair round. For each page that was repaired in that round you get the page's text and brief, then the PREVIOUS picture (before the repair) and the NEW picture (after it), in that order. For such a page, list the faults that remain in the NEW picture exactly as above, and then add one line "BETTER: p<N> — NEW", "BETTER: p<N> — PREVIOUS" or "BETTER: p<N> — SAME", naming the picture a listener would rather see in the book. A picture that fixed the old fault but introduced a worse one is not better. Pages shown with a single picture were not touched in that round: review them as before.

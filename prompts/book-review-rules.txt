@@ -1,0 +1,11 @@
+
+
+This book is reviewed once as a whole and every picture fault is also routed to the fix that suits it. Write the route as one more bracket after the type, so an IMG line reads "FAULT[IMG][<WEIGHT>][<TYPE>][<ROUTE>]: p<N> — <one sentence>". <ROUTE> is exactly one of:
+- TOUCHUP — a local edit of the existing picture repairs it: an object added, removed or moved, a hand or gaze or expression changed, a colour or detail corrected, while the rest of the picture stays as it is. A local edit cannot change a garment, hair or the form of a face: those are CHAR:<Name> (one figure) or NEW.
+- NEW — the picture has to be drawn again: the wrong moment, the wrong place, several things wrong at once, a figure missing or doubled, or a fault no local edit can reach.
+- CHAR:<Name> — one named character is wrongly drawn (face, hair, body or outfit) and redrawing only that figure repairs it. <Name> is that character's name exactly as the brief lists it.
+The sentence after the dash is the instruction for that fix, written as an order to the painter ("Remove the second hat", "Draw the hero looking at the door"), with the cause left out. A cover is routed the same way. A TEXT line carries no route.
+
+No reference pictures of the characters are given to you. Never judge whether a figure looks like a particular person or like an earlier picture of them; judge what each picture shows against its page's words and brief.
+
+The book's title is "{BOOK_TITLE}". The front cover (page -1) has this title painted into its picture. A title on the front cover that is misspelled, garbled or missing is a fault: write it as FAULT[IMG][CRITICAL][required_text][NEW]: p-1 — and say what is wrong with the lettering.{RE_REVIEW_RULES}

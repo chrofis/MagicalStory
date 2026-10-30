@@ -368,7 +368,7 @@ describe('the wiring — ONE call PER PROP, in its own call, never per chunk', (
     // Folding it into the (whole-book) audit call was built and measured on
     // 2026-09-19 and reverted: the reader's-eye pass returned 5 and 6 faults
     // with the size question appended, against 16 without it on the same story.
-    expect(src).toMatch(/await judgeChunk\(template, chunk, modelId, thinkingLevel\)/);
+    expect(src).toMatch(/await judgeChunk\(template, chunk, modelId, thinkingLevel, review\)/);
     expect(src.match(/await judgeChunk\(/g)?.length).toBe(1);
     expect(src.match(/await askObjectScale\(/g)?.length).toBe(1);
     expect(src).not.toMatch(/foldedScale|scaleQuestion/);

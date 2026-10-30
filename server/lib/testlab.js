@@ -3972,6 +3972,10 @@ async function runBookAuditStage(target, { params = {}, promptOverride = null })
     // is absent nothing is sent and the model keeps its own default, so a
     // production audit is unchanged.
     thinkingLevel: params.thinkingLevel || undefined,
+    // The staging book REVIEW call (routes every IMG fault to a fix, checks the
+    // cover title) — the same option the story run passes when
+    // pageJudgeMode is 'book_review'. Absent = the production audit.
+    bookReview: params.bookReview ? { title: storyData.title } : null,
     // OpenRouter reports billed dollars (cost_usd); Gemini native reports tokens
     // only, so those are priced with the same table production uses.
     usageTracker: (provider, u, fnName, mid) => usage.push({

@@ -77,7 +77,9 @@ describe('question 6 does not bind a cover', () => {
 
   it('keeps the p<N> fault format the parser keys on', () => {
     // The heading gains a name; the fault line must still carry the number.
-    expect(read()).toContain('FAULT[IMG][<WEIGHT>][<TYPE>]: p<N>');
+    // {ROUTE_TAG} is empty in the production audit and '[<ROUTE>]' in the staging book review
+    // (2026-10-29); the page number stays right after the colon either way.
+    expect(read()).toContain('FAULT[IMG][<WEIGHT>][<TYPE>]{ROUTE_TAG}: p<N>');
     expect(read()).toContain('FAULT[TEXT][<WEIGHT>]: p<N>');
   });
 });

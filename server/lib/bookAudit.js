@@ -81,7 +81,16 @@ function SCALE_COLLECTIONS_PRESENT(vb) {
 // Severity bracket is optional so pre-severity stored reports still parse; the
 // TYPE bracket (IMG lines, from the closed list — 2026-09-24) is optional so
 // pre-type reports still parse.
-const ROUTED_FAULT_RE = /^[ \t>*-]*FAULT\[(IMG|TEXT)\](?:\[(MINOR|MAJOR|CRITICAL|CATASTROPHIC)\])?(?:\[([a-z_]+)\])?:\s*(?:p(-?\d+))?\s*(.*)$/gim;
+//
+// The FIX ROUTE bracket (book review, 2026-10-29) follows the type:
+// `[TOUCHUP]`, `[NEW]` or `[CHAR:<Name>]`. Optional, so every stored line from
+// before it still parses. The type group is `[a-z_]+` and the regex is
+// case-insensitive, so a line that omits the type would swallow `[TOUCHUP]` as
+// its type — parseRoutes moves it back.
+const ROUTED_FAULT_RE = /^[ \t>*-]*FAULT\[(IMG|TEXT)\](?:\[(MINOR|MAJOR|CRITICAL|CATASTROPHIC)\])?(?:\[([a-z_]+)\])?(?:\[(TOUCHUP|NEW|CHAR:[^\]\r\n]*)\])?:\s*(?:p(-?\d+))?\s*(.*)$/gim;
+
+// "BETTER: p5 — NEW" — the re-review's verdict on a repaired page's two pictures.
+const BETTER_RE = /^[ \t>*-]*BETTER:\s*p(-?\d+)\s*[—–-]?\s*(NEW|PREVIOUS|SAME)\b/gim;
 
 /**
  * Position of the SHIPPED image inside a scene's imageVersions[].
@@ -355,8 +364,8 @@ async function judgeParts(parts, modelId, thinkingLevel) {
  * it thinned the reader's-eye faults to 5 and 6 where the same call without it
  * found 16 on the same story. Returns raw text + usage.
  */
-async function judgeChunk(template, chunk, modelId, thinkingLevel = null) {
-  const { fillTemplate } = require('../services/prompts');
+async function judgeChunk(template, chunk, modelId, thinkingLevel = null, review = null) {
+  const { fillTemplate, PROMPT_TEMPLATES } = require('../services/prompts');
   const { coverLabelForPage } = require('./coverKeys');
   // A cover reached the judge as a bare "PAGE -3" and was read as a story page
   // in sequence, so question 6 reported it for showing a moment the text
@@ -380,6 +389,14 @@ async function judgeChunk(template, chunk, modelId, thinkingLevel = null) {
     // The consolidator's closed type list — the reader names its IMG finding
     // from it, so the consolidator carries the type over (evalBuckets).
     FINDING_TYPES: require('./evalBuckets').CONSOLIDATED_TYPES.map(t => `\`${t}\``).join(' · '),
+    // A page with nobody in it that fits the story is no defect — ONE string
+    // shared with the Art Director's rule 10b (promptBuilders.EMPTY_PAGE_FITS_RULE).
+    EMPTY_PAGE_FITS: require('./promptBuilders').EMPTY_PAGE_FITS_RULE,
+    // The staging book REVIEW adds a fix route to every IMG line and the rules
+    // that go with it; the production audit asks for neither (both stay empty,
+    // so its prompt keeps the wording it always had).
+    ROUTE_TAG: review ? '[<ROUTE>]' : '',
+    BOOK_REVIEW_RULES: review ? reviewRulesText(review, PROMPT_TEMPLATES, fillTemplate) : '',
   });
 
   // Instructions FIRST, then the book. The judge must know what it is looking
@@ -390,11 +407,32 @@ async function judgeChunk(template, chunk, modelId, thinkingLevel = null) {
     parts.push({ text: `${pageHeading(p.pageNumber)} TEXT: ${p.text || '(no text on this page)'}` });
     const brief = briefLine(pageHeading(p.pageNumber), p.brief);
     if (brief) parts.push({ text: brief });
+    if (p.previousPart) {
+      // A page repaired in the last round: the picture it had, then the one it has.
+      parts.push({ text: `${pageHeading(p.pageNumber)} — PREVIOUS PICTURE (before this round's repair)` });
+      parts.push(p.previousPart);
+      parts.push({ text: `${pageHeading(p.pageNumber)} — NEW PICTURE (after this round's repair)` });
+    }
     parts.push(p.part);
   }
 
   assertPromptFilled(parts, 'bookAudit.judgeChunk');
   return judgeParts(parts, modelId, thinkingLevel);
+}
+
+/**
+ * The rules the book REVIEW appends to the audit prompt: route per fault, the
+ * cover-title check, and, from the second review on, the previous/new
+ * comparison. Both texts live in prompts/ (book-review-*.txt).
+ */
+function reviewRulesText(review, templates, fillTemplate) {
+  const rules = templates.bookReviewRules;
+  if (!rules) throw new Error('bookReviewRules template not loaded');
+  const title = String(review.title || '').trim();
+  if (!title) throw new Error('book review needs the book title');
+  const rereview = review.hasRepairedPages ? templates.bookReviewRereview : '';
+  if (review.hasRepairedPages && !rereview) throw new Error('bookReviewRereview template not loaded');
+  return fillTemplate(rules, { BOOK_TITLE: title, RE_REVIEW_RULES: rereview || '' });
 }
 
 /** The native-Google call. Same body production has always sent. */
@@ -549,28 +587,60 @@ function collectObjectScale(raws, askedByObject, notEvaluated) {
   return { objects, findings };
 }
 
+/**
+ * A fault's fix route as a structured value, or null when the line carries none
+ * (a stored line from before the route existed, or a TEXT line).
+ * @returns {{kind:'TOUCHUP'|'NEW'|'CHAR', charName?:string}|null}
+ */
+function parseRouteTag(tag) {
+  const t = String(tag || '').trim();
+  if (!t) return null;
+  const upper = t.toUpperCase();
+  if (upper === 'TOUCHUP' || upper === 'NEW') return { kind: upper };
+  const m = t.match(/^CHAR:\s*(.+)$/i);
+  if (m && m[1].trim()) return { kind: 'CHAR', charName: m[1].trim() };
+  return null;
+}
+
 /** Pull routed fault lines out of the concatenated raw output. */
 function parseRoutes(raw) {
   const byRoute = { IMG: [], TEXT: [] };
   for (const m of String(raw || '').matchAll(ROUTED_FAULT_RE)) {
-    const route = m[1].toUpperCase();
+    const channel = m[1].toUpperCase();
     const severity = m[2] ? m[2].toUpperCase() : null;
     // The reader's own type, carried verbatim; the consolidator discards an
     // unlisted value as it does for every evaluator.
-    const type = m[3] ? m[3].toLowerCase() : null;
-    const page = m[4] != null ? parseInt(m[4], 10) : null;
-    byRoute[route].push({
+    let type = m[3] ? m[3].toLowerCase() : null;
+    let routeTag = m[4] || null;
+    // `[MAJOR][TOUCHUP]` (no type): the type group swallowed the route.
+    if (!routeTag && (type === 'touchup' || type === 'new')) { routeTag = type; type = null; }
+    const page = m[5] != null ? parseInt(m[5], 10) : null;
+    byRoute[channel].push({
       page,
       severity,
       type,
+      // The fix route the reviewer chose (book review); null on every line that has none.
+      route: channel === 'IMG' ? parseRouteTag(routeTag) : null,
       // The whole line, verbatim — the corrective text round is fed FAULT lines
       // in the same shape the text audit produces, so the refine template reads
       // them without a second format to learn.
       line: m[0].trim(),
-      detail: (m[5] || '').replace(/^[—–-]\s*/, '').trim(),
+      detail: (m[6] || '').replace(/^[—–-]\s*/, '').trim(),
     });
   }
   return byRoute;
+}
+
+/**
+ * The re-review's "BETTER: p<N> — NEW|PREVIOUS|SAME" lines, one verdict per
+ * page (the last one wins). A typed answer to "which of the two pictures",
+ * nothing else is read from it.
+ * @returns {Map<number,'NEW'|'PREVIOUS'|'SAME'>}
+ */
+function parseBetterVerdicts(raw) {
+  const out = new Map();
+  for (const m of String(raw || '').matchAll(BETTER_RE)) out.set(parseInt(m[1], 10), m[2].toUpperCase());
+  return out;
 }
 
 /**
@@ -601,6 +671,11 @@ async function auditStoryBook(storyData, opts = {}) {
     // The cross-page object-scale pass. On by default; a caller that only
     // wants the reader's-eye faults (a replay, a Lab arm) turns it off.
     objectScale: objectScaleEnabled = true,
+    // The staging BOOK REVIEW (pageJudgeMode 'book_review'): { title } makes
+    // this call route every IMG fault to a fix, check the cover title and, for
+    // pages carrying `previousImageData`, compare the two pictures. Absent =
+    // the production audit, byte-identical.
+    bookReview = null,
   } = opts;
   const storyId = opts.storyId || storyData?.id || null;
 
@@ -629,14 +704,22 @@ async function auditStoryBook(storyData, opts = {}) {
         log.warn(`⚠️ [BOOK-AUDIT] p${scene.pageNumber} image load failed (${err.message})`);
       }
       if (!part) { missing.push(scene.pageNumber); return; }
-      prepared.push({ pageNumber: scene.pageNumber, text: String(scene.text || '').trim(), part, brief: auditPageBrief(scene, storyData) });
+      // A page repaired in the last round also shows the picture it had before.
+      const previousPart = bookReview && scene.previousImageData ? inlinePart(scene.previousImageData) : null;
+      if (bookReview && scene.previousImageData && !previousPart) {
+        throw new Error(`p${scene.pageNumber}: the previous picture could not be read — the re-review cannot compare`);
+      }
+      prepared.push({ pageNumber: scene.pageNumber, text: String(scene.text || '').trim(), part, previousPart, brief: auditPageBrief(scene, storyData) });
     }));
     prepared.sort((a, b) => a.pageNumber - b.pageNumber);
     if (prepared.length === 0) throw new Error('no page images could be resolved');
     if (missing.length) {
+      // A review that silently skips a page has not reviewed the book.
+      if (bookReview) throw new Error(`book review: no shipped image for page(s) ${missing.sort((a, b) => a - b).join(', ')}`);
       log.warn(`⚠️ [BOOK-AUDIT] ${missing.length} page(s) skipped — no shipped image: ${missing.sort((a, b) => a - b).join(', ')}`);
     }
 
+    const review = bookReview ? { title: bookReview.title, hasRepairedPages: prepared.some(p => p.previousPart) } : null;
     const chunks = [];
     for (let i = 0; i < prepared.length; i += MAX_PAGES_PER_CALL) {
       chunks.push(prepared.slice(i, i + MAX_PAGES_PER_CALL));
@@ -684,7 +767,7 @@ async function auditStoryBook(storyData, opts = {}) {
     const raws = [];
     for (const chunk of chunks) {
       try {
-        const r = await judgeChunk(template, chunk, modelId, thinkingLevel);
+        const r = await judgeChunk(template, chunk, modelId, thinkingLevel, review);
         raws.push(r.text);
         chunkUsage.push({
           pages: `${chunk[0].pageNumber}-${chunk[chunk.length - 1].pageNumber}`,
@@ -696,7 +779,10 @@ async function auditStoryBook(storyData, opts = {}) {
         // OpenRouter reports the billed dollars per call; Gemini native does not.
         if (typeof r.usage.cost_usd === 'number') usage.cost_usd = (usage.cost_usd || 0) + r.usage.cost_usd;
       } catch (err) {
-        // One bad chunk must not cost the other chunks' findings.
+        // The production audit: one bad chunk must not cost the other chunks'
+        // findings. The book review: a chunk that failed is pages nobody read,
+        // and a review that reports the rest as the whole book is not one.
+        if (bookReview) throw err;
         log.warn(`⚠️ [BOOK-AUDIT] chunk p${chunk[0].pageNumber}-${chunk[chunk.length - 1].pageNumber} failed: ${err.message}`);
       }
     }
@@ -743,7 +829,13 @@ async function auditStoryBook(storyData, opts = {}) {
 
     const raw = raws.join('\n');
     if (usageTracker && (usage.input_tokens || usage.output_tokens)) {
-      usageTracker('gemini_quality', usage, 'book_audit', modelId);
+      // The bucket follows the vendor the model id names; an OpenRouter model
+      // is booked at the dollars OpenRouter billed (direct_cost).
+      if (isOpenRouterId(modelId)) {
+        usageTracker('openrouter', typeof usage.cost_usd === 'number' ? { ...usage, direct_cost: usage.cost_usd } : usage, 'book_audit', modelId);
+      } else {
+        usageTracker('gemini_quality', usage, 'book_audit', modelId);
+      }
     }
 
     const byRoute = parseRoutes(raw);
@@ -758,6 +850,8 @@ async function auditStoryBook(storyData, opts = {}) {
       modelId,
       thinkingLevel,
       objectScale,
+      // "BETTER: pN — NEW|PREVIOUS|SAME" per repaired page (re-review only).
+      betterVerdicts: Object.fromEntries(parseBetterVerdicts(raw)),
       pagesRead: prepared.map(p => p.pageNumber),
       pagesSkipped: missing.sort((a, b) => a - b),
     };
@@ -774,6 +868,8 @@ module.exports = {
   briefLine,
   shippedVersionIndex,
   parseRoutes,
+  parseRouteTag,
+  parseBetterVerdicts,
   collectObjectScale,
   askObjectScale,
   MAX_PAGES_PER_CALL,

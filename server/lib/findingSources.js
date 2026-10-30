@@ -63,6 +63,12 @@ const FINDING_SOURCES = Object.freeze({
   READER: 'reader',
   /** The mechanical end-of-page checks (text overlay, borders, contract). */
   FINAL_CHECKS: 'final_checks',
+  /**
+   * bookReview.js (staging pageJudgeMode 'book_review'): a fault of the ONE whole-book
+   * vision review. Never emitted by the consolidator (it is not in that prompt's enum):
+   * the review's faults become deduped issues directly, with no consolidator call.
+   */
+  BOOK_REVIEW: 'book_review',
 });
 
 const KNOWN_SOURCES = new Set(Object.values(FINDING_SOURCES));

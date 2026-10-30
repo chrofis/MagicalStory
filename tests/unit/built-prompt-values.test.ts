@@ -390,6 +390,38 @@ const STUB_SHEET_VERDICT = JSON.stringify({
 //     beats route, so the rule's position in the prompt cannot cost it its
 //     life (shrinkPromptForModel is an IMAGE-prompt path only).
 // ---------------------------------------------------------------------------
+// A page with nobody in it is no defect when it fits the story (owner, 2026-10-29): ONE constant,
+// filled into both Art Director templates' rule 10b and into the book review's audit prompt.
+describe('a page with no character that fits the story: one rule for the authors and the reviewer', () => {
+  const rule10b = (prompt: string) => (String(prompt).split('\n').find((l) => l.startsWith('10b.')) || '');
+
+  it('both Art Director prompts carry the constant in rule 10b, no placeholder left', () => {
+    const all = PB.buildSceneBriefsAllPrompt(inputData, BEATS, {});
+    const one = PB.buildSceneExpansionPrompt(1, PAGE_TEXT, CHARACTERS, 'en', VISUAL_BIBLE, '', null, {});
+    expect(PB.EMPTY_PAGE_FITS_RULE.length).toBeGreaterThan(40);
+    for (const built of [all, one]) {
+      expect(rule10b(built)).toContain(PB.EMPTY_PAGE_FITS_RULE);
+      expect(built).not.toContain('{EMPTY_PAGE_FITS}');
+    }
+  });
+
+  it('the book audit prompt carries the same string', async () => {
+    await loadPromptTemplates();
+    const { fillTemplate } = require('../../server/services/prompts');
+    const built = fillTemplate(PROMPT_TEMPLATES.bookAudit, {
+      PAGE_LIST: '1, 2', TEXT_NOT_A_CHECKLIST: PB.TEXT_NOT_A_CHECKLIST_RULE, FINDING_TYPES: 'x',
+      EMPTY_PAGE_FITS: PB.EMPTY_PAGE_FITS_RULE, ROUTE_TAG: '', BOOK_REVIEW_RULES: '',
+    });
+    expect(built).toContain(PB.EMPTY_PAGE_FITS_RULE);
+    expect(built).not.toMatch(/\{[A-Z_]+\}/);
+  });
+
+  it('the rule is generic: it names no character, place or story', () => {
+    expect(PB.EMPTY_PAGE_FITS_RULE).not.toMatch(/[A-Z][a-z]+ (said|stood|walked)/);
+    expect(PB.EMPTY_PAGE_FITS_RULE).toMatch(/no character/);
+  });
+});
+
 describe('the Art Director is told to name a size ratio', () => {
   const ruleOf = (prompt: string) =>
     (String(prompt).split('\n').find((l) => l.startsWith('8f.')) || '');
