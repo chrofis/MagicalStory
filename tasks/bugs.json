@@ -4425,6 +4425,36 @@
       "fix": "pdf.js createStripPainter reports every scheduled/finished strip through fillStats.onProgress; runJob maps it to job.done/total; BookPreview.tsx shows 'n of m'. tests/unit/strip-painter.test.ts.",
       "status": "fixed",
       "fixedIn": "8d9e594c9"
+    },
+    {
+      "id": "wizard-edit-selected-idea-drops-card-index",
+      "title": "Editing the text of the selected story-idea card cleared selectedIdeaIndex, so the job payload sent ideaWorld and ideaPick as null and the edited story lost the card world and story shape",
+      "reportedAt": "2026-10-30",
+      "source": "Customer report (edited many times, inconsistent stories); WizardStep6Summary.tsx textarea onChange",
+      "rootCause": "onSelectIdea(full) was called without the card index; handleSelectIdea sets selectedIdeaIndex to index ?? null.",
+      "fix": "Pass index when editing the selected card. tests/unit/client-wizard-summary-fixes.test.ts",
+      "status": "fixed",
+      "fixedIn": "f6891bcf0"
+    },
+    {
+      "id": "wizard-topic-age-hints-never-shown",
+      "title": "Topic age-window hints (sort/dim by the story age) never showed in the live wizard: step 3 rendered StoryCategorySelector without focusAge, so topicFitsAge always returned true",
+      "reportedAt": "2026-10-30",
+      "source": "Code review 2026-10-30; only caller passing focusAge was dead StorySettings.tsx",
+      "rootCause": "WizardStep4StoryType did not receive or forward focusAge.",
+      "fix": "StoryWizard computes focusAge with pickMainCharacters (same as CharacterList) and passes it through WizardStep4StoryType. tests/unit/client-wizard-summary-fixes.test.ts",
+      "status": "fixed",
+      "fixedIn": "f6891bcf0"
+    },
+    {
+      "id": "wizard-reading-level-label-differs-en",
+      "title": "English reading level label differed between step 2 (Young Reader) and the summary (Young Adult)",
+      "reportedAt": "2026-10-30",
+      "source": "Code review 2026-10-30; translations.ts advanced vs WizardStep6Summary getReadingLevelLabel",
+      "rootCause": "Summary hard-coded its own per-language label strings instead of reading the translation keys step 2 uses.",
+      "fix": "Summary reads t.firstGrade/standard/advanced. tests/unit/client-wizard-summary-fixes.test.ts",
+      "status": "fixed",
+      "fixedIn": "f6891bcf0"
     }
   ]
 }
