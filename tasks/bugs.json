@@ -4434,7 +4434,7 @@
       "rootCause": "onSelectIdea(full) was called without the card index; handleSelectIdea sets selectedIdeaIndex to index ?? null.",
       "fix": "Pass index when editing the selected card. tests/unit/client-wizard-summary-fixes.test.ts",
       "status": "fixed",
-      "fixedIn": "f6891bcf0"
+      "fixedIn": "7b0ff959d"
     },
     {
       "id": "wizard-topic-age-hints-never-shown",
@@ -4444,7 +4444,7 @@
       "rootCause": "WizardStep4StoryType did not receive or forward focusAge.",
       "fix": "StoryWizard computes focusAge with pickMainCharacters (same as CharacterList) and passes it through WizardStep4StoryType. tests/unit/client-wizard-summary-fixes.test.ts",
       "status": "fixed",
-      "fixedIn": "f6891bcf0"
+      "fixedIn": "7b0ff959d"
     },
     {
       "id": "wizard-reading-level-label-differs-en",
@@ -4454,7 +4454,7 @@
       "rootCause": "Summary hard-coded its own per-language label strings instead of reading the translation keys step 2 uses.",
       "fix": "Summary reads t.firstGrade/standard/advanced. tests/unit/client-wizard-summary-fixes.test.ts",
       "status": "fixed",
-      "fixedIn": "f6891bcf0"
+      "fixedIn": "7b0ff959d"
     }
   ]
 }
