@@ -10760,7 +10760,9 @@
   {
    "id": "own-story-binding-brief-2026-10-30",
    "title": "Own story: the arc and beats keep the parent's events, their order and the ending",
-   "commits": [],
+   "commits": [
+    "f74f958dd"
+   ],
    "addedAt": "2026-10-30",
    "status": "pending",
    "claim": "A job started from the wizard Own story card carries ownStory true (stories.data.ownStory) and its STORY_BRIEF holds the binding own-story rule instead of the loose one; the shipped arc and the page plan keep every event the parent wrote, in the parent's order, and the parent's ending. Gaps the text leaves (no problem, no ending) may be filled. A job from Idea 1, Idea 2 or the custom theme carries no ownStory and keeps the loose rule.",
