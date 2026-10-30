@@ -150,7 +150,7 @@ export function WizardStep6Summary({
   layoutOverride = 'auto',
   onLayoutOverrideChange,
 }: WizardStep6Props) {
-  const { language } = useLanguage();
+  const { language, t: levelT } = useLanguage();
   const lang = language as 'en' | 'de' | 'fr' | 'it';
   const thinkingMessage = useRotatingMessage(lang);
 
@@ -243,10 +243,10 @@ export function WizardStep6Summary({
   };
 
   const getReadingLevelLabel = () => {
-    // Use same labels as WizardStep3BookSettings
-    if (languageLevel === '1st-grade') return language === 'de' ? 'Bilderbuch' : language === 'fr' ? 'Album illustré' : language === 'it' ? 'Libro illustrato' : 'Picture Book';
-    if (languageLevel === 'standard') return language === 'de' ? 'Kinderbuch' : language === 'fr' ? 'Livre enfant' : language === 'it' ? 'Libro per bambini' : 'Chapter Book';
-    if (languageLevel === 'advanced') return language === 'de' ? 'Jugendbuch' : language === 'fr' ? 'Roman Jeunesse' : language === 'it' ? 'Libro per ragazzi' : 'Young Adult';
+    // Same translation keys as WizardStep3BookSettings (one source)
+    if (languageLevel === '1st-grade') return levelT.firstGrade;
+    if (languageLevel === 'standard') return levelT.standard;
+    if (languageLevel === 'advanced') return levelT.advanced;
     return '';
   };
 
@@ -587,7 +587,7 @@ export function WizardStep6Summary({
                           setEditableIdeas(newIdeas);
                           // If this option was selected, update the story details too
                           if (isSelected) {
-                            onSelectIdea(full);
+                            onSelectIdea(full, index);
                           }
                         }}
                         className={`w-full px-4 py-3 border-0 focus:outline-none focus:ring-0 text-base resize-none ${

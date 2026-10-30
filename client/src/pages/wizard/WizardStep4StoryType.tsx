@@ -13,6 +13,8 @@ interface WizardStep4Props {
   customThemeText: string;
   userLocation?: { city: string | null; region: string | null; country: string | null } | null;
   preselectedFromUrl?: boolean;
+  /** Age of the oldest main character; topics outside their age window are dimmed/sorted last. */
+  focusAge?: number | null;
   onCategoryChange: (cat: StoryCategoryId) => void;
   onTopicChange: (topic: string) => void;
   onThemeChange: (theme: string) => void;
@@ -38,6 +40,7 @@ export function WizardStep4StoryType({
   storyTheme,
   customThemeText,
   userLocation,
+  focusAge,
   preselectedFromUrl = false,
   onCategoryChange,
   onTopicChange,
@@ -100,6 +103,7 @@ export function WizardStep4StoryType({
         storyTheme={storyTheme}
         customThemeText={customThemeText}
         userLocation={userLocation}
+        focusAge={focusAge}
         onCategoryChange={onCategoryChange}
         onTopicChange={onTopicChange}
         onThemeChange={onThemeChange}

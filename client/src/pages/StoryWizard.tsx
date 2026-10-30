@@ -1,4 +1,4 @@
-import { defaultMainCharacterId, addMainCharacter, trimMainCharacters, MAX_CHARACTERS_PER_STORY } from '@/utils/mainCharacters';
+import { pickMainCharacters, defaultMainCharacterId, addMainCharacter, trimMainCharacters, MAX_CHARACTERS_PER_STORY } from '@/utils/mainCharacters';
 import { buildOrderDetailLines } from '@/utils/orderDetails';
 import { avatarFailureMessage, errorStatusOf } from '@/utils/avatarErrors';
 import { photoFailureMessage } from '@/utils/apiErrors';
@@ -4714,6 +4714,7 @@ export default function StoryWizard() {
             customThemeText={customThemeText}
             userLocation={userLocation}
             preselectedFromUrl={!!knownDeepLink(searchParams.toString()).topic}
+            focusAge={pickMainCharacters(characters.filter(c => !excludedCharacters.includes(c.id)), mainCharacters).focusAge}
             onCategoryChange={handleCategoryChange}
             onTopicChange={handleTopicChange}
             onThemeChange={handleThemeChange}
