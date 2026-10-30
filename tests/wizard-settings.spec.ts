@@ -208,6 +208,7 @@ test.describe('wizard settings reach the create-story payload', () => {
     expect(body.storyDetails).toBe(IDEAS[0]);
     expect(body.ideaPick.index).toBe(0);
     expect(body.ideaWorld).toEqual(IDEA_WORLDS[0]);
+    expect(body.ownStory).toBeUndefined();     // a generated idea keeps the loose commission
   });
 
   test('own story: Jev checklist after the pause, selecting sends the text as a custom text', async ({ page }) => {
@@ -234,6 +235,7 @@ test.describe('wizard settings reach the create-story payload', () => {
     const body = await submit(page, mock);
     expect(body.storyDetails).toBe(text);
     expect(body.ideaPick.index).toBeNull();   // a custom text: no idea index, no idea world
+    expect(body.ownStory).toBe(true);         // the Own story card: the writer follows its events and ending
     expect(body.ideaWorld).toBeNull();
   });
 

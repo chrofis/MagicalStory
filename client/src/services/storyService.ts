@@ -1971,6 +1971,8 @@ export const storyService = {
     // WHICH card was clicked, with the world and premise shape it carried.
     // This is the buy signal (docs/decisions.md, 2026-09-21).
     ideaPick?: IdeaPick | null;
+    // True when the parent wrote the story on the Own story card: the writer follows its events and ending closely.
+    ownStory?: boolean;
   }): Promise<{ jobId: string; creditsRemaining?: number }> {
     // Generate idempotency key to prevent duplicate job creation on retries
     const idempotencyKey = `idem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -2014,6 +2016,7 @@ export const storyService = {
       ideaWorld: data.ideaWorld,
       // Which arm was clicked, plus its world and premise shape
       ideaPick: data.ideaPick,
+      ownStory: data.ownStory,
     });
     return { jobId: response.jobId, creditsRemaining: response.creditsRemaining };
   },

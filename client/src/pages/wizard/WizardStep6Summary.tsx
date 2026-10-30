@@ -100,7 +100,7 @@ interface WizardStep6Props {
   // Steering for the next idea (re)generation
   ideaWorldMode?: IdeaWorldMode;
   onIdeaWorldModeChange?: (mode: IdeaWorldMode) => void;
-  onSelectIdea: (idea: string, index?: number) => void;  // index: 0 or 1 for generated ideas, undefined for custom
+  onSelectIdea: (idea: string, index?: number, ownStory?: boolean) => void;  // index: 0 or 1 for generated ideas, undefined for custom; ownStory true only from the Own story card
   onUseDirectly?: () => void;  // Called when "Use my theme directly" is clicked to start generation
   // Navigation
   onEditStep: (step: number) => void;
@@ -204,7 +204,7 @@ export function WizardStep6Summary({
   // The own story is sent like the custom theme: text only, no idea index (so no idea world or shape travels with it)
   const handleSelectOwnStory = () => {
     setSelectedOption(2);
-    onSelectIdea(ownStoryText);
+    onSelectIdea(ownStoryText, undefined, true);
   };
 
   // Helper functions
@@ -648,7 +648,7 @@ export function WizardStep6Summary({
               text={ownStoryText}
               onTextChange={(text) => {
                 setOwnStoryText(text);
-                if (selectedOption === 2) onSelectIdea(text);
+                if (selectedOption === 2) onSelectIdea(text, undefined, true);
               }}
               isSelected={selectedOption === 2}
               onSelect={handleSelectOwnStory}

@@ -349,6 +349,8 @@ export default function StoryWizard() {
   const [lastIdeaFullResponse, setLastIdeaFullResponse] = useState<string>('');
   const [generatedIdeas, setGeneratedIdeas] = useState<string[]>([]);
   const [selectedIdeaIndex, setSelectedIdeaIndex] = useState<number | null>(null); // Track which idea was selected (0, 1, or null for custom)
+  // True only while the parent's Own story card is the selected option. Sent as `ownStory` so the writer follows the text closely (docs/decisions.md, 2026-10-30).
+  const [ownStorySelected, setOwnStorySelected] = useState(false);
   // Per-idea worlds (location vs fantasy), server-resolved with each idea run; null = no split (no location / historical)
   const [ideaWorlds, setIdeaWorlds] = useState<IdeaWorld[] | null>(null);
   // User steering for the next idea (re)generation: auto = 1 location + 1 fantasy
@@ -978,7 +980,7 @@ export default function StoryWizard() {
       setLanguageLevel('standard');
       setPages(15);
       setDedication('');
-      setStoryDetails('');
+      setStoryDetails(''); setOwnStorySelected(false);
       // NOTE: mainCharacters and excludedCharacters are USER data, not story data
       // They persist across stories - don't reset them here
       setStoryCharacters(null);
@@ -1862,7 +1864,7 @@ export default function StoryWizard() {
         JSON.stringify(prevExcludedRef.current) !== JSON.stringify(excludedCharacters)) {
       setGeneratedIdeas([]);
       setIdeaWorlds(null);
-      setStoryDetails('');
+      setStoryDetails(''); setOwnStorySelected(false);
       prevExcludedRef.current = excludedCharacters;
     }
   }, [excludedCharacters]);
@@ -1961,7 +1963,7 @@ export default function StoryWizard() {
     const themeChanged = prevThemeRef.current !== storyTheme;
 
     if (categoryChanged || topicChanged || themeChanged) {
-      setStoryDetails('');
+      setStoryDetails(''); setOwnStorySelected(false);
       localStorage.removeItem('story_details');
       // Clear generated story ideas when topic/theme changes to avoid confusion
       setGeneratedIdeas([]);
@@ -3837,9 +3839,11 @@ export default function StoryWizard() {
   // Generate story ideas using AI
   // Handler when user selects one of the generated ideas
   // index: 0 or 1 for generated ideas, undefined for custom/edited
-  const handleSelectIdea = (idea: string, index?: number) => {
+  // ownStory: true only from the Own story card; every other caller clears it
+  const handleSelectIdea = (idea: string, index?: number, ownStory = false) => {
     setStoryDetails(idea);
     setSelectedIdeaIndex(index ?? null);
+    setOwnStorySelected(ownStory);
     // Don't clear generatedIdeas - let user switch between options
   };
 
@@ -4206,6 +4210,8 @@ export default function StoryWizard() {
         // World of the selected idea — persisted on stories.data.ideaWorld so
         // the pipeline can honor the chosen world (location vs fantasy)
         ideaWorld: (selectedIdeaIndex !== null && ideaWorlds) ? (ideaWorlds[selectedIdeaIndex] ?? null) : null,
+        // The parent's own story: the book follows its events and ending closely.
+        ownStory: ownStorySelected && storyDetails.trim().length > 0 ? true : undefined,
         // The click itself. Recorded even when the customer wrote their own
         // premise (index null) — that is a verdict on the pair too.
         ideaPick: generatedIdeas.length > 0 ? {
@@ -5306,7 +5312,7 @@ export default function StoryWizard() {
                 setLanguageLevel('standard');
                 setPages(15);
                 setDedication('');
-                setStoryDetails('');
+                setStoryDetails(''); setOwnStorySelected(false);
                 setCustomThemeText('');
                 // Keep character configuration (mainCharacters, excludedCharacters) - user preference persists
 

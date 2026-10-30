@@ -6738,6 +6738,9 @@ ${trialWriter.pagesPrompt}`;
       // way ideaWorld already is. Owner, 2026-09-21: the production click is the
       // buy metric, the rater proxy is not.
       ideaPick: inputData.ideaPick || null,
+      // The parent wrote the story on the wizard's Own story card: the commission binds the
+      // events and ending (STORY_BRIEF_OWN_STORY_RULE, docs/decisions.md 2026-10-30). Persisted so a replay rebuilds the same commission.
+      ownStory: inputData.ownStory === true,
       trialMode: !!inputData.trialMode,
       artStyle: inputData.artStyle || 'pixar',
       language: inputData.language || 'en',
