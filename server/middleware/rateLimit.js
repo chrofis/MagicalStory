@@ -163,6 +163,18 @@ const trialEventLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Own-story check in the idea step: one Jev call (~USD 0.0001) per 5 s pause in typing.
+// 20 per user per 10 minutes covers a long edit session; keyed by user id, so it runs AFTER authenticateToken.
+const ownStoryAnalysisLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  keyGenerator: (req) => `user:${req.user.id}`,
+  skip: (req) => require('./auth').isAdminActing(req.user),
+  message: { error: 'Too many story checks. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // The idea-landmark prepare calls (wizard + trial, 2026-09-27): fired each
 // time a story kind is picked, so a visitor clicking through themes sends a
 // handful. Its OWN store — sharing an idea limiter would spend the idea
@@ -210,6 +222,7 @@ module.exports = {
   storyIdeasLimiter,
   avatarGenerationLimiter,
   ideaLandmarksPrepareLimiter,
+  ownStoryAnalysisLimiter,
   landmarkDiscoverLimiter,
   resetTrialMiddlewareStores,
   _peekAdminFromToken,

@@ -165,6 +165,7 @@ export const WIZARD_STORY_KEYS = [
   'story_custom_theme_text',
   'story_art_style',
   'story_language_level',
+  'story_language_level_manual',
   'story_pages',
   'story_dedication',
   'story_details',

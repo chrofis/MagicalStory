@@ -9,6 +9,8 @@ import { LoadingSpinner } from '@/components/common';
 import type { Character } from '@/types/character';
 import type { StoryLanguageCode, IdeaWorld, IdeaWorldMode } from '@/types/story';
 import type { LayoutOverride } from '@/hooks/useDeveloperMode';
+import { pickMainCharacters } from '@/utils/mainCharacters';
+import { OwnStoryCard } from './OwnStoryCard';
 
 // All story language options for display lookup (user-friendly names, no codes shown)
 const STORY_LANGUAGES: { code: StoryLanguageCode; name: string }[] = [
@@ -157,13 +159,18 @@ export function WizardStep6Summary({
   // Editable versions of the generated ideas
   const [editableIdeas, setEditableIdeas] = useState<string[]>([]);
   // Track which option is selected (null = none, 0 = first, 1 = second)
+  // Track which option is selected (null = none, 0/1 = generated ideas, 2 = the parent's own story)
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  // The parent's own story text (third card). Starts empty; survives idea regeneration.
+  const [ownStoryText, setOwnStoryText] = useState('');
+  // Oldest counted main: the age the story is written for, handed to the own-story check.
+  const ownStoryAge = pickMainCharacters(characters.filter(c => !excludedCharacters.includes(c.id)), mainCharacters).focusAge ?? undefined;
 
   // Sync editable ideas when generated ideas change
   useEffect(() => {
     if (generatedIdeas.length > 0) {
       setEditableIdeas([...generatedIdeas]);
-      setSelectedOption(null); // Reset selection when new ideas arrive
+      setSelectedOption(prev => (prev === 2 ? 2 : null)); // Reset selection when new ideas arrive; the own story is not an idea and stays
     } else {
       setEditableIdeas([]);
       setSelectedOption(null);
@@ -192,6 +199,12 @@ export function WizardStep6Summary({
   const handleSelectOption = (index: number) => {
     setSelectedOption(index);
     onSelectIdea(editableIdeas[index], index);
+  };
+
+  // The own story is sent like the custom theme: text only, no idea index (so no idea world or shape travels with it)
+  const handleSelectOwnStory = () => {
+    setSelectedOption(2);
+    onSelectIdea(ownStoryText);
   };
 
   // Helper functions
@@ -300,6 +313,7 @@ export function WizardStep6Summary({
     chooseIdea: language === 'de' ? 'Idee auswählen oder bearbeiten:' : language === 'fr' ? 'Choisissez une idée ou modifiez-la :' : language === 'it' ? 'Scegli un\'idea o modificala:' : 'Choose an idea or edit it:',
     useThis: language === 'de' ? 'Diese verwenden' : language === 'fr' ? 'Utiliser celle-ci' : language === 'it' ? 'Usa questa' : 'Use this',
     option1: language === 'de' ? 'Option 1' : language === 'fr' ? 'Option 1' : language === 'it' ? 'Opzione 1' : 'Option 1',
+    option3: language === 'de' ? 'Eigene Geschichte' : language === 'fr' ? 'Votre propre histoire' : language === 'it' ? 'La tua storia' : 'Own story',
     option2: language === 'de' ? 'Option 2' : language === 'fr' ? 'Option 2' : language === 'it' ? 'Opzione 2' : 'Option 2',
     selected: language === 'de' ? 'Ausgewählt' : language === 'fr' ? 'Sélectionné' : language === 'it' ? 'Selezionata' : 'Selected',
     worldLocation: language === 'de' ? 'Deine Stadt' : language === 'fr' ? 'Votre ville' : language === 'it' ? 'La tua città' : 'Your city',
@@ -499,7 +513,7 @@ export function WizardStep6Summary({
               ))}
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {[0, 1].map((index) => {
               const idea = editableIdeas[index] || '';
               const hasIdea = !!idea;
@@ -629,6 +643,20 @@ export function WizardStep6Summary({
                 </div>
               );
             })}
+            <OwnStoryCard
+              lang={lang}
+              text={ownStoryText}
+              onTextChange={(text) => {
+                setOwnStoryText(text);
+                if (selectedOption === 2) onSelectIdea(text);
+              }}
+              isSelected={selectedOption === 2}
+              onSelect={handleSelectOwnStory}
+              age={ownStoryAge}
+              title={t.option3}
+              selectedLabel={t.selected}
+              useThisLabel={t.useThis}
+            />
           </div>
         </div>
       </div>

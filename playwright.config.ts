@@ -64,7 +64,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /auth\.spec\.ts/, /analysis\.spec\.ts/, /setup-test-family\.spec\.ts/, /demo-story\.spec\.ts/, /trial-to-full\.spec\.ts/, /repair-tile-visibility\.spec\.ts/, /repair-not-on-page\.spec\.ts/],
+      testIgnore: [/auth\.setup\.ts/, /auth\.spec\.ts/, /analysis\.spec\.ts/, /setup-test-family\.spec\.ts/, /demo-story\.spec\.ts/, /trial-to-full\.spec\.ts/, /repair-tile-visibility\.spec\.ts/, /repair-not-on-page\.spec\.ts/, /wizard-settings\.spec\.ts/],
     },
 
     // Chromium without auth (for unauthenticated tests - auth flow tests and UX analysis)
@@ -92,6 +92,15 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
       },
       testMatch: /demo-story\.spec\.ts/,
+    },
+
+    // Wizard settings round-trip: every option reaches the create-story payload. FREE: hermetic, every
+    // /api call is mocked (tests/helpers/wizard-mock.ts), no backend, no login, no story created.
+    // Run: TEST_BASE_URL=http://localhost:5173 npx playwright test tests/wizard-settings.spec.ts --project=wizard-settings
+    {
+      name: 'wizard-settings',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /wizard-settings\.spec\.ts/,
     },
 
     // Trial → full-account end-to-end (no auth dep — the test itself registers

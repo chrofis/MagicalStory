@@ -1701,6 +1701,11 @@ export const storyService = {
     return response;
   },
 
+  // "Own story" box: which story parts the parent's text has (typed flags from Jev). Aborted when the text moves on.
+  analyzeOwnStory(data: { text: string; age?: number }, signal?: AbortSignal): Promise<{ present: Record<string, boolean>; missing: string[]; unsuitable: boolean; costUsd: number }> {
+    return api.post('/api/analyze-own-story', data, { signal });
+  },
+
   // Fired when the story kind is picked: the server ranks the town's landmarks
   // for this setup in the background, so the idea request reads a ready ranking
   // instead of waiting for one. Fire-and-forget; a failure only means the idea

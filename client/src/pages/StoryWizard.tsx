@@ -1,9 +1,10 @@
 import { pickMainCharacters, defaultMainCharacterId, addMainCharacter, trimMainCharacters, MAX_CHARACTERS_PER_STORY } from '@/utils/mainCharacters';
+import { autoReadingLevel } from '@/utils/readingLevel';
 import { buildOrderDetailLines } from '@/utils/orderDetails';
 import { avatarFailureMessage, errorStatusOf } from '@/utils/avatarErrors';
 import { photoFailureMessage } from '@/utils/apiErrors';
 import { findVersionByIndex, iterateErrorMessage } from '@/utils/imageVersions';
-import { useState, useEffect, useRef, lazy, Suspense, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, lazy, Suspense, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -301,6 +302,11 @@ export default function StoryWizard() {
     } catch {
       return 'standard';
     }
+  });
+  // Signature of the mains (ids + ages) the parent chose a reading level for by hand. The level is
+  // pre-selected from the youngest main's age and stays the parent's own choice until that signature changes.
+  const [levelManualFor, setLevelManualFor] = useState<string | null>(() => {
+    try { return localStorage.getItem('story_language_level_manual'); } catch { return null; }
   });
   // Story language (de-ch is default for German, fr-ch for French)
   const [storyLanguage, setStoryLanguage] = useState<StoryLanguageCode>(() => {
@@ -1864,6 +1870,23 @@ export default function StoryWizard() {
   useEffect(() => {
     localStorage.setItem('story_language_level', languageLevel);
   }, [languageLevel]);
+
+  // Reading level from the youngest main's age (utils/readingLevel.ts). Applied whenever the mains or their
+  // ages change, unless the parent picked a level by hand for exactly this combination.
+  const autoLevel = useMemo(
+    () => autoReadingLevel(characters.filter(c => !excludedCharacters.includes(c.id)), mainCharacters),
+    [characters, excludedCharacters, mainCharacters],
+  );
+  useEffect(() => {
+    if (!autoLevel || levelManualFor === autoLevel.signature) return;
+    setLanguageLevel(autoLevel.level);
+  }, [autoLevel, levelManualFor]);
+  const chooseLanguageLevel = (level: LanguageLevel) => {
+    setLanguageLevel(level);
+    const sig = autoLevel?.signature ?? null;
+    setLevelManualFor(sig);
+    try { if (sig) localStorage.setItem('story_language_level_manual', sig); else localStorage.removeItem('story_language_level_manual'); } catch { /* optional */ }
+  };
 
   useEffect(() => {
     localStorage.setItem('story_language', storyLanguage);
@@ -4690,7 +4713,8 @@ export default function StoryWizard() {
         return (
           <WizardStep3BookSettings
             languageLevel={languageLevel}
-            onLanguageLevelChange={setLanguageLevel}
+            onLanguageLevelChange={chooseLanguageLevel}
+            autoLevel={autoLevel}
             pages={pages}
             onPagesChange={setPages}
             storyLanguage={storyLanguage}

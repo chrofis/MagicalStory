@@ -4,6 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { CREDITS_PER_PAGE } from '@/constants/credits';
 import { storyService } from '@/services';
 import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
+import type { AutoReadingLevel } from '@/utils/readingLevel';
 
 // Localized default country label — preselected when adding a location
 function defaultCountryFor(uiLang: string): string {
@@ -102,6 +103,8 @@ interface UserLocation {
 interface WizardStep3Props {
   languageLevel: LanguageLevel;
   onLanguageLevelChange: (level: LanguageLevel) => void;
+  /** Level suggested by the youngest main's age, null when no main has an age. */
+  autoLevel?: AutoReadingLevel | null;
   pages: number;
   onPagesChange: (pages: number) => void;
   storyLanguage: StoryLanguageCode;
@@ -124,6 +127,7 @@ export { getCurrentSeason };
 export function WizardStep3BookSettings({
   languageLevel,
   onLanguageLevelChange,
+  autoLevel = null,
   pages,
   onPagesChange,
   storyLanguage,
@@ -584,6 +588,21 @@ export function WizardStep3BookSettings({
             );
           })}
         </div>
+        {autoLevel && (() => {
+          const suggested = readingLevels.find(l => l.value === autoLevel.level);
+          const { name, age } = autoLevel;
+          const kept = languageLevel !== autoLevel.level;
+          const text = kept
+            ? (language === 'de' ? `Vorschlag für ${name} (${age}): ${suggested?.label}. Deine Wahl bleibt bestehen.`
+              : language === 'fr' ? `Suggestion pour ${name} (${age} ans) : ${suggested?.label}. Votre choix est conservé.`
+              : language === 'it' ? `Suggerito per ${name} (${age} anni): ${suggested?.label}. La tua scelta resta valida.`
+              : `Suggested for ${name} (${age}): ${suggested?.label}. Your choice is kept.`)
+            : (language === 'de' ? `Gewählt, weil ${name} ${age} ist – du kannst es ändern.`
+              : language === 'fr' ? `Choisi parce que ${name} a ${age} ans – vous pouvez le modifier.`
+              : language === 'it' ? `Scelto perché ${name} ha ${age} anni – puoi cambiarlo.`
+              : `Chosen because ${name} is ${age} – you can change it.`);
+          return <p data-testid="reading-level-why" className="text-sm text-gray-600 mt-2">{text}</p>;
+        })()}
       </div>
 
       {/* Number of Pages - shown after reading level is selected */}
