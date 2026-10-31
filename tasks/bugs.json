@@ -4475,6 +4475,16 @@
       "fix": "buildTouchupPlan stamps reviewerDecided:true; repairLogic.isReviewerDecidedPlan / typesAreInpaintable(types, plan) and the issue filter in inpaintPage skip NOT_INPAINTABLE_TYPES for such a plan (owner: Opus decides, tool obeys). Production plans keep the filter. Test tests/unit/book-review-touchup-type-gate.test.ts.",
       "status": "fixed",
       "fixedIn": "e9d286c30"
+    },
+    {
+      "id": "realistic-style-sheets-refused-by-one-call-generator",
+      "title": "Realistic art style: every costume, pyjama or redressed avatar sheet throws \"a non-realistic art style is required\", so a realistic story that needs one fails before illustration",
+      "reportedAt": "2026-10-31",
+      "source": "Showcase entry 14 (Dubois, realistic, 10 pages) on staging, job_1793457389255_mtwu4lc42: Railway log [STYLED AVATAR] 2x4 generation threw for Léa/nightwear/realistic (and 7 more sheets) at character2x4Sheet.js:414; job failed with MissingRequiredCostumeSheetError. Prod: no realistic job since 2026-10-10, so no customer hit.",
+      "rootCause": "f56809311 (2026-10-10, one-call avatar sheets) deleted the photoreal pass-1 sheet that realistic stories used for costumes and redresses (decision 2026-07-09 \"Realistic style: redress pass\") and added a guard in generateOneCallSheet that refuses realistic. prepareStyledAvatars still requests realistic costume/redress sheets, so they always throw. The sheet judge also flags a photographic look as layout not_illustrated, with a redo line asking for a painted illustration.",
+      "fix": "generateOneCallSheet refuses only a missing art style; the sheet judge takes the art style and RENDER_RULES (avatarSheetJudge.js) gives the not_illustrated meaning and redo line per style (photographic for realistic). Owner: Draw + check, photo OK. Regression test in tests/unit/avatar-sheet-one-call-check-2026-10-10.test.ts (3b).",
+      "status": "fixed",
+      "fixedIn": "3110d6f51"
     }
   ]
 }
