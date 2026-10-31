@@ -1369,22 +1369,27 @@ test.describe('Demo Story Generation', () => {
     // disabled until text is typed. Counting it made the check below pass with no ideas
     // and the click wait on a disabled button until the 90-minute test timeout.
     const ideaButtons = page.locator('button:enabled').filter({ hasText: USE_THIS_RE });
-    // Step 4 should pre-generate the ideas (StoryWizard preGenerateIdeasRef). On staging it
-    // twice did not fire (see tasks/BACKLOG.md), leaving an empty placeholder. Give it 20 s;
-    // if still empty and no generation is running (the generate button is disabled while
-    // one is), click it ourselves, loudly.
-    const ideasPresent = await ideaButtons.first().waitFor({ state: 'visible', timeout: 20000 })
-      .then(() => true, () => false);
-    if (!ideasPresent) {
-      const generateBtn = page.getByRole('button', {
-        name: /vorschlag generieren|generate suggestion|g[ée]n[ée]rer une suggestion|genera (un[ao] )?(suggerimento|proposta)/i,
-      }).first();
-      if (await generateBtn.isEnabled().catch(() => false)) {
-        console.log('  WARNING: idea pre-generation did not fire — clicking Vorschlag generieren');
-        await generateBtn.click();
-      } else {
-        console.log('  Ideas still generating (generate button disabled) — waiting');
+    // Step 4 starts the idea request (StoryWizard preGenerateIdeasRef); on staging it takes ~45 s, so the
+    // summary often shows the cards still loading. While a request runs the generate button reads
+    // "Generating..." (disabled), so a button with its IDLE label means no request is running. Only then,
+    // and only after a short re-check (an answer that just finished is still rendering), click it once.
+    // The old fixed 20 s wait clicked at the moment the prepared ideas arrived and threw them away
+    // (staging 2026-10-31: the second idea request reached the server 80 ms after the first finished).
+    const ideaGenerateBtn = page.getByRole('button', {
+      name: /vorschlag generieren|generate suggestion|g[ée]n[ée]rer une suggestion|genera (un[ao] )?(suggerimento|proposta)/i,
+    }).first();
+    const ideasVisible = () => ideaButtons.first().isVisible().catch(() => false);
+    const ideaDeadline = Date.now() + 180000;
+    let clickedGenerate = false;
+    while (Date.now() < ideaDeadline && !(await ideasVisible())) {
+      if (!clickedGenerate && await ideaGenerateBtn.isEnabled({ timeout: 1000 }).catch(() => false)) {
+        await page.waitForTimeout(3000);
+        if (await ideasVisible()) break;
+        console.log('  WARNING: no idea request was running on the summary step — clicking the generate button');
+        await ideaGenerateBtn.click();
+        clickedGenerate = true;
       }
+      await page.waitForTimeout(2000);
     }
     await expect(ideaButtons.first()).toBeVisible({ timeout: 180000 });
     const wantsOwnWorld = !!entry.storyTheme;

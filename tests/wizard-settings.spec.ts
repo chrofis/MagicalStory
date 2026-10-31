@@ -16,8 +16,8 @@ import { installWizardMock, WizardMock, IDEAS, IDEA_WORLDS, IDEA_SHAPES, MockCha
 
 const NEXT = /^next$/i;
 
-async function openWizard(page: Page, cast?: MockCharacter[]): Promise<WizardMock> {
-  const mock = await installWizardMock(page, cast);
+async function openWizard(page: Page, cast?: MockCharacter[], opts?: { ideaDelayMs?: number }): Promise<WizardMock> {
+  const mock = await installWizardMock(page, cast, opts);
   page.on('pageerror', e => { throw new Error(`page error: ${e.message}`); });
   await page.goto('/create?new=true');
   await page.getByRole('button', { name: NEXT }).waitFor();
@@ -158,6 +158,27 @@ test.describe('wizard settings reach the create-story payload', () => {
     expect(body.season).toBe('winter');
     expect(body.pages).toBe(20);
     expect(body.userLocation.city).toBe('Baden');
+  });
+
+  // The art-style step prepares the ideas, so the summary shows them without "Generate Suggestion". Three staging
+  // showcases on 2026-10-31 reached the summary with empty idea cards.
+  test('ideas are ready on the summary without pressing Generate Suggestion', async ({ page }) => {
+    const mock = await openWizard(page);
+    await toSummary(page);
+    await expect(page.locator('textarea').filter({ hasText: IDEAS[0] })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('textarea').filter({ hasText: IDEAS[1] })).toBeVisible();
+    expect(mock.ideaRequests).toHaveLength(1);
+  });
+
+  test('while the prepared ideas are still being written, the summary shows them loading and Generate Suggestion waits', async ({ page }) => {
+    const mock = await openWizard(page, undefined, { ideaDelayMs: 8000 });
+    await toSummary(page);
+    // while the request runs the button reads Generating... and is disabled; its idle label is gone
+    await expect(page.getByRole('button', { name: /Generating/ }).first()).toBeDisabled();
+    await expect(page.getByRole('button', { name: /Generate Suggestion/ })).toHaveCount(0);
+    await expect(page.getByText('Click "Generate Suggestion"')).toHaveCount(0);
+    await expect(page.locator('textarea').filter({ hasText: IDEAS[0] })).toBeVisible({ timeout: 15_000 });
+    expect(mock.ideaRequests).toHaveLength(1);
   });
 
   test('story type, topic and art style', async ({ page }) => {

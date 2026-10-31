@@ -50,7 +50,8 @@ export interface WizardMock {
   unmocked: string[];
 }
 
-export async function installWizardMock(page: Page, cast: MockCharacter[] = DEFAULT_CAST): Promise<WizardMock> {
+/** ideaDelayMs: hold the idea stream answer this long, as the real server takes ~45 s (staging 2026-10-31). */
+export async function installWizardMock(page: Page, cast: MockCharacter[] = DEFAULT_CAST, { ideaDelayMs = 0 }: { ideaDelayMs?: number } = {}): Promise<WizardMock> {
   const mock: WizardMock = {
     createStoryRequests: [], ownStoryRequests: [], ideaRequests: [], unmocked: [],
     setOwnStoryAnswer(a) { ownAnswer = a; },
@@ -109,6 +110,7 @@ export async function installWizardMock(page: Page, cast: MockCharacter[] = DEFA
     }
     if (p === '/api/generate-story-ideas-stream') {
       mock.ideaRequests.push(body());
+      if (ideaDelayMs) await new Promise(r => setTimeout(r, ideaDelayMs));
       const events = [
         { status: 'generating', prompt: 'e2e prompt', model: 'e2e-model' },
         { ideaWorlds: IDEA_WORLDS },
