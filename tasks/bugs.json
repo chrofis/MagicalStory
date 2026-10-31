@@ -4465,6 +4465,16 @@
       "fix": "A card counts only with an integer card index.",
       "status": "fixed",
       "fixedIn": "e1f59d74a"
+    },
+    {
+      "id": "book-review-touchup-dropped-by-inpaint-type-filter",
+      "title": "Opus book review: a TOUCHUP fault of type wrong_state / wrong_action is dropped by the inpaint planner as not inpaintable, so the page is never repaired",
+      "reportedAt": "2026-10-31",
+      "source": "Repair success test on Test Lab #1768 findings (exps 1770, 1771, 1773): log \"wrong_state is not inpaintable - left for character repair\" / \"dropping wrong_action fix ... not inpaintable, character repair owns it\"; production returns failed(inpaint had no instruction to send) and runBookReviewRounds never retries it",
+      "rootCause": "The inpaint plan builder keeps the per-page-judge era type filter that reserves pose/state/clothing types for character repair; in book_review mode Opus picks the route and the filter overrules it.",
+      "fix": "buildTouchupPlan stamps reviewerDecided:true; repairLogic.isReviewerDecidedPlan / typesAreInpaintable(types, plan) and the issue filter in inpaintPage skip NOT_INPAINTABLE_TYPES for such a plan (owner: Opus decides, tool obeys). Production plans keep the filter. Test tests/unit/book-review-touchup-type-gate.test.ts.",
+      "status": "fixed",
+      "fixedIn": "e9d286c30"
     }
   ]
 }
