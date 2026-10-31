@@ -653,6 +653,7 @@ export function WizardStep6Summary({
               isSelected={selectedOption === 2}
               onSelect={handleSelectOwnStory}
               age={ownStoryAge}
+              book={{ pages, languageLevel }}
               title={t.option3}
               selectedLabel={t.selected}
               useThisLabel={t.useThis}

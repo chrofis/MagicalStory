@@ -377,6 +377,17 @@ describe('the arc prompts v2 (owner, 2026-09-25)', () => {
     expect(retell).not.toMatch(/may rebuild the story|Never edit or patch the old arc/);
   });
 
+  it('an own-story re-telling keeps every parent event: the open event bound and no dead-end cut (2026-10-31)', () => {
+    const own = input(5, { ownStory: true });
+    const retellOwn = PB.buildArcRetellPrompt(own, 18, committed, '## PANELIST A' + String.fromCharCode(10) + 'x');
+    expect(retellOwn).toContain(`The story keeps ${PB.happeningsLabel(own, 18)}: a repair never adds a happening, and ${PB.OWN_STORY_EVENT_STAYS}`);
+    expect(retellOwn).toContain(PB.OWN_STORY_EVENTS_OPEN);
+    expect(retellOwn).not.toContain('cutting a dead end is the preferred repair');
+    const loose = PB.buildArcRetellPrompt(input(5), 18, committed, '## PANELIST A' + String.fromCharCode(10) + 'x');
+    expect(loose).not.toContain(PB.OWN_STORY_EVENTS_OPEN);
+    expect(loose).toContain('a repair that would add a happening cuts one first, and cutting a dead end is the preferred repair.');
+  });
+
   it('a panel repair may not invent plot, and only a MAJOR or CRITICAL finding names one', () => {
     const panel = PB.buildArcPanelPrompt(input(5), committed);
     expect(panel).toMatch(/It adds no figure, object, happening or rule of the world the arc does not have/);

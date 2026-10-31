@@ -10775,6 +10775,23 @@
    },
    "evidence": [],
    "lastChecked": null
+  },
+  {
+   "id": "own-story-events-win-over-budget-2026-10-31",
+   "title": "Own story: more parent events than the arc budget are kept, and the wizard warns without blocking",
+   "commits": [],
+   "addedAt": "2026-10-31",
+   "status": "pending",
+   "claim": "With an Own story of clearly more events than the chosen book's arc event range (for example 10 events at 10 pages, age 8), the wizard shows the fixed too-many-events hint (the book will still follow the story) and the Use button stays enabled; the shipped arc has at least as many chain links as the parent has events, none dropped as a dead end, and the arc log shows no arc_chain_out_of_range warning. A loose idea keeps the plain range. Stored-text check 2026-10-31: the new Jev question flagged 5/5 long texts and 0/5 short texts, USD 0.0002.",
+   "runShape": [
+    "any"
+   ],
+   "check": {
+    "kind": "human",
+    "what": "On staging pick Own story, type a 10-event text for a 10-page book, wait 5 s: the amber hint appears and the button works. Start the story and count the arc's chain links against the parent's events (arcReviewReport): none dropped."
+   },
+   "evidence": [],
+   "lastChecked": null
   }
  ],
  "runs": [

@@ -46,7 +46,7 @@ export interface WizardMock {
   /** Bodies of POST /api/generate-story-ideas(-stream). */
   ideaRequests: any[];
   /** Queue the next own-story answer. */
-  setOwnStoryAnswer(answer: { present: Record<string, boolean>; missing: string[]; unsuitable: boolean }): void;
+  setOwnStoryAnswer(answer: { present: Record<string, boolean>; missing: string[]; unsuitable: boolean; tooManyEvents: boolean }): void;
   unmocked: string[];
 }
 
@@ -55,7 +55,7 @@ export async function installWizardMock(page: Page, cast: MockCharacter[] = DEFA
     createStoryRequests: [], ownStoryRequests: [], ideaRequests: [], unmocked: [],
     setOwnStoryAnswer(a) { ownAnswer = a; },
   };
-  let ownAnswer = { present: { WHO: true, WHERE: false, PROBLEM: false, WANT: true, ENDING: false }, missing: ['WHERE', 'PROBLEM', 'ENDING'], unsuitable: false };
+  let ownAnswer = { present: { WHO: true, WHERE: false, PROBLEM: false, WANT: true, ENDING: false }, missing: ['WHERE', 'PROBLEM', 'ENDING'], unsuitable: false, tooManyEvents: false };
   const user = { id: 'e2e-user', username: 'e2e', email: 'e2e@example.invalid', role: 'user', credits: 1000, emailVerified: true, photoConsentAt: '2026-01-01T00:00:00Z' };
   const token = fakeJwt();
 

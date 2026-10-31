@@ -1,9 +1,9 @@
-#! JEV OWN-STORY CHECK QUESTIONS — v1 (2026-10-30). Read by server/lib/ownStoryAnalysis.js.
+#! JEV OWN-STORY CHECK QUESTIONS — v2 (2026-10-31). Read by server/lib/ownStoryAnalysis.js.
 #! Jev (typesafe/jev-1.13 on OpenRouter) answers each line as a yes-probability ("noul").
 #! The wizard's "Own story" box asks these while a parent types a story idea; code turns
 #! each probability into a present/missing flag and the UI shows a checklist plus a fixed,
 #! translated tip for the first missing part. Jev generates no prose.
-#! One line per question: `ID: proposition`. Placeholder: {AGE} (age of the child the book is for).
+#! One line per question: `ID: proposition`. Placeholders: {AGE} (age of the child the book is for), {EVENTS} and {PAGES} (the most events the book's page count and age comfortably hold, from arcEventRange in promptBuilders.js, and the page count).
 #! Keep every proposition generic: no names, places or plots from a real story.
 
 [PARTS]
@@ -13,3 +13,4 @@ PROBLEM: The text describes something that goes wrong, or a problem or obstacle 
 WANT: The text says what the main character wants or what they set out to do.
 ENDING: The text says how the story ends or what the outcome is.
 UNSUITABLE: The text contains content that is too frightening, violent or mature for a child aged {AGE}.
+TOO_MANY_EVENTS: The text names more than {EVENTS} separate events, things that happen one after another in the story, and a book of {PAGES} pages comfortably holds only about {EVENTS}.

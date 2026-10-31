@@ -779,15 +779,17 @@ router.post('/prepare-idea-landmarks', authenticateToken, ideaLandmarksPrepareLi
 // Own-story check (idea step): which story parts the parent's text has. Typed flags only.
 // Jev is paid (~USD 0.0001/call), rate-limited per user. see prompts/jev-own-story.txt
 router.post('/analyze-own-story', authenticateToken, ownStoryAnalysisLimiter, async (req, res) => {
-  const { text, age } = req.body || {};
+  const { text, age, pages, languageLevel } = req.body || {};
   const { analyseOwnStory, OWN_STORY_MIN_CHARS, OWN_STORY_MAX_CHARS } = require('../lib/ownStoryAnalysis');
   if (typeof text !== 'string' || text.trim().length < OWN_STORY_MIN_CHARS) return res.status(400).json({ error: `text must be at least ${OWN_STORY_MIN_CHARS} characters` });
   if (text.length > OWN_STORY_MAX_CHARS * 2) return res.status(400).json({ error: 'text too long' });
+  const parsedPages = parseInt(pages, 10);
+  if (!Number.isInteger(parsedPages) || parsedPages < 1 || parsedPages > 200) return res.status(400).json({ error: 'pages must be the chosen book page count' });
   try {
     const parsedAge = parseInt(age, 10);
-    const r = await analyseOwnStory(text, Number.isFinite(parsedAge) ? parsedAge : undefined);
-    log.info(`🧭 [OWN-STORY] user ${req.user.id}: ${r.missing.length} part(s) missing, unsuitable=${r.unsuitable}, cost $${r.costUsd.toFixed(6)}`);
-    res.json({ present: r.present, missing: r.missing, unsuitable: r.unsuitable, costUsd: r.costUsd });
+    const r = await analyseOwnStory(text, Number.isFinite(parsedAge) ? parsedAge : undefined, { pages: parsedPages, languageLevel: typeof languageLevel === 'string' ? languageLevel : undefined });
+    log.info(`🧭 [OWN-STORY] user ${req.user.id}: ${r.missing.length} part(s) missing, unsuitable=${r.unsuitable}, tooManyEvents=${r.tooManyEvents}, cost $${r.costUsd.toFixed(6)}`);
+    res.json({ present: r.present, missing: r.missing, unsuitable: r.unsuitable, tooManyEvents: r.tooManyEvents, costUsd: r.costUsd });
   } catch (err) {
     log.error(`🚨 [OWN-STORY] analysis failed for user ${req.user.id}: ${err.message}`);
     res.status(502).json({ error: 'story check unavailable' });

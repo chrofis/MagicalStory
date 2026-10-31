@@ -227,7 +227,8 @@ test.describe('wizard settings reach the create-story payload', () => {
     expect(mock.ownStoryRequests).toHaveLength(0); // the 5 s pause has not passed
     await expect(page.getByTestId('own-story-checklist')).toBeVisible({ timeout: 8000 });
     expect(mock.ownStoryRequests).toHaveLength(1);
-    expect(mock.ownStoryRequests[0]).toMatchObject({ text, age: 8 });
+    expect(mock.ownStoryRequests[0]).toMatchObject({ text, age: 8, pages: expect.any(Number) });  // the book sizes the event question
+    await expect(page.getByTestId('own-story-too-many-events')).toHaveCount(0);  // not flagged: no hint
     await expect(page.getByTestId('own-story-checklist').locator('[data-part="WHO"]')).toHaveAttribute('data-present', 'true');
     await expect(page.getByTestId('own-story-checklist').locator('[data-part="WHERE"]')).toHaveAttribute('data-present', 'false');
     await expect(page.getByTestId('own-story-tip')).toHaveText('Say where the story happens.');
@@ -237,6 +238,25 @@ test.describe('wizard settings reach the create-story payload', () => {
     expect(body.ideaPick.index).toBeNull();   // a custom text: no idea index, no idea world
     expect(body.ownStory).toBe(true);         // the Own story card: the writer follows its events and ending
     expect(body.ideaWorld).toBeNull();
+  });
+
+  test('own story: too many events shows a hint, selection stays open and the book still follows the text', async ({ page }) => {
+    test.setTimeout(60_000);
+    const mock = await openWizard(page);
+    mock.setOwnStoryAnswer({ present: { WHO: true, WHERE: true, PROBLEM: true, WANT: true, ENDING: true }, missing: [], unsuitable: false, tooManyEvents: true });
+    await toSummary(page);
+    await generateIdeas(page);
+    const text = 'A girl rows out, meets a heron, loses her oar, finds a cave, wakes a bear, crosses a bridge, sings to a storm and sails home.';
+    await page.getByTestId('own-story-text').fill(text);
+    const hint = page.getByTestId('own-story-too-many-events');
+    await expect(hint).toBeVisible({ timeout: 8000 });
+    await expect(hint).toContainText('pages comfortably hold');
+    await expect(hint).toContainText(String(mock.ownStoryRequests[0].pages));
+    await expect(page.getByTestId('own-story-select')).toBeEnabled();   // a warning, never a block
+    await page.getByTestId('own-story-select').click();
+    const body = await submit(page, mock);
+    expect(body.storyDetails).toBe(text);
+    expect(body.ownStory).toBe(true);
   });
 
   test('dedication', async ({ page }) => {

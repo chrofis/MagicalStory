@@ -1702,7 +1702,7 @@ export const storyService = {
   },
 
   // "Own story" box: which story parts the parent's text has (typed flags from Jev). Aborted when the text moves on.
-  analyzeOwnStory(data: { text: string; age?: number }, signal?: AbortSignal): Promise<{ present: Record<string, boolean>; missing: string[]; unsuitable: boolean; costUsd: number }> {
+  analyzeOwnStory(data: { text: string; age?: number; pages: number; languageLevel?: string }, signal?: AbortSignal): Promise<{ present: Record<string, boolean>; missing: string[]; unsuitable: boolean; tooManyEvents: boolean; costUsd: number }> {
     return api.post('/api/analyze-own-story', data, { signal });
   },
 

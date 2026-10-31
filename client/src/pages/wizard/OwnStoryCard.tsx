@@ -6,6 +6,7 @@ import {
   OWN_STORY_PARTS,
   type OwnStoryPart,
   type OwnStoryResult,
+  type OwnStoryBook,
 } from '@/utils/ownStoryCheck';
 
 type Lang = 'en' | 'de' | 'fr' | 'it';
@@ -36,6 +37,13 @@ const PARTS: Record<OwnStoryPart, { label: Record<Lang, string>; tip: Record<Lan
   },
 };
 
+/** Fixed hint when the text holds more events than the book comfortably does. Shown beside, never instead of, the book: selection stays open and the book follows the story. */
+const tooManyEventsHint = (lang: Lang, pages: number) => L(lang,
+  `Deine Geschichte hat mehr Ereignisse, als ${pages} Seiten bequem fassen. Mit mehr Seiten oder einem kürzeren Text hat das Buch mehr Luft. Das Buch folgt trotzdem deiner Geschichte.`,
+  `Votre histoire contient plus d'événements que ${pages} pages n'en contiennent confortablement. Avec plus de pages ou un texte plus court, le livre respire mieux. Le livre suivra quand même votre histoire.`,
+  `La tua storia ha più avvenimenti di quanti ${pages} pagine ne contengano comodamente. Con più pagine o un testo più breve il libro respira meglio. Il libro seguirà comunque la tua storia.`,
+  `Your story has more happenings than ${pages} pages comfortably hold. More pages or a shorter text would give the book room to breathe. The book will still follow your story.`);
+
 interface OwnStoryCardProps {
   lang: Lang;
   text: string;
@@ -44,20 +52,22 @@ interface OwnStoryCardProps {
   onSelect: () => void;
   /** Age of the oldest main character, handed to the check so it can judge what suits the child. */
   age?: number;
+  /** The chosen book: the check says when the text holds more events than it comfortably does. */
+  book: OwnStoryBook;
   title: string;
   selectedLabel: string;
   useThisLabel: string;
 }
 
 /** The third idea card: the parent writes the story idea; Jev says which parts it still lacks. */
-export function OwnStoryCard({ lang, text, onTextChange, isSelected, onSelect, age, title, selectedLabel, useThisLabel }: OwnStoryCardProps) {
+export function OwnStoryCard({ lang, text, onTextChange, isSelected, onSelect, age, book, title, selectedLabel, useThisLabel }: OwnStoryCardProps) {
   const [result, setResult] = useState<OwnStoryResult | null>(null);
   const [failed, setFailed] = useState(false);
   const checkerRef = useRef<ReturnType<typeof createOwnStoryChecker> | null>(null);
 
   useEffect(() => {
     const checker = createOwnStoryChecker({
-      analyse: async (t, a, signal) => (await storyService.analyzeOwnStory({ text: t, age: a }, signal)) as OwnStoryResult,
+      analyse: async (t, a, signal, b) => (await storyService.analyzeOwnStory({ text: t, age: a, pages: b.pages, languageLevel: b.languageLevel }, signal)) as OwnStoryResult,
       onResult: (r) => { setFailed(false); setResult(r); },
       onError: (err) => { console.error('Own-story check failed', err); setFailed(true); },
     });
@@ -65,7 +75,7 @@ export function OwnStoryCard({ lang, text, onTextChange, isSelected, onSelect, a
     return () => { checker.cancel(); checkerRef.current = null; };
   }, []);
 
-  useEffect(() => { checkerRef.current?.update(text, age); }, [text, age]);
+  useEffect(() => { checkerRef.current?.update(text, age, { pages: book.pages, languageLevel: book.languageLevel }); }, [text, age, book.pages, book.languageLevel]);
 
   const firstMissing = result?.missing[0];
   const tip = result
@@ -109,6 +119,12 @@ export function OwnStoryCard({ lang, text, onTextChange, isSelected, onSelect, a
             ))}
           </ul>
           <p data-testid="own-story-tip" className="font-medium">{tip}</p>
+          {result.tooManyEvents && (
+            <p data-testid="own-story-too-many-events" className="flex items-start gap-1.5 text-amber-700">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              {tooManyEventsHint(lang, book.pages)}
+            </p>
+          )}
           {result.unsuitable && (
             <p data-testid="own-story-unsuitable" className="flex items-center gap-1.5 text-amber-700">
               <AlertTriangle size={14} />

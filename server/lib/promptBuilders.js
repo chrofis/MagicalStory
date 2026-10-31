@@ -9468,11 +9468,26 @@ function arcEventRange(inputData, pageCount) {
   const rule = EVENT_BUDGETS[band]
     || EVENT_BUDGETS_STANDARD[lvl]
     || EVENT_BUDGETS_STANDARD.standard;
-  if (rule.flat) return { lo: rule.flat, hi: rule.flat };
+  // OWN STORY (owner, 2026-10-31, docs/decisions.md): the parent's events stay
+  // whatever their number, so the upper bound is open. `open` is the one flag
+  // every stater (happeningsLabel, rangeLabel) and every counter
+  // (arcShapeCounts) reads; loose ideas return the plain { lo, hi }.
+  const open = inputData?.ownStory === true ? { open: true } : {};
+  if (rule.flat) return { lo: rule.flat, hi: rule.flat, ...open };
   const lo = Math.max(1, Math.round(pages / rule.lo));
   const hi = Math.max(lo, Math.max(1, Math.round(pages / rule.hi)));
-  return { lo, hi };
+  return { lo, hi, ...open };
 }
+
+/**
+ * The open upper bound of an own story's event budget, ONE phrase for the
+ * generator (arc principles, STORY LOGIC "Events:", re-tell) beside the
+ * code-side count (arcShapeCounts.chainInRange reads `range.open`, not this text).
+ */
+const OWN_STORY_EVENTS_OPEN = "or as many as the parent's story names, if more";
+
+/** What "cut the dead ends" becomes when the parent wrote the events (generator and critic read it). */
+const OWN_STORY_EVENT_STAYS = "an event the parent's story names is never cut as a dead end";
 
 /**
  * THE CHAIN IS THE EVENT BUDGET (owner, 2026-09-24, D3; tightened 2026-09-25).
@@ -9489,8 +9504,9 @@ function arcChainRange(inputData, pageCount) {
 }
 
 /** "5-6", or "2" when the range is one number. */
-function rangeLabel({ lo, hi }) {
-  return lo === hi ? `${lo}` : `${lo}-${hi}`;
+function rangeLabel({ lo, hi, open }) {
+  const base = lo === hi ? `${lo}` : `${lo}-${hi}`;
+  return open ? `${base}, ${OWN_STORY_EVENTS_OPEN}` : base;
 }
 
 /**
@@ -10931,6 +10947,12 @@ function commissionedCastDef(inputData) {
  * finding is measured against (arXiv 2503.23512).
  */
 const ARC_LOGIC_CHECK = 'an act against the want, motive, ability or limit the story logic gives its figure; an act that no motive line causes; a happening that causes nothing later; a fact that contradicts an earlier one; a "why don\'t they just …?" that a child would ask and the logic leaves open; a Facts limit the arc\'s own sentences break.';
+/** The creator critique's and the panel's LOGIC check; an own story's events are not dead ends (OWN_STORY_EVENT_STAYS). */
+function arcLogicCheck(inputData) {
+  return inputData?.ownStory === true
+    ? ARC_LOGIC_CHECK.replace('a happening that causes nothing later', `a happening the story added that causes nothing later (${OWN_STORY_EVENT_STAYS})`)
+    : ARC_LOGIC_CHECK;
+}
 
 /**
  * HOW AN ISSUE IS WRITTEN — one set of strings, the creator's critique and the
@@ -11171,8 +11193,9 @@ function buildTellingRulesSection(inputData = {}) {
 
 /** "4-5 happenings", "1 happening" — the event budget as the prompt states it. */
 function happeningsLabel(inputData, pageCount) {
-  const r = arcEventRange(inputData, pageCount);
-  return `${rangeLabel(r)} happening${r.hi === 1 ? '' : 's'}`;
+  const { open, ...r } = arcEventRange(inputData, pageCount);
+  const noun = `${rangeLabel(r)} happening${r.hi === 1 ? '' : 's'}`;
+  return open ? `${noun}, ${OWN_STORY_EVENTS_OPEN}` : noun;
 }
 
 /**
@@ -11214,8 +11237,12 @@ function arcPrinciples(inputData = {}, pageCount = 10) {
     '- One problem, from the first sentence to the last, and no second storyline: a listening child follows one question.',
     `- ${ARC_MAIN_TURN_RULE}: every child the book is about sees themselves matter.`,
     `- ${EVERY_CHILD_ACTS_RULE}`,
-    `- ${happeningsLabel(inputData, pageCount)} a child would retell: the child remembers the happenings on the way to the ending and forgets the rest.`,
-    '- Every happening causes the ending; one that causes nothing is cut, not explained: a dead end costs a page and is forgotten.',
+    inputData.ownStory === true
+      ? `- ${happeningsLabel(inputData, pageCount)}: the parent's events all stay, in their order, and a child retells the ones on the way to the ending.`
+      : `- ${happeningsLabel(inputData, pageCount)} a child would retell: the child remembers the happenings on the way to the ending and forgets the rest.`,
+    inputData.ownStory === true
+      ? `- Every happening the story adds causes the ending; one that causes nothing is cut, not explained. ${OWN_STORY_EVENT_STAYS[0].toUpperCase()}${OWN_STORY_EVENT_STAYS.slice(1)}: it is tied into the chain.`
+      : '- Every happening causes the ending; one that causes nothing is cut, not explained: a dead end costs a page and is forgotten.',
     `- ${arcLengthRange(pages)} sentences for ${pages} pages: the telling follows the book, about one sentence a page.`,
     '- Few new figures, each carrying the one thing the plot uses: every new figure is a name the child has to hold.',
   ].join('\n');
@@ -11306,7 +11333,7 @@ const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real
 function arcCritiqueSpec({ retell = false, inputData = {} } = {}) {
   const remain = retell ? ' that remain' : '';
   return [
-    `"Faults:" then the arc's three worst faults${remain}, one per numbered line, or the single word "none". ${ARC_ISSUE_RULE} A fault is one of these: ${ARC_LOGIC_CHECK} Or one of these: ${ARC_PART_CHECK} Or a break of one of these rules: ${[...arcStakesRules(inputData), EVERY_CHILD_ACTS_RULE, WORLD_FRAME_RULE].join(' ')} Each line: ${arcIssueLine()} ${ARC_FINDING_RULE} Tag each ${ARC_SEVERITY_DEF} A fault is never a count, a page number or a sourced measurement.`,
+    `"Faults:" then the arc's three worst faults${remain}, one per numbered line, or the single word "none". ${ARC_ISSUE_RULE} A fault is one of these: ${arcLogicCheck(inputData)} Or one of these: ${ARC_PART_CHECK} Or a break of one of these rules: ${[...arcStakesRules(inputData), EVERY_CHILD_ACTS_RULE, WORLD_FRAME_RULE].join(' ')} Each line: ${arcIssueLine()} ${ARC_FINDING_RULE} Tag each ${ARC_SEVERITY_DEF} A fault is never a count, a page number or a sourced measurement.`,
     '',
     '"Commission honored:" one line — "yes", or the commission\'s own words the arc drops or inverts, quoted; a TOPIC PROMISE, where one is given, counts among the commission\'s words.',
   ].join('\n');
@@ -11365,7 +11392,7 @@ function buildArcPanelPrompt(inputData, committedBlock) {
     // An issue is written the way the creator's critique writes a fault — its
     // three worst, each citing its sentences and quoting them (2026-09-25);
     // parseArcIssues drops one whose quotes are not in the arc.
-    ARC_LOGIC_CHECK,
+    ARC_LOGIC_CHECK: arcLogicCheck(inputData),
     ARC_ISSUE_RULE,
     ARC_ISSUE_LINE: arcIssueLine({ lens: true }),
     ARC_FINDING_RULE,
@@ -11427,6 +11454,9 @@ function buildArcRetellPrompt(inputData, pageCount, arcBlock, repairFindings, { 
     TELLING_RULES: buildTellingRulesSection(inputData),
     // The event budget the re-telling may not exceed: cut before add.
     HAPPENINGS: happeningsLabel(inputData, pageCount),
+    HAPPENINGS_REPAIR: inputData.ownStory === true
+      ? `a repair never adds a happening, and ${OWN_STORY_EVENT_STAYS}: only a happening the story added itself that causes nothing is cut.`
+      : 'a repair that would add a happening cuts one first, and cutting a dead end is the preferred repair.',
     ARC_TO_REPAIR: String(arcBlock || '').trim(),
     REPAIR_FINDINGS: String(repairFindings).trim(),
     ARC_LOGIC_SPEC: arcLogicSpec(inputData, pageCount),
@@ -12099,7 +12129,8 @@ function arcShapeCounts({ sentences, logic, inputData, pageCount }) {
     sentencesInRange: sentences >= sentenceRange.lo && sentences <= sentenceRange.hi,
     chainLinks,
     chainRange,
-    chainInRange: chainLinks >= chainRange.lo && chainLinks <= chainRange.hi,
+    // An own story's range has no upper bound: the parent's events all stay.
+    chainInRange: chainLinks >= chainRange.lo && (chainRange.open || chainLinks <= chainRange.hi),
     invented,
     inventedAllowance,
     inventedOver: invented.length > inventedAllowance,
@@ -14213,6 +14244,9 @@ module.exports = {
   arcLogicSpec,
   arcChainRange,
   arcEventRange,
+  arcLogicCheck,
+  OWN_STORY_EVENTS_OPEN,
+  OWN_STORY_EVENT_STAYS,
   arcLengthRange,
   arcLengthBounds,
   arcShapeCounts,
