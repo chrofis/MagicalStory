@@ -51,7 +51,7 @@ async function run() {
       try {
         const r = await judgeAvatarSheet({
           sheet: dataUri(path.join(dir, e.file)), photo: e.photoFile ? dataUri(path.join(dir, e.photoFile)) : null,
-          kind: e.kind, model, usageTracker: (_k, u) => usage.push(u),
+          kind: e.kind, artStyle: e.artStyle || arg('art-style'), model, usageTracker: (_k, u) => usage.push(u),
         });
         rec = { id: e.id, ok: true, raw: r.raw };
       } catch (err) { rec = { id: e.id, ok: false, error: String(err.message).slice(0, 500) }; }

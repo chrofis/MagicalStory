@@ -61,7 +61,7 @@ beforeAll(async () => {
 afterEach(() => { globalThis.fetch = realFetch; editCalls = 0; });
 
 const OPTS = {
-  characterName: 'Daniel', authoredWardrobe: 'The bolt is off; the tunic stays.', removedItems: ['bolt'],
+  characterName: 'Daniel', artStyle: 'watercolor', authoredWardrobe: 'The bolt is off; the tunic stays.', removedItems: ['bolt'],
   keptGarments: [{ type: 'baldric', colour: 'brown', details: 'leather, wide' }, { type: 'tunic', colour: 'grey', details: 'wool' }],
 };
 

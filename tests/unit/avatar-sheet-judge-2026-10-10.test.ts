@@ -109,16 +109,31 @@ describe('buildAvatarSheetJudgePrompt', () => {
   it('fills every placeholder for both sheet kinds, with and without a photo', () => {
     for (const kind of ['standard', 'costume']) {
       for (const hasPhoto of [true, false]) {
-        const p = judge.buildAvatarSheetJudgePrompt({ kind, hasPhoto });
+        const p = judge.buildAvatarSheetJudgePrompt({ kind, hasPhoto, artStyle: 'watercolor' });
         expect(p).not.toMatch(/\{[A-Z_]+\}/);
         expect(p).toContain(hasPhoto ? 'Image 2 is a PHOTO' : 'No photo is given');
       }
     }
-    expect(judge.buildAvatarSheetJudgePrompt({ kind: 'costume', hasPhoto: true })).toContain('COSTUME sheet');
-    expect(judge.buildAvatarSheetJudgePrompt({ kind: 'standard', hasPhoto: true })).toContain('EVERYDAY-CLOTHES');
+    expect(judge.buildAvatarSheetJudgePrompt({ kind: 'costume', hasPhoto: true, artStyle: 'watercolor' })).toContain('COSTUME sheet');
+    expect(judge.buildAvatarSheetJudgePrompt({ kind: 'standard', hasPhoto: true, artStyle: 'watercolor' })).toContain('EVERYDAY-CLOTHES');
+  });
+
+  // Bug realistic-style-sheets-refused-by-one-call-generator (2026-10-31): a realistic sheet is meant to look photographic, so the
+  // judge must not call a photograph a defect there; every other style still wants painted cells.
+  it('the not_illustrated line follows the art style: a photograph is a defect for a painted style, correct for realistic', () => {
+    const painted = judge.buildAvatarSheetJudgePrompt({ kind: 'costume', hasPhoto: true, artStyle: 'watercolor' });
+    const real = judge.buildAvatarSheetJudgePrompt({ kind: 'costume', hasPhoto: true, artStyle: 'realistic' });
+    expect(painted).toContain('not_illustrated: the cells are photographs or cut-outs rather than painted illustrations.');
+    expect(real).toContain('a photographic look on its own is correct');
+    expect(real).not.toContain('rather than painted illustrations');
+    expect(real).not.toMatch(/\{[A-Z_]+\}/);
+  });
+
+  it('refuses a missing art style instead of guessing one', () => {
+    expect(() => judge.buildAvatarSheetJudgePrompt({ kind: 'costume', hasPhoto: true })).toThrow(/artStyle is required/);
   });
 
   it('refuses an unknown sheet kind', () => {
-    expect(() => judge.buildAvatarSheetJudgePrompt({ kind: 'cape', hasPhoto: false })).toThrow(/unknown sheet kind/);
+    expect(() => judge.buildAvatarSheetJudgePrompt({ kind: 'cape', hasPhoto: false, artStyle: 'watercolor' })).toThrow(/unknown sheet kind/);
   });
 });

@@ -411,7 +411,7 @@ The outfit is identical in all eight cells, layers included, and the neckline in
  * `grokModel` defaults to MODEL_DEFAULTS.avatarSheetModel (the Lab may name another tier).
  */
 async function generateOneCallSheet(character, { artStyle, kind, costumeDescription = 'standard outfit', costumeName = null, seasonOutfit = null, usageTracker = null, grokModel = MODEL_DEFAULTS.avatarSheetModel, references = MODEL_DEFAULTS.avatarSheetReferences, redoLines = [] } = {}) {
-  if (!artStyle || artStyle === 'realistic') throw new Error('generateOneCallSheet: a non-realistic art style is required');
+  if (!artStyle) throw new Error('generateOneCallSheet: an art style is required');
   if (references !== 'face' && references !== 'face+body') throw new Error(`generateOneCallSheet: references must be face | face+body, got "${references}"`);
   const facePhoto = await resolveFacePhoto(character);
   if (!facePhoto) throw new Error(`No face photo for ${character?.name || 'character'}.`);
@@ -699,7 +699,7 @@ async function checkKeptGarment(sheet, garment, opts = {}) {
  * A judge or check that cannot answer THROWS: the caller rejects the attempt, a variant is never shipped unchecked.
  */
 async function evaluateVariantSheet(sheet, opts = {}) {
-  const { removedGarments = [], keptGarments = null, keptCheckSkipped = null, usageTracker = null } = opts;
+  const { removedGarments = [], keptGarments = null, keptCheckSkipped = null, usageTracker = null, artStyle } = opts;
   const names = (Array.isArray(removedGarments) ? removedGarments : []).map(s => String(s || '').trim()).filter(Boolean);
   // The kept list is required unless the caller says why no kept check runs
   // (an outfit version authors none): a variant is never gated on half the question.
@@ -707,7 +707,7 @@ async function evaluateVariantSheet(sheet, opts = {}) {
   if (!kept.length && !keptCheckSkipped) throw new Error('evaluateVariantSheet: no keptGarments and no keptCheckSkipped reason');
   const { judgeAvatarSheet, sheetDefects } = require('./avatarSheetJudge');
   const [judged, checks, keptChecks] = await Promise.all([
-    judgeAvatarSheet({ sheet, kind: 'costume', model: MODEL_DEFAULTS.sheetEvalModel, usageTracker }),
+    judgeAvatarSheet({ sheet, kind: 'costume', artStyle, model: MODEL_DEFAULTS.sheetEvalModel, usageTracker }),
     Promise.all(names.map(g => checkGarmentGone(sheet, g, { usageTracker }))),
     Promise.all(kept.map(g => checkKeptGarment(sheet, g, { usageTracker }))),
   ]);
@@ -919,7 +919,7 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
     characterName = 'character',
     removedItems = [], usageTracker = null, skipQualityEval = false,
     backendOverride = null, authoredWardrobe = null,
-    keptGarments = null, keptCheckSkipped = null,
+    keptGarments = null, keptCheckSkipped = null, artStyle = null,
   } = opts;
   if (!baseSheetImageData) return null;
 
@@ -972,7 +972,7 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
     let verdict = null;
     try {
       ({ verdict } = await evaluateVariantSheet(result.imageData, {
-        usageTracker, removedGarments: items, keptGarments, keptCheckSkipped,
+        usageTracker, removedGarments: items, keptGarments, keptCheckSkipped, artStyle,
       }));
     } catch (err) {
       log.error(`[WARDROBE-VARIANT] ${characterName} redress eval threw: ${err.message} — attempt rejected, never shipped unchecked`);

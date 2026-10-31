@@ -2054,6 +2054,7 @@ async function prepareWardrobeVariantAvatars(characters, artStyle, variantRequir
         authoredWardrobe: j.row.redressNote,
         keptGarments: j.row.keptGarments || null,
         keptCheckSkipped: j.row.keptCheckSkipped || null,
+        artStyle,
         usageTracker: addUsage,
         skipQualityEval,
         backendOverride,

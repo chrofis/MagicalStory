@@ -28,7 +28,7 @@ function countMetric(name) {
 }
 
 // One fixed correction line per judge word, written here, never read from the judge's prose. The redo is told what to fix and in which cells.
-function redoLinesOf(defects) {
+function redoLinesOf(defects, artStyle) {
   const { SHEET_EMPTY_HANDS_RULE, SHEET_NO_LETTERING_RULE, TAIL_POSE_RULE } = require('./character2x4Sheet');
   const lines = {
     bald: () => 'Every cell shows a complete head with the same hair: no bald scalp, no blank, missing or cut-off face.',
@@ -38,7 +38,7 @@ function redoLinesOf(defects) {
       not_a_grid: 'The output is exactly one 2×4 grid: two rows of four cells, one figure per cell.',
       extra_figures: 'Only the one person appears, once per cell: no second person, ghost figure or part of another person.',
       lettering: SHEET_NO_LETTERING_RULE,
-      not_illustrated: 'Every cell is a painted illustration, not a photograph or a cut-out.',
+      not_illustrated: require('./avatarSheetJudge').renderRuleFor(artStyle).redo,
     }[word]),
   };
   return defects.map(({ type, word, cells }) => {
@@ -71,7 +71,7 @@ async function generateJudgedOneCallSheet(character, { artStyle, kind, costumeDe
   const judgeSheet = async (imageData, label) => {
     const t0 = Date.now();
     try {
-      const r = await judge({ sheet: imageData, kind, model: MODEL_DEFAULTS.sheetEvalModel, usageTracker });
+      const r = await judge({ sheet: imageData, kind, artStyle, model: MODEL_DEFAULTS.sheetEvalModel, usageTracker });
       return { defects: judgeMod.sheetDefects(r.parsed), ms: Date.now() - t0 };
     } catch (err) {
       log.error(`❌ [AVATAR SHEET] ${name}/${kind} ${label} sheet judge FAILED (${err.message}) — shipping the ${label} sheet unchecked`);
@@ -112,7 +112,7 @@ async function generateJudgedOneCallSheet(character, { artStyle, kind, costumeDe
   countMetric('avatar_sheet_check_redo');
   let second;
   try {
-    second = await generate(character, { ...gen, redoLines: redoLinesOf(j1.defects) });
+    second = await generate(character, { ...gen, redoLines: redoLinesOf(j1.defects, artStyle) });
   } catch (err) {
     check.redoError = err.message;
     log.error(`❌ [AVATAR SHEET] ${name}/${kind} redo failed (${err.message}) — shipping the first sheet, which the judge flagged`);

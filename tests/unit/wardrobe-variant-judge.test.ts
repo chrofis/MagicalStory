@@ -66,8 +66,9 @@ describe('1 — the variant is judged by the ONE sheet judge plus a garment-gone
       const visible = !/jacket/.test(text);
       return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ visible, cells: '5-8', reason: 'seen' }) }] }, finishReason: 'STOP' }], usageMetadata: {} }), text: async () => '' };
     }) as any;
-    const { verdict } = await SHEET.evaluateVariantSheet('data:image/jpeg;base64,AAAA', { removedGarments: ['jacket'], keptGarments: kept });
+    const { verdict } = await SHEET.evaluateVariantSheet('data:image/jpeg;base64,AAAA', { removedGarments: ['jacket'], keptGarments: kept, artStyle: 'realistic' });
     expect(verdict.valid).toBe(true);
+    expect((judgeLib.judgeAvatarSheet as any).mock.calls[0][0]).toMatchObject({ kind: 'costume', artStyle: 'realistic' });
     expect(verdict.sheetFlags).toEqual([]);
     expect(verdict.garmentChecks).toHaveLength(1);
     expect(verdict.keptChecks).toHaveLength(1);

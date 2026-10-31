@@ -57,7 +57,7 @@ layout - Is the sheet a clean 2 x 4 grid of one person?
   not_a_grid: not a 2 x 4 grid (a single figure, a different number of cells, cells merged or overlapping).
   extra_figures: a second person, a ghost figure or a part of another person appears anywhere.
   lettering: a caption, label, word or number is written on the paper (print on a garment does not count).
-  not_illustrated: the cells are photographs or cut-outs rather than painted illustrations.
+  not_illustrated: {NOT_ILLUSTRATED_RULE}
 
 tail - Does a figure whose lower body is a tail or fin stand on it? Look only at the full-body cells 5-8, and only at a figure whose legs are replaced by a tail, a fin or another single fused lower form (a mermaid, a fish, a serpent); a figure with two legs and feet, however long its skirt or robe, is ok.
   ok: no full-body cell shows such a figure, or in every such cell the tail curves out along the ground and ends in a visible tail tip or fin.

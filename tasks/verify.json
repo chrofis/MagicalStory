@@ -10801,6 +10801,21 @@
    },
    "evidence": [],
    "lastChecked": null
+  },
+  {
+   "id": "realistic-avatar-sheets-2026-10-31",
+   "title": "Realistic style: costume, pyjama and redressed avatar sheets are drawn, so a realistic story reaches illustration",
+   "commits": [],
+   "addedAt": "2026-10-31",
+   "status": "pending",
+   "claim": "A realistic-style story that needs a costume, pyjama or redressed sheet generates those sheets (styled-avatar log: no \"non-realistic art style\" error, no MissingRequiredCostumeSheetError), the sheets are photographic on plain paper in a 2x4 grid, and the sheet judge does not flag them as layout/not_illustrated for looking photographic.",
+   "runShape": [
+    "any"
+   ],
+   "check": {
+    "kind": "human",
+    "what": "Run a realistic story whose topic needs pyjamas or a costume (showcase entry 14, going to bed). Check the styled-avatar log entries carry sheetCheck with no not_illustrated flag on a photographic sheet, view each realistic sheet, and confirm the job completes."
+   }
   }
  ],
  "runs": [

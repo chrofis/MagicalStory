@@ -2970,7 +2970,7 @@ async function runAvatarSheetVariantStage(target, { experimentId, params = {} })
     if (costumeParam === 'standard') throw new Error('avatar_sheet_variant: costumeFromStandard needs params.costume (a trial costume key)');
     // The real redress path (one provider edit of an approved sheet), unscored (skipQualityEval): the trial would ship the first roll.
     const authoredWardrobe = `Replace the outfit with: ${costumeDescription}. Same character, same 8 poses, same proportions, same layout and cell framing. Headgear only if the costume has it, and then identical in every cell. ${sheet.SHEET_EMPTY_HANDS_RULE}`;
-    const r = await sheet.redressSheetVariant(stored.standard, { characterName: character.name, characterAge: character.age ?? null, usageTracker, skipQualityEval: true, authoredWardrobe });
+    const r = await sheet.redressSheetVariant(stored.standard, { characterName: character.name, characterAge: character.age ?? null, usageTracker, skipQualityEval: true, authoredWardrobe, artStyle });
     if (!r?.imageData) throw new Error('avatar_sheet_variant: the redress edit returned no image');
     imageData = r.imageData; prompt = r.prompt;
   }
@@ -10685,7 +10685,7 @@ async function runAvatarRedressStage(target, { experimentId, params = {} }) {
   const out = await require('./character2x4Sheet').redressSheetVariant(baseSheet, {
     characterName: char.name, characterAge: char.age ?? null,
     removedItems: row.removedItemNames, authoredWardrobe: row.redressNote,
-    skipQualityEval: true, usageTracker,
+    skipQualityEval: true, usageTracker, artStyle,
   });
   if (!out?.imageData) throw new Error(`avatar_redress: the edit returned no image (${JSON.stringify(out?.attempts || [])})`);
   const [versionIndex, baseVersionIndex] = await Promise.all([

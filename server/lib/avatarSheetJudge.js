@@ -48,8 +48,26 @@ const HEADGEAR_EXPECTATIONS = {
   costume: 'not used on a costume sheet.',
 };
 
-function buildAvatarSheetJudgePrompt({ kind, hasPhoto }) {
+// What "not_illustrated" means, and its redo line, per art style: ONE source for the judge and the generator's redo. A realistic sheet is
+// MEANT to look photographic, so there only a pasted cut-out is the defect (tasks/bugs.json realistic-style-sheets-refused-by-one-call-generator).
+const RENDER_RULES = {
+  painted: {
+    judge: 'the cells are photographs or cut-outs rather than painted illustrations.',
+    redo: 'Every cell is a painted illustration, not a photograph or a cut-out.',
+  },
+  photographic: {
+    judge: 'the cells are cut-outs pasted onto the paper, or some cells are painted while others are photographic. This sheet is meant to look like a photograph, so a photographic look on its own is correct.',
+    redo: 'Every cell is the same photographic rendering of the person on the plain paper: not a pasted cut-out, not painted.',
+  },
+};
+function renderRuleFor(artStyle) {
+  if (!artStyle) throw new Error('avatarSheetJudge: artStyle is required');
+  return RENDER_RULES[artStyle === 'realistic' ? 'photographic' : 'painted'];
+}
+
+function buildAvatarSheetJudgePrompt({ kind, hasPhoto, artStyle }) {
   if (!SHEET_KIND_RULES[kind]) throw new Error(`avatarSheetJudge: unknown sheet kind "${kind}" (standard | costume)`);
+  const renderRule = renderRuleFor(artStyle);
   const template = PROMPT_TEMPLATES.avatarSheetDefectJudge;
   if (!template) throw new Error('avatarSheetDefectJudge prompt template not loaded');
   return fillTemplate(template, {
@@ -59,6 +77,7 @@ function buildAvatarSheetJudgePrompt({ kind, hasPhoto }) {
     SHEET_KIND_RULE: SHEET_KIND_RULES[kind],
     HEADGEAR_EXPECTATION: HEADGEAR_EXPECTATIONS[kind],
     AND_PHOTO: hasPhoto ? ' and compared with the photo' : '',
+    NOT_ILLUSTRATED_RULE: renderRule.judge,
   });
 }
 
@@ -145,9 +164,9 @@ function defectsOf(parsed, use = {}) {
  * Returns { parsed, raw, prompt }. Throws when the judge fails; the caller decides what a failed judge means
  * (the pipeline wiring proposal in docs/decisions.md: fail loudly).
  */
-async function judgeAvatarSheet({ sheet, photo = null, kind, model, usageTracker = null, apiKey = null }) {
+async function judgeAvatarSheet({ sheet, photo = null, kind, artStyle, model, usageTracker = null, apiKey = null }) {
   const { askSheetJudge, inlinePartOf } = require('./character2x4Sheet')._internal;
-  const prompt = buildAvatarSheetJudgePrompt({ kind, hasPhoto: Boolean(photo) });
+  const prompt = buildAvatarSheetJudgePrompt({ kind, hasPhoto: Boolean(photo), artStyle });
   const parts = [inlinePartOf(sheet)];
   if (photo) parts.push(inlinePartOf(photo));
   parts.push({ text: prompt });
@@ -179,4 +198,4 @@ function betterSheet(a, b) {
   return (tb < ta || (tb === ta && cb < ca)) ? b : a;
 }
 
-module.exports = { SHEET_CHECK_SIGNALS, sheetDefects, betterSheet, VERDICTS, DEFECT_TYPES, CELL_ENUMS, buildAvatarSheetJudgePrompt, parseAvatarSheetVerdict, cellSignals, defectsOf, judgeAvatarSheet };
+module.exports = { renderRuleFor, SHEET_CHECK_SIGNALS, sheetDefects, betterSheet, VERDICTS, DEFECT_TYPES, CELL_ENUMS, buildAvatarSheetJudgePrompt, parseAvatarSheetVerdict, cellSignals, defectsOf, judgeAvatarSheet };

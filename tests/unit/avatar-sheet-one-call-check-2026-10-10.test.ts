@@ -51,7 +51,7 @@ describe('1. generateJudgedOneCallSheet', () => {
     const out = await h.run('costume');
     expect(h.gen).toHaveBeenCalledTimes(1);
     expect(h.judge).toHaveBeenCalledTimes(1);
-    expect(h.judge.mock.calls[0][0]).toMatchObject({ sheet: 'SHEET1', kind: 'costume' });
+    expect(h.judge.mock.calls[0][0]).toMatchObject({ sheet: 'SHEET1', kind: 'costume', artStyle: 'watercolor' });
     expect(h.judge.mock.calls[0][0].photo).toBeUndefined();
     expect(out.imageData).toBe('SHEET1');
     expect(out.sheetCheck).toMatchObject({ kind: 'costume', model: 'grok-imagine-image-2.0', judged: true, judgeError: null, firstFlags: [], redone: false, secondFlags: null, redoError: null, shipped: 'first' });
@@ -173,17 +173,25 @@ describe('2. the judge vocabulary the redo is built from', () => {
   it('every verdict word of a checked type has a fixed correction line, so no flag can reach a redo without one; the lines carry no story text', () => {
     for (const [type, mode] of Object.entries(judgeLib.SHEET_CHECK_SIGNALS)) {
       for (const word of judgeLib.VERDICTS[type].filter((w: string) => w !== 'ok')) {
-        const lines = redoLinesOf([{ type, word: type === 'held' ? 'object_in_hand' : word, cells: [] }]);
+        const lines = redoLinesOf([{ type, word: type === 'held' ? 'object_in_hand' : word, cells: [] }], 'watercolor');
         expect(lines, `${type}/${word}`).toHaveLength(1);
         expect(lines[0]).not.toMatch(/Omar|Lukas|Emma|wizard|pirate/i);
       }
       expect(mode).toBeTruthy();
     }
-    expect(() => redoLinesOf([{ type: 'layout', word: 'invented', cells: [] }])).toThrow(/no correction line/);
+    expect(() => redoLinesOf([{ type: 'layout', word: 'invented', cells: [] }], 'watercolor')).toThrow(/no correction line/);
   });
 
   it('the correction names the cells', () => {
-    expect(redoLinesOf([{ type: 'bald', word: 'bald_cell', cells: [5, 6] }])[0]).toMatch(/cells 5, 6/);
+    expect(redoLinesOf([{ type: 'bald', word: 'bald_cell', cells: [5, 6] }], 'watercolor')[0]).toMatch(/cells 5, 6/);
+  });
+
+  it('a realistic sheet is never redone toward paint: its not_illustrated correction asks for one photographic rendering', () => {
+    const [painted] = redoLinesOf([{ type: 'layout', word: 'not_illustrated', cells: [] }], 'watercolor');
+    const [real] = redoLinesOf([{ type: 'layout', word: 'not_illustrated', cells: [] }], 'realistic');
+    expect(painted).toMatch(/painted illustration/);
+    expect(real).toMatch(/photographic rendering/);
+    expect(real).not.toMatch(/painted illustration,/);
   });
 
   it('betterSheet: fewer failed types, then fewer flagged cells, a tie keeps the first', () => {
@@ -241,9 +249,14 @@ describe('3b. the references of the one call', () => {
   it('face+body without any body photo is an error before any paid call, not a silent face-only sheet', async () => {
     await expect(sheetLib.generateOneCallSheet({ name: 'K', age: 5, photos: { face: jpg } }, { artStyle: 'watercolor', kind: 'standard', references: 'face+body' })).rejects.toThrow(/no body photo/);
   });
-  it('an unknown references value is refused, and so is a realistic art style', async () => {
+  it('an unknown references value is refused', async () => {
     await expect(sheetLib.generateOneCallSheet({ name: 'K', photos: { face: jpg } }, { artStyle: 'watercolor', kind: 'standard', references: 'face+avatar' })).rejects.toThrow(/references must be/);
-    await expect(sheetLib.generateOneCallSheet({ name: 'K', photos: { face: jpg } }, { artStyle: 'realistic', kind: 'standard' })).rejects.toThrow(/non-realistic art style/);
+  });
+  // Regression, bug realistic-style-sheets-refused-by-one-call-generator: a realistic story's costume, pyjama and redress sheets
+  // threw here, so the story failed before illustration. Realistic now reaches the reference checks like any style.
+  it('a realistic art style is drawn like any other style; only a missing art style is refused', async () => {
+    await expect(sheetLib.generateOneCallSheet({ name: 'K', age: 5, photos: { face: jpg } }, { artStyle: 'realistic', kind: 'costume', references: 'face+body' })).rejects.toThrow(/no body photo/);
+    await expect(sheetLib.generateOneCallSheet({ name: 'K', photos: { face: jpg } }, { kind: 'standard' })).rejects.toThrow(/an art style is required/);
   });
   it('the body reference is the cut-out, else the body photo, nothing else', async () => {
     const r = sheetLib._internal.resolveBodyReference;
