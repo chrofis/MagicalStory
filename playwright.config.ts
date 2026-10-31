@@ -64,7 +64,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /auth\.spec\.ts/, /analysis\.spec\.ts/, /setup-test-family\.spec\.ts/, /demo-story\.spec\.ts/, /trial-to-full\.spec\.ts/, /repair-tile-visibility\.spec\.ts/, /repair-not-on-page\.spec\.ts/, /wizard-settings\.spec\.ts/],
+      testIgnore: [/auth\.setup\.ts/, /auth\.spec\.ts/, /analysis\.spec\.ts/, /setup-test-family\.spec\.ts/, /demo-story\.spec\.ts/, /trial-to-full\.spec\.ts/, /repair-tile-visibility\.spec\.ts/, /repair-not-on-page\.spec\.ts/, /wizard-settings\.spec\.ts/, /story-edits-staging\.spec\.ts/],
     },
 
     // Chromium without auth (for unauthenticated tests - auth flow tests and UX analysis)
@@ -210,7 +210,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['setup'],
-      testIgnore: /auth\.setup\.ts/,
+      testIgnore: [/auth\.setup\.ts/, /story-edits-staging\.spec\.ts/],
     },
 
     {
@@ -220,7 +220,18 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['setup'],
-      testIgnore: /auth\.setup\.ts/,
+      testIgnore: [/auth\.setup\.ts/, /story-edits-staging\.spec\.ts/],
+    },
+
+    // Every customer edit on a finished story, ONCE each, against STAGING. COSTS REAL MONEY (~USD 0.3-0.6
+    // per run), so it is excluded from every other project's testIgnore and refuses to run without
+    // ALLOW_PAID_STORY_EDITS=1. Run: ALLOW_PAID_STORY_EDITS=1 npx playwright test --project=story-edits-staging
+    {
+      name: 'story-edits-staging',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /story-edits-staging\.spec\.ts/,
+      workers: 1,
+      fullyParallel: false,
     },
 
     /* Test against mobile viewports */
@@ -231,7 +242,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['setup'],
-      testIgnore: /auth\.setup\.ts/,
+      testIgnore: [/auth\.setup\.ts/, /story-edits-staging\.spec\.ts/],
     },
     {
       name: 'Mobile Safari',
@@ -240,7 +251,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['setup'],
-      testIgnore: /auth\.setup\.ts/,
+      testIgnore: [/auth\.setup\.ts/, /story-edits-staging\.spec\.ts/],
     },
   ],
 
