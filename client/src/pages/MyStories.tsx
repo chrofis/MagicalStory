@@ -508,7 +508,10 @@ export default function MyStories() {
       createStory: 'Create Story',
       noStories: 'No stories created yet',
       seePricing: 'See Pricing',
-      selectHint: 'Select stories to create a book',
+      selectHint: 'Pick the stories for your book',
+      story: 'story',
+      stories: 'stories',
+      severalHint: 'You can put several stories in one book, up to {max} pages.',
       selected: 'selected',
       pages: 'pages',
       createBook: 'Create Book',
@@ -524,7 +527,10 @@ export default function MyStories() {
       createStory: 'Geschichte erstellen',
       noStories: 'Noch keine Geschichten erstellt',
       seePricing: 'Preise ansehen',
-      selectHint: 'Wähle Geschichten, um ein Buch zu erstellen',
+      selectHint: 'Wähle die Geschichten für dein Buch',
+      story: 'Geschichte',
+      stories: 'Geschichten',
+      severalHint: 'Du kannst mehrere Geschichten in ein Buch nehmen, bis {max} Seiten.',
       selected: 'ausgewählt',
       pages: 'Seiten',
       createBook: 'Buch erstellen',
@@ -540,7 +546,10 @@ export default function MyStories() {
       createStory: 'Créer une histoire',
       noStories: 'Aucune histoire créée',
       seePricing: 'Voir les tarifs',
-      selectHint: 'Sélectionnez des histoires pour créer un livre',
+      selectHint: 'Choisissez les histoires de votre livre',
+      story: 'histoire',
+      stories: 'histoires',
+      severalHint: "Vous pouvez réunir plusieurs histoires dans un livre, jusqu'à {max} pages.",
       selected: 'sélectionné(s)',
       pages: 'pages',
       createBook: 'Créer le livre',
@@ -556,7 +565,10 @@ export default function MyStories() {
       createStory: 'Crea una storia',
       noStories: 'Nessuna storia creata finora',
       seePricing: 'Vedi i prezzi',
-      selectHint: 'Seleziona le storie per creare un libro',
+      selectHint: 'Scegli le storie per il tuo libro',
+      story: 'storia',
+      stories: 'storie',
+      severalHint: 'Puoi mettere più storie in un solo libro, fino a {max} pagine.',
       selected: 'selezionate',
       pages: 'pagine',
       createBook: 'Crea il libro',
@@ -941,17 +953,20 @@ export default function MyStories() {
 
         <VoucherBookBanner />
 
-        {/* Instructions hint - hidden on mobile, shown on desktop */}
+        {/* Book hint, phones included: what is in the book so far, and that several stories fit
+            (parents did not know, customer mail 2026-10-29). "Buch erstellen" on a story lands here. */}
         {stories.length > 0 && (
-          <div className="hidden md:flex bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 items-center gap-3">
-            <BookOpen size={20} className="text-blue-600 flex-shrink-0" />
-            <p className="text-blue-800 text-sm">{t.selectHint}</p>
-            {selectedStories.length > 0 && (
-              <span className={`ml-auto text-sm font-medium ${isOverLimit ? 'text-red-600' : 'text-blue-600'}`}>
-                {selectedStories.length} {t.selected} • {totalSelectedPages} {t.pages}
+          <div className="flex bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 items-start gap-3">
+            <BookOpen size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className={`font-semibold ${isOverLimit ? 'text-red-600' : 'text-blue-800'}`}>
+                {selectedStories.length > 0
+                  ? `${selectedStories.length} ${selectedStories.length === 1 ? t.story : t.stories}${language === 'fr' ? ' ' : ''}: ${totalSelectedPages} ${t.pages}`
+                  : t.selectHint}
                 {isOverLimit && ` (${t.tooManyPages})`}
-              </span>
-            )}
+              </p>
+              <p className="text-blue-700">{t.severalHint.replace('{max}', String(MAX_BOOK_PAGES))}</p>
+            </div>
           </div>
         )}
 
