@@ -3577,13 +3577,20 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   //
   // Filtering on the DECLARED type, never on the description prose: classifying
   // by reading the text is what docs/SETTLED.md forbids.
-  const { NOT_INPAINTABLE_TYPES, typesAreInpaintable } = require('./repairLogic');
+  // EXCEPT when the book review routed the fault here: Opus decides, the tool obeys
+  // (owner, 2026-10-31, docs/decisions.md; Lab #1768 exps 1770/1771/1773). The signal
+  // is a typed flag on the plan, never prose.
+  const { NOT_INPAINTABLE_TYPES, typesAreInpaintable, isReviewerDecidedPlan } = require('./repairLogic');
+  const reviewerPlan = consolidatedPlanIn || evaluation?.consolidatedPlan || null;
+  const reviewerDecided = isReviewerDecidedPlan(reviewerPlan);
   const inpaintableIssues = combinedIssues.filter(i => {
     const t = String(i.type || '').toLowerCase();
     if (!t) return true;                       // untyped: leave the old behaviour alone
-    if (!NOT_INPAINTABLE_TYPES.has(t)) return true;
-    log.info(`[INPAINT PAGE] P${pageNumber}: "${t}" is not inpaintable — left for character repair`);
-    return false;
+    if (!reviewerDecided && NOT_INPAINTABLE_TYPES.has(t)) {
+      log.info(`[INPAINT PAGE] P${pageNumber}: "${t}" is not inpaintable — left for character repair`);
+      return false;
+    }
+    return true;
   });
 
   if (combinedIssues.length === 0) {
@@ -3727,7 +3734,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // front cover of job_1789853503332_riqncqg1i carried
     // scene_fix.types ['extra_character'] and nothing stopped it.
     const sceneTypes = consolidatedPlan.scene_fix?.types;
-    const sceneAllowed = typesAreInpaintable(sceneTypes);
+    const sceneAllowed = typesAreInpaintable(sceneTypes, reviewerPlan);
     if (!sceneAllowed) {
       log.info(`[INPAINT PAGE] P${pageNumber}: dropping scene fix "${(Array.isArray(sceneTypes) ? sceneTypes : []).join('/')}" — not inpaintable, character repair or a page redo owns it`);
     }
@@ -3747,7 +3754,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // fixes would lose real pose work.
     const perCharSource = (consolidatedPlan.per_character_fixes || []).filter(p => {
       const types = Array.isArray(p?.types) ? p.types.filter(Boolean) : [];
-      const blocked = !typesAreInpaintable(types);
+      const blocked = !typesAreInpaintable(types, reviewerPlan);
       if (blocked) {
         log.info(`[INPAINT PAGE] P${pageNumber}: dropping "${types.join('/')}" fix for ${p.characterName || 'a character'} — not inpaintable, character repair owns it`);
         return false;

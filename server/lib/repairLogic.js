@@ -1709,7 +1709,16 @@ function semanticFindings(semanticResult) {
   return Array.isArray(found) ? found : [];
 }
 
-function typesAreInpaintable(types) {
+// OPUS DECIDES, THE TOOL OBEYS (owner, 2026-10-31, docs/decisions.md): a plan built
+// by the book review's TOUCHUP route carries `reviewerDecided: true`. The reviewer
+// already chose the method, so the per-page-judge type filter does not second-guess it.
+// A typed flag, never a read of the prose.
+function isReviewerDecidedPlan(plan) {
+  return !!plan && plan.reviewerDecided === true;
+}
+
+function typesAreInpaintable(types, plan = null) {
+  if (isReviewerDecidedPlan(plan)) return true;
   const list = Array.isArray(types) ? types.filter(Boolean) : [];
   if (!list.length) return true;
   return !list.every((t) => NOT_INPAINTABLE_TYPES.has(String(t).toLowerCase()));
@@ -2116,4 +2125,4 @@ function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = n
 
 module.exports = {
   expressionEditBlocked, describeFigureForRepair, repairGarmentPhrase, buildRepairNameMap, buildPageRepairNameMap, nameRepairText, resolveRepairIds,
-  repairAttemptFromResult, describeCharFixFailure, detectionForRetryEntry, findBadPages, findReaderMajorFinding, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, pagesWherePickMoved, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, charFixEntityFindings, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX, scoredFindingPools };
+  repairAttemptFromResult, describeCharFixFailure, detectionForRetryEntry, findBadPages, findReaderMajorFinding, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, pagesWherePickMoved, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, isReviewerDecidedPlan, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, charFixEntityFindings, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX, scoredFindingPools };

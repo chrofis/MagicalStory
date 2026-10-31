@@ -156,6 +156,8 @@ function buildTouchupPlan(faults, nameMap) {
     per_character_fixes: perChar,
     dropped_issues: [],
     source: FINDING_SOURCES.BOOK_REVIEW,
+    // The reviewer chose TOUCHUP: inpaint obeys for every type (docs/decisions.md 2026-10-31).
+    reviewerDecided: true,
   };
 }
 
