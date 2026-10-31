@@ -1365,7 +1365,10 @@ test.describe('Demo Story Generation', () => {
     // job_1788558535073_dm6qxomqe died at 56%. The landmark rule landed
     // 2026-09-04, so every themed entry here has the same problem; none had run
     // since.
-    const ideaButtons = page.locator('button').filter({ hasText: USE_THIS_RE });
+    // Enabled only: the "own story" card carries the same "use this" label and stays
+    // disabled until text is typed. Counting it made the check below pass with no ideas
+    // and the click wait on a disabled button until the 90-minute test timeout.
+    const ideaButtons = page.locator('button:enabled').filter({ hasText: USE_THIS_RE });
     // Step 4 should pre-generate the ideas (StoryWizard preGenerateIdeasRef). On staging it
     // twice did not fire (see tasks/BACKLOG.md), leaving an empty placeholder. Give it 20 s;
     // if still empty and no generation is running (the generate button is disabled while
