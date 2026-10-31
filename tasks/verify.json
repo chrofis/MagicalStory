@@ -10735,7 +10735,14 @@
     "kind": "human",
     "what": "In eval_calls for the story: count book-review calls (1 + re-reviews, max 3) and confirm no per-page judge kinds; read each FAULT line route tag and the repair method that ran for that page (story_images versions); eye-check every final page against the findings; record the Opus cost from tokenUsage.byFunction."
    },
-   "evidence": [],
+   "evidence": [
+    {
+     "date": "2026-10-31",
+     "env": "staging",
+     "result": "PARTIAL",
+     "detail": "Test Lab #1768 (book_audit, bookReview:true, Opus 5.5) on 3 stored books: 20 faults, 20/20 route-tagged (11 TOUCHUP, 6 NEW, 3 CHAR), 6/6 spot-checked findings real, USD 0.879, 44-63 s per book. The repair loop and re-review are NOT exercised by the Lab stage; still needs a staging story run."
+    }
+   ],
    "lastChecked": null
   },
   {
