@@ -1,5 +1,6 @@
 
 
+const { stageArgs } = require('./beatsStageTable');
 const { mergeReplanPages, duplicatePlanLine, pageCountHolds } = require('./planGuards');
 const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges, restoreRefusedChanges, buildReissueSection, reissueLostPages, refreshPlanShot, namesIn } = require('./planCounters');
 const { commissionedCast, castCoverage, parsePlanCastBlock } = require('./castCoverage');
@@ -1059,7 +1060,7 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
     const coverageRule = castCoverage({ pageCount: beats.length, castCount: commission.listed.length });
     for (let round = 1; round <= MAX_REPLAN_ROUNDS; round++) {
       await checkCancellation();
-      await stage(5, 'Re-dividing the named pages...', { next: 18, ms: 45000 });
+      await stage(...stageArgs('replan', 'Re-dividing the named pages...'));
       // WHAT THIS ROUND MUST KEEP (2026-09-23): the last page, the check's
       // WANTED and ACTION pages, and a character's only focal page — one list
       // for the prompt and for the review's `protected` rule below.
@@ -1831,7 +1832,7 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
     if (!parsedVb) throw new Error('labAdoptBibleFrom: the stored transcript carries no parseable ---VISUAL BIBLE--- section');
     adBible = { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: 'stored bible (Lab)' };
   } else {
-    await stage(30, 'Writing the visual bible...', { next: 36, ms: 90000 });
+    await stage(...stageArgs('visualBible', 'Writing the visual bible...'));
     // One call, parsed; null when the reply is not a whole bible (JSON parse is the completeness test).
     const askBible = async (prompt, attempt) => {
       try {
@@ -2115,7 +2116,7 @@ ${bibleBody}` : bibleBody;
     // only FILL gaps (job_1788123310558 lost pages 12-16 to a cut reply).
     let allModelId = briefsModel;
     const byPage = new Map();
-    await stage(36, 'Writing the scene briefs...', { next: 42, ms: 140000 });
+    await stage(...stageArgs('briefs', 'Writing the scene briefs...'));
     for (let attempt = 1; attempt <= 2; attempt++) {
       let allRaw = '';
       const attemptStart = Date.now();
@@ -2258,7 +2259,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   } = opts;
   const gl = genLog || NOOP_LOG;
   const onChunk = heartbeat ? () => heartbeat() : null;
-  // Stage checkpoints carry their measured budget so the caller can INTERPOLATE
+  // Stage checkpoints (table: server/lib/beatsStageTable.js) carry their measured budget so the caller can INTERPOLATE
   // between them: percent is time-proportional (medians over completed staging
   // runs), and `nextPct`/`ms` let the job's heartbeat ease the bar forward while
   // a single 200s+ LLM call is in flight. Without that the bar froze at one
@@ -2420,7 +2421,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // CREATE: ONE arc, its STORY LOGIC first (owner, 2026-09-24). A parse miss
     // (no or incomplete logic block, no ARC block) gets one full re-create,
     // then throws into the outer containment.
-    await stage(1, 'Shaping the story arc...', { next: 2, ms: 90000 });
+    await stage(...stageArgs('arcCreate', 'Shaping the story arc...'));
     const createPrompt = buildArcCreatePrompt(inputData, pageCount, { challengeIdeas });
     if (!createPrompt) throw new Error('arc-create template unavailable');
     let createRes = null;
@@ -2507,7 +2508,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     for (let round = 1; round <= roundBudget; round++) {
       let forceAnotherRound = false;
       await checkCancellation();
-      await stage(2, 'Convening the story panel...', { next: 2, ms: 120000 });
+      await stage(...stageArgs('arcPanel', 'Convening the story panel...'));
       const panelPrompt = buildArcPanelPrompt(inputData, currentBlock);
       if (!panelPrompt) throw new Error('arc-panel template unavailable');
       const settled = await Promise.allSettled(arcPanelModels.map(async (m) => {
@@ -2614,7 +2615,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // RE-TELL: same creator, the arc + its story logic + the MAJOR and
       // CRITICAL findings, repaired sentence by sentence. A parse miss (no
       // FINAL ARC) gets one more telling, then throws.
-      await stage(2, 'Re-telling the story arc...', { next: 3, ms: 90000 });
+      await stage(...stageArgs('arcRetell', 'Re-telling the story arc...'));
       const retellPrompt = buildArcRetellPrompt(inputData, pageCount, arcBlock, gate.text, { challengeIdeas });
       if (!retellPrompt) throw new Error('arc-retell template unavailable');
       let retellRes = null;
@@ -2889,7 +2890,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const readPlan = makePlanReader(expected, approvedArc);
 
   t = Date.now();
-  await stage(3, 'Planning the story beats...', { next: 5, ms: 25000 });
+  await stage(...stageArgs('plan', 'Planning the story beats...'));
   const planRes = await textModels.callTextModelStreaming(planPrompt, null, onChunk, planModel, { usageLabel: 'beats_plan', effort: MODEL_DEFAULTS.beatsPlanEffort });
   meta.timings.planMs = Date.now() - t;
   const first = readPlan(planRes.text);
@@ -2975,7 +2976,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
 
 
   t = Date.now();
-  await stage(4, 'Checking the page division...', { next: 5, ms: 45000 });
+  await stage(...stageArgs('planCheck', 'Checking the page division...'));
   const check1 = await runCheck('plan_check', plan.pages, pagePlan);
   // The LEDGER of re-plan rounds, kept and discarded alike. The report's
   // canonical fields are derived from it by shippedReplanState() so they can
@@ -3132,7 +3133,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   } else {
     t = Date.now();
     try {
-      await stage(18, 'Building the wardrobe contract...', { next: 23, ms: 71000 });
+      await stage(...stageArgs('wardrobe', 'Building the wardrobe contract...'));
       const bibleRes = await textModels.callTextModelStreaming(biblePrompt, null, onChunk, bibleModel, { usageLabel: 'beats_story_bible', effort: MODEL_DEFAULTS.beatsPlanEffort });
       const sections = extractBibleSections(bibleRes.text || '', CLOTHING_MARKERS);
       meta.timings.storyBibleMs = Date.now() - t;
@@ -3402,7 +3403,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   }
 
   // ── Step 6: page text — runs HERE, after the brief checks, with the briefs ─
-  await stage(51, 'Writing the page text...', { next: 56, ms: 75000 });
+  await stage(...stageArgs('pageText', 'Writing the page text...'));
   const textResult = await runStoryText(expansions);
   const { textRaw, textModelId, parsedText, textPromptSent, textUsage } = textResult;
 

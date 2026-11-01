@@ -11072,6 +11072,22 @@
         "kind": "human",
         "what": "For a story with 6+ characters whose matrix names a parent or child of the main character, that parent appears in the opening page and back cover cast (plan line 'who is in frame'). Replayed over stored data: production job_1793561351885_kkg5gxkbj gains Mamma in place of Serena; 299 stored stories with 5 or fewer characters keep the same set."
       }
+    },
+    {
+      "id": "progress-bar-moves-during-arc-2026-11-01",
+      "title": "The progress bar keeps moving through the arc machine and the rest of the text phase",
+      "commits": [],
+      "addedAt": "2026-11-01",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On the next beats story run the bar leaves 1% within a minute and keeps rising during arc creation, panel and re-telling (reaching about 9, 17, 27 at the stage boundaries, never frozen for more than ~2 minutes before 57).",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Poll GET /api/jobs/:id/status every 30 s during a staging story and compare progress against the stage events in the generation log: progress should rise steadily across the arc stages, with no plateau longer than about 2 minutes between 1 and 57."
+      }
     }
   ],
   "runs": [
