@@ -5,7 +5,7 @@ import { useRotatingMessage } from '@/hooks/useRotatingMessage';
 import { storyTypes, lifeChallenges, educationalTopics, historicalEvents, realisticSetting } from '@/constants/storyTypes';
 import { artStyles } from '@/constants/artStyles';
 import { splitIdeaRoles, joinIdeaRoles } from '@/utils/ideaRoles';
-import { LoadingSpinner } from '@/components/common';
+import { LoadingSpinner, AutoGrowTextarea } from '@/components/common';
 import type { Character } from '@/types/character';
 import type { StoryLanguageCode, IdeaWorld, IdeaWorldMode } from '@/types/story';
 import type { LayoutOverride } from '@/hooks/useDeveloperMode';
@@ -591,8 +591,11 @@ export function WizardStep6Summary({
                     </div>
                   ) : hasIdea ? (
                     <>
-                      {/* Textarea */}
-                      <textarea
+                      {/* Textarea: as tall as its text, never scrolling (owner 2026-11-01). The flex-1 wrapper
+                          stretches every card in a desktop row to the longest idea, so the cards stay one size;
+                          stacked on a phone each card is just its own text. */}
+                      <div className={`flex-1 ${isSelected ? 'bg-green-50' : 'bg-white'}`}>
+                      <AutoGrowTextarea
                         value={blurb}
                         onChange={(e) => {
                           const full = joinIdeaRoles(rolesBlock, e.target.value);
@@ -604,11 +607,9 @@ export function WizardStep6Summary({
                             onSelectIdea(full, index);
                           }
                         }}
-                        className={`w-full px-4 py-3 border-0 focus:outline-none focus:ring-0 text-base resize-none ${
-                          isSelected ? 'bg-green-50' : 'bg-white'
-                        }`}
-                        rows={10}
+                        className="block w-full px-4 py-3 border-0 focus:outline-none focus:ring-0 text-base resize-none overflow-hidden bg-transparent"
                       />
+                      </div>
                       {/* Cast list — the casting block, out of the blurb.
                           Same small-text treatment as the world badge above. */}
                       {cast.length > 0 && (

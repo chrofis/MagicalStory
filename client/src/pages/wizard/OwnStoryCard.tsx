@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, AlertTriangle, CircleCheck, Circle } from 'lucide-react';
 import { storyService } from '@/services';
+import { AutoGrowTextarea } from '@/components/common';
 import {
   createOwnStoryChecker,
   OWN_STORY_PARTS,
@@ -96,7 +97,9 @@ export function OwnStoryCard({ lang, text, onTextChange, isSelected, onSelect, a
           <span className="flex items-center gap-1 text-sm"><Check size={16} />{selectedLabel}</span>
         )}
       </div>
-      <textarea
+      {/* Grows with the parent's text and fills the row's height next to the idea cards (owner 2026-11-01: no scrolling). */}
+      <div className={`flex-1 ${isSelected ? 'bg-green-50' : 'bg-white'}`}>
+      <AutoGrowTextarea
         data-testid="own-story-text"
         value={text}
         onChange={(e) => onTextChange(e.target.value)}
@@ -105,9 +108,9 @@ export function OwnStoryCard({ lang, text, onTextChange, isSelected, onSelect, a
           'Écrivez votre histoire : qui, où, ce qui tourne mal, ce que veut le personnage et comment ça finit.',
           'Scrivi la tua storia: chi, dove, cosa va storto, cosa vuole il personaggio e come finisce.',
           'Write your story: who, where, what goes wrong, what the character wants and how it ends.')}
-        className={`w-full px-4 py-3 border-0 focus:outline-none focus:ring-0 text-base resize-none ${isSelected ? 'bg-green-50' : 'bg-white'}`}
-        rows={10}
+        className="block w-full min-h-[15rem] px-4 py-3 border-0 focus:outline-none focus:ring-0 text-base resize-none overflow-hidden bg-transparent"
       />
+      </div>
       {result && (
         <div data-testid="own-story-checklist" className="px-4 py-2 bg-indigo-50 text-indigo-800 text-sm space-y-1">
           <ul className="grid grid-cols-1 gap-0.5">

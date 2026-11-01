@@ -1,5 +1,4 @@
-import type { TextareaHTMLAttributes } from 'react';
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ArrowLeft, Check, Loader2, MapPin, Pencil, RefreshCw, Sparkles, X } from 'lucide-react';
 import { storyTypes } from '@/constants/storyTypes';
 import type { CharacterData, StoryInput, GeneratedIdea } from '../TrialWizard';
@@ -7,37 +6,7 @@ import { trackTrialStep } from '@/utils/trialFunnel';
 import { splitIdeaRoles, joinIdeaRoles } from '@/utils/ideaRoles';
 import { isTrialSessionDead } from '@/utils/trialSession';
 import { localizedApiError } from '@/utils/apiErrors';
-import { LoadingSpinner } from '@/components/common';
-
-// ─── Auto-height textarea ────────────────────────────────────────────────────
-
-/** A textarea that is always as tall as its text, so the idea never scrolls inside its box
- *  (owner 2026-10-09: ideas run to ~75 words). Re-measures on text and on width change. */
-function AutoGrowTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const fit = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, []);
-  // Layout effect: measured before the first paint, so the box is never painted one line tall (the "collapse" the owner saw
-  // when the idea was finished). Re-measured when the text changes, when the web fonts have loaded (a measure taken with the
-  // fallback font is the wrong height) and whenever the box's width changes.
-  useLayoutEffect(() => { fit(); }, [fit, props.value]);
-  useEffect(() => {
-    void document.fonts?.ready.then(fit);
-    const el = ref.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    let width = el.clientWidth;
-    const ro = new ResizeObserver(() => {
-      if (el.clientWidth !== width) { width = el.clientWidth; fit(); }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [fit]);
-  return <textarea ref={ref} rows={1} {...props} />;
-}
+import { LoadingSpinner, AutoGrowTextarea } from '@/components/common';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

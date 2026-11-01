@@ -14,13 +14,13 @@ const WIZARD = read('pages', 'wizard', 'WizardStep6Summary.tsx');
 
 describe('idea cards show a visible spinner until the idea is complete', () => {
   it('trial: a card that is not final shows the shared LoadingSpinner with the generating text, never the faint grey one', () => {
-    expect(TRIAL).toContain("import { LoadingSpinner } from '@/components/common';");
+    expect(TRIAL).toMatch(/import \{[^}]*\bLoadingSpinner\b[^}]*\} from '@\/components\/common';/);
     expect((TRIAL.match(/<LoadingSpinner size="sm" message=\{t\.generating\} \/>/g) || []).length).toBe(2);
     expect(TRIAL).not.toMatch(/Loader2 className="w-5 h-5 text-gray-300 animate-spin"/);
   });
 
   it('full wizard: the loading card shows the same shared spinner above its progress bar', () => {
-    expect(WIZARD).toContain("import { LoadingSpinner } from '@/components/common';");
+    expect(WIZARD).toMatch(/import \{[^}]*\bLoadingSpinner\b[^}]*\} from '@\/components\/common';/);
     const loading = WIZARD.slice(WIZARD.indexOf('{isLoading ? ('), WIZARD.indexOf(') : hasIdea ? ('));
     expect(loading).toContain('<LoadingSpinner size="sm" />');
   });
