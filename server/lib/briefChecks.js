@@ -199,6 +199,13 @@ function collectBriefFindings(expansions, ctx) {
       }, ctx.clothingRequirements),
     );
   }
+  // A cover dressed for bed (owner, 2026-11-01): sent back once with the cover's day-outfit sentence.
+  const { coverNightwearFindings } = require('./clothingCategories');
+  const { coverKeyOfPage } = require('./coverBeats');
+  for (const x of expansions) {
+    if (!coverKeyOfPage(x.pageNumber)) continue;
+    findings.push(...coverNightwearFindings(x.pageNumber, (extractSceneMetadata(x.brief) || {}).characterClothing));
+  }
   // A decided field the brief cannot hold as written: an outdoor page whose
   // weather is `none` (jevDecisions.pinBrief reports it, never guesses one).
   for (const x of expansions) {

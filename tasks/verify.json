@@ -10819,6 +10819,22 @@
     "what": "Run a realistic story whose topic needs pyjamas or a costume (showcase entry 14, going to bed). Check the styled-avatar log entries carry sheetCheck with no not_illustrated flag on a photographic sheet, view each realistic sheet, and confirm the job completes."
    },
    "evidence": []
+  },
+  {
+   "id": "cover-day-outfit-2026-11-01",
+   "title": "A bedtime story's covers are dressed for the day; a cover in nightwear is sent back once before it can stop the story",
+   "commits": [],
+   "addedAt": "2026-11-01",
+   "status": "pending",
+   "evidence": [],
+   "claim": "In a story whose wardrobe has nightwear, every cover plan line carries the day-outfit sentence, no cover brief ships in nightwear (a cover_nightwear finding, if any, is cleared by the re-ask), and the story passes the cover render without the [COVER] nightwear stop. A failed run stores artDirectorBriefs.",
+   "runShape": [
+    "any"
+   ],
+   "check": {
+    "kind": "human",
+    "what": "Run a bedtime story (showcase entry 14). Check artDirectorBriefs / the cover briefs: no cover characterClothing is nightwear; the log shows no [COVER] ... nightwear stop; if a cover_nightwear finding fired, the re-ask cleared it."
+   }
   }
  ],
  "runs": [

@@ -389,6 +389,7 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
     let visualBible = null;
     let coverImages = {};
     let pageClothingData = null;
+    let artDirectorBriefs = null;
     const lang = inputData?.language || 'en';
     const pageWord = lang.startsWith('de') ? 'Seite' : lang.startsWith('it') ? 'Pagina' : lang.startsWith('fr') ? 'Page' : 'Page';
 
@@ -432,6 +433,8 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
             if (sd.description) sceneDescMap.set(sd.pageNumber, sd.description);
           }
         }
+      } else if (cp.step_name === 'art_director_briefs') {
+        artDirectorBriefs = Array.isArray(data.briefs) ? data.briefs : null;
       } else if (cp.step_name === 'story_batch') {
         if (data.batchText) fullStoryText += (fullStoryText ? '\n\n' : '') + data.batchText;
         if (data.batchPrompt) storyTextPrompts.push({ batch: data.batchNum || storyTextPrompts.length + 1, startPage: data.startScene || 1, endPage: data.endScene || 15, prompt: data.batchPrompt });
@@ -486,6 +489,8 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
         return vb;
       })(),
       pageClothing: pageClothingData, sceneDescriptions, sceneImages, coverImages,
+      // Every brief the Art Director wrote, covers and their decided places included (null before that step).
+      artDirectorBriefs,
       characterAvatars: require('./server/lib/storyAvatars').projectStoryCharacterAvatars(
         inputData?.characters || [], inputData?.artStyle || 'pixar'
       ),
@@ -3507,6 +3512,14 @@ ${trialWriter.pagesPrompt}`;
       // (steps 3 + 4), so there is nothing left to expand here.
       expandedScenes = beatsResult.scenes;
       coverScenes = skipCovers ? [] : (beatsResult.coverScenes || []);
+      // The Art Director's briefs, covers and each cover's decided place included, so a job that fails
+      // after this point is diagnosable from the partial story (staging job_1793520777470_7sgat9ene kept none).
+      await saveCheckpoint(jobId, 'art_director_briefs', {
+        briefs: [...expandedScenes, ...coverScenes].map(s => ({
+          pageNumber: s.pageNumber, coverKey: s.coverKey || null, planLine: s.sceneHint || '',
+          sceneDescription: s.sceneDescription || '', characterClothing: s.characterClothing || {}, jevFixed: s.jevFixed || null,
+        })),
+      });
       log.info(`⏭️ [BEATS] Using ${expandedScenes.length} scene brief(s) from the beats pipeline`);
       genLog.info('scenes_complete', `${expandedScenes.length} scene briefs from the beats pipeline`);
     } else if (inputData.trialMode) {

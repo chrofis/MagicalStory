@@ -22,6 +22,7 @@
 const { COVER_PAGE_NUMBERS, COVER_TEXT_POSITION } = require('./coverKeys');
 const { MAX_COVER_CHARACTERS } = require('./coverCastRoster');
 const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
+const { COVER_DAY_OUTFIT_FACT } = require('./clothingCategories');
 
 /**
  * The instant and the copy space of each cover, in beat words.
@@ -106,6 +107,15 @@ function coverCasts(inputData = {}) {
  */
 const COVER_COSTUME_FACT = 'each figure with a costumed outfit wears it where the place suits it (a tail in or at the water, a suit of armour in a castle) and their standard outfit where the costume does not belong';
 
+/** True when any cast member's wardrobe contract has nightwear: only then can a cover be dressed for bed. */
+function anyNightwear(names, clothingRequirements) {
+  if (!clothingRequirements || typeof clothingRequirements !== 'object') return false;
+  return names.some((n) => {
+    const req = clothingRequirements[n];
+    return !!(req && req.nightwear && req.nightwear.used);
+  });
+}
+
 /** True when any cast member's wardrobe contract uses a costumed outfit. */
 function anyCostumed(names, clothingRequirements) {
   if (!clothingRequirements || typeof clothingRequirements !== 'object') return false;
@@ -160,6 +170,7 @@ function buildCoverBeats(inputData = {}, { coverTypes = ['frontCover', 'initialP
       t.instant,
       ...(placeDecided ? [COVER_DECIDED_PLACE] : [COVER_KEY_PLACE, COVER_OWN_PLACE]),
       anyCostumed(cast, clothingRequirements) ? COVER_COSTUME_FACT : null,
+      anyNightwear(cast, clothingRequirements) ? COVER_DAY_OUTFIT_FACT : null,
       `any animal, artifact or vehicle from the Visual Bible the picture calls for, at most ${VB_ELEMENT_BUDGET}`,
       `textPosition "${COVER_TEXT_POSITION[coverKey]}"`,
     ].filter(Boolean).join('; ');

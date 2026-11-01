@@ -282,11 +282,42 @@ function dominantDayCategory(pageClothing) {
  * @param {string} label - which cover, for the message
  */
 function assertCoverClothingIsDay(perCharClothing, label = 'cover') {
-  for (const [name, cat] of Object.entries(perCharClothing || {})) {
-    if (normalizeClothingCategory(cat) === NIGHTWEAR) {
-      throw new Error(`[COVER] ${label}: ${name} is dressed in ${NIGHTWEAR}, but a cover shows the day outfit. The cover brief broke the cover rule; no cover is drawn from it.`);
-    }
+  const [name] = coverNightwearNames(perCharClothing);
+  if (name) {
+    throw new Error(`[COVER] ${label}: ${name} is dressed in ${NIGHTWEAR}, but a cover shows the day outfit. The cover brief broke the cover rule; no cover is drawn from it.`);
   }
+}
+
+/**
+ * THE COVER DAY-OUTFIT SENTENCE (owner, 2026-11-01: "who writes the back cover scene, that prompt must know").
+ * A bedtime story ends at rest in a bedroom, so the Art Director dressed the back cover in pyjamas (staging
+ * job_1793520777470_7sgat9ene, page -3) although C3 says a cover is never nightwear: the cover's own plan line
+ * said nothing about clothes. coverBeats puts this sentence into every cover plan line of a story whose wardrobe
+ * has nightwear, and the brief check (coverNightwearFindings) sends the same sentence back with a cover that
+ * still breaks it, so generator and critic read one text.
+ */
+const COVER_DAY_OUTFIT_FACT = 'every figure wears a day outfit, never `nightwear`, even where the story ends at bedtime or the place is a bedroom';
+
+/** The names a cover's per-character clothing dresses in nightwear. */
+function coverNightwearNames(perCharClothing) {
+  return Object.entries(perCharClothing || {})
+    .filter(([, cat]) => normalizeClothingCategory(cat) === NIGHTWEAR)
+    .map(([name]) => name);
+}
+
+/**
+ * The brief check for a cover in nightwear: one finding per cover page, for the one brief re-ask (briefChecks.js).
+ * @param {number} pageNumber - a cover page (-1, -2, -3)
+ * @param {Object|null} perCharClothing - the cover brief's METADATA characterClothing
+ */
+function coverNightwearFindings(pageNumber, perCharClothing) {
+  const names = coverNightwearNames(perCharClothing);
+  if (!names.length) return [];
+  return [{
+    pageNumber,
+    type: 'cover_nightwear',
+    detail: `${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} dressed in ${NIGHTWEAR} on this cover. On a cover ${COVER_DAY_OUTFIT_FACT}: give each of them their day category from AVAILABLE CLOTHING PER CHARACTER and dress them for the day in the prose.`,
+  }];
 }
 
 /**
@@ -404,6 +435,8 @@ module.exports = {
   normalizeClothingCategory,
   getUsedClothingCategories,
   assertCoverClothingIsDay,
+  COVER_DAY_OUTFIT_FACT,
+  coverNightwearFindings,
   dominantDayCategory,
   reconcileCoverClothingWithRequirements,
   reconcilePageClothingWithRequirements,
