@@ -45,7 +45,7 @@ Director picks pyjamas or invents clothes, and guards added afterwards catch it:
       cover entries, verify.json entry, sibling registry.
 - [x] 8. (8b done 2026-11-01, Lab #1791: 16 stored stories, characters without a day outfit 18/60 before, 0/60 after, none with pyjama parts; 8a done 2026-11-01: replay over 60 stored staging stories, 23 lack a standard day outfit for a cover figure; 8b wardrobe prompt on stored bedtime stories not run, paid cap was $0) Validate on stored data: replay the decider + pin over stored stories' covers (free);
       the wardrobe prompt change on stored bedtime stories (agent-as-model or a capped paid replay).
-- [ ] 9. Staging story run, then ask the owner before any production push.
+- [x] 9. Staging story run done 2026-11-01: showcase 8 job_1793557464719_txr1gqd28 completed; covers in the day outfit, title right, Opus 4->2->1 faults. Production push waits for the owner.
 
 ## Found on the way (not in scope)
 - sceneMetadata.js:989-992 / :1149-1152 silently turns an unknown clothing word into 'standard'
