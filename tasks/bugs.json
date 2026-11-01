@@ -4545,6 +4545,30 @@
       "fix": "Anthropic task budget 80,000 on claude-sonnet-5-5 at xhigh (taskBudgetAtEffort), effort kept; regression test tests/unit/sonnet55-arc-task-budget.test.ts. Lab check on one stored story pending.",
       "status": "fixed",
       "fixedIn": "dbab0d576"
+    },
+    {
+      "id": "secondary-ref-sheet-failure-silent",
+      "title": "A failed visual-bible reference-sheet batch is silent: the story continues and an invented character is drawn from words alone on every page",
+      "reportedAt": "2026-11-01",
+      "source": "Production story job_1793561351885_kkg5gxkbj (2026-11-01, invented mermaid Nerina = visualBible secondaryCharacters CHR001, pages cover/8/13/24): she looks different on every image (toddler in Ludovica's shirt on the cover, adult on p8, shirt on p13, correct only on p24). referenceSheetBatches holds batches 1-3 only (character batch 0 missing); CHR001 has no referenceImageUrl; page grids p8/p24 hold only the leaf/shell. Likely trigger (inferred, prod log no longer reaches 21:13 CH): Grok content-moderated on \"2-year-old, no garment, bare shoulders\", Gemini fallback returned nothing.",
+      "rootCause": "server/lib/referenceSheets.js:1584 catch counts the batch as failed and only logs; storyJobPipeline.js:3941 reads refResult.generated but never refResult.failed. Violates the no-fallbacks rule and the 2026-07-26 every-secondary-gets-a-reference decision.",
+      "status": "open"
+    },
+    {
+      "id": "secondary-age-cue-dropped-prose-briefs",
+      "title": "Invented (non-photo) characters never get an age cue in the image prompt for prose-format briefs, so an invented child can render as an adult",
+      "reportedAt": "2026-11-01",
+      "source": "Production story job_1793561351885_kkg5gxkbj (2026-11-01, invented mermaid Nerina = visualBible secondaryCharacters CHR001, pages cover/8/13/24): she looks different on every image (toddler in Ludovica's shirt on the cover, adult on p8, shirt on p13, correct only on p24). p8 prompt: \"the small waist-high figure of Nerina ... bare shoulders\" with no age; AGE & PROPORTIONS lists only the photo characters.",
+      "rootCause": "server/lib/promptBuilders.js:4883 `const secondaryCast = isProseFormat ? [] : collectSecondaryCastForPage(...)`, so secondaryAgeCues (line ~4966) and the CAST WITHOUT A REFERENCE IMAGE block (~5023) get an empty list on every prose+METADATA brief (all current pages).",
+      "status": "open"
+    },
+    {
+      "id": "secondary-clothing-ignores-child-top-rule",
+      "title": "The visual-bible writer can give an invented child \"no garment, bare shoulders\" although the image judge scores an uncovered child torso CRITICAL; the repair then dresses the child in the main child's outfit",
+      "reportedAt": "2026-11-01",
+      "source": "Production story job_1793561351885_kkg5gxkbj (2026-11-01, invented mermaid Nerina = visualBible secondaryCharacters CHR001, pages cover/8/13/24): she looks different on every image (toddler in Ludovica's shirt on the cover, adult on p8, shirt on p13, correct only on p24). Front cover: first brief \"bare shoulders above her violet scaled mermaid tail\" -> evaluator child_torso_uncovered CRITICAL -> repair \"a purple long-sleeve cotton swim shirt ... matching Ludovica's outfit\" -> shipped at 85.",
+      "rootCause": "Generator-vs-critic gap: CHILD_TOP_DEF (server/lib/promptBuilders.js:12758) is filled only into story-bible-from-beats.txt and clothing-review.txt; prompts/visual-bible.txt:142 (secondary clothing field) never sees it, while prompts/image-evaluation.txt:139 deducts for it.",
+      "status": "open"
     }
   ]
 }
