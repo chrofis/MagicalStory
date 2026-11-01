@@ -4542,8 +4542,8 @@
       "reportedAt": "2026-11-01",
       "source": "Production log 2026-11-01: job_1793560136987_ohe71lhr4 arc_create started 20:09:00 CH, 20:25:54 CH stop_reason=max_tokens 128000 output tokens, \"the output budget was spent on thinking\", retry finished 20:34:56; customer cancelled at 20:34. Same customer cancelled job_1793560620937_jgraekouh (arc 20:17->~20:33) and job_1793545525778_vccdez10p (16:05, 21 min at 5%). job_1793561351885_kkg5gxkbj arc create took 20:29->20:40.",
       "rootCause": "arcCreateEffort xhigh on claude-sonnet-5-5 (server/config/models.js:511) with max_tokens 128000 and no thinking ceiling; the progress bar holds at 5% for the whole arc stage. Same config on master and staging.",
-      "fix": "",
-      "status": "open"
+      "fix": "Anthropic task budget 80,000 on claude-sonnet-5-5 at xhigh (taskBudgetAtEffort), effort kept; regression test tests/unit/sonnet55-arc-task-budget.test.ts. Lab check on one stored story pending.",
+      "status": "fixed"
     }
   ]
 }

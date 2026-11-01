@@ -22,10 +22,16 @@ const IMAGE_ASPECTS = {
 // text, judges, guardModel fallback) resolves here since 2026-10-05 (owner: no
 // Sonnet 4.6 anywhere), as do arc create/retell and text_refine.
 // docs/decisions.md 2026-10-05 "Sonnet 4.6 retired".
+// taskBudgetAtEffort.xhigh (2026-11-01): the arc creator (the only xhigh call)
+// spent all 128,000 output tokens on thinking on production and returned no
+// arc (job_1793560136987_ohe71lhr4, 17 min lost, customer cancelled). 11
+// production arcs used 51,790-103,938 (median ~64,000); 80,000 sits above the
+// median and caps the runaway. See decisions.md 2026-11-01 "Arc creator task budget".
 const CLAUDE_SONNET = {
   provider: 'anthropic',
   modelId: 'claude-sonnet-5-5',
   maxOutputTokens: 128000,
+  taskBudgetAtEffort: { xhigh: 80000 },
   description: 'Claude Sonnet 5.5 - ($2/$10 per 1M). Default effort high. The Sonnet alias.'
 };
 
