@@ -513,7 +513,7 @@ export function WizardStep6Summary({
               ))}
             </div>
           )}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {[0, 1].map((index) => {
               const idea = editableIdeas[index] || '';
               const hasIdea = !!idea;
@@ -644,6 +644,10 @@ export function WizardStep6Summary({
                 </div>
               );
             })}
+          </div>
+          {/* Below the two ideas, collapsed to one line until opened (owner 2026-11-01: a parent who picks an idea
+              must not scroll past an empty box). */}
+          <div className="mt-6">
             <OwnStoryCard
               lang={lang}
               text={ownStoryText}

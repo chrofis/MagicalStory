@@ -237,6 +237,7 @@ test.describe('wizard settings reach the create-story payload', () => {
     const mock = await openWizard(page);
     await toSummary(page);
     await generateIdeas(page);
+    await page.getByTestId('own-story-open').click(); // collapsed to one line until opened
     const own = page.getByTestId('own-story-text');
     await expect(own).toHaveValue('');
     await own.fill('Too short');
@@ -268,6 +269,7 @@ test.describe('wizard settings reach the create-story payload', () => {
     await toSummary(page);
     await generateIdeas(page);
     const text = 'A girl rows out, meets a heron, loses her oar, finds a cave, wakes a bear, crosses a bridge, sings to a storm and sails home.';
+    await page.getByTestId('own-story-open').click();
     await page.getByTestId('own-story-text').fill(text);
     const hint = page.getByTestId('own-story-too-many-events');
     await expect(hint).toBeVisible({ timeout: 8000 });

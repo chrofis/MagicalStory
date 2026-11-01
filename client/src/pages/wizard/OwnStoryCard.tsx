@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, AlertTriangle, CircleCheck, Circle } from 'lucide-react';
+import { Check, AlertTriangle, CircleCheck, Circle, Pencil } from 'lucide-react';
 import { storyService } from '@/services';
 import { AutoGrowTextarea } from '@/components/common';
 import {
@@ -78,11 +78,28 @@ export function OwnStoryCard({ lang, text, onTextChange, isSelected, onSelect, a
 
   useEffect(() => { checkerRef.current?.update(text, age, { pages: book.pages, languageLevel: book.languageLevel }); }, [text, age, book.pages, book.languageLevel]);
 
+  // Collapsed to one line until the parent opens it (owner 2026-11-01); a draft or a selected own story stays open.
+  const [open, setOpen] = useState(() => isSelected || !!text.trim());
+
   const firstMissing = result?.missing[0];
   const tip = result
     ? (firstMissing ? PARTS[firstMissing].tip[lang]
       : L(lang, 'Sieht vollständig aus.', 'Cela semble complet.', 'Sembra completa.', 'Looks complete.'))
     : null;
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        data-testid="own-story-open"
+        onClick={() => setOpen(true)}
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl ring-1 ring-gray-200 bg-gray-50 text-gray-700 font-semibold hover:ring-2 hover:ring-indigo-300"
+      >
+        <Pencil size={16} />
+        {L(lang, 'Lieber eine eigene Geschichte schreiben', 'Écrire plutôt votre propre histoire', 'Scrivi invece la tua storia', 'Write your own story instead')}
+      </button>
+    );
+  }
 
   return (
     <div
