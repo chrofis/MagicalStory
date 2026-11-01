@@ -362,7 +362,8 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
   // output contract, the Visual Bible, and only the FLAGGED pages' plan lines
   // and FIXED blocks — never the whole book. See buildBriefReaskContext.
   const adContext = buildBriefReaskContext(inputData, briefBeats, flagged, {
-    jevBackup, availableAvatars, maxCharactersPerScene, visualBible: visualBibleJson,
+    // The outfit text the first call was given: without it the re-ask rewrites a page with no outfits to copy.
+    jevBackup, availableAvatars, maxCharactersPerScene, visualBible: visualBibleJson, clothingRequirements,
   }) || '';
   const prompt = buildBriefReaskPrompt({
     contextPrompt: adContext,

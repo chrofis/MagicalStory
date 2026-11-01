@@ -3276,7 +3276,7 @@ function artDirectorFills(inputData, beats = [], options = {}) {
   const primaryCategory = options.primaryClothing || inputData.pageClothing?.primaryClothing || null;
   const { block: characterDescriptions, resolvedOutfits } = buildExpansionCastBlock(characters, clothingReqs, primaryCategory);
   if (!clothingReqs) {
-    log.warn('[PROMPT] all-pages scene expansion has no clothingRequirements — the Art Director sees no outfit text and may write category keys into the prose');
+    log.warn('[PROMPT] Art Director prompt (bible, all-pages briefs or brief re-ask) has no clothingRequirements — the Art Director sees no outfit text and may write category keys into the prose');
   } else if (resolvedOutfits < characters.length) {
     // Loud on a PARTIAL resolve too: one silent character is one invented
     // outfit, and the quality evaluator then judges the render against it.
