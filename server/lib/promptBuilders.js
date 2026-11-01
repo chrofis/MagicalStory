@@ -3427,6 +3427,9 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     ONE_SIDED_FEATURE: ONE_SIDED_FEATURE_RULE,
     // An object's description never names the support it rests on (2026-10-17).
     OBJECT_NOT_PLACED: OBJECT_NOT_PLACED_RULE,
+    // An invented child's clothing has a covering top: the SAME constant the wardrobe writer and reviewer hold, and the
+    // image judge's D-05f child_torso_uncovered CRITICAL enforces (sibling set vb-secondary-clothing-vs-image-eval).
+    CHILD_TOP_DEF: WARDROBE_RULES.CHILD_TOP_DEF,
     STATE_REPLACES_PART: STATE_REPLACES_PART_RULE,
     STATE_FULL_DESCRIPTION: STATE_FULL_DESCRIPTION_RULE,
     VB_CATEGORY: VB_CATEGORY_RULE,
@@ -4543,6 +4546,15 @@ function collectSecondaryCastForPage(visualBible, metadata, sceneCharacters, ref
       if (!id && !name) continue;
       take(pool.find(e => (id && norm(e?.id) === id) || (name && norm(e?.name) === name)));
     }
+    // An invented character is filed under objects[] by its bible id (prod
+    // job_1793561351885_kkg5gxkbj p8: characters[] = the two commissioned
+    // people, objects[] = ["LOC007","ART001","CHR001"] and CHR001 is the
+    // mermaid). Structural id match only; a name never counts here.
+    const objectIds = new Set((Array.isArray(metadata?.objects) ? metadata.objects : [])
+      .map(o => norm(typeof o === 'string' ? o : o?.id)).filter(Boolean));
+    if (objectIds.size > 0) {
+      for (const entry of pool) if (objectIds.has(norm(entry?.id))) take(entry);
+    }
     return out;
   }
 
@@ -4880,9 +4892,17 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // out the park keeper's hat, shirt, trousers and boots inline — so emitting
   // there would be the duplicate 2026-06-09 removed. Only the JSON brief,
   // which has no appearance field at all, gets the block.
-  const secondaryCast = isProseFormat ? [] : collectSecondaryCastForPage(
+  //
+  // AGE IS NOT A DUPLICATE (2026-11-01, prod job_1793561351885_kkg5gxkbj): the
+  // prose brief weaves the DESCRIPTION in, but a numeric age is a different
+  // channel — the AGE & PROPORTIONS block. The old `isProseFormat ? []` gate
+  // emptied the cast for every prose page, so an invented child got no age cue
+  // and rendered as an adult. The cast is therefore collected for both formats;
+  // only the appearance-line block below stays JSON-brief-only.
+  const secondaryCast = collectSecondaryCastForPage(
     visualBible, metadata, sceneCharacters, referencePhotos, pageNumber
   );
+  const describedSecondaryCast = isProseFormat ? [] : secondaryCast;
 
   // Build character reference list (Option B: explicit labeling in prompt)
   let characterReferenceList = '';
@@ -5020,10 +5040,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // The appearance line for the invented cast collected above. One line per
   // character, the bible's own `description` verbatim — the only description
   // of them that exists anywhere in the pipeline.
-  if (secondaryCast.length > 0) {
-    const lines = secondaryCast.map(e => `- ${e.name}: ${String(e.description).trim()}`);
+  if (describedSecondaryCast.length > 0) {
+    const lines = describedSecondaryCast.map(e => `- ${e.name}: ${String(e.description).trim()}`);
     characterReferenceList += `\nCAST WITHOUT A REFERENCE IMAGE (draw each from this description, identically on every page):\n${lines.join('\n')}\n`;
-    log.info(`[IMAGE PROMPT] Page ${pageNumber}: described ${secondaryCast.length} bible-invented cast member(s): ${secondaryCast.map(e => e.name).join(', ')}`);
+    log.info(`[IMAGE PROMPT] Page ${pageNumber}: described ${describedSecondaryCast.length} bible-invented cast member(s): ${describedSecondaryCast.map(e => e.name).join(', ')}`);
   }
 
   // (Removed 2026-06-09) SECONDARY CHARACTERS IN THIS SCENE block — was
@@ -13440,6 +13460,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // The trial writer's Visual Bible entries state a one-sided feature relationally (sibling of visual-bible.txt).
       ONE_SIDED_FEATURE: ONE_SIDED_FEATURE_RULE,
       OBJECT_NOT_PLACED: OBJECT_NOT_PLACED_RULE,
+      CHILD_TOP_DEF: WARDROBE_RULES.CHILD_TOP_DEF,
       STATE_REPLACES_PART: STATE_REPLACES_PART_RULE,
       STATE_FULL_DESCRIPTION: STATE_FULL_DESCRIPTION_RULE,
       VB_CATEGORY: VB_CATEGORY_RULE,

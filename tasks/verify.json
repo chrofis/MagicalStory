@@ -11008,6 +11008,38 @@
         "result": "HUMAN",
         "note": "human check | LOOK: Run any full story with book review. Read the last bookAuditRounds round: no required_text fault on p-1; if one fired earlier, the log shows title-redraw attempts and the picked p-1 version is the redraw. View the shipped front cover and read its title."
       }
+    },
+    {
+      "id": "secondary-age-cue-prose-2026-11-01",
+      "title": "An invented child on a prose-format brief gets an AGE & PROPORTIONS cue",
+      "commits": [],
+      "addedAt": "2026-11-01",
+      "status": "pending",
+      "evidence": [],
+      "claim": "In the image prompt of a page whose brief cites an invented child (by id under objects[]), AGE & PROPORTIONS names that child with the head-count cue for its numeric age.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Run any story whose bible invents a child. In the stored page prompts (story_images prompt / generation log), AGE & PROPORTIONS lists the invented child on every page it is cited."
+      }
+    },
+    {
+      "id": "vb-child-covering-top-2026-11-01",
+      "title": "The Visual Bible writers give an invented child a covering top",
+      "commits": [],
+      "addedAt": "2026-11-01",
+      "status": "pending",
+      "evidence": [],
+      "claim": "No visualBible.secondaryCharacters entry for a child has clothing that says no garment, bare shoulders or bare upper body.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Run any story that invents a child (a costume or creature child). Read visualBible.secondaryCharacters[].clothing for the child: it names a covering top, and no D-05f child_torso_uncovered fault is raised for it."
+      }
     }
   ],
   "runs": [

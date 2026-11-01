@@ -43,6 +43,7 @@ Work from the plan lines: an element a plan line only implies still needs an ent
 - Secondary characters you invented only. Never {CHARACTER_NAMES} — they have reference photos.
 - Every secondary-character entry carries `age` as a NUMBER of years (`8`, `34`), never prose, and opens `build` with the character's sex and body type ("a boy, slim", "a woman, broad-shouldered"), never a height or a size word — `scaleClass` carries the size. Jaw and facial-hair notes carry neither.
 {CHILD_AGE_BAND}
+- **An invented child's `clothing` has a covering top.** {CHILD_TOP_DEF} A child's `clothing` never says "no garment", "bare shoulders" or "bare upper body", whatever creature or costume the child is.
 - An entry shaped like a person — an invented figure, a small winged being, a doll, a figurine, a statue, a puppet — states its HAIR in `description`: colour, length and how it is worn, or plainly that it has none. Such an entry reaches the image model as its description and nothing else, and a head described only by its eyes is drawn bald. State the head the same way a face is stated: hair, then whatever else the figure's head carries.
 - {VB_CATEGORY}
 - Every Visual Bible element carries `scaleClass`, and it is the only place an element’s size is stated: {SCALE_CLASS_SPEC} An adjective is not a band — massive, tiny, huge name none. No entry gives a size of its own, in words or in units.
