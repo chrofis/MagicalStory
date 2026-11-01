@@ -10887,6 +10887,42 @@
         "result": "HUMAN",
         "note": "human check | LOOK: Run a bedtime story (showcase entry 14). Check artDirectorBriefs / the cover briefs: no cover characterClothing is nightwear; the log shows no [COVER] ... nightwear stop; if a cover_nightwear finding fired, the re-ask cleared it."
       }
+    },
+    {
+      "id": "cover-outfit-stated-2026-11-01",
+      "title": "A cover whose prose does not dress a figure in its outfit is sent back once; the book review flags a cover figure in sleepwear",
+      "commits": [
+        "ef5901df2"
+      ],
+      "addedAt": "2026-11-01",
+      "status": "pending",
+      "evidence": [],
+      "claim": "Every cover brief that reaches the render states each figure's day outfit in its prose (a cover_outfit_not_stated finding, if any, is cleared by the re-ask), no shipped cover shows a figure in pyjamas or with bare legs outdoors at night, and the Opus review never asks for sleepwear on a cover.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Run showcase entry 14 (bedtime). Read the three cover briefs (coverImages[].description): each names the figure's day outfit; log beats_brief_reask / cover_outfit_not_stated lines; view the three shipped covers; read bookAuditRounds for any clothing fault on p-1/-2/-3 asking for pyjamas."
+      }
+    },
+    {
+      "id": "title-redraw-2026-11-01",
+      "title": "A front cover whose title the book review reads wrong is redrawn until a redraw spells it right; still wrong stops the story",
+      "commits": [
+        "12763e850"
+      ],
+      "addedAt": "2026-11-01",
+      "status": "pending",
+      "evidence": [],
+      "claim": "No shipped front cover carries a title the final book review reads wrong: either the first review finds none, or a title-redraw with a verified spelling is picked, or the story stops with the title error.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Run any full story with book review. Read the last bookAuditRounds round: no required_text fault on p-1; if one fired earlier, the log shows title-redraw attempts and the picked p-1 version is the redraw. View the shipped front cover and read its title."
+      }
     }
   ],
   "runs": [

@@ -4515,6 +4515,26 @@
       "fix": "runBriefChecks passes clothingRequirements to buildBriefReaskContext.",
       "status": "fixed",
       "fixedIn": "59d51c903"
+    },
+    {
+      "id": "cover-title-typo-shipped-after-failed-redraw",
+      "title": "A front cover ships with a misspelled title: the CRITICAL required_text fault survives three Opus rounds because its only route (NEW redraw) regressed",
+      "reportedAt": "2026-11-01",
+      "source": "Staging job_1793526073039_9nhq3ju59 (showcase 6): front cover reads \"qui répétaire tout\" for \"qui répétait tout\"; Opus flagged it CRITICAL in rounds 0, 1 and 2; the round-1 redraw scored 43 (from 75) and the original shipped.",
+      "rootCause": "A required_text fault on p-1 routed to one NEW redraw; the redraw garbled the title again, the review kept the original, and round 2 skipped the cover because iterate had already failed on that picture.",
+      "fix": "title-redraw: up to 4 verified redraws per round, every round; re-review never prefers a misspelled title; a title still wrong stops the story.",
+      "status": "fixed",
+      "fixedIn": "12763e850"
+    },
+    {
+      "id": "cover-pyjamas-in-prose-with-day-label",
+      "title": "Covers show nightwear: the Art Director labels the cover outfit as day clothes but describes the pyjamas in the prose, and the Opus review asks for pyjamas on a cover",
+      "reportedAt": "2026-11-01",
+      "source": "Staging job_1793526073039_9nhq3ju59 (showcase 6): front and back cover prose dress Léa in her red pyjamas and wool socks although every cover plan line carried COVER_DAY_OUTFIT_FACT; round-1 review: \"Dress Léa in her red long-sleeved pyjamas ... instead of the polka-dot dress\" on p-1; log: [CLOTHING] page -1/-2/-3: the scene prose does not dress Léa in their outfit (logged, not acted on).",
+      "rootCause": "The cover check and the render stop read only the clothing label; the prose check only logs; the book review prompt does not know the cover day-outfit rule (generator-vs-critic gap). Owner, 2026-11-01: tell Opus the same sentence, and make the prose check a fault that sends the cover back once.",
+      "fix": "Jev decideOutfitsStated on cover prose in the brief check (cover_outfit_not_stated, re-asked once with the outfit text); book-review-rules.txt carries COVER_DAY_OUTFIT_FACT.",
+      "status": "fixed",
+      "fixedIn": "ef5901df2"
     }
   ]
 }
