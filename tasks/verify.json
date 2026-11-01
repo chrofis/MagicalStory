@@ -3,7 +3,9 @@
   "entries": [
     {
       "id": "up-to-3-stories-in-the-making",
-      "commits": [],
+      "commits": [
+        "f761ee339"
+      ],
       "addedAt": "2026-11-01",
       "claim": "On staging, one account can start a 2nd and 3rd story while one is running, a 4th is refused with the plain message (de/fr/it/en) and no cancel offer, and all stories complete and appear in My Stories (each with its own progress card while running).",
       "runShape": [
