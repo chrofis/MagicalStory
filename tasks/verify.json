@@ -3,7 +3,9 @@
   "entries": [
     {
       "id": "own-story-depth-checks",
-      "commits": [],
+      "commits": [
+        "fd035498d"
+      ],
       "addedAt": "2026-11-01",
       "claim": "On staging, in the idea step, an own-story text with a bare name, an invented place without world kind and era, or (20-page book) a single problem shows its part as not done with the matching depth tip, and a rich text shows all five parts done.",
       "runShape": [
