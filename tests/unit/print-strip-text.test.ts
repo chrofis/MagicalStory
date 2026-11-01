@@ -27,5 +27,6 @@ describe('strip text via generateTextOverlay', () => {
     }
     expect(inStrip).toBeGreaterThan(500);
     expect(inPicture).toBe(0);
-  });
+  // Renders a real 850x1100 overlay: ~2 s alone, past the 10 s default under full-suite load.
+  }, 60000);
 });
