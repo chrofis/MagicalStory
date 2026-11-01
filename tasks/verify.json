@@ -10823,7 +10823,9 @@
   {
    "id": "cover-day-outfit-2026-11-01",
    "title": "A bedtime story's covers are dressed for the day; a cover in nightwear is sent back once before it can stop the story",
-   "commits": [],
+   "commits": [
+    "ae9c60a57"
+   ],
    "addedAt": "2026-11-01",
    "status": "pending",
    "evidence": [],

@@ -4495,6 +4495,16 @@
       "fix": "askArtDirector (server/lib/artDirectorCall.js): a refused reply is never returned; the same prompt goes once to claude-sonnet-5-5, and a second refusal stops the story with ArtDirectorRefusedError. All Art Director call sites route through it.",
       "fixedIn": "43e3b7c49",
       "status": "fixed"
+    },
+    {
+      "id": "cover-brief-nightwear-stops-bedtime-story",
+      "title": "A bedtime story stops at 60%: the Art Director dresses a cover in nightwear and no brief check sends it back",
+      "reportedAt": "2026-11-01",
+      "source": "Showcase entry 14 (going to bed, realistic, 10 pages) on staging, job_1793520777470_7sgat9ene: [COVER] page -3: Léa is dressed in nightwear",
+      "rootCause": "The cover day-outfit rule was only the last clause of C3 after the bedtime rule; the cover plan line said nothing about clothes; no brief check tested it, so the brief went straight to the render stop.",
+      "fix": "COVER_DAY_OUTFIT_FACT in every cover plan line of a nightwear story; cover_nightwear brief check re-asked once; C3 says the cover rule wins; art_director_briefs checkpoint kept by a failed run.",
+      "status": "fixed",
+      "fixedIn": "ae9c60a57"
     }
   ]
 }
