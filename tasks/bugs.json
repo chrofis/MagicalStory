@@ -4485,6 +4485,16 @@
       "fix": "generateOneCallSheet refuses only a missing art style; the sheet judge takes the art style and RENDER_RULES (avatarSheetJudge.js) gives the not_illustrated meaning and redo line per style (photographic for realistic). Owner: Draw + check, photo OK. Regression test in tests/unit/avatar-sheet-one-call-check-2026-10-10.test.ts (3b).",
       "status": "fixed",
       "fixedIn": "3110d6f51"
+    },
+    {
+      "id": "art-director-safety-refusal-shipped-as-brief",
+      "title": "Art Director replies refused by Google (PROHIBITED_CONTENT) on bedtime scenes are shipped as briefs; the story fails 20 min later at the clothing step",
+      "reportedAt": "2026-10-31",
+      "source": "Showcase entry 14 (going to bed, realistic, 10 pages) on staging, job_1793480917111_84ivx1lou: 6 Art Director calls (gemini-3.7-flash all-pages x2, gemini-3.1-pro per-page fallback x2, brief re-ask x1) returned finish_reason=content_filter / PROHIBITED_CONTENT. Page 6 (Léa in pyjamas, Jules hands her the toothbrush at the basin) shipped a cut-off brief (\"In a waist-\") with no parseable METADATA, logged SHIPPING IT ANYWAY; preparePageData then threw [CLOTHING] Léa: no per-page clothing category at 60%.",
+      "rootCause": "(1) Google safety filter refuses innocent bedtime scenes with children (pyjamas, bathroom). (2) beatsPipeline accepts a page brief after two incomplete per-page attempts (\"SHIPPING IT ANYWAY\") instead of failing the stage, so a refused page travels on with no cast or clothing and fails late.",
+      "fix": "askArtDirector (server/lib/artDirectorCall.js): a refused reply is never returned; the same prompt goes once to claude-sonnet-5-5, and a second refusal stops the story with ArtDirectorRefusedError. All Art Director call sites route through it.",
+      "fixedIn": "43e3b7c49",
+      "status": "fixed"
     }
   ]
 }
