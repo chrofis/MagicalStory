@@ -92,7 +92,8 @@ describe('every parser of a category keeps nightwear', () => {
     const added = PB.acceptAddedWardrobeCategory(reqs, 'Mia', parsed.entries[0], reqs.Mia.nightwear);
     expect(added.used).toBe(true);
     expect(reqs.Mia.nightwear.used).toBe(true);
-    const stray = PB.acceptAddedWardrobeCategory(reqs, 'Mia', { name: 'Mia', category: 'standard' }, undefined);
+    // (`standard` is also accepted since 2026-11-01, the day outfit every character has: cover-day-outfit.test.ts)
+    const stray = PB.acceptAddedWardrobeCategory(reqs, 'Mia', { name: 'Mia', category: 'costumed' }, undefined);
     expect(stray).toBeUndefined();
   });
 });
@@ -238,8 +239,10 @@ describe('covers and primaryClothing are the day outfit, never pyjamas', () => {
   });
 
   it('a full-story cover brief that dresses anyone in pyjamas is stopped, loudly', () => {
-    expect(() => cats.assertCoverClothingIsDay({ Mia: 'nightwear' }, 'page -1')).toThrow(/cover shows the day outfit/);
-    expect(() => cats.assertCoverClothingIsDay({ Mia: 'standard', Tom: 'costumed:pirate' }, 'page -1')).not.toThrow();
+    const decided = { clothing: { Mia: 'standard' }, clothingOpen: { Tom: ['standard', 'costumed:pirate'] } };
+    expect(() => cats.assertCoverClothingIsDecided({ Mia: 'nightwear' }, decided, 'page -1')).toThrow(/Mia is dressed in nightwear, but code decided standard/);
+    expect(() => cats.assertCoverClothingIsDecided({ Tom: 'nightwear' }, decided, 'page -1')).toThrow(/Tom is dressed in nightwear, but a cover shows standard or costumed:pirate/);
+    expect(() => cats.assertCoverClothingIsDecided({ Mia: 'standard', Tom: 'costumed:pirate' }, decided, 'page -1')).not.toThrow();
   });
 
   it('primaryClothing counts day pages only: more pyjama pages than day pages leaves it standard', () => {
@@ -287,8 +290,10 @@ describe('the rule reaches the generator, the critic and both Art Director templ
     expect(c3).toMatch(/Sleep means `nightwear`/);
     expect(c3).toMatch(/until a plan line dresses them for the day again/);
     expect(c3).not.toMatch(/Once a character changes, later pages keep the new one\./);
-    expect(c3).toMatch(/A cover is never `nightwear`/);
-    expect(readPrompt('scene-expansion.txt')).toMatch(/a cover is never `nightwear`/);
+    // a cover's outfit is code's since 2026-11-01 (docs/decisions.md "Cover outfit decided by code"): the cover sentence says so
+    expect(c3).toMatch(/A cover is the exception: its plan line names what each figure wears/);
+    expect(c3).not.toMatch(/never `nightwear`/);
+    expect(readPrompt('scene-expansion.txt')).not.toMatch(/cover is never `nightwear`/);
   });
 });
 

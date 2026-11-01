@@ -34,7 +34,7 @@ Primary characters: {PRIMARY_CHARACTER_NAMES}
 
 Determine which clothing variants each character needs, based on the page plan.
 
-- Mark `used: true` only for variants that actually appear.{ERA_CLOTHING_RULE}{THEME_COSTUME_RULE}
+- Mark `used: true` only for variants that actually appear, except `standard`. {DAY_OUTFIT_DEF}{ERA_CLOTHING_RULE}{THEME_COSTUME_RULE}
 - Set `costumed.used: true` whenever the theme, setting or era implies special clothing, and name it in `costumed.costume` (`medieval`, `wizard`, `pirate`, `firefighter`, `1920s`, …). Leave it false for a present-day story in everyday clothes that states no theme costume, and for any character whose own role clothing the story keeps.
 - Set `nightwear.used: true` for each person the page plan puts in bed, or into pyjamas for a bedtime routine at night: a child, and an adult too when the plan has them in bed. An adult who only sits at a bedside reading or tucking in stays in their day outfit, and so does anyone whose pages are in daytime. Write `nightwear.description` as the full pyjama outfit, top and bottoms, in the same words-and-colour style as every other outfit. Everyone else leaves `nightwear.used` false. {NIGHTWEAR_DEF}
 - **A character the story already dresses for their role stays `standard`** — a working captain, a uniformed officer, a baker at their own oven. Their own outfit IS their clothing in this world, and the theme's costume puts a second set of clothes on someone who came dressed. Costume the characters the theme is a costume FOR.

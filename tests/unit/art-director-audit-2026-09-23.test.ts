@@ -12,6 +12,7 @@ import { createRequire } from 'node:module';
 const require_ = createRequire(import.meta.url);
 const { REVIEWABLE } = require_('../../server/lib/sceneBriefCheck');
 import { checkPage, checkSceneConsistency } from '../helpers/cast-index';
+import { dayWardrobe } from './helpers/dayWardrobe';
 const PB = require_('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = require_('../../server/services/prompts');
 const { VANTAGE_SHOT_RULE, PLATE_DERIVED_SHOTS } = require_('../../server/lib/shotVocabulary');
@@ -130,7 +131,7 @@ describe('built prompts', () => {
     // The cover cast moved out of the Art Director template into the cover
     // pages' own beats (coverBeats.js, 2026-09-24).
     const { buildCoverBeats } = require_('../../server/lib/coverBeats.js');
-    const beats = buildCoverBeats(inputData);
+    const beats = buildCoverBeats(inputData, { clothingRequirements: dayWardrobe(inputData) });
     expect(ad).not.toMatch(/and None/);
     expect(beats.map((b: any) => b.planLine).join('\n')).not.toMatch(/\bNone\b/);
     expect(beats.find((b: any) => b.coverKey === 'initialPage').planLine).toMatch(/^wide — Mira, Tom — /);

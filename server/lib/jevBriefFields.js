@@ -779,8 +779,10 @@ function coverLight(coverKey, storyBeats, location = null) {
  * @param {string|null} o.location - the cover's decided vantage / location id
  * @param {Object<string,{population:string}>} [o.population] - decidePopulation's byLocation
  * @param {string|null} [o.era] - the Visual Bible's story-level era
+ * @param {{fixed:Object<string,string>, open:Object<string,string[]>}|null} [o.outfits] - coverBeats.coverOutfits: the
+ *   outfit code fixed per figure, and the two categories a costumed figure may choose between
  */
-function coverFacts({ coverKey, storyBeats, location = null, population = null, era = null }) {
+function coverFacts({ coverKey, storyBeats, location = null, population = null, era = null, outfits = null }) {
   const light = coverLight(coverKey, storyBeats, location);
   const base = location ? String(location).trim().toUpperCase().split('.')[0] : null;
   const pop = base && population && population[base] ? population[base].population : null;
@@ -792,6 +794,8 @@ function coverFacts({ coverKey, storyBeats, location = null, population = null, 
     ...(light ? { timeOfDay: light.timeOfDay, indoor: light.indoor, ...(light.weather ? { weather: light.weather } : {}), lightFromPage: light.sourcePage } : {}),
     ...(pop ? { population: pop } : {}),
     ...(eraText ? { era: eraText } : {}),
+    // Both maps are present whenever code decided the outfits (either may be empty): the render guard needs the decision itself.
+    ...(outfits ? { clothing: outfits.fixed, clothingOpen: outfits.open } : {}),
   };
 }
 

@@ -37,6 +37,8 @@ Characters: {CHARACTER_NAMES}
 13. Appearance only — {OUTFIT_APPEARANCE_RULE} Name any outfit that carries more, and rewrite it as the appearance alone.
 14. Props — {PROP_NOT_GARMENT_DEF} Name any outfit that lists a prop, and rewrite it without it.
 
+15. Day outfit — name any character listed under `Characters:` who breaks this: {DAY_OUTFIT_DEF} Add the missing outfit, or rewrite the one that carries sleepwear, under the heading `## <CharacterName> / standard` with the full day outfit, in the words-and-colour style of the other outfits. A character's `nightwear` outfit stays as it is.
+
 Fixing check 1 outranks fixing check 3: a character in the right costume sharing a colour with someone else is better than a distinct colour on a garment that does not read as the costume. Two characters of different age or sex may wear the same headwear.
 
 A rewrite must not create a fault of its own. Before writing a corrected outfit, check it against every other character's outfit — including the ones you are leaving alone — and against the outfit you are replacing. Swapping two colours between characters leaves them as hard to tell apart as before.

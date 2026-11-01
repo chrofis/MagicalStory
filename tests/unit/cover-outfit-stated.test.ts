@@ -7,7 +7,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 const jev = require('../../server/lib/jevDecisions.js');
 const resolve = require('../../server/lib/clothingResolve.js');
 const { coverOutfitFindings, COVER_ONLY_TYPES } = require('../../server/lib/briefChecks.js');
-const { COVER_DAY_OUTFIT_FACT } = require('../../server/lib/clothingCategories.js');
+const { COVER_OUTFIT_RULE } = require('../../server/lib/clothingCategories.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -32,7 +32,7 @@ describe('coverOutfitFindings', () => {
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({ pageNumber: -3, type: 'cover_outfit_not_stated', character: 'Mia' });
     expect(out[0].detail).toContain('a yellow raincoat over blue jeans and red boots.');
-    expect(out[0].detail).toContain(COVER_DAY_OUTFIT_FACT);
+    expect(out[0].detail).toContain(COVER_OUTFIT_RULE);
     expect(seen.prose).toBe('Mia in a red top and red bottoms waves under the stars.');
     expect(seen.figures).toEqual([{ name: 'Mia', outfit: 'a yellow raincoat over blue jeans and red boots.' }]);
   });
@@ -64,11 +64,11 @@ describe('coverOutfitFindings', () => {
 describe('the book review reads the same cover outfit sentence', () => {
   it('reviewRulesText fills it in', () => {
     const tpl = fs.readFileSync(path.join(__dirname, '../../prompts/book-review-rules.txt'), 'utf8');
-    expect(tpl).toContain('{COVER_DAY_OUTFIT_FACT}');
+    expect(tpl).toContain('{COVER_OUTFIT_RULE}');
     const { reviewRulesText } = require('../../server/lib/bookAudit.js');
     const { fillTemplate } = require('../../server/services/prompts.js');
     const text = reviewRulesText({ title: 'Le titre' }, { bookReviewRules: tpl }, fillTemplate);
-    expect(text).toContain(COVER_DAY_OUTFIT_FACT);
-    expect(text).not.toContain('{COVER_DAY_OUTFIT_FACT}');
+    expect(text).toContain(COVER_OUTFIT_RULE);
+    expect(text).not.toContain('{COVER_OUTFIT_RULE}');
   });
 });

@@ -12759,6 +12759,9 @@ const WARDROBE_RULES = {
   // Pyjamas (docs/decisions.md 2026-10-24): the third outfit category. One definition, filled into the bible writer, the
   // wardrobe reviewer and nothing else; the Art Director and the evaluators never restate it.
   NIGHTWEAR_DEF: 'Nightwear is two-piece pyjamas: a top covering the torso from shoulders to waist (long or short sleeve) and pyjama bottoms (long or shorts). Slippers or socks may be worn, or bare feet. Never a vest or singlet, a bare chest or midriff, or a one-piece or nightdress.',
+  // The day outfit (owner, 2026-11-01; docs/decisions.md "Cover outfit decided by code"): code dresses every cover figure in
+  // `standard`, so the wardrobe always writes one. One definition, filled into the bible writer and the wardrobe reviewer.
+  DAY_OUTFIT_DEF: 'Every commissioned character has a `standard` outfit with `used: true` and a full description, even when no page dresses them in it: it is their day outfit, the clothes they wear by day and on the book covers. It is day clothes only: never a pyjama top or bottoms, a nightdress, a dressing gown, a nightcap or slippers, and never pyjamas under a coat. A scene where someone goes out in pyjamas is a `nightwear` scene; the coat or boots they pull on over the pyjamas are written into the `nightwear` outfit.',
   TAIL_DEF: 'A costume that replaces the legs (a tail, a fin) is one tail from the waist down, written as replacing the legs. Never a skirt over legs, and no feet, bare feet or footwear.',
   SLOT_STATE_DEF: 'One state per garment slot: never two garments in one slot that exclude each other, and a slot the character does not wear is omitted, never written out as empty.',
   VARIETY_DEF: "Two characters never wear the same set of garments recoloured, neither the whole outfit nor what is left once a page takes an outer layer off. A child's covering top and a leg-replacing tail are never the garment given up: vary colour, sleeve length, neckline and trim around them.",
@@ -12844,7 +12847,7 @@ function applyClothingFix(entry, fix, who) {
 
 /**
  * Check 9 (coverage) of the wardrobe review may ADD a category the bible missed: a costume a page puts on
- * (`costumed:<name>`) or the pyjamas a page puts someone in bed in (`nightwear`). A plain rewrite of an unused
+ * (`costumed:<name>`), the pyjamas a page puts someone in bed in (`nightwear`), or the day outfit every character has (`standard`, check 15). A plain rewrite of an unused
  * category stays stray (hallucination guard). ONE rule for the pipeline and the Test Lab, which mirrors it.
  * Mutates `reqs[name]` and returns the entry to apply the fix to (the existing one when nothing is added).
  */
@@ -12855,6 +12858,10 @@ function acceptAddedWardrobeCategory(reqs, name, fix, entry) {
   }
   if (fix.category === NIGHTWEAR) {
     return (reqs[name][NIGHTWEAR] = { ...(reqs[name][NIGHTWEAR] || {}), used: true });
+  }
+  // The day outfit every commissioned character must have (WARDROBE_RULES.DAY_OUTFIT_DEF), written even when no page wears it.
+  if (fix.category === 'standard') {
+    return (reqs[name].standard = { ...(reqs[name].standard || {}), used: true });
   }
   return entry;
 }

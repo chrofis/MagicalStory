@@ -31,7 +31,7 @@ async function run(extra: any) {
   };
   await runArtDirector({
     inputData: { language: 'en', characters: [{ id: 1, name: 'Mila', age: 6, gender: 'female', isMainCharacter: true }], coverTypes: ['frontCover'], artStyle: 'watercolor', title: 'T' },
-    modelOverrides: {}, clothingRequirements: null, visualBible: null, bibleSections: null, sceneModel: 'claude-sonnet',
+    modelOverrides: {}, clothingRequirements: { Mila: { standard: { used: true, description: 'a plain day outfit' } } }, visualBible: null, bibleSections: null, sceneModel: 'claude-sonnet',
     onChunk: null, gl: { info() {}, warn() {}, error() {}, debug() {} }, meta: { timings: {} }, stage: async () => {},
     beats: [{ pageNumber: 1, planLine: 'page 1' }], arcCentralFigure: null, approvedArc: 'an arc', present: new Map([[1, ['Mila']]]),
     ...extra,

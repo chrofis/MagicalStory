@@ -761,7 +761,17 @@ function outfitAbsent(clothingRequirements, names = []) {
   return absent;
 }
 
+/**
+ * THE DAY-OUTFIT GUARD (owner, 2026-11-01): every commissioned character leaves the wardrobe with a `standard` day
+ * outfit (promptBuilders WARDROBE_RULES.DAY_OUTFIT_DEF), because code dresses every cover figure in it
+ * (coverBeats.coverOutfits). Which of `names` has none. Reports; never invents a garment.
+ */
+function standardAbsent(clothingRequirements, names = []) {
+  const { standardOutfitText } = require('./clothingCategories');
+  return (names || []).filter(n => !standardOutfitText(clothingRequirements, n));
+}
+
 // The image prompt's own "does the prose dress this character" check is Jev's
 // (jevDecisions.decideOutfitsStated); the token match it used to share with this
 // file (missingGarments) was deleted 2026-10-09, docs/decisions.md.
-module.exports = { REVIEWABLE, GARMENT_NOUNS, outfitAbsent, checkClothingIncomplete, checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, characterWindow, tokens };
+module.exports = { REVIEWABLE, GARMENT_NOUNS, outfitAbsent, standardAbsent, checkClothingIncomplete, checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, characterWindow, tokens };

@@ -274,50 +274,50 @@ function dominantDayCategory(pageClothing) {
 }
 
 /**
- * A cover shows the day outfit. A brief that dresses anyone on a cover in pyjamas broke the cover rule
- * (prompts/scene-briefs-all.txt C3); that is stated and stopped here, never drawn and never quietly rewritten
- * (docs/decisions.md 2026-10-24).
+ * A character's `standard` day outfit text from the wardrobe contract, or '' when the contract has none (no entry, no
+ * description, or the review template's no-change marker). The one reader: the cover decider (coverBeats.coverOutfits),
+ * the wardrobe guard (clothingCheck.standardAbsent) and the cover sheet requirement (styledAvatars) all ask this.
+ */
+function standardOutfitText(clothingRequirements, name) {
+  const reqs = resolveCharacterReqs(clothingRequirements, name);
+  const d = reqs && reqs.standard && typeof reqs.standard.description === 'string' ? reqs.standard.description.trim() : '';
+  return d && !/^NONE\.?$/i.test(d) ? d : '';
+}
+
+/**
+ * THE COVER OUTFIT SENTENCE, ONE TEXT (owner, 2026-11-01). Code decides the outfit (coverBeats.coverOutfits, docs/decisions.md
+ * "Cover outfit decided by code"); the two readers that judge a cover against it say it in the same words: the brief check
+ * `cover_outfit_not_stated` (briefChecks.coverOutfitFindings, which reads the prose) and the book review's cover rule
+ * (prompts/book-review-rules.txt, filled by bookAudit.reviewRulesText, which reads the picture).
+ */
+const COVER_OUTFIT_RULE = "every figure wears the story's day outfit exactly as the cover states it, never pyjamas or other sleepwear";
+
+/**
+ * THE RENDER GUARD OF A COVER'S OUTFIT (owner, 2026-11-01; docs/decisions.md "Cover outfit decided by code"). Code decides
+ * what each cover figure wears (coverBeats.coverOutfits) and pins it into the cover's METADATA (jevDecisions.pinBrief), so a
+ * cover that reaches the render with anything else is a bug upstream: stated and stopped here, never drawn and never
+ * quietly rewritten. `decided.clothing` is the category code fixed per figure; `decided.clothingOpen` lists, for a figure
+ * the wardrobe also costumes, the two categories the Art Director may choose between. Pyjamas are in neither.
  *
  * @param {Object|null} perCharClothing - { [charName]: category } of one cover
+ * @param {{clothing?:Object<string,string>, clothingOpen?:Object<string,string[]>}|null} decided - the cover's stored jevFixed
  * @param {string} label - which cover, for the message
  */
-function assertCoverClothingIsDay(perCharClothing, label = 'cover') {
-  const [name] = coverNightwearNames(perCharClothing);
-  if (name) {
-    throw new Error(`[COVER] ${label}: ${name} is dressed in ${NIGHTWEAR}, but a cover shows the day outfit. The cover brief broke the cover rule; no cover is drawn from it.`);
+function assertCoverClothingIsDecided(perCharClothing, decided, label = 'cover') {
+  const fixed = (decided && decided.clothing) || null;
+  if (!fixed || typeof fixed !== 'object') {
+    throw new Error(`[COVER] ${label}: no outfit was decided for this cover's figures, so none can be drawn.`);
   }
-}
-
-/**
- * THE COVER DAY-OUTFIT SENTENCE (owner, 2026-11-01: "who writes the back cover scene, that prompt must know").
- * A bedtime story ends at rest in a bedroom, so the Art Director dressed the back cover in pyjamas (staging
- * job_1793520777470_7sgat9ene, page -3) although C3 says a cover is never nightwear: the cover's own plan line
- * said nothing about clothes. coverBeats puts this sentence into every cover plan line of a story whose wardrobe
- * has nightwear, and the brief check (coverNightwearFindings) sends the same sentence back with a cover that
- * still breaks it, so generator and critic read one text.
- */
-const COVER_DAY_OUTFIT_FACT = 'every figure wears a day outfit, never `nightwear`, even where the story ends at bedtime or the place is a bedroom';
-
-/** The names a cover's per-character clothing dresses in nightwear. */
-function coverNightwearNames(perCharClothing) {
-  return Object.entries(perCharClothing || {})
-    .filter(([, cat]) => normalizeClothingCategory(cat) === NIGHTWEAR)
-    .map(([name]) => name);
-}
-
-/**
- * The brief check for a cover in nightwear: one finding per cover page, for the one brief re-ask (briefChecks.js).
- * @param {number} pageNumber - a cover page (-1, -2, -3)
- * @param {Object|null} perCharClothing - the cover brief's METADATA characterClothing
- */
-function coverNightwearFindings(pageNumber, perCharClothing) {
-  const names = coverNightwearNames(perCharClothing);
-  if (!names.length) return [];
-  return [{
-    pageNumber,
-    type: 'cover_nightwear',
-    detail: `${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} dressed in ${NIGHTWEAR} on this cover. On a cover ${COVER_DAY_OUTFIT_FACT}: give each of them their day category from AVAILABLE CLOTHING PER CHARACTER and dress them for the day in the prose.`,
-  }];
+  const open = (decided && decided.clothingOpen) || {};
+  const canon = (c) => String(c || '').trim().toLowerCase();
+  for (const [name, cat] of Object.entries(perCharClothing || {})) {
+    if (Object.prototype.hasOwnProperty.call(fixed, name) && canon(cat) !== canon(fixed[name])) {
+      throw new Error(`[COVER] ${label}: ${name} is dressed in ${cat}, but code decided ${fixed[name]}. The cover brief broke the decided outfit; no cover is drawn from it.`);
+    }
+    if (Object.prototype.hasOwnProperty.call(open, name) && !open[name].map(canon).includes(canon(cat))) {
+      throw new Error(`[COVER] ${label}: ${name} is dressed in ${cat}, but a cover shows ${open[name].join(' or ')}. The cover brief broke the decided outfit; no cover is drawn from it.`);
+    }
+  }
 }
 
 /**
@@ -434,9 +434,9 @@ module.exports = {
   assertNotRemovedSeasonCategory,
   normalizeClothingCategory,
   getUsedClothingCategories,
-  assertCoverClothingIsDay,
-  COVER_DAY_OUTFIT_FACT,
-  coverNightwearFindings,
+  assertCoverClothingIsDecided,
+  standardOutfitText,
+  COVER_OUTFIT_RULE,
   dominantDayCategory,
   reconcileCoverClothingWithRequirements,
   reconcilePageClothingWithRequirements,

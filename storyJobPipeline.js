@@ -4355,8 +4355,9 @@ ${trialWriter.pagesPrompt}`;
             }
           }
         }
-        // A cover page shows the day outfit; a brief that put anyone in pyjamas on it is stopped here.
-        if (coverOpts) require('./server/lib/clothingCategories').assertCoverClothingIsDay(perCharClothing, `page ${pageNum}`);
+        // A cover page shows the outfit code decided (coverBeats.coverOutfits, pinned into its METADATA); a brief that
+        // dresses anyone otherwise is stopped here.
+        if (coverOpts) require('./server/lib/clothingCategories').assertCoverClothingIsDecided(perCharClothing, scene.jevFixed, `page ${pageNum}`);
         const defaultClothing = 'standard';
         const sceneClothingRequirements = buildSceneClothingRequirements(
           sceneCharacters,

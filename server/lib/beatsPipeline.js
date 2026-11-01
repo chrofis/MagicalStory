@@ -2053,6 +2053,7 @@ ${bibleBody}` : bibleBody;
   // them (jevBriefFields.coverFacts). See decisions.md 2026-10-05.
   {
     const { coverFacts } = require('./jevBriefFields');
+    const { coverOutfits, coverCasts } = require('./coverBeats');
     const era = visualBible && typeof visualBible.era === 'string' ? visualBible.era.trim() : '';
     if (!era) gl.warn('beats_cover_era_missing', "The Visual Bible states no story-level era — the covers' era stays the Art Director's");
     // POPULATION IS THE PLACE'S (owner, 2026-10-06): a cover's place no story page stands on (an
@@ -2071,7 +2072,9 @@ ${bibleBody}` : bibleBody;
       jevFallBack(jevReport, 'cover_population', err, gl);
     }
     for (const cb of coverBeats) {
-      const facts = coverFacts({ coverKey: cb.coverKey, storyBeats: beats, location: cb.jevFixed && cb.jevFixed.location, population: jevReport && jevReport.population && jevReport.population.byLocation, era });
+      // WHAT EVERY COVER FIGURE WEARS IS CODE'S (owner, 2026-11-01): the story's day outfit (coverBeats.coverOutfits).
+      const outfits = coverOutfits(coverCasts(inputData)[cb.coverKey], clothingRequirements);
+      const facts = coverFacts({ coverKey: cb.coverKey, storyBeats: beats, location: cb.jevFixed && cb.jevFixed.location, population: jevReport && jevReport.population && jevReport.population.byLocation, era, outfits });
       if (cb.jevFixed && cb.jevFixed.location && !facts.population && jevActive(jevReport)) {
         gl.warn('beats_cover_population_undecided', `Cover p${cb.pageNumber}: no population decision for ${cb.jevFixed.location} (no story page stands there) — the Art Director writes its population`, null, { pageNumber: cb.pageNumber });
       }
@@ -3259,6 +3262,15 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     if (absent.length > 0) {
       log.error(`❌ [BEATS] No outfit in the wardrobe contract for ${absent.join(', ')} — every brief will describe them undressed`);
       gl.error('beats_outfit_absent', `The wardrobe contract gives ${absent.join(', ')} no outfit to wear`, null, { characters: absent });
+    }
+  }
+  // The day outfit every cover figure wears (coverBeats.coverOutfits): a wardrobe without it stops the story here, before
+  // the avatars start and the Art Director is paid, never later at the cover (production job_1793542624900_w0aqtk6aj).
+  {
+    const noDayOutfit = require('./clothingCheck').standardAbsent(clothingRequirements, (inputData.characters || []).map(c => c && c.name).filter(Boolean));
+    if (noDayOutfit.length > 0) {
+      gl.error('beats_standard_outfit_absent', `The wardrobe contract gives ${noDayOutfit.join(', ')} no standard day outfit`, null, { characters: noDayOutfit });
+      throw new Error(`Wardrobe: ${noDayOutfit.join(', ')} ${noDayOutfit.length === 1 ? 'has' : 'have'} no standard day outfit after the wardrobe review — every commissioned character needs one for the covers`);
     }
   }
 

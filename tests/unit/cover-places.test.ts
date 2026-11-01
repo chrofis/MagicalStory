@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { createRequire } from 'node:module';
 import { makeJevStub } from '../helpers/jev-stub';
+import { dayWardrobe } from './helpers/dayWardrobe';
 
 const req = createRequire(import.meta.url);
 const JBF = req('../../server/lib/jevBriefFields');
@@ -125,8 +126,8 @@ describe('the FIXED field and its pin', () => {
 describe('the own-place rule and its check stay for the backup only', () => {
   const input = { characters: [{ id: 1, name: 'Child1' }], mainCharacters: [1] };
   it('a decided place carries no own-place rule; the backup does', () => {
-    for (const b of CB.buildCoverBeats(input, { placeDecided: true })) expect(b.planLine).not.toContain(CB.COVER_OWN_PLACE);
-    for (const b of CB.buildCoverBeats(input, { placeDecided: false })) expect(b.planLine).toContain(CB.COVER_OWN_PLACE);
+    for (const b of CB.buildCoverBeats(input, { placeDecided: true, clothingRequirements: dayWardrobe(input) })) expect(b.planLine).not.toContain(CB.COVER_OWN_PLACE);
+    for (const b of CB.buildCoverBeats(input, { placeDecided: false, clothingRequirements: dayWardrobe(input) })) expect(b.planLine).toContain(CB.COVER_OWN_PLACE);
   });
   it('cover_location_repeated never compares a decided cover', () => {
     const vb = VB();
@@ -226,7 +227,7 @@ async function run(jevImpl: any, extra: any = {}) {
   const gl = { info() {}, warn() {}, error() {}, debug() {} };
   const out = await runArtDirector({
     inputData: { language: 'en', characters: [{ id: 1, name: 'Mila', age: 6, gender: 'female', isMainCharacter: true }], artStyle: 'watercolor', title: 'T', ...extra },
-    modelOverrides: {}, clothingRequirements: null, visualBible: null, bibleSections: null, sceneModel: 'claude-sonnet',
+    modelOverrides: {}, clothingRequirements: { Mila: { standard: { used: true, description: 'a plain day outfit' } } }, visualBible: null, bibleSections: null, sceneModel: 'claude-sonnet',
     onChunk: null, gl, meta: { timings: {} }, stage: async () => {},
     beats: pages.map(p => ({ ...p, planLine: p.planLine.replace('Child1', 'Mila') })),
     arcCentralFigure: null, approvedArc: 'an arc', present: new Map(pages.map(p => [p.pageNumber, ['Mila']])), jevReport,

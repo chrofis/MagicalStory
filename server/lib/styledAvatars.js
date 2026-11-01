@@ -1704,7 +1704,10 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
 
     // For covers, each character needs ALL their clothing variations
     for (const char of characters) {
-      const clothingCategories = characterClothingMap[char.name.trim().toLowerCase()] || [defaultClothing];
+      const clothingCategories = [...(characterClothingMap[char.name.trim().toLowerCase()] || [defaultClothing])];
+      // A cover figure wears the story's day outfit, `standard`, whether or not a page does (owner, 2026-11-01;
+      // coverBeats.coverOutfits): its sheet is required. Only a wardrobe that WRITES a standard outfit asks for it.
+      if (require('./clothingCategories').standardOutfitText(clothingRequirements, char.name) && !clothingCategories.includes('standard')) clothingCategories.push('standard');
       for (const clothingCategory of clothingCategories) {
         requirements.push({
           pageNumber: 'cover',

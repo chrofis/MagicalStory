@@ -14,6 +14,7 @@ const CB = req('../../server/lib/coverBeats.js');
 const SM = req('../../server/lib/sceneMetadata.js');
 const BC = req('../../server/lib/briefChecks.js');
 import { checkScenes, ctxWithIndex } from '../helpers/cast-index';
+import { dayWardrobe } from './helpers/dayWardrobe';
 const { loadPromptTemplates, PROMPT_TEMPLATES } = req('../../server/services/prompts.js');
 
 const chars = [
@@ -29,7 +30,7 @@ const briefs = (o: any = {}) => PB.buildSceneBriefsAllPrompt(input(), beats, { .
 beforeAll(async () => { await loadPromptTemplates(); });
 
 describe('§1 covers: a beat states the picture, never a mood, a title or a book; one copy-space source', () => {
-  const planLines = () => CB.buildCoverBeats(input(), { coverTypes: ['frontCover', 'initialPage', 'backCover'] }).map((b: any) => b.planLine);
+  const planLines = () => CB.buildCoverBeats(input(), { coverTypes: ['frontCover', 'initialPage', 'backCover'], clothingRequirements: dayWardrobe(input()) }).map((b: any) => b.planLine);
 
   it('no mood word, no title/book/dedication bait in any cover plan line', () => {
     for (const l of planLines()) {

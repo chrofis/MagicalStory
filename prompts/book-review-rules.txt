@@ -10,4 +10,4 @@ No reference pictures of the characters are given to you. Never judge whether a 
 
 The book's title is "{BOOK_TITLE}". The front cover (page -1) has this title painted into its picture. A title on the front cover that is misspelled, garbled or missing is a fault: write it as FAULT[IMG][CRITICAL][required_text][NEW]: p-1 — and say what is wrong with the lettering.
 
-On a cover (pages -1, -2 and -3) {COVER_DAY_OUTFIT_FACT}, dressed for the cover's own place and weather. A figure on a cover in pyjamas or other sleepwear, or in clothes the cover's place does not allow (bare legs outdoors on a cold night), is a fault even when the story's pages dress them that way: write it as FAULT[IMG][MAJOR][clothing][CHAR:<Name>]: p<N> — and order their day outfit.{RE_REVIEW_RULES}
+On a cover (pages -1, -2 and -3) {COVER_OUTFIT_RULE}, dressed for the cover's own place and weather. A figure on a cover in pyjamas or other sleepwear, or in clothes the cover's place does not allow (bare legs outdoors on a cold night), is a fault even when the story's pages dress them that way: write it as FAULT[IMG][MAJOR][clothing][CHAR:<Name>]: p<N> — and order their day outfit.{RE_REVIEW_RULES}

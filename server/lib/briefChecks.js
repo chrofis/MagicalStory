@@ -127,7 +127,7 @@ async function coverOutfitFindings(expansions, ctx, gl) {
   const { extractSceneMetadata, splitBrief } = require('./sceneMetadata');
   const { resolveSceneClothingDescriptions } = require('./clothingResolve');
   const { decideOutfitsStated } = require('./jevDecisions');
-  const { COVER_DAY_OUTFIT_FACT } = require('./clothingCategories');
+  const { COVER_OUTFIT_RULE } = require('./clothingCategories');
   const out = [];
   for (const x of expansions) {
     if (!coverKeyOfPage(x.pageNumber)) continue;
@@ -149,7 +149,7 @@ async function coverOutfitFindings(expansions, ctx, gl) {
         pageNumber: x.pageNumber,
         type: 'cover_outfit_not_stated',
         character: name,
-        detail: `The prose does not dress ${name} in the outfit this cover gives them. On a cover ${COVER_DAY_OUTFIT_FACT}. ${name} wears: ${String(outfits[name]).trim()} Describe exactly that outfit for ${name} in the prose.`,
+        detail: `The prose does not dress ${name} in the outfit this cover gives them. On a cover ${COVER_OUTFIT_RULE}. ${name} wears: ${String(outfits[name]).trim()} Describe exactly that outfit for ${name} in the prose.`,
       });
     }
   }
@@ -244,13 +244,6 @@ function collectBriefFindings(expansions, ctx) {
   }
   // A cover whose prose does not dress a figure in its outfit (Jev, computed by runBriefChecks).
   for (const f of (ctx.coverOutfitFindings || [])) if (expansions.some(x => x.pageNumber === f.pageNumber)) findings.push(f);
-  // A cover dressed for bed (owner, 2026-11-01): sent back once with the cover's day-outfit sentence.
-  const { coverNightwearFindings } = require('./clothingCategories');
-  const { coverKeyOfPage } = require('./coverBeats');
-  for (const x of expansions) {
-    if (!coverKeyOfPage(x.pageNumber)) continue;
-    findings.push(...coverNightwearFindings(x.pageNumber, (extractSceneMetadata(x.brief) || {}).characterClothing));
-  }
   // A decided field the brief cannot hold as written: an outdoor page whose
   // weather is `none` (jevDecisions.pinBrief reports it, never guesses one).
   for (const x of expansions) {

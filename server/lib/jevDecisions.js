@@ -1410,6 +1410,8 @@ function fixedBlock(page) {
     if (f.population) lines.push(`- population: ${f.population}${populationExtrasNote(f.population)}`);
     if (f.era) lines.push(`- era: ${f.era}`);
     if (f.looksAtAll) lines.push(`- looksAt: every figure → ${f.looksAtAll} (the reader)`);
+    const dressed = Object.entries(f.clothing || {});
+    if (dressed.length) lines.push(`- clothing: ${dressed.map(([n, c]) => `${n} → ${c}`).join('; ')} (each outfit is in the plan line: the prose dresses that figure in exactly that, top, bottom and footwear)`);
     return lines.length > 1 ? lines.join('\n') : '';
   }
   const lines = ['FIXED — code writes each into METADATA (write none of them); the prose shows each:'];
@@ -1446,6 +1448,7 @@ function fixedBlock(page) {
  *                                    `aboard` outside `aboardIds` (a structure) stays
  *   looksAt                        — { characterName: target }
    looksAtAll                     — one target for EVERY character row (a cover: `viewer`)
+   clothing                       — { characterName: category } for the character rows it lists (a cover: coverBeats.coverOutfits)
    emotions                       — { characterName | creatureId: emotion } (decideEmotions), the figures it lists
    weather, era                   — written as given (a cover's; a story page's weather stays the Art Director's)
  */
@@ -1513,6 +1516,16 @@ function pinBrief(brief, fixed) {
       if (!c || typeof c !== 'object' || c.looksAt === fixed.looksAtAll) return c;
       changes.push({ field: 'looksAt', name: c.name, from: c.looksAt ?? null, to: fixed.looksAtAll });
       return { ...c, looksAt: fixed.looksAtAll };
+    });
+  }
+  // A COVER FIGURE'S OUTFIT IS CODE'S (owner, 2026-11-01): the story's day outfit, written into the character row.
+  if (fixed.clothing && Array.isArray(m.characters)) {
+    m.characters = m.characters.map((c) => {
+      if (!c || typeof c !== 'object' || !Object.prototype.hasOwnProperty.call(fixed.clothing, c.name)) return c;
+      const to = fixed.clothing[c.name];
+      if (c.clothing === to) return c;
+      changes.push({ field: 'clothing', name: c.name, from: c.clothing ?? null, to });
+      return { ...c, clothing: to };
     });
   }
   if (fixed.looksAt && Array.isArray(m.characters)) {

@@ -22,7 +22,7 @@
 const { COVER_PAGE_NUMBERS, COVER_TEXT_POSITION } = require('./coverKeys');
 const { MAX_COVER_CHARACTERS } = require('./coverCastRoster');
 const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
-const { COVER_DAY_OUTFIT_FACT } = require('./clothingCategories');
+const { resolveCharacterReqs, standardOutfitText } = require('./clothingCategories');
 
 /**
  * The instant and the copy space of each cover, in beat words.
@@ -107,13 +107,49 @@ function coverCasts(inputData = {}) {
  */
 const COVER_COSTUME_FACT = 'each figure with a costumed outfit wears it where the place suits it (a tail in or at the water, a suit of armour in a castle) and their standard outfit where the costume does not belong';
 
-/** True when any cast member's wardrobe contract has nightwear: only then can a cover be dressed for bed. */
-function anyNightwear(names, clothingRequirements) {
-  if (!clothingRequirements || typeof clothingRequirements !== 'object') return false;
-  return names.some((n) => {
-    const req = clothingRequirements[n];
-    return !!(req && req.nightwear && req.nightwear.used);
-  });
+/**
+ * CODE DECIDES WHAT EVERY COVER FIGURE WEARS (owner, 2026-11-01; docs/decisions.md "Cover outfit decided by code").
+ * The Art Director used to pick a cover outfit from AVAILABLE CLOTHING PER CHARACTER, which lists only the categories
+ * the story's pages use: a bedtime story often had no legal cover outfit in it, so the cover came back in pyjamas or
+ * in invented clothes (staging job_1793520777470_7sgat9ene, job_1793526073039_9nhq3ju59, job_1793531935175_rhdndngoq;
+ * production job_1793542624900_w0aqtk6aj). A cover figure now wears the story's day outfit, the wardrobe's `standard`
+ * (the wardrobe step always writes one for every commissioned character, prompts/story-bible-from-beats.txt), and the
+ * Art Director only describes it.
+ *   - `fixed`: figures with no costume in the wardrobe -> 'standard'. Code pins it into the cover's METADATA.
+ *   - `open`: figures the wardrobe also costumes -> the two categories they may wear. COVER_COSTUME_FACT stays the
+ *     Art Director's rule for them (costume where the place suits it, standard where it does not); the render guard
+ *     (clothingCategories.assertCoverClothingIsDecided) holds them to the two and never to pyjamas.
+ *   - `outfits`: every figure's standard outfit text, for the plan line.
+ * A figure with no `standard` description throws: no outfit is correct, an invented one is not.
+ *
+ * @param {string[]} names - the cover's figures (commissioned characters)
+ * @param {Object|null} clothingRequirements
+ * @returns {{fixed:Object<string,string>, open:Object<string,string[]>, outfits:Object<string,string>}}
+ */
+function coverOutfits(names, clothingRequirements) {
+  const fixed = {};
+  const open = {};
+  const outfits = {};
+  const missing = [];
+  for (const name of names || []) {
+    const reqs = resolveCharacterReqs(clothingRequirements, name);
+    const text = standardOutfitText(clothingRequirements, name).replace(/\.$/, '');
+    if (!text) { missing.push(name); continue; }
+    outfits[name] = text;
+    const costumed = reqs.costumed && reqs.costumed.used ? reqs.costumed : null;
+    if (costumed) open[name] = ['standard', costumed.costume ? `costumed:${String(costumed.costume).toLowerCase()}` : 'costumed'];
+    else fixed[name] = 'standard';
+  }
+  if (missing.length) {
+    throw new Error(`coverBeats: ${missing.join(', ')} ${missing.length === 1 ? 'has' : 'have'} no standard day outfit in the wardrobe, so the cover cannot say what to dress them in — the wardrobe step must give every commissioned character one`);
+  }
+  return { fixed, open, outfits };
+}
+
+/** The plan-line fact that names the outfit of each figure code decided ("Mia wears: ..."), or null with none. */
+function coverOutfitFact({ fixed, outfits }) {
+  const names = Object.keys(fixed);
+  return names.length ? names.map(n => `${n} wears: ${outfits[n]}`).join('. ') : null;
 }
 
 /** True when any cast member's wardrobe contract uses a costumed outfit. */
@@ -165,12 +201,13 @@ function buildCoverBeats(inputData = {}, { coverTypes = ['frontCover', 'initialP
     if (!cast.length) {
       throw new Error(`coverBeats: ${coverKey} has no cast — the story has no characters`);
     }
+    const decidedOutfits = coverOutfits(cast, clothingRequirements);
     const inFrame = (coverKey === 'frontCover' && central && !cast.includes(central)) ? [...cast, central] : cast;
     const facts = [
       t.instant,
       ...(placeDecided ? [COVER_DECIDED_PLACE] : [COVER_KEY_PLACE, COVER_OWN_PLACE]),
       anyCostumed(cast, clothingRequirements) ? COVER_COSTUME_FACT : null,
-      anyNightwear(cast, clothingRequirements) ? COVER_DAY_OUTFIT_FACT : null,
+      coverOutfitFact(decidedOutfits),
       `any animal, artifact or vehicle from the Visual Bible the picture calls for, at most ${VB_ELEMENT_BUDGET}`,
       `textPosition "${COVER_TEXT_POSITION[coverKey]}"`,
     ].filter(Boolean).join('; ');
@@ -240,6 +277,8 @@ function coverIteratePath(storyData, coverKey) {
 module.exports = {
   COVER_COPY_SPACE,
   COVER_COSTUME_FACT,
+  coverOutfits,
+  coverOutfitFact,
   COVER_OWN_PLACE,
   COVER_KEY_PLACE,
   COVER_DECIDED_PLACE,

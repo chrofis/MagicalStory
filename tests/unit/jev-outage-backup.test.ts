@@ -53,6 +53,11 @@ const CHECK_REPLY = ['ROSTER 1: people=Mila, Ben', 'ROSTER 2: people=Ben', 'ROST
 const brief = (n: number) => [`## Page ${n}`, `Mila and Ben by the tree on page ${n}.`, '', '---METADATA---',
   JSON.stringify({ sceneIntent: `page ${n}`, characters: [{ name: 'Mila', looksAt: 'Ben' }, { name: 'Ben', looksAt: 'Mila' }], shot: 'medium', objects: ['LOC001'], timeOfDay: 'evening', weather: 'clear', population: 'cast_only' })].join('\n');
 const VB_REPLY = ['---VISUAL BIBLE---', '```json', JSON.stringify({ locations: [{ id: 'LOC001', name: 'the old oak', description: 'a big oak', pages: [1, 2, 3, 4] }], animals: [], secondaryCharacters: [], artifacts: [], vehicles: [], clothing: [] }), '```', ''].join('\n');
+// Every commissioned character has a standard day outfit (the covers' outfit, coverBeats.coverOutfits).
+const WARDROBE_REPLY = ['---CLOTHING REQUIREMENTS---', '```json', JSON.stringify({ clothingRequirements: {
+  Mila: { standard: { used: true, description: 'a red jacket, blue trousers and brown boots' } },
+  Ben: { standard: { used: true, description: 'a green jumper, grey trousers and black shoes' } },
+} }), '```'].join('\n');
 const AD_REPLY = [1, 2, 3, 4].map(brief).join('\n\n');
 
 async function run(jevImpl: any) {
@@ -62,7 +67,8 @@ async function run(jevImpl: any) {
     const label = opts?.usageLabel || '';
     labels.push(label);
     prompts[label] = p;
-    const text = label === 'arc_create' ? CREATE
+    const text = label === 'beats_story_bible' ? WARDROBE_REPLY
+      : label === 'arc_create' ? CREATE
       : label === 'arc_panel' ? '1. [MINOR] (s1) SENSE: fine — "Mila and Ben find a lost egg."'
         : label === 'arc_hints' ? 'ISSUE: x → CHANGE: y'
           : label === 'beats_plan' || label === 'beats_replan' ? PLAN_REPLY(/first field is always the word/.test(p) ? SV.PLAN_SHOT_PLACEHOLDER : 'medium')

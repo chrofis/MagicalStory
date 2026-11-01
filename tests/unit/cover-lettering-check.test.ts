@@ -25,6 +25,7 @@
  */
 import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
 import { createRequire } from 'node:module';
+import { dayWardrobe } from './helpers/dayWardrobe';
 
 const require_ = createRequire(import.meta.url);
 const { loadPromptTemplates } = require_('../../server/services/prompts.js');
@@ -194,7 +195,7 @@ describe('(C) no internal cover label in the plan line', () => {
   const input = { characters: [{ name: 'Child1', isMainCharacter: true }, { name: 'Child2' }] };
 
   it('no beat carries a label the Art Director could copy into sceneIntent', () => {
-    for (const b of CB.buildCoverBeats(input)) {
+    for (const b of CB.buildCoverBeats(input, { clothingRequirements: dayWardrobe(input) })) {
       expect(b.planLine).not.toMatch(/BOOK (FRONT|BACK) COVER|BOOK OPENING PAGE|story moment/i);
       expect(b.planLine.split(' — ')[0]).toBe('wide');
       expect(typeof b.coverKey).toBe('string');

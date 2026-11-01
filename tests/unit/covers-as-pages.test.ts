@@ -20,6 +20,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
+import { dayWardrobe } from './helpers/dayWardrobe';
 
 const require_ = createRequire(import.meta.url);
 const CB = require_('../../server/lib/coverBeats');
@@ -29,6 +30,9 @@ const { MODEL_DEFAULTS } = require_('../../server/config/models');
 const { VB_ELEMENT_BUDGET } = require_('../../server/lib/vbElementBudget');
 const { MAX_COVER_CHARACTERS } = require_('../../server/lib/coverCastRoster');
 
+// Every cover figure needs a standard day outfit (coverBeats.coverOutfits): the wardrobe is part of the fixture.
+const beatsFor = (input: any, o: any = {}) => CB.buildCoverBeats(input, { clothingRequirements: dayWardrobe(input), ...o });
+
 const cast = (n: number, mains: number[]) => ({
   characters: Array.from({ length: n }, (_, i) => ({ id: i + 1, name: `Child${i + 1}` })),
   mainCharacters: mains,
@@ -36,9 +40,9 @@ const cast = (n: number, mains: number[]) => ({
 
 describe('cover beats — what code knows about a cover, written as the beat', () => {
   it('one beat per requested cover, on the cover page numbers, after nothing else', () => {
-    const beats = CB.buildCoverBeats(cast(2, [1]));
+    const beats = beatsFor(cast(2, [1]));
     expect(beats.map((b: any) => [b.coverKey, b.pageNumber])).toEqual([['frontCover', -1], ['initialPage', -2], ['backCover', -3]]);
-    expect(CB.buildCoverBeats(cast(2, [1]), { coverTypes: ['frontCover'] })).toHaveLength(1);
+    expect(beatsFor(cast(2, [1]), { coverTypes: ['frontCover'] })).toHaveLength(1);
   });
   it('front = the main characters; opening and back = mains then the others, capped', () => {
     const c = CB.coverCasts(cast(8, [2, 3]));
@@ -50,7 +54,7 @@ describe('cover beats — what code knows about a cover, written as the beat', (
     expect(CB.coverCasts(cast(2, [])).frontCover).toEqual(['Child1', 'Child2']);
   });
   it('each beat is shot — cast — facts — after, and carries copy space and the element budget; the gaze lives in the FIXED block', () => {
-    for (const b of CB.buildCoverBeats(cast(2, [1]))) {
+    for (const b of beatsFor(cast(2, [1]))) {
       const parts = b.planLine.split(' — ');
       expect(parts[0]).toBe('wide');
       expect(b.planLine).not.toContain('looksAt');
@@ -60,15 +64,15 @@ describe('cover beats — what code knows about a cover, written as the beat', (
   });
   it('a costumed wardrobe contract reaches the beat; none, no costume line', () => {
     const input = cast(2, [1]);
-    const withCostume = CB.buildCoverBeats(input, { clothingRequirements: { Child1: { costumed: { used: true } } } });
-    const without = CB.buildCoverBeats(input, { clothingRequirements: { Child1: { standard: { used: true } } } });
+    const withCostume = beatsFor(input, { clothingRequirements: dayWardrobe(input, { Child1: { costumed: { used: true, costume: 'pirate' } } }) });
+    const without = beatsFor(input);
     expect(withCostume[0].planLine).toContain(CB.COVER_COSTUME_FACT);
     expect(without[0].planLine).not.toContain(CB.COVER_COSTUME_FACT);
     // a costume is worn where the place suits it, never forced on every cover (dry hillside in a tail)
     expect(withCostume[0].planLine).not.toMatch(/every figure wears their costumed/);
   });
   it('a story with no characters has no cover cast, and says so loudly', () => {
-    expect(() => CB.buildCoverBeats({ characters: [] })).toThrow(/no cast/);
+    expect(() => CB.buildCoverBeats({ characters: [] }, { clothingRequirements: {} })).toThrow(/no cast/);
   });
   it('cover page numbers map both ways', () => {
     expect(CB.isCoverPage(-2)).toBe(true);
@@ -86,23 +90,23 @@ describe('the front cover names the central figure; each cover its own place (20
   const brief = (objects: string[], chars = ['Child1']) =>
     `prose\n---METADATA---\n${JSON.stringify({ characters: chars.map(n => ({ name: n, looksAt: 'viewer' })), objects })}`;
   it('the arc central figure joins the FRONT cover cast only; its last name wins; none → the cast alone', () => {
-    const beats = CB.buildCoverBeats(cast(2, [1]), { centralFigure: ['the egg', 'Creature1'] });
+    const beats = beatsFor(cast(2, [1]), { centralFigure: ['the egg', 'Creature1'] });
     expect(beats[0].planLine).toMatch(/^wide — Child1, Creature1 — /);
     expect(beats[1].planLine).not.toContain('Creature1');
-    expect(CB.buildCoverBeats(cast(2, [1]), { centralFigure: null })[0].planLine).toMatch(/^wide — Child1 — /);
+    expect(beatsFor(cast(2, [1]), { centralFigure: null })[0].planLine).toMatch(/^wide — Child1 — /);
     for (const b of beats) expect(b.planLine).toContain(CB.COVER_OWN_PLACE);
   });
   it('a cast member named in the central figure list is the figure: a role name beside it adds no second figure', () => {
     // staging job_1791145238223_50osg2osm: "Daniel / Wilhelm Tell" (a cast member plays the title figure)
     // put "Wilhelm Tell" on the front cover beside Daniel, and a second Daniel-looking figure was drawn.
     const input = cast(2, [1, 2]);
-    expect(CB.buildCoverBeats(input, { centralFigure: ['Child2', 'Role Name'] })[0].planLine).toMatch(/^wide — Child1, Child2 — /);
-    expect(CB.buildCoverBeats(input, { centralFigure: ['Role Name', 'child2'] })[0].planLine).toMatch(/^wide — Child1, Child2 — /);
+    expect(beatsFor(input, { centralFigure: ['Child2', 'Role Name'] })[0].planLine).toMatch(/^wide — Child1, Child2 — /);
+    expect(beatsFor(input, { centralFigure: ['Role Name', 'child2'] })[0].planLine).toMatch(/^wide — Child1, Child2 — /);
     // a cast member outside the main cover cast still joins the front cover once, under their own name
-    expect(CB.buildCoverBeats(cast(2, [1]), { centralFigure: ['Child2', 'Role Name'] })[0].planLine).toMatch(/^wide — Child1, Child2 — /);
+    expect(beatsFor(cast(2, [1]), { centralFigure: ['Child2', 'Role Name'] })[0].planLine).toMatch(/^wide — Child1, Child2 — /);
   });
   it('a named figure the cover brief does not cite is cover_cast_dropped; cited is clean', () => {
-    const planLine = CB.buildCoverBeats(cast(1, [1]), { centralFigure: ['Creature1'] })[0].planLine;
+    const planLine = beatsFor(cast(1, [1]), { centralFigure: ['Creature1'] })[0].planLine;
     const bad = SBC.checkCoverCast({ pageNumber: -1, planLine }, require_('../../server/lib/sceneMetadata').extractSceneMetadata(brief(['LOC001'])), vb);
     expect(bad.map((f: any) => f.type)).toEqual(['cover_cast_dropped']);
     const ok = SBC.checkCoverCast({ pageNumber: -1, planLine }, require_('../../server/lib/sceneMetadata').extractSceneMetadata(brief(['LOC001', 'ANI001'])), vb);
