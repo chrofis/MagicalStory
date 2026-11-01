@@ -167,6 +167,12 @@ const SETTINGS = {
   // 'book_review'; production's budget stays repairMaxPasses.
   bookReviewRepairRounds: 2,
 
+  // Redraws of the front cover per book-review round when the review reads its
+  // title wrong (owner, 2026-11-01: "retry the title until right"). Each redraw
+  // is checked against the title before it reaches the review; the first one
+  // spelled right is kept. A cover still wrong after the last round stops the story.
+  bookReviewTitleRedraws: 4,
+
   // ── Verification registry auto-check ───────────────────────────────────
   // Staging only (owner, 2026-09-27). When a story completes, the server
   // judges it against tasks/verify.json (server/lib/verifyAutoCheck.js) and

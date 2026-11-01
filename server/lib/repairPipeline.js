@@ -3242,6 +3242,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       maxRepairRounds: maxRegenAttempts === 0 ? 0 : require('../config/runtime').runtime('bookReviewRepairRounds'),
       reviewBook,
       runRepairMethod,
+      title: bookTitle,
+      titleRedraws: require('../config/runtime').runtime('bookReviewTitleRedraws'),
+      verifyTitle: require('./coverTitlePaint').verifyTitleRender,
       buildRoundVersion,
       redetect: redetectVersionImage,
       nameMapFor: (img, version) => require('./repairLogic').buildPageRepairNameMap({

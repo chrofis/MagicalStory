@@ -462,4 +462,4 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   }
 }
 
-module.exports = { paintCoverTitle, PLATE_PROMPT, titleEvalCropRect };
+module.exports = { paintCoverTitle, PLATE_PROMPT, titleEvalCropRect, verifyTitleRender };

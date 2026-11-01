@@ -257,6 +257,9 @@ function groupFaultsByPage(imgFaults) {
  * @param {number} d.maxRepairRounds               0 = review only
  * @param {(shown:Map, previous:Map)=>Promise<object|null>} d.reviewBook one auditStoryBook call; null = failed
  * @param {(a:object)=>Promise<object>} d.runRepairMethod  repairPipeline.runRepairMethod
+ * @param {string} d.title                          the book title (the front cover's lettering)
+ * @param {number} d.titleRedraws                   redraws per round for a cover whose title is wrong
+ * @param {(img:string,title:string)=>Promise<{matches:boolean,problem:string}>} d.verifyTitle  coverTitlePaint.verifyTitleRender
  * @param {(r:object, p:object)=>object} d.buildRoundVersion
  * @param {(r:object, label:string)=>Promise<object>} d.redetect  fresh detection for a repaired image
  * @param {(img:object, version:object)=>object|null} d.nameMapFor repairLogic.buildRepairNameMap for the page
@@ -344,13 +347,16 @@ async function runBookReviewRounds(d) {
       const versions = d.pageVersions.get(img.pageNumber) || [];
       const best = d.selectBestVersion(versions);
       if (!best?.reviewFaults?.length) continue;
-      const choice = chooseMethod(best.reviewFaults);
+      const choice = hasTitleFault(img.pageNumber, best.reviewFaults)
+        ? { method: 'title-redraw', faults: best.reviewFaults.filter(f => f.route), charName: null, issueTypes: [], unroutable: best.reviewFaults.filter(f => !f.route), reason: 'the cover title is spelled wrong' }
+        : chooseMethod(best.reviewFaults);
       for (const u of choice.unroutable) {
         log.error(`❌ [BOOK-REVIEW] Round ${round} p${img.pageNumber}: the fault carries no fix route and is NOT repaired (no fallback router) — ${u.line}`);
       }
       if (!choice.method) continue;
       const failedBefore = (best.failedRepairs || []).some(f => f.method === choice.method);
-      if (failedBefore) {
+      // A wrong title is redrawn again every round (owner: "until right"); the end-of-review stop catches the rest.
+      if (failedBefore && choice.method !== 'title-redraw') {
         log.warn(`📖 [BOOK-REVIEW] Round ${round} p${img.pageNumber}: ${choice.method} already tried on this very picture and not kept — not repeated`);
         continue;
       }
@@ -386,7 +392,7 @@ async function runBookReviewRounds(d) {
         if (choice.method === 'inpaint') {
           const plan = buildTouchupPlan(choice.faults, d.nameMapFor(img, best));
           latestEval = { fixableIssues: buildFixableIssues(choice.faults), consolidatedPlan: plan, reasoning: 'book review touch-up', pageNumber };
-        } else if (choice.method === 'iterate') {
+        } else if (choice.method === 'iterate' || choice.method === 'title-redraw') {
           latestEval = { fixableIssues: buildFixableIssues(choice.faults), consolidatedPlan: null, reasoning: 'book review: draw the picture again', pageNumber };
         } else {
           latestEval = best.evaluation || null;
@@ -394,6 +400,12 @@ async function runBookReviewRounds(d) {
         const decision = choice.method === 'char-fix'
           ? { charName: choice.charName, issueTypes: choice.issueTypes, severity: choice.faults.map(severityOf).sort((a, b) => sevRank(b) - sevRank(a))[0].toUpperCase() }
           : { reason: choice.reason };
+        if (choice.method === 'title-redraw') {
+          return await redrawTitle({
+            img, latestEval, round, failed, title: d.title, attempts: d.titleRedraws,
+            runRepairMethod: d.runRepairMethod, verifyTitle: d.verifyTitle,
+          });
+        }
         const result = await d.runRepairMethod({ img, method: choice.method, latestEval, decision, round, recolourInput: null, failed });
         if (result && choice.method === 'inpaint') result.reviewPlan = latestEval.consolidatedPlan;
         return result;
@@ -483,7 +495,45 @@ async function runBookReviewRounds(d) {
   }
 
   if (auditRecords.length) auditRecords[auditRecords.length - 1].finalRound = true;
+  // No book ships with a wrong title (owner, 2026-11-01): the review still reads the picked front cover's title wrong.
+  const front = pagesWithImage.some(i => i.pageNumber === -1) ? d.selectBestVersion(d.pageVersions.get(-1) || []) : null;
+  if (!reviewFailure && front && hasTitleFault(-1, front.reviewFaults)) {
+    const fault = front.reviewFaults.find(f => String(f.type || '').toLowerCase() === 'required_text');
+    throw new Error(`[BOOK-REVIEW] The front cover's title is still wrong after every repair round — the story is stopped, no book ships with a wrong title: ${fault.detail || fault.line || ''}`);
+  }
   return { auditRecords, repairRounds, reviewFailed: false, reviewFailure };
+}
+
+/** True when the review reads the front cover's title wrong (book-review-rules.txt: required_text on p-1). */
+function hasTitleFault(pageNumber, faults) {
+  return pageNumber === -1 && (faults || []).some(f => f && String(f.type || '').toLowerCase() === 'required_text');
+}
+
+/**
+ * THE TITLE REDRAW (owner, 2026-11-01: "retry the title until right"). A front cover whose title the review reads
+ * wrong is drawn again up to `attempts` times, each redraw checked against the title (verifyTitleRender, a
+ * comparison call), and the first one spelled right goes to the re-review. Staging job_1793526073039_9nhq3ju59 shipped
+ * "répétaire": its one redraw garbled the title again, the review kept the original, and round 2 never retried.
+ * @returns {Promise<object>} the redraw result, or failed(...) when no redraw was spelled right
+ */
+async function redrawTitle({ img, latestEval, round, failed, title, attempts, runRepairMethod, verifyTitle }) {
+  const problems = [];
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const result = await runRepairMethod({ img, method: 'iterate', latestEval, decision: { reason: 'the cover title is spelled wrong' }, round, recolourInput: null, failed });
+    if (!result?.imageData) { problems.push(`redraw ${attempt}: ${result?.error || 'no picture'}`); continue; }
+    let verdict;
+    try { verdict = await verifyTitle(result.imageData, title); } catch (err) {
+      problems.push(`redraw ${attempt}: the title check failed (${err.message})`);
+      continue;
+    }
+    if (verdict.matches) {
+      log.info(`🔤 [BOOK-REVIEW] Round ${round}: front cover redraw ${attempt} of ${attempts} spells the title right`);
+      return { ...result, titleRedraws: attempt };
+    }
+    problems.push(`redraw ${attempt}: ${verdict.problem || 'title wrong'}`);
+    log.warn(`🔤 [BOOK-REVIEW] Round ${round}: front cover redraw ${attempt} of ${attempts} still has the title wrong — ${verdict.problem}`);
+  }
+  return failed(`the title was wrong in all ${attempts} redraws: ${problems.join('; ')}`, { method: 'title-redraw' });
 }
 
 /** 'inpaint-round-2' -> 'inpaint' (a version's source names the method that made it). */
@@ -509,4 +559,6 @@ module.exports = {
   groupFaultsByPage,
   runBookReviewRounds,
   methodOfSource,
+  hasTitleFault,
+  redrawTitle,
 };
