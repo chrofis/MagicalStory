@@ -994,3 +994,10 @@ Owner asked to interleave the EXISTING avatar views on the waiting screen. I als
 
 ## 2026-10-12 — A test costs about CHF 1, not 30
 Recommended a 20-story arc+plan replay (~$25, cap $30) to validate one prompt change. Owner: "we will not spend 30.- on one test!! Your normal budget should be 1.-". Rule: design every test to fit ~CHF 1 (free code replays over stored data, agent stand-ins, the single cheapest stage, fewer cases); an expensive option is never the recommended one, and asking for more needs a concrete reason why 1.- cannot answer the question.
+
+## 2026-10-27 — book layout
+- I turned a one-line product rule into two equal options and a free format choice, then tested the wrong format and showed the owner a broken book. Rule: restate the owner's product rule back in one paragraph BEFORE building, test the exact format the product prints, and never ask a question whose answer follows from the rule.
+
+## 2026-11-01 — A report page that shows zero needs its own count check before it is shown
+Showed the owner an Opus-vs-old-judges page with every Opus column at 0 although Opus wrote 22 faults: the page-matching regex was built inside a template literal (`new RegExp(\`\]:\s*p${n}\b\`)`), which strips the backslashes, so nothing matched. The totals line counted the raw lines and said 9/6/7, contradicting the columns, and I did not notice.
+Rule: before opening any generated report, assert that the per-item counts add up to the total (here: rendered findings == raw FAULT lines). Build regexes as literals, never inside template strings.
