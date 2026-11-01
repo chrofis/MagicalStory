@@ -2423,3 +2423,5 @@ three below are prompt/classification questions and are the owner's call.
 - [ ] Cover outfit decided by code (owner 2026-11-01; root cause of runs 5–7 and production job_1793542624900_w0aqtk6aj) → tasks/cover-outfit-code-decided-2026-11-01.md:1
 - [ ] sceneMetadata parser turns an unknown clothing word into 'standard' (forbidden fallback) → tasks/cover-outfit-code-decided-2026-11-01.md:45
 - [ ] Production job_1793545525778_vccdez10p stuck at 5% for 12 min, customer cancelled; cause unknown (logs rolled) → tasks/cover-outfit-code-decided-2026-11-01.md:47
+- [ ] Production page inventory model qwen3-vl (Qwen3 VL 32B) deprecated by OpenRouter on 2026-10-09: every call 404s and falls back to gemini-2.5-flash (prod log 2026-11-01). Pick the replacement (owner) → server/config/runtime.js:203
+- [ ] Production [STYLED-AVATAR] CACHE MISS for 3 standard_realistic avatars (#1793522060597, #1793524024937, #1793526286145) on a customer's realistic story, "quality will degrade" (prod log 2026-11-01) → server/lib/styledAvatars.js:1
