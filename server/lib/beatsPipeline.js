@@ -2204,7 +2204,7 @@ ${bibleBody}` : bibleBody;
     visualBibleReplies: vbReplies,
     replies: adReplies,
   };
-  gl.info('beats_scenes', `${expansions.length} scene briefs by ${sceneModel} (bible ${(vbMs / 1000).toFixed(1)}s + briefs ${(briefsMs / 1000).toFixed(1)}s)${missingBriefs.length ? ` (+${missingBriefs.length} per-page fallback)` : ''}`, null, {
+  gl.info('beats_scenes', `${expansions.length} scene briefs by ${[...new Set(expansions.map(e => e.modelId).filter(Boolean))].join(' + ') || briefsModel} (bible ${(vbMs / 1000).toFixed(1)}s + briefs ${(briefsMs / 1000).toFixed(1)}s)${missingBriefs.length ? ` (+${missingBriefs.length} per-page fallback)` : ''}`, null, {
     pages: expansions.length, fallbackPages: missingBriefs.map(b => b.pageNumber), model: sceneModel,
   });
 
