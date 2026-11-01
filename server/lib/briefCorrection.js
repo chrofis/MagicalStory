@@ -201,7 +201,7 @@ async function correctFindings({
       reason: `refused: the correction came back unusable${out?.reason ? ` (${out.reason})` : ''}`,
     };
   }
-  const after = recheck(out.text) || [];
+  const after = (await recheck(out.text)) || [];
   const verdict = judgeCorrection({ before, after, acceptance });
   log[verdict.accepted ? 'info' : 'warn'](
     `${verdict.accepted ? '🔄' : '⚠️'} [BRIEF-FIX] ${label}: ${verdict.reason}`,

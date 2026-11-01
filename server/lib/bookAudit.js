@@ -432,7 +432,9 @@ function reviewRulesText(review, templates, fillTemplate) {
   if (!title) throw new Error('book review needs the book title');
   const rereview = review.hasRepairedPages ? templates.bookReviewRereview : '';
   if (review.hasRepairedPages && !rereview) throw new Error('bookReviewRereview template not loaded');
-  return fillTemplate(rules, { BOOK_TITLE: title, RE_REVIEW_RULES: rereview || '' });
+  // The cover outfit sentence is the one the cover plan lines carry (coverBeats): generator and critic read one text.
+  const { COVER_DAY_OUTFIT_FACT } = require('./clothingCategories');
+  return fillTemplate(rules, { BOOK_TITLE: title, RE_REVIEW_RULES: rereview || '', COVER_DAY_OUTFIT_FACT });
 }
 
 /** The native-Google call. Same body production has always sent. */
@@ -873,4 +875,5 @@ module.exports = {
   collectObjectScale,
   askObjectScale,
   MAX_PAGES_PER_CALL,
+  reviewRulesText,
 };

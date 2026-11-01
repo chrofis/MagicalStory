@@ -113,6 +113,49 @@ const REASK_CLOTHING_EXTRA = new Set(['outfit_missing']);
  */
 const COVER_ONLY_TYPES = new Set(['cover_cast_dropped', 'cover_location_repeated', 'cover_text_zone_mismatch']);
 
+/**
+ * THE COVER OUTFIT CHECK (owner, 2026-11-01, "check text"). A cover's clothing LABEL can say the day outfit while its
+ * prose dresses the figure for bed (staging job_1793526073039_9nhq3ju59: "red long-sleeve cotton top and matching red
+ * bottoms ... wool socks" under a standard label, drawn as a bodysuit with bare legs outdoors). The prose is what the
+ * image model reads, so Jev (decideOutfitsStated, the check the image prompt only logs) decides whether it dresses each
+ * figure in the outfit its label names; a "no" is a `cover_outfit_not_stated` finding for the one re-ask, carrying
+ * the outfit text and the cover sentence. Async, so runBriefChecks computes it and hands it in through
+ * `ctx.coverOutfitFindings`. A failed Jev call leaves that cover unchecked and is logged as an error.
+ */
+async function coverOutfitFindings(expansions, ctx, gl) {
+  const { coverKeyOfPage } = require('./coverBeats');
+  const { extractSceneMetadata, splitBrief } = require('./sceneMetadata');
+  const { resolveSceneClothingDescriptions } = require('./clothingResolve');
+  const { decideOutfitsStated } = require('./jevDecisions');
+  const { COVER_DAY_OUTFIT_FACT } = require('./clothingCategories');
+  const out = [];
+  for (const x of expansions) {
+    if (!coverKeyOfPage(x.pageNumber)) continue;
+    const characterClothing = (extractSceneMetadata(x.brief) || {}).characterClothing || {};
+    const outfits = resolveSceneClothingDescriptions({
+      characterClothing, clothingRequirements: ctx.clothingRequirements, characters: ctx.inputData.characters || [], artStyle: ctx.inputData.artStyle,
+    });
+    const figures = Object.entries(outfits).map(([name, outfit]) => ({ name, outfit }));
+    if (!figures.length) continue;
+    let missing;
+    try {
+      ({ missing } = await decideOutfitsStated({ prose: splitBrief(x.brief).prose, figures }));
+    } catch (err) {
+      if (gl) gl.error('beats_cover_outfit_check_failed', `Page ${x.pageNumber}: the cover outfit check failed (${err.message}) — this cover is not checked`, null, { pageNumber: x.pageNumber });
+      continue;
+    }
+    for (const name of missing) {
+      out.push({
+        pageNumber: x.pageNumber,
+        type: 'cover_outfit_not_stated',
+        character: name,
+        detail: `The prose does not dress ${name} in the outfit this cover gives them. On a cover ${COVER_DAY_OUTFIT_FACT}. ${name} wears: ${String(outfits[name]).trim()} Describe exactly that outfit for ${name} in the prose.`,
+      });
+    }
+  }
+  return out;
+}
+
 /** The cast the brief check counts: the commissioned characters and the bible's secondaries, once each. */
 function briefCastNames(inputData, visualBible) {
   const secondaryList = Array.isArray(visualBible?.secondaryCharacters)
@@ -199,6 +242,8 @@ function collectBriefFindings(expansions, ctx) {
       }, ctx.clothingRequirements),
     );
   }
+  // A cover whose prose does not dress a figure in its outfit (Jev, computed by runBriefChecks).
+  for (const f of (ctx.coverOutfitFindings || [])) if (expansions.some(x => x.pageNumber === f.pageNumber)) findings.push(f);
   // A cover dressed for bed (owner, 2026-11-01): sent back once with the cover's day-outfit sentence.
   const { coverNightwearFindings } = require('./clothingCategories');
   const { coverKeyOfPage } = require('./coverBeats');
@@ -325,7 +370,7 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
   const commissioned = (inputData.characters || []).map(c => c && c.name).filter(Boolean);
   const briefsIn = expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
 
-  const before = collectBriefFindings(expansions, ctx);
+  const before = collectBriefFindings(expansions, { ...ctx, coverOutfitFindings: await coverOutfitFindings(expansions, ctx, gl) });
   for (const f of before.withheld) {
     gl.warn('beats_jev_field_vs_brief', `Page ${f.pageNumber}: ${f.type} on a page whose field the decision layer owns — ${String(f.detail || '').split('. ')[0]}`, null, { pageNumber: f.pageNumber, finding: f });
   }
@@ -414,8 +459,11 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
       if (fixed) candidate = pinBrief(candidate, fixed).brief;
       candidate = require('./jevBriefFields').dropAbsentWearerCites(candidate, visualBible, n, 'brief re-ask');
       const guard = assessSceneBrief(candidate);
-      const recheck = (text) => collectBriefFindings(expansions.map(e => (e.pageNumber === n ? { pageNumber: n, brief: text } : e)), ctx)
-        .findings.filter(f => f.pageNumber === n);
+      const recheck = async (text) => {
+        const swapped = expansions.map(e => (e.pageNumber === n ? { pageNumber: n, brief: text } : e));
+        const fresh = await coverOutfitFindings(swapped.filter(e => e.pageNumber === n), ctx, gl);
+        return collectBriefFindings(swapped, { ...ctx, coverOutfitFindings: fresh }).findings.filter(f => f.pageNumber === n);
+      };
       // A contract violation (the payload does not carry the brief it corrects)
       // stops this page's correction, loudly — never the story.
       let verdict;
@@ -446,7 +494,7 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
     }
   }
 
-  const after = collectBriefFindings(expansions, ctx);
+  const after = collectBriefFindings(expansions, { ...ctx, coverOutfitFindings: await coverOutfitFindings(expansions, ctx, gl) });
   const parts = partitionFindings(before.findings, after.findings);
   report.findingsAfter = after.findings;
   report.introduced = parts.introduced;
@@ -470,6 +518,7 @@ module.exports = {
   JEV_OWNED,
   REASK_CLOTHING_EXTRA,
   COVER_ONLY_TYPES,
+  coverOutfitFindings,
   keepDeclaredWornRows,
   keepDeclaredLight,
   briefCastNames,
