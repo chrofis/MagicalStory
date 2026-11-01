@@ -4560,7 +4560,9 @@
       "reportedAt": "2026-11-01",
       "source": "Production story job_1793561351885_kkg5gxkbj (2026-11-01, invented mermaid Nerina = visualBible secondaryCharacters CHR001, pages cover/8/13/24): she looks different on every image (toddler in Ludovica's shirt on the cover, adult on p8, shirt on p13, correct only on p24). p8 prompt: \"the small waist-high figure of Nerina ... bare shoulders\" with no age; AGE & PROPORTIONS lists only the photo characters.",
       "rootCause": "server/lib/promptBuilders.js:4883 `const secondaryCast = isProseFormat ? [] : collectSecondaryCastForPage(...)`, so secondaryAgeCues (line ~4966) and the CAST WITHOUT A REFERENCE IMAGE block (~5023) get an empty list on every prose+METADATA brief (all current pages).",
-      "status": "open"
+      "status": "fixed",
+    "fixedIn": "bd575cae2",
+    "fix": "promptBuilders.js: the invented cast is collected for prose briefs too (the CAST block stays JSON-only; the age cue now reaches AGE & PROPORTIONS) and collectSecondaryCastForPage reads bible ids from objects[]. Replay over 462 stored pages: 50 gain the cue, 322 clean pages byte-identical."
     },
     {
       "id": "secondary-clothing-ignores-child-top-rule",
@@ -4568,7 +4570,9 @@
       "reportedAt": "2026-11-01",
       "source": "Production story job_1793561351885_kkg5gxkbj (2026-11-01, invented mermaid Nerina = visualBible secondaryCharacters CHR001, pages cover/8/13/24): she looks different on every image (toddler in Ludovica's shirt on the cover, adult on p8, shirt on p13, correct only on p24). Front cover: first brief \"bare shoulders above her violet scaled mermaid tail\" -> evaluator child_torso_uncovered CRITICAL -> repair \"a purple long-sleeve cotton swim shirt ... matching Ludovica's outfit\" -> shipped at 85.",
       "rootCause": "Generator-vs-critic gap: CHILD_TOP_DEF (server/lib/promptBuilders.js:12758) is filled only into story-bible-from-beats.txt and clothing-review.txt; prompts/visual-bible.txt:142 (secondary clothing field) never sees it, while prompts/image-evaluation.txt:139 deducts for it.",
-      "status": "open"
+      "status": "fixed",
+    "fixedIn": "bd575cae2",
+    "fix": "CHILD_TOP_DEF is filled into visual-bible.txt and story-trial-arc.txt; sibling set vb-secondary-clothing-vs-image-eval registered."
     }
   ]
 }
