@@ -43,7 +43,7 @@ Director picks pyjamas or invents clothes, and guards added afterwards catch it:
 - [x] 7. Tests (rewrite cover-day-outfit, cover-outfit-stated, nightwear-category, covers-as-pages;
       new: decider, pin, wardrobe rule), docs/decisions.md entry superseding the two 2026-11-01
       cover entries, verify.json entry, sibling registry.
-- [~] 8. (8a done 2026-11-01: replay over 60 stored staging stories, 23 lack a standard day outfit for a cover figure; 8b wardrobe prompt on stored bedtime stories not run, paid cap was $0) Validate on stored data: replay the decider + pin over stored stories' covers (free);
+- [x] 8. (8b done 2026-11-01, Lab #1791: 16 stored stories, characters without a day outfit 18/60 before, 0/60 after, none with pyjama parts; 8a done 2026-11-01: replay over 60 stored staging stories, 23 lack a standard day outfit for a cover figure; 8b wardrobe prompt on stored bedtime stories not run, paid cap was $0) Validate on stored data: replay the decider + pin over stored stories' covers (free);
       the wardrobe prompt change on stored bedtime stories (agent-as-model or a capped paid replay).
 - [ ] 9. Staging story run, then ask the owner before any production push.
 
