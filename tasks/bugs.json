@@ -4552,7 +4552,9 @@
       "reportedAt": "2026-11-01",
       "source": "Production story job_1793561351885_kkg5gxkbj (2026-11-01, invented mermaid Nerina = visualBible secondaryCharacters CHR001, pages cover/8/13/24): she looks different on every image (toddler in Ludovica's shirt on the cover, adult on p8, shirt on p13, correct only on p24). referenceSheetBatches holds batches 1-3 only (character batch 0 missing); CHR001 has no referenceImageUrl; page grids p8/p24 hold only the leaf/shell. Likely trigger (inferred, prod log no longer reaches 21:13 CH): Grok content-moderated on \"2-year-old, no garment, bare shoulders\", Gemini fallback returned nothing.",
       "rootCause": "server/lib/referenceSheets.js:1584 catch counts the batch as failed and only logs; storyJobPipeline.js:3941 reads refResult.generated but never refResult.failed. Violates the no-fallbacks rule and the 2026-07-26 every-secondary-gets-a-reference decision.",
-      "status": "open"
+      "status": "fixed",
+      "fixedIn": "2947239a9",
+      "fix": "referenceSheets.js: a batch that throws re-renders each element solo once; assertReferenceSheetComplete (called at the one trial+full join in storyJobPipeline.js) fails the job with MissingReferenceSheetError and the error event vb_sheet_no_reference_fatal when a page-bound element still has no reference; a rejected promise becomes fatalError, not zeros. See docs/decisions.md 2026-11-01."
     },
     {
       "id": "secondary-age-cue-dropped-prose-briefs",
