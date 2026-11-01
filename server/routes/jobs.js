@@ -26,6 +26,8 @@ const { normalizeCharacterName } = require('../lib/characterName');
 const guards = require('../lib/requestGuards');
 const { CHARACTERS_MAX, TOO_MANY_CHARACTERS } = guards;
 const { settleJobWithRefund, JOB_SAVING_PROGRESS } = require('../lib/jobCredits');
+const { runtime } = require('../config/runtime');
+const { resolveLiveActiveJobs, isAtActiveStoryLimit, activeStoryLimitBody, checkActiveCapInTransaction } = require('../lib/activeStoryJobs');
 
 function getDbPool() { return getPool(); }
 
@@ -293,72 +295,13 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
       }
     }
 
-    // Check if user already has a story generation in progress
+    // Up to runtime('maxActiveStoryJobsPerUser') stories in the making per account
+    // (owner 2026-11-01). Stale ones are failed+refunded and do not count.
     if (STORAGE_MODE === 'database') {
-      const activeJobResult = await getDbPool().query(
-        `SELECT id, status, created_at, updated_at, progress FROM story_jobs
-         WHERE user_id = $1 AND status IN ('pending', 'processing')
-         ORDER BY created_at DESC LIMIT 1`,
-        [userId]
-      );
-
-      if (activeJobResult.rows.length > 0) {
-        const activeJob = activeJobResult.rows[0];
-        const jobAgeMinutes = (Date.now() - new Date(activeJob.created_at).getTime()) / (1000 * 60);
-        const minutesSinceUpdate = activeJob.updated_at
-          ? (Date.now() - new Date(activeJob.updated_at).getTime()) / (1000 * 60)
-          : jobAgeMinutes;
-
-        // Two detectors (owner ruling 2026-09-04, evidence job_1788551692337_bc479p945):
-        // 1. Heartbeat staleness (10 min) — the REAL stall detector. The worker
-        //    arms a WHOLE-JOB 60s heartbeat for the lifetime of the job
-        //    (startJobHeartbeat, server/lib/jobHeartbeat.js), so a dead or
-        //    wedged process goes stale within minutes of dying while no live
-        //    phase can ever be outside the heartbeat. Phase-local timers used
-        //    to be the only writers and every silent phase between them killed
-        //    healthy runs.
-        // 2. Total age (180 min) — runaway BACKSTOP only. The old 60-min cap
-        //    predated the beats pipeline and killed a healthy 18-page run at 89%;
-        //    a legitimate run must never hit this, only a job that heartbeats
-        //    forever without finishing.
-        const TOTAL_TIMEOUT_MINUTES = 180;
-        const HEARTBEAT_TIMEOUT_MINUTES = 10;
-
-        const isStale = jobAgeMinutes > TOTAL_TIMEOUT_MINUTES ||
-          minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES;
-
-        if (isStale) {
-          const reason = minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES ? 'no progress' : 'timeout';
-          log.info(`🧹 Auto-cancelling stale job ${activeJob.id} (${reason}, age: ${Math.round(jobAgeMinutes)}min, last update: ${Math.round(minutesSinceUpdate)}min ago)`);
-
-          // Fail + refund in one transaction (settleJobWithRefund): the refund and the
-          // status flip commit together, and a job that finished meanwhile is untouched.
-          // Mark as failed with appropriate message based on failure reason
-          const errorMessage = minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES
-            ? `Job stopped responding (no progress for ${Math.round(minutesSinceUpdate)} minutes)`
-            : `Job timed out after ${Math.round(jobAgeMinutes)} minutes`;
-          try {
-            const settled = await settleJobWithRefund(getDbPool(), activeJob.id, {
-              status: 'failed',
-              errorMessage,
-              statusIn: ['pending', 'processing'],
-              describe: ({ progress }) => `Auto-refund: stale job timed out after ${Math.round(jobAgeMinutes)} min (progress: ${progress}%)`,
-            });
-            if (settled.refunded > 0) log.info(`💳 Auto-refunded ${settled.refunded} credits for stale job ${activeJob.id}`);
-          } catch (refundErr) {
-            log.error(`❌ Failed to fail/refund stale job ${activeJob.id}:`, refundErr.message);
-          }
-          // Continue with creating new job
-        } else {
-          log.warn(`User ${req.user.username} already has active job ${activeJob.id} (status: ${activeJob.status}, age: ${Math.round(jobAgeMinutes)} min)`);
-          return res.status(409).json({
-            error: 'Story generation already in progress',
-            activeJobId: activeJob.id,
-            activeJobStatus: activeJob.status,
-            jobAgeMinutes: Math.round(jobAgeMinutes),
-            message: 'Please wait for your current story to finish before starting a new one.'
-          });
-        }
+      const { live } = await resolveLiveActiveJobs(getDbPool(), userId, { log });
+      if (isAtActiveStoryLimit(live.length)) {
+        log.warn(`User ${req.user.username} already has ${live.length} active jobs (${live.map(j => j.id).join(', ')})`);
+        return res.status(409).json(activeStoryLimitBody(live.map(j => j.id), runtime('maxActiveStoryJobsPerUser')));
       }
     }
 
@@ -428,21 +371,18 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
         `story_jobs.input_data/${jobId}`, inputData);
 
       let insufficientRace = false;
-      let activeJobRace = null;
+      let activeJobRace = null; // set when the in-transaction count is at the cap
       try {
         await withTransaction(async (txClient) => {
-          // One-job-at-a-time, atomically (review 2026-10-04 R3): the SELECT above and
-          // this INSERT were separate statements, so two requests with different
-          // idempotency keys both passed. A per-user advisory lock serialises them and
-          // the re-check below sees the winner's committed row. (A partial unique index
+          // Active-job cap, atomically (review 2026-10-04 R3; cap raised from 1 to
+          // runtime('maxActiveStoryJobsPerUser') on 2026-11-01): the SELECT above and
+          // this INSERT were separate statements, so concurrent requests with different
+          // idempotency keys all passed. A per-user advisory lock serialises them and
+          // the COUNT re-check sees the winners' committed rows. (A partial unique index
           // was rejected: admin reruns legitimately run several jobs on one account.)
-          await txClient.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`story_job_create:${userId}`]);
-          const raced = await txClient.query(
-            `SELECT id, status FROM story_jobs WHERE user_id = $1 AND status IN ('pending', 'processing') LIMIT 1`,
-            [userId]
-          );
-          if (raced.rows.length > 0) {
-            activeJobRace = raced.rows[0];
+          const cap = await checkActiveCapInTransaction(txClient, userId);
+          if (cap.atLimit) {
+            activeJobRace = cap.activeJobIds;
             throw new Error('ACTIVE_JOB_RACE');
           }
           if (userCredits !== -1 && req.user.role !== 'admin' && !isAdminDraft) {
@@ -472,13 +412,8 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
         });
       } catch (txErr) {
         if (activeJobRace) {
-          log.warn(`User ${req.user.username} raced a second create-story past the active-job check (active: ${activeJobRace.id})`);
-          return res.status(409).json({
-            error: 'Story generation already in progress',
-            activeJobId: activeJobRace.id,
-            activeJobStatus: activeJobRace.status,
-            message: 'Please wait for your current story to finish before starting a new one.'
-          });
+          log.warn(`User ${req.user.username} raced a create-story past the active-job check (active: ${activeJobRace.join(', ')})`);
+          return res.status(409).json(activeStoryLimitBody(activeJobRace, runtime('maxActiveStoryJobsPerUser')));
         }
         if (insufficientRace) {
           return res.status(402).json({
@@ -788,6 +723,9 @@ router.get('/my-jobs', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 100);
+    // ?active=1: only pending/processing jobs, so a running story is never pushed
+    // out of the page by newer finished jobs (several stories can run at once).
+    const onlyActive = req.query.active === '1';
 
     if (STORAGE_MODE === 'database') {
       const pool = getDbPool();
@@ -827,9 +765,10 @@ router.get('/my-jobs', authenticateToken, async (req, res) => {
         `SELECT id, status, progress, progress_message, created_at, completed_at
          FROM story_jobs
          WHERE user_id = $1
+           AND ($3::boolean = false OR status IN ('pending', 'processing'))
          ORDER BY created_at DESC
          LIMIT $2`,
-        [userId, limit]
+        [userId, limit, onlyActive]
       );
 
       res.json({ jobs: result.rows });

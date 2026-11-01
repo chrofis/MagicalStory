@@ -56,15 +56,12 @@ class ApiClient {
         else if (details.error) errorMessage += `: ${details.error}`;
         else if (typeof details === 'string') errorMessage += `: ${details}`;
       }
-      // Include activeJobId for 409 conflicts (job already in progress)
-      if (errorData.activeJobId) {
-        errorMessage += `|ACTIVE_JOB:${errorData.activeJobId}`;
-      }
       // Create error with additional fields preserved (e.g., retryAfter for rate limiting)
-      const error = new Error(errorMessage) as Error & { retryAfter?: number; code?: string; status?: number };
+      const error = new Error(errorMessage) as Error & { retryAfter?: number; code?: string; status?: number; maxActive?: number };
       error.status = response.status; // lets callers map 429 etc. to a localised message
       if (errorData.retryAfter) error.retryAfter = errorData.retryAfter;
       if (errorData.code) error.code = errorData.code;
+      if (typeof errorData.maxActive === 'number') error.maxActive = errorData.maxActive; // 409 ACTIVE_STORY_LIMIT
       throw error;
     }
 

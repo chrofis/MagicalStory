@@ -4558,35 +4558,18 @@ export default function StoryWizard() {
         return;
       }
 
-      // Check for "already in progress" error (409)
-      if (errorMessage.includes('already in progress')) {
-        // Extract the active job ID if present (format: job_<timestamp>_<random>)
-        const jobIdMatch = errorMessage.match(/\|ACTIVE_JOB:(job_[a-z0-9_]+)/i);
-        const activeJobId = jobIdMatch ? jobIdMatch[1] : null;
-
-        const cancelMessage = language === 'de'
-          ? 'Eine Geschichte wird bereits erstellt. Möchtest du diese abbrechen und eine neue starten?'
+      // Too many stories in the making (409 ACTIVE_STORY_LIMIT, owner 2026-11-01).
+      // The old "cancel the running one?" offer is gone: starting a story must never
+      // destroy a running one. Nothing is started; the user waits for one to finish.
+      if ((error as { code?: string }).code === 'ACTIVE_STORY_LIMIT') {
+        const maxActive = (error as { maxActive?: number }).maxActive;
+        const n = typeof maxActive === 'number' ? maxActive : 3;
+        showError(language === 'de'
+          ? `Du hast bereits ${n} Geschichten in Arbeit. Bitte warte, bis eine fertig ist, bevor du eine weitere startest.`
           : language === 'fr'
-          ? 'Une histoire est déjà en cours de création. Voulez-vous l\'annuler et en commencer une nouvelle ?'
-          : language === 'it' ? 'Una storia è già in creazione. Vuoi annullarla e avviarne una nuova?' : 'A story is already being generated. Would you like to cancel it and start a new one?';
-
-        if (activeJobId && window.confirm(cancelMessage)) {
-          try {
-            await storyService.cancelJob(activeJobId);
-            log.info('Cancelled existing job:', activeJobId);
-            // Retry the generation - await to prevent finally from resetting state
-            await generateStory(overrides);
-            return;
-          } catch (cancelError) {
-            log.error('Failed to cancel existing job:', cancelError);
-            showError(language === 'de'
-              ? 'Abbrechen fehlgeschlagen. Bitte versuche es später erneut.'
-              : language === 'fr'
-              ? 'Échec de l\'annulation. Veuillez réessayer plus tard.'
-              : language === 'it' ? 'Annullamento non riuscito. Riprova più tardi.' : 'Failed to cancel. Please try again later.');
-          }
-        }
-        // User chose not to cancel - reset generating state
+          ? `Vous avez déjà ${n} histoires en cours de création. Veuillez attendre qu'une soit terminée avant d'en commencer une autre.`
+          : language === 'it' ? `Hai già ${n} storie in creazione. Attendi che una sia finita prima di iniziarne un'altra.`
+          : `You already have ${n} stories being made. Please wait until one finishes before starting another.`);
         setIsGenerating(false);
         return;
       } else {

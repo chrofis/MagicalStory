@@ -201,6 +201,14 @@ const SETTINGS = {
   // OpenRouter throw, timeout or non-2xx STAYS (evalPipeline.js:112-133) — it
   // is a provider-failure path, not a second implementation.
   inventoryModel: 'qwen3-vl',
+
+  // ── Stories in the making per account ──────────────────────────────────
+  // Up to 3 stories (status pending/processing) per account at once (owner,
+  // 2026-11-01, docs/decisions.md). The old rule was one; it forced a paying
+  // customer to cancel two running stories to start new ones. Each story
+  // reserves its own credits in the create transaction, so cost safety is
+  // unchanged. The 4th create-story is refused with 409 ACTIVE_STORY_LIMIT.
+  maxActiveStoryJobsPerUser: 3,
 };
 
 /**

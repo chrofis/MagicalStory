@@ -280,7 +280,21 @@ export default function MyStories() {
   const [totalStories, setTotalStories] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const loadAttemptedRef = useRef(false);
-  const [activeJob, setActiveJob] = useState<{ id: string; progress: number; message: string } | null>(null);
+  // Every story in the making (an account may have several at once, owner 2026-11-01)
+  const [activeJobs, setActiveJobs] = useState<Array<{ id: string; progress: number; message: string }>>([]);
+  // The cards to show: every polled story in the making, plus the one the global
+  // generation context tracks if the poll has not seen it yet (just created). The
+  // tracked job uses the context's faster-updating progress and its title.
+  const trackedJob = isGeneratingStory ? generation?.activeJob : null;
+  const generatingJobs = (() => {
+    const list = activeJobs.map(j => (trackedJob && trackedJob.jobId === j.id)
+      ? { id: j.id, title: trackedJob.storyTitle, progress: generation!.progress.current, message: generation!.progress.message }
+      : { id: j.id, title: '', progress: j.progress, message: j.message });
+    if (trackedJob && !list.some(j => j.id === trackedJob.jobId)) {
+      list.unshift({ id: trackedJob.jobId, title: trackedJob.storyTitle, progress: generation!.progress.current, message: generation!.progress.message });
+    }
+    return list;
+  })();
 
   // Set-password banner state
   const [newPassword, setNewPassword] = useState('');
@@ -701,29 +715,25 @@ export default function MyStories() {
   // ~10×/second hammer loop (logged as "Loaded 0 stories in 50ms" repeating
   // endlessly when impersonating a user with no stories and no jobs).
   useEffect(() => {
-    if (isLoading || stories.length > 0 || !isAuthenticated) return;
+    if (isLoading || !isAuthenticated) return;
 
     let cancelled = false;
-    let hadActiveJob = false;
+    let seenIds = new Set<string>();
     const poll = async () => {
       try {
         const jobs = await storyService.getActiveJobs();
         if (cancelled) return;
-        if (jobs.length > 0) {
-          hadActiveJob = true;
-          const job = jobs[0];
-          setActiveJob({ id: job.id, progress: job.progress, message: job.progress_message });
-        } else {
-          setActiveJob(null);
-          // Only refresh the stories list if we PREVIOUSLY saw an active
-          // job — meaning one just completed and there's now likely a new
-          // story to fetch. Otherwise polling does nothing destructive.
-          if (hadActiveJob) {
-            hadActiveJob = false;
-            storiesCache = { data: null, total: 0, timestamp: 0, userId: null };
-            loadAttemptedRef.current = false;
-            loadStories();
-          }
+        setActiveJobs(jobs.map(j => ({ id: j.id, progress: j.progress, message: j.progress_message })));
+        // Only refresh the stories list if a job we PREVIOUSLY saw has
+        // disappeared — meaning it just completed and there's now likely a
+        // new story to fetch. Otherwise polling does nothing destructive.
+        const currentIds = new Set(jobs.map(j => j.id));
+        const someFinished = [...seenIds].some(id => !currentIds.has(id));
+        seenIds = currentIds;
+        if (someFinished) {
+          storiesCache = { data: null, total: 0, timestamp: 0, userId: null };
+          loadAttemptedRef.current = false;
+          loadStories();
         }
       } catch { /* ignore */ }
     };
@@ -731,7 +741,7 @@ export default function MyStories() {
     poll(); // Initial check
     const interval = setInterval(poll, 10000); // Poll every 10s
     return () => { cancelled = true; clearInterval(interval); };
-  }, [isLoading, stories.length, isAuthenticated]);
+  }, [isLoading, isAuthenticated]);
 
   // Load cover image for a story
   const loadCover = useCallback(async (storyId: string) => {
@@ -989,22 +999,25 @@ export default function MyStories() {
             </button>
           </div>
         ) : stories.length === 0 ? (
-          activeJob ? (
+          generatingJobs.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <GeneratingStoryCard
-                storyTitle=""
-                progress={{ current: activeJob.progress, total: 100, message: activeJob.message }}
-                language={language}
-                onView={() => {
-                  // Hand the jobId off to the wizard via URL so step 6 mounts
-                  // synchronously on first render — without ?jobId, the
-                  // wizard sits at step 1 (blank) until useEffect picks the
-                  // job up from GenerationContext, and if the context lost
-                  // it (fresh tab) the screen stays blank entirely.
-                  if (generation?.startTracking) generation.startTracking(activeJob.id, '');
-                  navigate(`/create?jobId=${encodeURIComponent(activeJob.id)}`);
-                }}
-              />
+              {generatingJobs.map(job => (
+                <GeneratingStoryCard
+                  key={job.id}
+                  storyTitle={job.title}
+                  progress={{ current: job.progress, total: 100, message: job.message }}
+                  language={language}
+                  onView={() => {
+                    // Hand the jobId off to the wizard via URL so step 6 mounts
+                    // synchronously on first render — without ?jobId, the
+                    // wizard sits at step 1 (blank) until useEffect picks the
+                    // job up from GenerationContext, and if the context lost
+                    // it (fresh tab) the screen stays blank entirely.
+                    if (generation?.startTracking) generation.startTracking(job.id, job.title);
+                    navigate(`/create?jobId=${encodeURIComponent(job.id)}`);
+                  }}
+                />
+              ))}
             </div>
           ) : (
             <div className="text-center py-12">
@@ -1021,17 +1034,21 @@ export default function MyStories() {
         ) : (
           <>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {/* Show generating card if there's an active job */}
-              {isGeneratingStory && generation?.activeJob && (
+              {/* One card per story in the making */}
+              {generatingJobs.map(job => (
                 <GeneratingStoryCard
-                  storyTitle={generation.activeJob.storyTitle}
-                  progress={generation.progress}
+                  key={job.id}
+                  storyTitle={job.title}
+                  progress={{ current: job.progress, total: 100, message: job.message }}
                   language={language}
-                  onView={() => navigate(`/create?jobId=${encodeURIComponent(generation.activeJob!.jobId)}`)}
+                  onView={() => {
+                    if (generation?.startTracking && trackedJob?.jobId !== job.id) generation.startTracking(job.id, job.title);
+                    navigate(`/create?jobId=${encodeURIComponent(job.id)}`);
+                  }}
                 />
-              )}
+              ))}
               {stories
-                .filter(story => !(isGeneratingStory && generation?.activeJob?.jobId === story.id))
+                .filter(story => !generatingJobs.some(j => j.id === story.id))
                 .map((story) => (
                 <StoryCard
                   key={story.id}

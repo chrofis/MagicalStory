@@ -2288,7 +2288,8 @@ export const storyService = {
     return response;
   },
 
-  // Get user's active/pending jobs (for restoring generation state after impersonation)
+  // Get user's active/pending jobs, newest first (up to 3 can run at once; active=1 so a
+  // running story is never pushed out of the list by newer finished jobs).
   async getActiveJobs(): Promise<Array<{
     id: string;
     status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
@@ -2302,7 +2303,7 @@ export const storyService = {
       progress: number;
       progress_message: string;
       created_at: string;
-    }> }>('/api/jobs/my-jobs?limit=5');
+    }> }>('/api/jobs/my-jobs?limit=10&active=1');
 
     // Return only active jobs (pending or processing)
     return response.jobs
