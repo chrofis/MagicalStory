@@ -109,11 +109,12 @@ describe('arc machine — create and retell effort', () => {
     expect(MODEL_DEFAULTS.arcCreatorModel).toBeUndefined();
   });
 
-  it('xhigh on the create model carries no task budget; the empty-text guard covers the create', () => {
+  // 2026-11-01: the create carries an 80k task budget (docs/decisions.md "Arc creator task budget").
+  it('xhigh on the create model carries the 80k task budget; the empty-text guard still covers the create', () => {
     const { TEXT_MODELS } = require('../../server/config/models.js');
     const m = TEXT_MODELS[MODEL_DEFAULTS.arcCreateModel];
     expect(m.provider).toBe('anthropic');
-    expect(textModels.taskBudgetFor(m, { effort: MODEL_DEFAULTS.arcCreateEffort })).toBeNull();
+    expect(textModels.taskBudgetFor(m, { effort: MODEL_DEFAULTS.arcCreateEffort })).toBe(80000);
     expect(() => textModels.assertAnthropicText({ text: '', stop_reason: 'max_tokens', usage: { output_tokens: 128000 } }, MODEL_DEFAULTS.arcCreateModel))
       .toThrow(/returned no text: stop_reason=max_tokens/);
   });
