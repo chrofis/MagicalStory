@@ -21,6 +21,7 @@
  */
 
 const SENTINELS = require('../../shared/relationship-sentinels.json');
+const RELATIONSHIP_TYPES = require('../../shared/relationship-types.json').types;
 
 const LANGS = ['en', 'de', 'fr', 'it'];
 
@@ -57,7 +58,66 @@ function getStrangersRelationship(lang) {
   return SENTINELS.strangers[lang] || SENTINELS.strangers.en;
 }
 
+// label (any language, trimmed) -> typed key. A label in the table is unique per
+// language; a label that is not in the table (custom, legacy, sentinel) is absent.
+const KEY_BY_LABEL = new Map();
+for (const t of RELATIONSHIP_TYPES) {
+  for (const label of labelsOf(t.labels)) KEY_BY_LABEL.set(label, t.key);
+}
+const TYPE_BY_KEY = new Map(RELATIONSHIP_TYPES.map(t => [t.key, t]));
+
+/**
+ * The typed key ('parentOf', 'childOf', 'olderSiblingOf', ...) of a stored matrix
+ * label in ANY UI language, or null for anything not in
+ * shared/relationship-types.json (a custom relationship, a legacy value, a
+ * sentinel, empty). Never guessed: an unknown label is null.
+ */
+function relationshipKeyOf(label) {
+  if (!label) return null;
+  return KEY_BY_LABEL.get(String(label).trim()) || null;
+}
+
+/** The key of the inverse type ('parentOf' -> 'childOf'), or null for an unknown key. */
+function inverseRelationshipKey(key) {
+  const t = TYPE_BY_KEY.get(key);
+  return t ? t.inverse : null;
+}
+
+// How close a family tie is for choosing who stands on a cover when the cast is
+// larger than the cover cap (owner 2026-11-01 "Rank by role", docs/decisions.md).
+// Direction is ignored on purpose: customers fill the matrix backwards ("Ludovica
+// Genitore di Mamma" when Mamma is Ludovica's parent), so parentOf and childOf
+// are the same tie. Anything not listed (friends, in-laws, strangers, unknown
+// labels) is not a tier.
+const FAMILY_TIER_BY_KEY = Object.freeze({
+  parentOf: 1, childOf: 1,
+  olderSiblingOf: 2, youngerSiblingOf: 2, grandparentOf: 2, grandchildOf: 2,
+});
+const NO_FAMILY_TIER = 3;
+
+/**
+ * The family tier (1 parent/child, 2 sibling or grandparent/grandchild, 3 none)
+ * of the tie between two characters, reading BOTH matrix cells of the pair
+ * ("A-B" and "B-A") and taking the closest.
+ *
+ * @param {Object<string,string>|null} relationships  inputData.relationships (localized labels, keyed "<idA>-<idB>")
+ */
+function familyTierBetween(relationships, idA, idB) {
+  if (!relationships || typeof relationships !== 'object') return NO_FAMILY_TIER;
+  let best = NO_FAMILY_TIER;
+  for (const cell of [`${idA}-${idB}`, `${idB}-${idA}`]) {
+    const tier = FAMILY_TIER_BY_KEY[relationshipKeyOf(relationships[cell])];
+    if (tier && tier < best) best = tier;
+  }
+  return best;
+}
+
 module.exports = {
+  familyTierBetween,
+  NO_FAMILY_TIER,
+  relationshipKeyOf,
+  inverseRelationshipKey,
+  RELATIONSHIP_TYPES,
   isNotSetRelationship,
   isStrangersRelationship,
   getNotSetRelationship,

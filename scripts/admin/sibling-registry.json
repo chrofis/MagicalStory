@@ -850,6 +850,22 @@
       }
     },
     {
+      "id": "relationship-types-table",
+      "axis": "wizard matrix label table vs server label-to-key mapping",
+      "reason": "The matrix stores the LOCALIZED label of the chosen relationship type, so the server can only recognise a parent, child, sibling or grandparent by matching that label against the wizard's table. The table is ONE file, shared/relationship-types.json (typed key, labels in en/de/fr/it, inverse key), read by the wizard (client/src/constants/relationships.ts) and by server/lib/relationships.js (relationshipKeyOf, familyTierBetween). Owner 2026-11-01 'Rank by role': the cover cast keeps the main characters' parents and children first; customers fill the matrix backwards, so both directions count. A hand-copied label list on either side is the drift this set exists to stop; client/server agreement on every label and inverse is asserted in tests/unit/beats-brief-relationships.test.ts.",
+      "members": [
+        "client/src/constants/relationships.ts",
+        "server/lib/relationships.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "relationship-types.json"
+        ],
+        "anchorsNote": "Both runtimes must read the one shared table by file name."
+      }
+    },
+    {
       "id": "peril-ceiling-everywhere",
       "axis": "the peril ceiling and its historical exception, at every stage that states or judges it",
       "reason": "The ceiling (nothing that could lead to death) is ONE constant, PERIL_CEILING_RULE in promptBuilders.js, filled as {PERIL_CEILING} into the arc creator and re-teller (via TELLING_RULES), the arc reviewer, the beats text writer, the trial writer (2026-10-07), the text repair and both story-idea templates. It carries the owner's historical exception (4804fe357: a historical event keeps the danger it really had, told at a child's level, never removed). The exception once reached only the two idea templates; the arc, told to stay under the ceiling, invented a blunt rubber-tipped bolt for a historical crossbow shot and it spread to the outline, text, costume and Visual Bible (staging job_1791145238223_50osg2osm, 2026-10-05). A new stage that states the ceiling takes the placeholder; it never hand-copies the sentence.",

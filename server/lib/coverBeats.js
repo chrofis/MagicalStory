@@ -21,6 +21,7 @@
 
 const { COVER_PAGE_NUMBERS, COVER_TEXT_POSITION } = require('./coverKeys');
 const { MAX_COVER_CHARACTERS } = require('./coverCastRoster');
+const { familyTierBetween } = require('./relationships');
 const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
 const { resolveCharacterReqs, standardOutfitText } = require('./clothingCategories');
 
@@ -82,9 +83,12 @@ function mainCharactersOf(inputData = {}) {
  * The cast of each cover — the rule the Art Director's cover section carried
  * until 2026-09-24 (the former `buildCoverCastLines`), now decided in code:
  * the front cover shows only the main characters; the opening page and the
- * back cover show the main characters plus the other characters, in the order
- * the story lists them, up to MAX_COVER_CHARACTERS (owner, 2026-09-15:
- * "max 5"). With no main character the whole cast stands in for them.
+ * back cover show the main characters plus the other characters, up to
+ * MAX_COVER_CHARACTERS (owner, 2026-09-15: "max 5"). The other characters are
+ * ranked by role (owner, 2026-11-01 "Rank by role"): parent/child of a main
+ * character first, then sibling or grandparent/grandchild, then everyone else,
+ * ties in the order the story lists them. With no main character the whole
+ * cast stands in for them.
  *
  * @returns {Object<string, string[]>} coverKey → names
  */
@@ -93,7 +97,13 @@ function coverCasts(inputData = {}) {
   let mains = mainCharactersOf(inputData);
   if (mains.length === 0) mains = all;
   const mainNames = new Set(mains.map(c => c.name));
-  const others = all.filter(c => !mainNames.has(c.name));
+  const rels = inputData.relationships;
+  const tierOf = (c) => Math.min(...mains.map(m => familyTierBetween(rels, m.id, c.id)));
+  // Array.prototype.sort is stable, so equal tiers keep creation order.
+  const others = all.filter(c => !mainNames.has(c.name))
+    .map(c => ({ c, tier: tierOf(c) }))
+    .sort((a, b) => a.tier - b.tier)
+    .map(x => x.c);
   const mainCapped = mains.slice(0, MAX_COVER_CHARACTERS).map(c => c.name);
   const group = [...mainCapped, ...others.map(c => c.name)].slice(0, MAX_COVER_CHARACTERS);
   return { frontCover: mainCapped, initialPage: group, backCover: group };

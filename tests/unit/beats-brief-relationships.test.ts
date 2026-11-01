@@ -352,3 +352,22 @@ describe('the story-idea prompt makes the same two distinctions', () => {
     expect(await render('Freunde mit')).toBe('- Leo Freunde mit Mia');
   });
 });
+
+describe('shared relationship types table (client/server parity)', () => {
+  it('the wizard offers exactly the shared table between the two sentinels, in order, with matching inverses', async () => {
+    const client = await import('../../client/src/constants/relationships');
+    const { RELATIONSHIP_TYPES, relationshipKeyOf, inverseRelationshipKey } = require('../../server/lib/relationships');
+    const offered = client.relationshipTypes;
+    expect(offered.length).toBe(RELATIONSHIP_TYPES.length + 2);
+    RELATIONSHIP_TYPES.forEach((t: any, i: number) => {
+      const row = offered[i + 1];
+      const inv = RELATIONSHIP_TYPES.find((x: any) => x.key === inverseRelationshipKey(t.key));
+      for (const lang of LANGS) {
+        expect(row.value[lang], `${t.key} ${lang}`).toBe(t.labels[lang]);
+        expect(relationshipKeyOf(row.value[lang]), `${t.key} ${lang} key`).toBe(t.key);
+        expect(row.inverse[lang], `${t.key} ${lang} inverse`).toBe(inv.labels[lang]);
+        expect(client.findInverseRelationship(t.labels[lang], lang)).toBe(inv.labels[lang]);
+      }
+    });
+  });
+});

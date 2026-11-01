@@ -1,6 +1,7 @@
 import type { RelationshipType, LocalizedString } from '@/types/character';
 import type { Language } from '@/types/story';
 import sentinels from '../../../shared/relationship-sentinels.json';
+import relationshipTypesJson from '../../../shared/relationship-types.json';
 
 // The two sentinels are NOT relationships — they are answers about whether a
 // relationship was given. Their labels live in shared/relationship-sentinels.json,
@@ -21,22 +22,16 @@ export const STRANGERS_RELATIONSHIP: LocalizedString = sentinels.strangers;
 // distinguishable retroactively, so every legacy occurrence reads as NOT SET.
 const LEGACY_NOT_SET: LocalizedString[] = sentinels.legacyNotSet;
 
+// The real types (everything between the two sentinels) come from
+// shared/relationship-types.json, the ONE table the server also reads to map a
+// stored label to a typed key. Order is the wizard's dropdown order.
+type SharedRelationshipType = { key: string; inverse: string; labels: LocalizedString };
+const SHARED_TYPES = relationshipTypesJson.types as SharedRelationshipType[];
+const labelsByKey = new Map(SHARED_TYPES.map(t => [t.key, t.labels]));
+
 export const relationshipTypes: RelationshipType[] = [
   { value: NOT_SET_RELATIONSHIP, inverse: NOT_SET_RELATIONSHIP },
-  { value: { en: 'Best Friends with', de: 'Beste Freunde mit', fr: 'Meilleur(e) ami(e) de', it: 'Migliori amici con' }, inverse: { en: 'Best Friends with', de: 'Beste Freunde mit', fr: 'Meilleur(e) ami(e) de', it: 'Migliori amici con' } },
-  { value: { en: 'Friends with', de: 'Freunde mit', fr: 'Ami(e) de', it: 'Amici con' }, inverse: { en: 'Friends with', de: 'Freunde mit', fr: 'Ami(e) de', it: 'Amici con' } },
-  { value: { en: 'Married to', de: 'Verheiratet mit', fr: 'Marié(e) à', it: 'Sposato/a con' }, inverse: { en: 'Married to', de: 'Verheiratet mit', fr: 'Marié(e) à', it: 'Sposato/a con' } },
-  { value: { en: 'In a relationship with', de: 'In einer Beziehung mit', fr: 'En couple avec', it: 'In relazione con' }, inverse: { en: 'In a relationship with', de: 'In einer Beziehung mit', fr: 'En couple avec', it: 'In relazione con' } },
-  { value: { en: 'Older Sibling of', de: 'Älteres Geschwister von', fr: 'Frère/Sœur aîné(e) de', it: 'Fratello/Sorella maggiore di' }, inverse: { en: 'Younger Sibling of', de: 'Jüngeres Geschwister von', fr: 'Frère/Sœur cadet(te) de', it: 'Fratello/Sorella minore di' } },
-  { value: { en: 'Younger Sibling of', de: 'Jüngeres Geschwister von', fr: 'Frère/Sœur cadet(te) de', it: 'Fratello/Sorella minore di' }, inverse: { en: 'Older Sibling of', de: 'Älteres Geschwister von', fr: 'Frère/Sœur aîné(e) de', it: 'Fratello/Sorella maggiore di' } },
-  { value: { en: 'Parent of', de: 'Elternteil von', fr: 'Parent de', it: 'Genitore di' }, inverse: { en: 'Child of', de: 'Kind von', fr: 'Enfant de', it: 'Figlio/a di' } },
-  { value: { en: 'Child of', de: 'Kind von', fr: 'Enfant de', it: 'Figlio/a di' }, inverse: { en: 'Parent of', de: 'Elternteil von', fr: 'Parent de', it: 'Genitore di' } },
-  { value: { en: 'Grandparent of', de: 'Grosselternteil von', fr: 'Grand-parent de', it: 'Nonno/a di' }, inverse: { en: 'Grandchild of', de: 'Enkelkind von', fr: 'Petit-enfant de', it: 'Nipote di' } },
-  { value: { en: 'Grandchild of', de: 'Enkelkind von', fr: 'Petit-enfant de', it: 'Nipote di' }, inverse: { en: 'Grandparent of', de: 'Grosselternteil von', fr: 'Grand-parent de', it: 'Nonno/a di' } },
-  { value: { en: 'Parent-in-law of', de: 'Schwiegerelternteil von', fr: 'Beau-parent de', it: 'Suocero/a di' }, inverse: { en: 'Child-in-law of', de: 'Schwiegerkind von', fr: 'Gendre/Belle-fille de', it: 'Genero/Nuora di' } },
-  { value: { en: 'Child-in-law of', de: 'Schwiegerkind von', fr: 'Gendre/Belle-fille de', it: 'Genero/Nuora di' }, inverse: { en: 'Parent-in-law of', de: 'Schwiegerelternteil von', fr: 'Beau-parent de', it: 'Suocero/a di' } },
-  { value: { en: 'Rivals with', de: 'Rivalen mit', fr: 'Rival(e) de', it: 'Rivali con' }, inverse: { en: 'Rivals with', de: 'Rivalen mit', fr: 'Rival(e) de', it: 'Rivali con' } },
-  { value: { en: 'Neighbors with', de: 'Nachbarn mit', fr: 'Voisin(e) de', it: 'Vicini di' }, inverse: { en: 'Neighbors with', de: 'Nachbarn mit', fr: 'Voisin(e) de', it: 'Vicini di' } },
+  ...SHARED_TYPES.map(t => ({ value: t.labels, inverse: labelsByKey.get(t.inverse) as LocalizedString })),
   { value: STRANGERS_RELATIONSHIP, inverse: STRANGERS_RELATIONSHIP },
 ];
 

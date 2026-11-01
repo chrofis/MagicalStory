@@ -11056,6 +11056,22 @@
         "kind": "human",
         "what": "In a story's generation log, a vb_sheet_batch_failed error is followed by vb_sheet_solo_rerender_ok per element and the story completes; or, when the solo render fails too, the job is failed with vb_sheet_no_reference_fatal naming the element ids and the credits are refunded. Not reproducible on demand (provider refusal); unit-tested with mocked image calls."
       }
+    },
+    {
+      "id": "cover-cast-rank-by-role-2026-11-01",
+      "title": "Cover cast ranks the other characters by family tie to the main character before the cap of 5",
+      "commits": [],
+      "addedAt": "2026-11-01",
+      "status": "pending",
+      "evidence": [],
+      "claim": "In a full story with more than 5 characters, the opening page and back cover show the main characters, then the parents/children of a main (matrix cell in either direction), then siblings and grandparents/grandchildren, then the rest in creation order, capped at 5. A story with 5 or fewer characters shows the same people.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "For a story with 6+ characters whose matrix names a parent or child of the main character, that parent appears in the opening page and back cover cast (plan line 'who is in frame'). Replayed over stored data: production job_1793561351885_kkg5gxkbj gains Mamma in place of Serena; 299 stored stories with 5 or fewer characters keep the same set."
+      }
     }
   ],
   "runs": [

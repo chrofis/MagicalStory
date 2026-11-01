@@ -1,0 +1,27 @@
+{
+  "_doc": [
+    "THE RELATIONSHIP TYPES the wizard's matrix offers, as ONE table read by the client (client/src/constants/relationships.ts) and the server (server/lib/relationships.js).",
+    "",
+    "The wizard stores the LOCALIZED label of the chosen type per ordered character pair, so the server can only recognise a relationship by matching that label against this table. Each type has a stable typed key (what code branches on), its labels and the key of its inverse. The two sentinels (not set / strangers) live in shared/relationship-sentinels.json and are not types.",
+    "",
+    "Customers fill the matrix in either direction ('Ludovica Genitore di Mamma' means Ludovica is the parent OF Mamma, the wrong way round), so code that asks 'is A the parent or child of B' must accept both parentOf and childOf. A label that is not in this table (custom or legacy) maps to null; it is never guessed.",
+    "",
+    "Swiss German: ss, never the eszett."
+  ],
+  "types": [
+    { "key": "bestFriends", "inverse": "bestFriends", "labels": { "en": "Best Friends with", "de": "Beste Freunde mit", "fr": "Meilleur(e) ami(e) de", "it": "Migliori amici con" } },
+    { "key": "friends", "inverse": "friends", "labels": { "en": "Friends with", "de": "Freunde mit", "fr": "Ami(e) de", "it": "Amici con" } },
+    { "key": "marriedTo", "inverse": "marriedTo", "labels": { "en": "Married to", "de": "Verheiratet mit", "fr": "Marié(e) à", "it": "Sposato/a con" } },
+    { "key": "inRelationshipWith", "inverse": "inRelationshipWith", "labels": { "en": "In a relationship with", "de": "In einer Beziehung mit", "fr": "En couple avec", "it": "In relazione con" } },
+    { "key": "olderSiblingOf", "inverse": "youngerSiblingOf", "labels": { "en": "Older Sibling of", "de": "Älteres Geschwister von", "fr": "Frère/Sœur aîné(e) de", "it": "Fratello/Sorella maggiore di" } },
+    { "key": "youngerSiblingOf", "inverse": "olderSiblingOf", "labels": { "en": "Younger Sibling of", "de": "Jüngeres Geschwister von", "fr": "Frère/Sœur cadet(te) de", "it": "Fratello/Sorella minore di" } },
+    { "key": "parentOf", "inverse": "childOf", "labels": { "en": "Parent of", "de": "Elternteil von", "fr": "Parent de", "it": "Genitore di" } },
+    { "key": "childOf", "inverse": "parentOf", "labels": { "en": "Child of", "de": "Kind von", "fr": "Enfant de", "it": "Figlio/a di" } },
+    { "key": "grandparentOf", "inverse": "grandchildOf", "labels": { "en": "Grandparent of", "de": "Grosselternteil von", "fr": "Grand-parent de", "it": "Nonno/a di" } },
+    { "key": "grandchildOf", "inverse": "grandparentOf", "labels": { "en": "Grandchild of", "de": "Enkelkind von", "fr": "Petit-enfant de", "it": "Nipote di" } },
+    { "key": "parentInLawOf", "inverse": "childInLawOf", "labels": { "en": "Parent-in-law of", "de": "Schwiegerelternteil von", "fr": "Beau-parent de", "it": "Suocero/a di" } },
+    { "key": "childInLawOf", "inverse": "parentInLawOf", "labels": { "en": "Child-in-law of", "de": "Schwiegerkind von", "fr": "Gendre/Belle-fille de", "it": "Genero/Nuora di" } },
+    { "key": "rivals", "inverse": "rivals", "labels": { "en": "Rivals with", "de": "Rivalen mit", "fr": "Rival(e) de", "it": "Rivali con" } },
+    { "key": "neighbors", "inverse": "neighbors", "labels": { "en": "Neighbors with", "de": "Nachbarn mit", "fr": "Voisin(e) de", "it": "Vicini di" } }
+  ]
+}
