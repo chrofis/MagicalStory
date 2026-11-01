@@ -1393,6 +1393,13 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       const batchModel = referenceSheetBatchModel(batch, imageModelOverride);
       if (textCell) log.info(`[REF-SHEET] ✍️ "${batch[0].name}" carries readable text "${textCell}" — rendering on ${batchModel}`);
       else if (stateCell) log.info(`[REF-SHEET] 🔧 "${batch[0].displayName}" draws ${batch.length} state cells — rendering on ${batchModel}`);
+      // A batch whose grid render or split THROWS (provider refusal, empty image) is not
+      // an excuse to ship its elements with no reference: every element is re-rendered
+      // once SOLO below (a solo render removes the batch-combination trigger of a content
+      // refusal). An element that still has none fails the story in the pipeline
+      // (assertReferenceSheetComplete). Owner decision 2026-11-01, docs/decisions.md.
+      let references;
+      try {
       const result = await callGeminiAPIForImage(
         prompt, [], null, 'avatar', null, batchModel, null, '',
         null, [], 0, null, null, null, null, batchAspectOverride
@@ -1419,7 +1426,12 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       });
 
       // Split grid into individual references
-      const references = await splitGridIntoReferences(gridImageData, batch.length, batch);
+      references = await splitGridIntoReferences(gridImageData, batch.length, batch);
+      } catch (gridErr) {
+        log.error(`❌ [REF-SHEET] Batch ${batchIdx + 1} grid render failed (${gridErr.message}) — re-rendering each element solo`);
+        require('./generationLogger').getCurrentLogger()?.error('vb_sheet_batch_failed', `Reference-sheet batch failed (${gridErr.message}) — re-rendering each element solo`, batch.map(e => e.name).join(', '));
+        references = batch.map(() => null);
+      }
 
       // Cell gates — one question, one re-render on NO, one re-check for the
       // record, then accept whatever came back (fail-open on any API error).
@@ -1448,7 +1460,9 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       // job_1789348171785_9oxos7dwv drew as a mottled stone, a glossy red egg,
       // a speckled egg, and twice over on one page. Bounded — see
       // MAX_SOLO_REFERENCE_RERENDERS.
-      await fillMissingReferencesSolo(references, batch, rerenderSolo, { genLog });
+            // A batch that threw has every cell empty: the cap (a bound on the salvage of a
+      // good sheet) does not apply, each element gets its one solo render.
+      await fillMissingReferencesSolo(references, batch, rerenderSolo, { genLog, cap: references.every(r => !r) ? batch.length : undefined });
 
       const record = (element, verdict) => {
         cellGates.push({ id: element.id, name: element.name, ...verdict });
@@ -1577,6 +1591,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
             name: element.name,
             type: element.type,
             success: false,
+            pages: element.appearsInPages || [],
             error: 'Failed to extract from grid'
           });
         }
@@ -1592,6 +1607,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
           name: element.name,
           type: element.type,
           success: false,
+          pages: element.appearsInPages || [],
           error: err.message
         });
       }
@@ -1932,6 +1948,57 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], op
   }
 }
 
+/**
+ * A reference sheet that left an element WITHOUT a reference fails the story
+ * (owner decision 2026-11-01, docs/decisions.md "retry solo once, then fail the
+ * story loudly"). The element was already re-rendered solo once; an invented
+ * character drawn from words alone looks different on every page (prod
+ * job_1793561351885_kkg5gxkbj). Thrown from the pipeline, so the job's normal
+ * failure path marks it failed and refunds the reservation.
+ */
+class MissingReferenceSheetError extends Error {
+  constructor(elements, cause = null) {
+    const what = elements.length > 0
+      ? `the reference image for ${elements.map(e => e.name || e.id).join(', ')}`
+      : 'the reference sheet';
+    super(`${what[0].toUpperCase()}${what.slice(1)} could not be created, so the story cannot be illustrated consistently. No credits are charged for a failed story; please try again.`);
+    this.name = 'MissingReferenceSheetError';
+    this.elementIds = elements.map(e => e.id);
+    this.cause = cause;
+  }
+}
+
+/**
+ * Turn a generateReferenceSheet promise into one that never rejects while it is
+ * still unawaited (an early-started trial promise would otherwise be an
+ * unhandled rejection), without hiding the failure: a rejection becomes
+ * `{ fatalError }`, which assertReferenceSheetComplete throws on.
+ */
+function settleReferenceSheet(promise, label = 'REF-SHEET') {
+  return Promise.resolve(promise).catch(err => {
+    log.error(`❌ [${label}] Reference sheet generation rejected: ${err.message}`);
+    return { generated: 0, failed: 0, elements: [], fatalError: err.message };
+  });
+}
+
+/**
+ * Throw when the sheet result leaves an element without a reference that a
+ * page depends on. "Depends" is decided from the element's page ids only
+ * (`pages`, copied from appearsInPages); an element on no page never fails a story.
+ * @param {Object} refResult generateReferenceSheet / settleReferenceSheet result
+ * @param {Object} [genLog] generation logger (error-level event)
+ */
+function assertReferenceSheetComplete(refResult, genLog = null) {
+  if (refResult?.fatalError) {
+    genLog?.error('vb_sheet_failed', `Reference sheet generation failed entirely: ${refResult.fatalError}`);
+    throw new MissingReferenceSheetError([], refResult.fatalError);
+  }
+  const missing = (refResult?.elements || []).filter(e => !e.success && Array.isArray(e.pages) && e.pages.length > 0);
+  if (missing.length === 0) return;
+  genLog?.error('vb_sheet_no_reference_fatal', `No reference image after the solo re-render for: ${missing.map(e => e.id).join(', ')} - the story is failed`, missing.map(e => e.name).join(', '), { elementIds: missing.map(e => e.id) });
+  throw new MissingReferenceSheetError(missing);
+}
+
 module.exports = {
   checkCharacterCellRender,
   cellGatePrompt,
@@ -1950,6 +2017,9 @@ module.exports = {
   identifySheetCellsImpl,
   sheetCellIdentityLine,
   fillMissingReferencesSolo,
+  MissingReferenceSheetError,
+  settleReferenceSheet,
+  assertReferenceSheetComplete,
   MAX_SOLO_REFERENCE_RERENDERS,
   buildReferenceSheetPrompt,
   characterAgeCue,

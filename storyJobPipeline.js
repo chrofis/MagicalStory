@@ -21,7 +21,7 @@ const { PROMPT_TEMPLATES, fillTemplate, buildEmptyScenePrompt } = require('./ser
 const { generateViewPdf } = require('./server/lib/pdf');
 const { generateImageOnly } = require('./server/lib/images');
 const { landmarkPhotoIsPageScene, pageNeedsPlate, pageLandmarkScene, resolveRepairScene } = require('./server/lib/landmarkScene');
-const { generateReferenceSheet, buildVisualBibleGrid, buildEmptySceneVbGrid } = require('./server/lib/referenceSheets');
+const { generateReferenceSheet, settleReferenceSheet, assertReferenceSheetComplete, buildVisualBibleGrid, buildEmptySceneVbGrid } = require('./server/lib/referenceSheets');
 const { runUnifiedRepairPipeline } = require('./server/lib/repairPipeline');
 const {
   prepareStyledAvatars,
@@ -2209,10 +2209,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // See the full-mode call site for why: non-character elements
             // should match the page aspect, not avatarAspect.
             elementAspect: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-          }).catch(err => {
-            log.warn(`⚠️ [TRIAL] Early VB reference sheet generation failed: ${err.message}`);
-            return { generated: 0, failed: 0, elements: [] };
           });
+          // A rejection is carried as `fatalError` and fails the story at the
+          // join (assertReferenceSheetComplete) - never `{generated:0, failed:0}`.
+          trialReferenceSheetPromise = settleReferenceSheet(trialReferenceSheetPromise, 'TRIAL');
           log.info(`📚 [TRIAL] Early VB reference-sheet generation started (parallel with empty scenes + costumed avatars); cell render gate skipped by design`);
         }
 
@@ -3309,10 +3309,8 @@ ${trialWriter.pagesPrompt}`;
         // page aspect — not avatarAspect — so a single-element plate reference
         // (composeVbSlot) doesn't need heavy white pillar-padding to fit.
         elementAspect: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-      }).catch(err => {
-        log.warn(`⚠️ [UNIFIED] Reference sheet generation failed: ${err.message}`);
-        return { generated: 0, failed: 0, elements: [] };
       });
+      referenceSheetPromise = settleReferenceSheet(referenceSheetPromise, 'UNIFIED');
     }
 
     // Save checkpoint. Include the RAW unified response (unifiedResponse) so a
@@ -3939,6 +3937,9 @@ ${trialWriter.pagesPrompt}`;
     let referenceSheetBatchMeta = null;
     if (referenceSheetPromise) {
       const refResult = await referenceSheetPromise;
+      // Trial and full story share this join. An element still without a reference
+      // after its solo re-render fails the story (job failure path refunds it).
+      assertReferenceSheetComplete(refResult, genLog);
       // TRIAL: the sheet was rendered onto the stream-time bible object; the page
       // phase below reads this finished parse. Carry the cells over (a full story
       // renders on `visualBible` itself, so there is nothing to carry).

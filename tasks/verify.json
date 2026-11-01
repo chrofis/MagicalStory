@@ -11040,6 +11040,22 @@
         "kind": "human",
         "what": "Run any story that invents a child (a costume or creature child). Read visualBible.secondaryCharacters[].clothing for the child: it names a covering top, and no D-05f child_torso_uncovered fault is raised for it."
       }
+    },
+    {
+      "id": "ref-sheet-failure-fails-story-2026-11-01",
+      "title": "A failed reference-sheet batch is re-rendered solo, then fails the story loudly",
+      "commits": [],
+      "addedAt": "2026-11-01",
+      "status": "pending",
+      "evidence": [],
+      "claim": "When a visual-bible reference-sheet batch throws, each element is re-rendered solo once; an element a page depends on that still has no reference fails the job (error event vb_sheet_no_reference_fatal, refund via the normal failure path). A story whose sheets all succeed is unchanged.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In a story's generation log, a vb_sheet_batch_failed error is followed by vb_sheet_solo_rerender_ok per element and the story completes; or, when the solo render fails too, the job is failed with vb_sheet_no_reference_fatal naming the element ids and the credits are refunded. Not reproducible on demand (provider refusal); unit-tested with mocked image calls."
+      }
     }
   ],
   "runs": [
