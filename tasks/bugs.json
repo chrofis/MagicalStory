@@ -4505,6 +4505,16 @@
       "fix": "COVER_DAY_OUTFIT_FACT in every cover plan line of a nightwear story; cover_nightwear brief check re-asked once; C3 says the cover rule wins; art_director_briefs checkpoint kept by a failed run.",
       "status": "fixed",
       "fixedIn": "ae9c60a57"
+    },
+    {
+      "id": "brief-reask-without-outfit-text",
+      "title": "The Art Director brief re-ask is built without the wardrobe contract, so a page sent back is rewritten with no outfit text",
+      "reportedAt": "2026-11-01",
+      "source": "Staging job_1793526073039_9nhq3ju59 and job_1793520777470_7sgat9ene logged [PROMPT] ... has no clothingRequirements on the re-ask",
+      "rootCause": "briefChecks.runBriefChecks called buildBriefReaskContext without clothingRequirements (it had them in scope).",
+      "fix": "runBriefChecks passes clothingRequirements to buildBriefReaskContext.",
+      "status": "fixed",
+      "fixedIn": "59d51c903"
     }
   ]
 }
