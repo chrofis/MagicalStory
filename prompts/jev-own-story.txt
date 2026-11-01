@@ -1,9 +1,10 @@
-#! JEV OWN-STORY CHECK QUESTIONS — v2 (2026-10-31). Read by server/lib/ownStoryAnalysis.js.
+#! JEV OWN-STORY CHECK QUESTIONS — v3 (2026-11-01). Read by server/lib/ownStoryAnalysis.js.
 #! Jev (typesafe/jev-1.13 on OpenRouter) answers each line as a yes-probability ("noul").
 #! The wizard's "Own story" box asks these while a parent types a story idea; code turns
 #! each probability into a present/missing flag and the UI shows a checklist plus a fixed,
 #! translated tip for the first missing part. Jev generates no prose.
-#! One line per question: `ID: proposition`. Placeholders: {AGE} (age of the child the book is for), {EVENTS} and {PAGES} (the most events the book's page count and age comfortably hold, from arcEventRange in promptBuilders.js, and the page count).
+#! One line per question: `ID: proposition`. Placeholders: {AGE} (age of the child the book is for), {EVENTS} and {PAGES} (the most events the book's page count and age comfortably hold, from arcEventRange in promptBuilders.js, and the page count), {PROBLEMS} (how many separate problems this page count wants, from problemsWanted in ownStoryAnalysis.js; the PROBLEM_DEPTH line is only asked when it is 2 or more).
+#! The three *_DEPTH lines are depth checks on a part: the checklist stays the five parts, a part whose depth is missing shows as not yet done with a fixed depth tip.
 #! Keep every proposition generic: no names, places or plots from a real story.
 
 [PARTS]
@@ -12,5 +13,8 @@ WHERE: The text says where the story happens, a place or a world.
 PROBLEM: The text describes something that goes wrong, or a problem or obstacle that has to be dealt with.
 WANT: The text says what the main character wants or what they set out to do.
 ENDING: The text says how the story ends or what the outcome is.
+WHO_DEPTH: The text says something about what the main character is like, such as a trait, a habit, a fear or a talent, and not only a name or a kind of creature.
+WHERE_DEPTH: The place is either a real place that most people know, or it is an invented place for which the text says both what kind of world it is and when the story happens, in the past, today or in the future.
+PROBLEM_DEPTH: The text names at least {PROBLEMS} separate problems or obstacles that come one after another, not just one.
 UNSUITABLE: The text contains content that is too frightening, violent or mature for a child aged {AGE}.
 TOO_MANY_EVENTS: The text names more than {EVENTS} separate events, things that happen one after another in the story, and a book of {PAGES} pages comfortably holds only about {EVENTS}.

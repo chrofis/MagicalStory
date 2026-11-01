@@ -265,7 +265,7 @@ test.describe('wizard settings reach the create-story payload', () => {
   test('own story: too many events shows a hint, selection stays open and the book still follows the text', async ({ page }) => {
     test.setTimeout(60_000);
     const mock = await openWizard(page);
-    mock.setOwnStoryAnswer({ present: { WHO: true, WHERE: true, PROBLEM: true, WANT: true, ENDING: true }, missing: [], unsuitable: false, tooManyEvents: true });
+    mock.setOwnStoryAnswer({ present: { WHO: true, WHERE: true, PROBLEM: true, WANT: true, ENDING: true }, missing: [], thin: [], unsuitable: false, tooManyEvents: true });
     await toSummary(page);
     await generateIdeas(page);
     const text = 'A girl rows out, meets a heron, loses her oar, finds a cave, wakes a bear, crosses a bridge, sings to a storm and sails home.';
@@ -280,6 +280,31 @@ test.describe('wizard settings reach the create-story payload', () => {
     const body = await submit(page, mock);
     expect(body.storyDetails).toBe(text);
     expect(body.ownStory).toBe(true);
+  });
+
+  test('own story: a named but thin part shows as not done with its depth tip', async ({ page }) => {
+    test.setTimeout(60_000);
+    const mock = await openWizard(page);
+    mock.setOwnStoryAnswer({ present: { WHO: false, WHERE: true, PROBLEM: true, WANT: true, ENDING: true }, missing: ['WHO'], thin: ['WHO'], unsuitable: false, tooManyEvents: false });
+    await toSummary(page);
+    await generateIdeas(page);
+    await page.getByTestId('own-story-open').click();
+    await page.getByTestId('own-story-text').fill('A boy named Tom goes to London to find his lost kite. At the end he finds it again.');
+    await expect(page.getByTestId('own-story-checklist')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByTestId('own-story-checklist').locator('[data-part="WHO"]')).toHaveAttribute('data-present', 'false');
+    await expect(page.getByTestId('own-story-tip')).toContainText('What is the main character like?');   // the depth tip, not "Say who the story is about."
+  });
+
+  test('own story: the check runs while the prepared ideas are still being written', async ({ page }) => {
+    test.setTimeout(60_000);
+    const mock = await openWizard(page, undefined, { ideaDelayMs: 20_000 });
+    await toSummary(page);
+    await expect(page.getByRole('button', { name: /Generating/ }).first()).toBeDisabled(); // the ideas are still loading
+    await page.getByTestId('own-story-open').click();
+    await page.getByTestId('own-story-text').fill('A girl and her grandfather row out to find a lost balloon on the lake.');
+    await expect(page.getByTestId('own-story-checklist')).toBeVisible({ timeout: 9000 }); // 5 s pause + answer, far inside the 20 s idea wait
+    expect(mock.ownStoryRequests).toHaveLength(1);
+    await expect(page.locator('textarea').filter({ hasText: IDEAS[0] })).toHaveCount(0);   // and the ideas really were not done yet
   });
 
   test('dedication', async ({ page }) => {

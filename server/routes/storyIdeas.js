@@ -788,8 +788,8 @@ router.post('/analyze-own-story', authenticateToken, ownStoryAnalysisLimiter, as
   try {
     const parsedAge = parseInt(age, 10);
     const r = await analyseOwnStory(text, Number.isFinite(parsedAge) ? parsedAge : undefined, { pages: parsedPages, languageLevel: typeof languageLevel === 'string' ? languageLevel : undefined });
-    log.info(`🧭 [OWN-STORY] user ${req.user.id}: ${r.missing.length} part(s) missing, unsuitable=${r.unsuitable}, tooManyEvents=${r.tooManyEvents}, cost $${r.costUsd.toFixed(6)}`);
-    res.json({ present: r.present, missing: r.missing, unsuitable: r.unsuitable, tooManyEvents: r.tooManyEvents, costUsd: r.costUsd });
+    log.info(`🧭 [OWN-STORY] user ${req.user.id}: ${r.missing.length} part(s) missing (${r.thin.length} thin), unsuitable=${r.unsuitable}, tooManyEvents=${r.tooManyEvents}, cost $${r.costUsd.toFixed(6)}`);
+    res.json({ present: r.present, missing: r.missing, thin: r.thin, unsuitable: r.unsuitable, tooManyEvents: r.tooManyEvents, costUsd: r.costUsd });
   } catch (err) {
     log.error(`🚨 [OWN-STORY] analysis failed for user ${req.user.id}: ${err.message}`);
     res.status(502).json({ error: 'story check unavailable' });

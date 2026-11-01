@@ -4,6 +4,7 @@ import { storyService } from '@/services';
 import { AutoGrowTextarea } from '@/components/common';
 import {
   createOwnStoryChecker,
+  nextOwnStoryTip,
   OWN_STORY_PARTS,
   type OwnStoryPart,
   type OwnStoryResult,
@@ -35,6 +36,32 @@ const PARTS: Record<OwnStoryPart, { label: Record<Lang, string>; tip: Record<Lan
   ENDING: {
     label: { de: 'Wie es endet', fr: 'Comment ça finit', it: 'Come finisce', en: 'How it ends' },
     tip: { de: 'Wie soll die Geschichte enden?', fr: 'Comment l\'histoire doit-elle finir ?', it: 'Come deve finire la storia?', en: 'How should the story end?' },
+  },
+};
+
+/**
+ * Fixed depth tips (a part that is named but thin). The checklist stays the five parts; a thin part shows as not
+ * yet done with this tip. Depth is judged by Jev flags, never by reading the text here. Swiss German: ss, never ß.
+ */
+type DepthPart = 'WHO' | 'WHERE' | 'PROBLEM';
+const DEPTH_TIPS: Record<DepthPart, Record<Lang, string>> = {
+  WHO: {
+    de: 'Wie ist die Hauptfigur? Erzähl etwas über ihre Art: eine Eigenschaft, eine Gewohnheit, eine Angst oder ein Talent.',
+    fr: 'Comment est le personnage principal ? Dites un trait de caractère, une habitude, une peur ou un talent.',
+    it: 'Com\'è il protagonista? Racconta un tratto del carattere, un\'abitudine, una paura o un talento.',
+    en: 'What is the main character like? Add a trait, a habit, a fear or a talent.',
+  },
+  WHERE: {
+    de: 'Ein erfundener Ort braucht mehr: Was für eine Welt ist es, und wann spielt die Geschichte (früher, heute oder in der Zukunft)?',
+    fr: 'Un lieu inventé a besoin de plus : quel genre de monde est-ce, et quand se passe l\'histoire (autrefois, aujourd\'hui ou dans le futur) ?',
+    it: 'Un luogo inventato ha bisogno di più: che tipo di mondo è, e quando si svolge la storia (nel passato, oggi o nel futuro)?',
+    en: 'An invented place needs more: what kind of world is it, and when does the story happen (in the past, today or in the future)?',
+  },
+  PROBLEM: {
+    de: 'Für ein Buch dieser Länge reicht ein Problem nicht. Was geht danach noch schief, oder welches zweite Hindernis kommt dazu?',
+    fr: 'Pour un livre de cette longueur, un seul problème ne suffit pas. Que se passe-t-il ensuite de travers, ou quel second obstacle s\'ajoute ?',
+    it: 'Per un libro di questa lunghezza un solo problema non basta. Cosa va storto dopo, o quale secondo ostacolo si aggiunge?',
+    en: 'One problem is not enough for a book this long. What goes wrong next, or what second obstacle comes up?',
   },
 };
 
@@ -81,9 +108,9 @@ export function OwnStoryCard({ lang, text, onTextChange, isSelected, onSelect, a
   // Collapsed to one line until the parent opens it (owner 2026-11-01); a draft or a selected own story stays open.
   const [open, setOpen] = useState(() => isSelected || !!text.trim());
 
-  const firstMissing = result?.missing[0];
+  const next = result ? nextOwnStoryTip(result) : null;
   const tip = result
-    ? (firstMissing ? PARTS[firstMissing].tip[lang]
+    ? (next ? (next.kind === 'depth' ? DEPTH_TIPS[next.part as DepthPart][lang] : PARTS[next.part].tip[lang])
       : L(lang, 'Sieht vollständig aus.', 'Cela semble complet.', 'Sembra completa.', 'Looks complete.'))
     : null;
 

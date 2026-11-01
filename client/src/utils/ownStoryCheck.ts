@@ -18,6 +18,8 @@ export type OwnStoryPart = typeof OWN_STORY_PARTS[number];
 export interface OwnStoryResult {
   present: Record<OwnStoryPart, boolean>;
   missing: OwnStoryPart[];
+  /** Parts that are named but too thin (traits, world and era, a second problem): they count as missing, with their depth tip. */
+  thin: OwnStoryPart[];
   unsuitable: boolean;
   /** The text names more events than the chosen book comfortably holds (a hint only, never a limit). */
   tooManyEvents: boolean;
@@ -25,6 +27,13 @@ export interface OwnStoryResult {
 
 /** The chosen book the check measures the text against. */
 export interface OwnStoryBook { pages: number; languageLevel?: string }
+
+/** The tip to show: the first missing part, and whether it is absent ('say') or named but thin ('depth'). Null when complete. */
+export function nextOwnStoryTip(result: Pick<OwnStoryResult, 'missing' | 'thin'>): { part: OwnStoryPart; kind: 'say' | 'depth' } | null {
+  const part = result.missing[0];
+  if (!part) return null;
+  return { part, kind: result.thin.includes(part) ? 'depth' : 'say' };
+}
 
 export interface OwnStoryCheckerOptions {
   analyse: (text: string, age: number | undefined, signal: AbortSignal, book: OwnStoryBook) => Promise<OwnStoryResult>;

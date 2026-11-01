@@ -1,0 +1,42 @@
+{
+  "cases": 31,
+  "costUsd": 0.000786,
+  "model": "typesafe/jev-1.13-20260917",
+  "agree": {
+    "WHO_DEPTH": {
+      "n": 31,
+      "agree": 31,
+      "rate": 1,
+      "truePositiveRate": 1,
+      "trueNegativeRate": 1,
+      "pos": 20,
+      "neg": 11
+    },
+    "WHERE_DEPTH": {
+      "n": 31,
+      "agree": 30,
+      "rate": 0.968,
+      "truePositiveRate": 1,
+      "trueNegativeRate": 0.889,
+      "pos": 22,
+      "neg": 9
+    },
+    "PROBLEM_DEPTH": {
+      "n": 18,
+      "agree": 18,
+      "rate": 1,
+      "truePositiveRate": 1,
+      "trueNegativeRate": 1,
+      "pos": 12,
+      "neg": 6
+    }
+  },
+  "misses": [
+    {
+      "flag": "WHERE_DEPTH",
+      "id": "en-invented-era-nokind-20",
+      "expected": false,
+      "p": 0.96
+    }
+  ]
+}

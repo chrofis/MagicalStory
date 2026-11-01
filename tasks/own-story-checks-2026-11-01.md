@@ -12,7 +12,7 @@
 - client/src/utils/ownStoryCheck.ts: 5 s debounce, min 40 chars; OwnStoryCard is rendered next to the idea cards (WizardStep6Summary.tsx:646). Why the check waits for the idea cards is NOT yet found: no client gate seen; check the browser's request queue (the two idea SSE streams) and the server Jev concurrency before changing anything.
 
 ## Plan
-- [ ] Reproduce the wait on staging (network tab timing: analyze-own-story request start vs idea streams end); find the cause from evidence.
-- [ ] Depth propositions in jev-own-story.txt (generic wording), each feeding a fixed translated tip; PROBLEM depth scaled to the page count.
-- [ ] Replay the new propositions on a set of >=20 stored/written premises (thin and rich, real and invented places) and report hit rates.
-- [ ] Unit tests (parser, tip choice), verify.json entry, decisions.md entry.
+- [x] Reproduce the wait: NOT reproduced. Mock spec with a 20 s idea stream fires the check at 5 s (test added); staging answered analyze-own-story in 0.26 s at +2/+6/+12/+20 s of a live idea stream. Ruled out: client gate, remount, server lock, limiter, connection limit (one HTTP/2 SSE stream).
+- [x] Depth propositions in jev-own-story.txt (generic wording), each feeding a fixed translated tip; PROBLEM depth scaled to the page count.
+- [x] Replay the new propositions on a set of >=20 stored/written premises (thin and rich, real and invented places) and report hit rates.
+- [x] Unit tests (parser, tip choice), verify.json entry, decisions.md entry.
