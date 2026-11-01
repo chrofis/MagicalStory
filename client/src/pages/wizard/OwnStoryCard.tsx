@@ -41,7 +41,7 @@ const PARTS: Record<OwnStoryPart, { label: Record<Lang, string>; tip: Record<Lan
 
 /**
  * Fixed depth tips (a part that is named but thin). The checklist stays the five parts; a thin part shows as not
- * yet done with this tip. Depth is judged by Jev flags, never by reading the text here. Swiss German: ss, never ß.
+ * yet done with this tip. Depth is judged by Jev flags, never by reading the text here. Swiss German: ss, never the eszett.
  */
 type DepthPart = 'WHO' | 'WHERE' | 'PROBLEM';
 const DEPTH_TIPS: Record<DepthPart, Record<Lang, string>> = {
