@@ -307,7 +307,8 @@ function anthropicOutputConfig(options = {}) {
   return Object.keys(cfg).length ? { output_config: cfg } : {};
 }
 
-/** The model's task budget at this effort, or null. Throws on a value the API would refuse. */
+/** The model's task budget at this effort, or null. Throws on a value the API would refuse.
+ *  options.noTaskBudget (Lab control arms only, 2026-11-01) sends the call without it. */
 function taskBudgetFor(model, options = {}) {
   const total = model?.taskBudgetAtEffort?.[options.effort];
   if (total == null) return null;
@@ -1492,7 +1493,7 @@ async function callTextModel(prompt, maxTokens = null, modelOverride = null, opt
   const startedAt = Date.now();
   switch (model.provider) {
     case 'anthropic':
-      result = await callAnthropicAPI(prompt, effectiveMaxTokens, model.modelId, { ...options, taskBudget: taskBudgetFor(model, options) });
+      result = await callAnthropicAPI(prompt, effectiveMaxTokens, model.modelId, { ...options, taskBudget: options.noTaskBudget ? null : taskBudgetFor(model, options) });
       break;
     case 'google':
       result = await callGeminiTextAPI(prompt, effectiveMaxTokens, model.modelId, options);
@@ -1563,7 +1564,7 @@ async function callTextModelStreaming(prompt, maxTokens = null, onChunk = null, 
   const streamStartedAt = Date.now();
   switch (model.provider) {
     case 'anthropic':
-      result = await callAnthropicAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk, { ...options, taskBudget: taskBudgetFor(model, options) });
+      result = await callAnthropicAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk, { ...options, taskBudget: options.noTaskBudget ? null : taskBudgetFor(model, options) });
       break;
     case 'google':
       result = await callGeminiTextAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk, options);

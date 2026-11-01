@@ -44,5 +44,10 @@ describe('Sonnet 5.5 arc creator task budget', () => {
     expect(res.text).toBe('ARC');
     expect(calls[0].headers['anthropic-beta']).toBe('task-budgets-2026-03-13');
     expect(calls[0].body.output_config).toEqual({ effort: 'xhigh', task_budget: { type: 'tokens', total: 80000 } });
+
+    // The Lab control arm (noTaskBudget) sends the same call without the budget or its beta header.
+    await TM.callTextModelStreaming('prompt', null, null, 'claude-sonnet-5-5', { effort: 'xhigh', usageLabel: 'testlab_arc_effort', noTaskBudget: true });
+    expect(calls[1].headers['anthropic-beta']).toBeUndefined();
+    expect(calls[1].body.output_config).toEqual({ effort: 'xhigh' });
   });
 });

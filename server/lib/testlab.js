@@ -8202,7 +8202,8 @@ async function runWriterCompareStage(target, { params = {} }) {
  * production does (parseArcCreate), and scores each committed arc with the
  * same judges arc_rounds uses. Cost and quality land side by side.
  *
- * params: { efforts, model, retellModel, judgeModels, stage, promptFrom, challengesFromStory, promptFromStory, baselineFromStory }
+ * params: { efforts, model, retellModel, judgeModels, stage, promptFrom, challengesFromStory, promptFromStory, baselineFromStory, noTaskBudget }
+ * params.noTaskBudget  send the calls without the model's task budget: the control arm for a budget A/B (2026-11-01).
  *   target: { storyId }
  *
  * params.stage      'retell' sends the stored round-1 re-tell prompt verbatim
@@ -8353,7 +8354,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     const t = Date.now();
     try {
       const armModel = phase === 'retell' ? retellModel : model;
-      const res = await callTextModelStreaming(armPrompt, null, null, armModel, { usageLabel: phase === 'retell' ? 'testlab_arc_effort_retell' : 'testlab_arc_effort', effort });
+      const res = await callTextModelStreaming(armPrompt, null, null, armModel, { usageLabel: phase === 'retell' ? 'testlab_arc_effort_retell' : 'testlab_arc_effort', effort, noTaskBudget: !!params.noTaskBudget });
       const visible = String(res.text || '');
       let commit = null, parseError = null;
       try { commit = phase === 'retell' ? parseArcRetell(visible) : parseArcCreate(visible); } catch (e) { parseError = String(e.message || e); }
@@ -8367,7 +8368,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
           phase, model: armModel, effort, ok: true, parseError,
           // The advisory task budget this call carried (models.js
           // taskBudgetAtEffort; Opus 5.5 at max, 2026-09-25), or null.
-          taskBudget: TEXT_MODELS[armModel].taskBudgetAtEffort?.[effort] ?? null,
+          taskBudget: params.noTaskBudget ? null : (TEXT_MODELS[armModel].taskBudgetAtEffort?.[effort] ?? null),
           cost: costOf(res), elapsedMs: Date.now() - t,
           inputTokens: res.usage?.input_tokens || 0,
           outputTokens: out,
