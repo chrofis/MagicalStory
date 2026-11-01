@@ -26,7 +26,7 @@ describe('Art Director stage models', () => {
     const src = readFileSync(join(ROOT, 'server/lib/beatsPipeline.js'), 'utf8');
     expect(src).toContain('model: sceneModel, gl, stage,'); // runBriefChecks
     expect(src).toContain('model: sceneModel, language: inputData.language'); // label round
-    expect(src).toContain("callTextModelStreaming(prompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion_fallback'");
+    expect(src).toContain("askArtDirector(prompt, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion_fallback'");
   });
   it('the default scene model routes the two stages; an explicit one wins for both', () => {
     const routed = adStageModels(MODEL_DEFAULTS.sceneDescription);
@@ -36,7 +36,7 @@ describe('Art Director stage models', () => {
   });
   it('the calls use the routed models, and the bible call carries the effort only on the routed model', () => {
     const src = readFileSync(join(ROOT, 'server/lib/beatsPipeline.js'), 'utf8');
-    expect(src).toContain("callTextModelStreaming(prompt, null, onChunk, vbModel, { usageLabel: 'beats_visual_bible', ...(vbModel === MODEL_DEFAULTS.visualBibleModel && MODEL_DEFAULTS.visualBibleEffort");
-    expect(src).toContain("callTextModelStreaming(allPrompt, null, onChunk, briefsModel, { usageLabel: 'beats_scene_expansion'");
+    expect(src).toContain("askArtDirector(prompt, onChunk, vbModel, { usageLabel: 'beats_visual_bible', ...(vbModel === MODEL_DEFAULTS.visualBibleModel && MODEL_DEFAULTS.visualBibleEffort");
+    expect(src).toContain("askArtDirector(allPrompt, onChunk, briefsModel, { usageLabel: 'beats_scene_expansion'");
   });
 });

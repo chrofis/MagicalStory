@@ -10817,7 +10817,8 @@
    "check": {
     "kind": "human",
     "what": "Run a realistic story whose topic needs pyjamas or a costume (showcase entry 14, going to bed). Check the styled-avatar log entries carry sheetCheck with no not_illustrated flag on a photographic sheet, view each realistic sheet, and confirm the job completes."
-   }
+   },
+   "evidence": []
   }
  ],
  "runs": [

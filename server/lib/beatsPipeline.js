@@ -103,6 +103,7 @@ const { buildCharacterDescription } = require('./visualBible');
  */
 
 const textModels = require('./textModels');
+const { askArtDirector, ArtDirectorRefusedError } = require('./artDirectorCall');
 const { MODEL_DEFAULTS, IMAGE_MODELS, TEXT_MODELS } = require('../config/models');
 const {
   buildBeatsPrompt,
@@ -455,7 +456,7 @@ async function runVisualBibleLabelRound(visualBible, { model, language, gl, log:
     });
 
     // maxTokens null = the model's own maximum (owner rule: no output caps).
-    const res = await textModels.callTextModelStreaming(prompt, null, null, model, { usageLabel: 'beats_vb_label_repair' });
+    const res = await askArtDirector(prompt, null, model, { usageLabel: 'beats_vb_label_repair' });
     if (res?.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(res.truncation)}`);
 
     const parsed = require('./storyHelpers').extractJsonFromText(res?.text || '');
@@ -469,6 +470,7 @@ async function runVisualBibleLabelRound(visualBible, { model, language, gl, log:
     }
     report.round = 1;
   } catch (err) {
+    if (err instanceof ArtDirectorRefusedError) throw err;
     logger.warn(`⚠️ [BEATS] Visual Bible label round failed (${err.message}) — repairing ${findings.length} label fault(s) in code`);
   }
 
@@ -1743,7 +1745,7 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
     let salvage = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const res = await textModels.callTextModelStreaming(prompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion_fallback', ...adBriefsCallOptions(), ...labCallOptions });
+        const res = await askArtDirector(prompt, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion_fallback', ...adBriefsCallOptions(), ...labCallOptions });
         if (onCall) onCall(res);
         if (!res || !res.text || !res.text.trim()) throw new Error('empty scene brief');
         const { assessSceneBrief, describeSceneBrief } = require('./iterateBriefGuard');
@@ -1754,6 +1756,7 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
         }
         return { pageNumber: b.pageNumber, brief: res.text, prompt, modelId: res.modelId || sceneModel };
       } catch (err) {
+        if (err instanceof ArtDirectorRefusedError) throw err;
         lastErr = err;
         log.warn(`⚠️ [BEATS] Scene expansion page ${b.pageNumber} attempt ${attempt} failed: ${err.message}`);
       }
@@ -1832,7 +1835,7 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
     // One call, parsed; null when the reply is not a whole bible (JSON parse is the completeness test).
     const askBible = async (prompt, attempt) => {
       try {
-        const res = await textModels.callTextModelStreaming(prompt, null, onChunk, vbModel, { usageLabel: 'beats_visual_bible', ...(vbModel === MODEL_DEFAULTS.visualBibleModel && MODEL_DEFAULTS.visualBibleEffort ? { effort: MODEL_DEFAULTS.visualBibleEffort } : {}), ...labCallOptions });
+        const res = await askArtDirector(prompt, onChunk, vbModel, { usageLabel: 'beats_visual_bible', ...(vbModel === MODEL_DEFAULTS.visualBibleModel && MODEL_DEFAULTS.visualBibleEffort ? { effort: MODEL_DEFAULTS.visualBibleEffort } : {}), ...labCallOptions });
         if (onCall) onCall(res);
         const raw = res?.text || '';
         vbReplies.push({ attempt, modelId: res?.modelId || vbModel, text: raw });
@@ -1841,6 +1844,7 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
         if (sections && parsedVb) return { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: res?.modelId || vbModel };
         log.error(`🚨 [BEATS] Visual Bible attempt ${attempt}: ${sections ? `---VISUAL BIBLE--- present but its JSON did not parse (${sections.body.length} chars)` : `no ---VISUAL BIBLE--- section (${raw.length} chars)`}`);
       } catch (err) {
+        if (err instanceof ArtDirectorRefusedError) throw err;
         log.error(`🚨 [BEATS] Visual Bible attempt ${attempt} failed: ${err.message}`);
         gl.warn('beats_visual_bible_failed', `Visual Bible call failed on attempt ${attempt}: ${err.message}`);
       }
@@ -2113,7 +2117,7 @@ ${bibleBody}` : bibleBody;
       let allRaw = '';
       const attemptStart = Date.now();
       try {
-        const res = await textModels.callTextModelStreaming(allPrompt, null, onChunk, briefsModel, { usageLabel: 'beats_scene_expansion', ...adBriefsCallOptions(), ...labCallOptions });
+        const res = await askArtDirector(allPrompt, onChunk, briefsModel, { usageLabel: 'beats_scene_expansion', ...adBriefsCallOptions(), ...labCallOptions });
         if (onCall) onCall(res);
         allRaw = res?.text || '';
         allModelId = res?.modelId || briefsModel;
@@ -2130,6 +2134,7 @@ ${bibleBody}` : bibleBody;
           cut: false,
         });
       } catch (err) {
+        if (err instanceof ArtDirectorRefusedError) throw err;
         // The transport already retried; a stream that never finished arrives here as streamCut.
         adReplies.push({ attempt, modelId: briefsModel, text: '', error: String(err.message).slice(0, 300), elapsedMs: Date.now() - attemptStart, cut: err.streamCut === true });
         log.error(`🚨 [BEATS] All-pages scene briefs attempt ${attempt} failed (${err.message}) — falling back to per-page expansion`);

@@ -647,6 +647,10 @@ const MODEL_DEFAULTS = {
   visualBibleModel: process.env.VISUAL_BIBLE_MODEL || 'claude-haiku-5-5',
   visualBibleEffort: 'medium',
   sceneBriefsModel: process.env.SCENE_BRIEFS_MODEL || 'gemini-3.7-flash',
+  // An Art Director call the provider REFUSES (Google content_filter / PROHIBITED_CONTENT, bedtime scenes with
+  // children) is asked once more here, a non-Google model, with the same prompt; refused again, the run stops
+  // (server/lib/artDirectorCall.js; owner 2026-10-31 "Other model on refusal"). Not Haiku: rejected for briefs above.
+  artDirectorRefusalModel: 'claude-sonnet-5-5',
   // Scene iteration/retry — the full-scene re-expansion during repair. Moved to
   // Qwen for cost (2026-07-12): its diagnosis + fix quality matched Sonnet in the
   // A/B; the one gap (copying German Visual-Bible names into English prose) is

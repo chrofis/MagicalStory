@@ -369,11 +369,12 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
     // Reasoning lowered one step from the model's default (owner, 2026-09-30):
     // the lector A/B on the same model found "medium" ✅ / "low" ❌ — see
     // docs/decisions.md. labCallOptions (Test Lab) may still override it.
-    res = await textModels.callTextModelStreaming(prompt, null, null, model, { usageLabel: 'beats_brief_reask', reasoning: { effort: 'medium' }, ...labCallOptions });
+    res = await require('./artDirectorCall').askArtDirector(prompt, null, model, { usageLabel: 'beats_brief_reask', reasoning: { effort: 'medium' }, ...labCallOptions });
     if (onCall) onCall(res);
     if (!res || !String(res.text || '').trim()) failed = 'the re-ask returned nothing';
     else if (res.truncation?.suspected) failed = `the re-ask reply was ${textModels.describeTruncation(res.truncation)}`;
   } catch (err) {
+    if (err instanceof require('./artDirectorCall').ArtDirectorRefusedError) throw err;
     failed = `the re-ask call failed: ${err.message}`;
   }
   report.reask = { prompt, model: (res && res.modelId) || model, usage: (res && res.usage) || null, durationMs: Date.now() - t1, pages: flagged, failed, reply: (res && res.text) || '' };

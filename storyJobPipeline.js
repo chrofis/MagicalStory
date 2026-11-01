@@ -1129,7 +1129,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // 24 parallel scene expansions can each take 30-60s; without heartbeating,
           // the row would only get updated when the first one finishes.
           const expansionHeartbeat = createJobHeartbeat(jobId, dbPool);
-          expansionResult = await callTextModelStreaming(expansionPrompt, null, () => expansionHeartbeat(), modelOverrides.sceneDescriptionModel, { usageLabel: 'scene_expansion' });
+          expansionResult = await require('./server/lib/artDirectorCall').askArtDirector(expansionPrompt, () => expansionHeartbeat(), modelOverrides.sceneDescriptionModel, { usageLabel: 'scene_expansion' });
           // Usage recorded by the callTextModelStreaming chokepoint (usageLabel above).
           finalSceneDescription = expansionResult.text;
 
