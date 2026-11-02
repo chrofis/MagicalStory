@@ -1001,3 +1001,7 @@ Recommended a 20-story arc+plan replay (~$25, cap $30) to validate one prompt ch
 ## 2026-11-01 — A report page that shows zero needs its own count check before it is shown
 Showed the owner an Opus-vs-old-judges page with every Opus column at 0 although Opus wrote 22 faults: the page-matching regex was built inside a template literal (`new RegExp(\`\]:\s*p${n}\b\`)`), which strips the backslashes, so nothing matched. The totals line counted the raw lines and said 9/6/7, contradicting the columns, and I did not notice.
 Rule: before opening any generated report, assert that the per-item counts add up to the total (here: rendered findings == raw FAULT lines). Build regexes as literals, never inside template strings.
+
+## 2026-11-02 - Prose under a picture is top-left; prove a staging boot before a prod push
+- Owner: "Isn't text normally left aligned???" / "Should be top left aligned". The long-text print pages reused the centered drawing of short captions. Rule: running prose (several sentences, paragraphs) is left-aligned and starts at the top of its box; only short captions are centered. Check the layout convention of the text TYPE before reusing a drawing path.
+- I pushed a fix to master while staging still served the previous commit (its deploy had not booted), so the "verify on staging" step was skipped. Rule: before a master push, `/api/health/config` on staging must report the commit being pushed.
