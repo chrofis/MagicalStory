@@ -4595,6 +4595,14 @@
       "status": "fixed",
       "fixedIn": "b1a23a0b4",
       "fix": "settleJobWithRefund releases the trial slot (stories_generated - 1, is_trial only) in the same transaction when a trialMode job transitions into failed; once only, not after the story was saved. Regression: tests/unit/job-credits.test.ts 'trial slot'."
+    },
+    {
+      "id": "gelato-504-orphans-order",
+      "title": "A Gelato 504 on order creation marks our order failed although Gelato created the order, so the Gelato id is lost and a retry orders again",
+      "reportedAt": "2026-11-02",
+      "source": "Prod order 102 admin draft retry 2026-11-02 22:38 CH: log \"Print provider API error: 504\" -> orders row gelato_status=failed, payment_status=failed, gelato_order_id still the cancelled 6f9ce74b; Gelato orders:search shows draft c723c52d-a3dd-4cb5-86c3-a9e05758b36d created 22:38:30 CH with orderReferenceId story-job_1793561351885_kkg5gxkbj-1793655479409 (the PDF of that very run, 12 pt).",
+      "rootCause": "server/lib/gelato.js processBookOrder: a non-2xx create response throws before gelatoOrderId is set, so the catch takes the \"nothing was ordered\" branch (marks failed, emails). A 5xx/timeout does not prove Gelato did not create the order. The orderReferenceId is built inline (story-<id>-<Date.now()>), so it is not known afterwards to look the order up.",
+      "status": "open"
     }
   ]
 }
