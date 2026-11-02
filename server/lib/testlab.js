@@ -7299,6 +7299,20 @@ function scoreArm(armKey, parsed, rawText) {
  * @param params.repeats  runs per arm (default 2 — a single run cannot separate
  *                        a prompt problem from run-to-run judge variance)
  */
+/**
+ * The inventory arms one experiment runs. `keys` (params.arms, e.g. ['unified']) picks a
+ * subset: a model comparison only needs the template production runs, at a third of the
+ * cost. No keys = every arm. An unknown key throws.
+ */
+function selectInventoryArms(allArms, keys) {
+  if (!Array.isArray(keys) || !keys.length) return allArms;
+  return keys.map(k => {
+    const arm = allArms.find(a => a.key === k);
+    if (!arm) throw new Error(`Unknown inventory arm: ${k}`);
+    return arm;
+  });
+}
+
 async function runInventoryAbStage(ctx, { experimentId, params = {} }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
@@ -7336,11 +7350,12 @@ async function runInventoryAbStage(ctx, { experimentId, params = {} }) {
   // {figures, objectMatches, rendering} — scoring that would have marked the
   // unified prompt as "dropping" interactions, setting and lettering when the
   // model had emitted all three and the plumbing discarded them.
-  const ARMS = [
+  const ALL_ARMS = [
     { key: 'split_p1', label: 'P1 (image-visual-inventory)', template: PROMPT_TEMPLATES.imageVisualInventory, json: true },
     { key: 'split_stage1', label: 'Stage 1 (image-vision-inventory)', template: PROMPT_TEMPLATES.imageVisionInventory, json: false },
     { key: 'unified', label: 'Unified (image-inventory-unified)', template: params.unifiedPrompt || PROMPT_TEMPLATES.imageInventoryUnified, json: true },
   ];
+  const ARMS = selectInventoryArms(ALL_ARMS, params.arms);
 
   const t0 = Date.now();
   const runs = [];
@@ -10875,6 +10890,7 @@ module.exports = {
   loadTestImage,
   resolveReplayParams,
   loadActivePageImage,
+  selectInventoryArms,
   // The identity-vote replay, exported so its arithmetic can be pinned without
   // a database, a story or a paid VLM call: what the witness said, whether the
   // vote withheld a rename, and how that classifies against a pixel-judged
