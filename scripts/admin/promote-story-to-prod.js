@@ -259,6 +259,9 @@ async function promoteAsNew(prod, stg, staged) {
   const inline = stagedImgs.rows.filter((r) => !r.image_url && r.image_data).length;
   console.log(`Images  : staging ${stagedImgs.rows.length} rows (${inline} inline, rest R2 URLs) -> prod currently ${liveImgs.rows[0].n}`);
   console.log(`Data    : staging ${(JSON.stringify(staged.data).length / 1048576).toFixed(2)}MB (sha ${sha(staged.data)})`);
+  // Same rewrite as --as-new, computed before --dry-run exits so a dry run proves it too.
+  const { payload, toCopy } = preparePayload(staged, stagedImgs.rows, storyId, storyId);
+  console.log(`R2 copy : ${toCopy.length} distinct staging URLs`);
 
   if (DRY) { console.log('\n--dry-run: no writes performed.'); await prod.end(); await stg.end(); return; }
 
