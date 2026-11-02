@@ -1607,6 +1607,7 @@ const MODEL_PRICING = {
   'qwen/qwen2.5-vl-72b-instruct': { input: 0.80, output: 1.00 },  // was 0.25/0.75 — 3.2x under on input; single endpoint (Parasail)
   'qwen/qwen3-vl-32b-instruct': { input: 0.104, output: 0.416 },
   'qwen/qwen3-vl-235b-a22b-instruct': { input: 0.21, output: 1.90 },
+  'anthropic/claude-sonnet-5.5': { input: 2.00, output: 10.00 },  // OpenRouter /api/v1/models, 2026-11-02
   'qwen/qwen3.6-plus': { input: 0.325, output: 1.95 },  // ADDED — had no entry
   'qwen/qwen3.8-27b': { input: 0.214, output: 2.55 },   // ADDED — had no entry (description says 0.45/3.20)
   // ADDED. The bare id is NOT in the OpenRouter catalogue LISTING (only
