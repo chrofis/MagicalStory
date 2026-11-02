@@ -152,15 +152,29 @@ async function impersonateFamilyAccount(apiBase, targetUserId) {
  * the condition behind the cross-account incident of 2026-08-09.
  */
 async function accountHasFamily(apiBase, token, family) {
-  try {
-    const res = await fetch(`${apiBase}/api/characters`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) return false;
-    const body = await res.json();
-    const existing = (body.characters || body || []).map(c => String(c.name || '').trim().toLowerCase());
-    return family.characters.every(c => existing.includes(c.name.trim().toLowerCase()));
-  } catch {
-    return false;
-  }
+  const res = await fetch(`${apiBase}/api/characters`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(`GET /api/characters failed: HTTP ${res.status}`);
+  const body = await res.json();
+  return familyOnAccount((body.characters || body || []).map(c => c.name), family);
+}
+
+/**
+ * true = the whole family is there once each; false = none of it is there.
+ * Anything in between throws: creating the family on top of a partial one is how
+ * staging's Dubois account got two Léas (2026-10-31), and a duplicated name makes
+ * the spec's character check ambiguous.
+ */
+function familyOnAccount(names, family) {
+  const norm = (n) => String(n || '').trim().toLowerCase();
+  const counts = new Map();
+  for (const n of names) counts.set(norm(n), (counts.get(norm(n)) || 0) + 1);
+  const wanted = family.characters.map(c => norm(c.name));
+  const present = wanted.filter(n => counts.has(n));
+  const duplicated = wanted.filter(n => (counts.get(n) || 0) > 1);
+  if (duplicated.length) throw new Error(`Account holds duplicate family characters (${duplicated.join(', ')}); delete the extra copies before running a showcase.`);
+  if (present.length === wanted.length) return true;
+  if (present.length === 0) return false;
+  throw new Error(`Account holds part of the family (${present.join(', ')}; missing ${wanted.filter(n => !counts.has(n)).join(', ')}); creating it again would duplicate them. Complete or clear the account first.`);
 }
 
 function loadEntries() {
@@ -415,7 +429,11 @@ async function main() {
   }
 }
 
-main().catch(err => {
-  console.error('Fatal:', err.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(err => {
+    console.error('Fatal:', err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { familyOnAccount };
