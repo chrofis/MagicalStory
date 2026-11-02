@@ -69119,3 +69119,11 @@ Revisit if: the preview is cheap enough to generate at order time for every cust
 **Considered:** retry on Gemini (another provider, a second implementation to keep in step); ask the user for another photo at upload (needs a pre-check call on every upload); keep failing (loses the trial).
 **Revisit if:** the metric shows the face photo refused too, or face-only sheets produce clothing complaints.
 **Touched files:** server/lib/grok.js, server/lib/oneCallSheet.js, tests/unit/avatar-sheet-body-photo-refused.test.ts
+
+## 2026-11-02 - A trial whose story job fails gets its one trial slot back
+**Context:** prod trial job_1793628697289_lf75a2z71 failed (MissingRequiredCostumeSheetError, "please try again"); users row stories_generated=1 of story_quota=1, so create-story answered 409 TRIAL_USED. routes/trial.js create-story takes the slot atomically and `releaseSlot` returns it only on exits before the job row exists; a failure inside the job never did. Owner, 2026-11-02: "Give the slot back".
+**Decision:** `settleJobWithRefund` (server/lib/jobCredits.js), the one place every job failure is settled (pipeline catch x2, status-poll timeout, my-jobs stale sweep), runs `UPDATE users SET stories_generated = stories_generated - 1 WHERE id=$1 AND is_trial = true AND stories_generated > 0` in the same transaction when the transition is INTO `failed`, the job's `input_data.trialMode` is true, the previous status was neither `failed` nor `completed` (the pipeline settles twice, the second must not release again), and, where `refundIfProgressBelow` is given, progress is below it (a saved story keeps its slot). A user cancel keeps the slot (the user chose to stop). Trials reserve 0 credits, so no credit or ledger row moves.
+**Claimed accounts:** a claimed (non-trial) account has `is_trial = false` and its `stories_generated` is only a counter against `story_quota`; it is untouched, as before (its failed job refunds credits only).
+**Considered:** releasing in storyJobPipeline's catch only (misses the timeout and stale-sweep failures, a second copy of the rule); a separate release call after settle (not atomic with the status flip).
+**Revisit if:** a failed trial is abused to farm unlimited retries (the per-day trial cap and photo checks are the other limits).
+**Touched files:** server/lib/jobCredits.js, tests/unit/job-credits.test.ts

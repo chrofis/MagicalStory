@@ -109,18 +109,34 @@ async function settleJobWithRefund(pool, jobId, opts) {
       `UPDATE story_jobs s
           SET status = $2, error_message = COALESCE($3, s.error_message),
               credits_reserved = ${claimSql}, updated_at = NOW()
-         FROM (SELECT credits_reserved AS prev, user_id AS uid, progress AS prog
+         FROM (SELECT credits_reserved AS prev, user_id AS uid, progress AS prog,
+                      status AS pstatus, (input_data ->> 'trialMode') = 'true' AS trial
                  FROM story_jobs WHERE id = $1 FOR UPDATE) old
         WHERE ${where.join(' AND ')}
         RETURNING old.prev AS prev, old.uid AS uid, COALESCE(old.prog, 0) AS prog,
-                  (s.credits_reserved = 0 AND old.prev > 0) AS claimed`,
+                  (s.credits_reserved = 0 AND old.prev > 0) AS claimed,
+                  old.pstatus AS pstatus, COALESCE(old.trial, false) AS trial`,
       params
     );
     if (res.rows.length === 0) {
       await client.query('ROLLBACK');
       return { changed: false, refunded: 0, userId: null, progress: 0 };
     }
-    const { prev, uid, prog, claimed } = res.rows[0];
+    const { prev, uid, prog, claimed, pstatus, trial } = res.rows[0];
+    // A /try job reserves 0 credits; what it spends is the account's ONE trial slot
+    // (routes/trial.js create-story takes it before the job row exists). A job that FAILS
+    // gives the slot back in this same transaction, so the retry the error page offers
+    // works (docs/decisions.md 2026-11-02). Only the transition INTO failed counts (the
+    // pipeline settles twice; the second finds 'failed' and must not release again), a
+    // story that is already saved (refundIfProgressBelow) keeps its slot, and a user
+    // cancel keeps it too (the user chose to stop).
+    if (status === 'failed' && trial && uid && pstatus !== 'failed' && pstatus !== 'completed'
+        && (refundIfProgressBelow == null || prog < refundIfProgressBelow)) {
+      await client.query(
+        'UPDATE users SET stories_generated = stories_generated - 1 WHERE id = $1 AND is_trial = true AND stories_generated > 0',
+        [uid]
+      );
+    }
     let refunded = 0;
     if (claimed && uid && prev > 0) {
       const credit = await client.query(

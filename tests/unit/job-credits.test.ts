@@ -115,6 +115,38 @@ describe('settleJobWithRefund', () => {
     expect(log).not.toContain('LEDGER');
   });
 
+  describe('trial slot (bug trial-failed-job-keeps-slot)', () => {
+    const run = async (row: any, opts: any = {}) => {
+      const slotUpdates: any[] = [];
+      const { pool, log } = fakePool((sql, params) => {
+        if (sql.includes('UPDATE story_jobs')) return { rows: [row] };
+        if (sql.includes('stories_generated')) { slotUpdates.push(params); return { rows: [] }; }
+      });
+      const r = await settleJobWithRefund(pool, 'job1', { status: 'failed', describe: describe_, ...opts });
+      return { r, slotUpdates, log };
+    };
+    const base = { prev: 0, uid: 'u1', prog: 20, claimed: false, pstatus: 'processing', trial: true };
+
+    it('a failing trial job gives the trial slot back in the same transaction', async () => {
+      const { slotUpdates, log } = await run(base);
+      expect(slotUpdates).toEqual([['u1']]);
+      expect(log).toEqual(['BEGIN', 'JOBS', 'USERS', 'COMMIT', 'RELEASE']);
+    });
+    it('settling an already failed job again does not release twice', async () => {
+      expect((await run({ ...base, pstatus: 'failed' })).slotUpdates).toEqual([]);
+    });
+    it('a non-trial job never touches stories_generated', async () => {
+      expect((await run({ ...base, trial: false })).slotUpdates).toEqual([]);
+    });
+    it('a cancel keeps the slot', async () => {
+      expect((await run(base, { status: 'cancelled' })).slotUpdates).toEqual([]);
+    });
+    it('a failure after the story was saved (progress >= refundIfProgressBelow) keeps the slot', async () => {
+      expect((await run({ ...base, prog: 100 }, { refundIfProgressBelow: 100 })).slotUpdates).toEqual([]);
+      expect((await run({ ...base, prog: 60 }, { refundIfProgressBelow: 100 })).slotUpdates).toEqual([['u1']]);
+    });
+  });
+
   it('puts every requested guard into the single UPDATE', async () => {
     let seen = '';
     const { pool } = fakePool((sql) => { seen = sql; return { rows: [] }; });
