@@ -2429,3 +2429,8 @@ three below are prompt/classification questions and are the owner's call.
 - [ ] Showcase 8 (job_1793557464719_txr1gqd28) p10: Élodie (34) reads as a teenager in the shipped picture and the final Opus round did not flag it; check against her sheet before calling it a defect → tasks/cover-outfit-code-decided-2026-11-01.md:45
 - [ ] Production page inventory model qwen3-vl (Qwen3 VL 32B) deprecated by OpenRouter on 2026-10-09: every call 404s and falls back to gemini-2.5-flash (prod log 2026-11-01). Pick the replacement (owner) → server/config/runtime.js:203
 - [ ] Production [STYLED-AVATAR] CACHE MISS for 3 standard_realistic avatars (#1793522060597, #1793524024937, #1793526286145) on a customer's realistic story, "quality will degrade" (prod log 2026-11-01) → server/lib/styledAvatars.js:1
+- [ ] Order 102 (customer book, CHF 39) is a Gelato DRAFT waiting for the owner's approval before it prints → tasks/showcase-review-2026-11-02.md:25
+- [ ] Showcase 2026-11-02 p8-p10: a boot handed to the hedgehog is back on Léa's foot in bed (prop continuity) → tasks/showcase-review-2026-11-02.md:12
+- [ ] Showcase 2026-11-02 p2: the window shows a later scene (Léa already at the bridge) → tasks/showcase-review-2026-11-02.md:14
+- [ ] Showcase 2026-11-02: manga style draws a Swiss village (Fislisbach) as Japanese architecture → tasks/showcase-review-2026-11-02.md:17
+- [ ] Showcase 2026-11-02 p9: page nearly monochrome, rest of the book full colour → tasks/showcase-review-2026-11-02.md:20
