@@ -1161,11 +1161,7 @@ router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
 
     // Fetch cover dimensions from Gelato API
     const coverDims = await getCoverDimensions(printProductUid, snappedPageCount);
-    if (coverDims) {
-      console.log(`📚 [BOOK PDF] Gelato cover dims: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
-    } else {
-      console.log(`⚠️ [BOOK PDF] getCoverDimensions returned null for product=${printProductUid}, pages=${snappedPageCount}`);
-    }
+    console.log(`📚 [BOOK PDF] Gelato cover dims: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
 
     // A square book prints square covers, made once per cover and reused afterwards (squareCovers.js)
     if (bookFormat === 'square') await Promise.all(stories.map(s => attachSquareCovers(s.id, s.data)));

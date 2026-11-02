@@ -339,95 +339,52 @@ async function computeBookPageInfo(dbPool, storyDatas, coverType, { layout: requ
 }
 
 /**
- * Get cover dimensions from Gelato API including spine width
+ * Cover size from the Gelato API, used as-is: page 1 of the print PDF must be EXACTLY this size.
+ *
+ * The query parameter is `pageCount` (interior pages). Until 2026-11-02 we sent `pagesCount`, which
+ * Gelato ignores, so every answer was its 32-page default and the spine was scaled linearly from it;
+ * order 102 (28 pages) came out 0.34 mm narrow and was refused. The response's `pagesCount` is the
+ * interior count + 4 cover pages by Gelato's convention, not a sign of a different book.
+ *
+ * Throws on any missing piece: a guessed cover is refused by Gelato after the customer has paid,
+ * while a throw marks the order failed and alerts the admin.
  *
  * @param {string} productUid - Gelato product UID
- * @param {number} pageCount - Number of interior pages
- * @returns {Promise<{spineWidth: number, coverWidth: number, coverHeight: number} | null>}
+ * @param {number} pageCount - Number of interior pages (the count sent with the order)
+ * @returns {Promise<{spineWidth: number, coverPageWidth: number, coverPageHeight: number, contentBack: Object, contentFront: Object, spineArea: Object, raw: Object}>}
  */
 async function getCoverDimensions(productUid, pageCount) {
   const printApiKey = process.env.GELATO_API_KEY;
-  if (!printApiKey) {
-    log.warn('[GELATO] No API key configured, cannot fetch cover dimensions');
-    return null;
+  if (!printApiKey) throw new Error('GELATO_API_KEY not configured: cannot size the cover');
+
+  const url = `https://product.gelatoapis.com/v3/products/${productUid}/cover-dimensions?pageCount=${pageCount}&measureUnit=mm`;
+  log.debug(`[GELATO] Fetching cover dimensions: ${url}`);
+  const response = await fetch(url, { method: 'GET', headers: { 'X-API-KEY': printApiKey } });
+  if (!response.ok) {
+    throw new Error(`Gelato cover-dimensions ${response.status} for ${productUid} (${pageCount} pages): ${await response.text()}`);
   }
 
-  try {
-    const url = `https://product.gelatoapis.com/v3/products/${productUid}/cover-dimensions?pagesCount=${pageCount}&measureUnit=mm`;
-    log.debug(`[GELATO] Fetching cover dimensions: ${url}`);
+  const data = await response.json();
+  console.log(`[GELATO] Cover dimensions response for ${productUid} (${pageCount} pages):`, JSON.stringify(data));
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'X-API-KEY': printApiKey
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      log.warn(`[GELATO] Cover dimensions API error: ${response.status} - ${errorText}`);
-      return null;
-    }
-
-    const data = await response.json();
-    console.log(`[GELATO] Cover dimensions response for ${productUid}:`, JSON.stringify(data));
-
-    // Extract dimensions from response
-    const spineSize = data.spineSize || data.spine;
-    if (spineSize) {
-      const apiSpineWidth = spineSize.width || spineSize;
-      const apiPageCount = data.pagesCount || pageCount;
-
-      // The API may return dimensions for a different page count than requested
-      // (e.g., always returns 32 for some products). Scale spine proportionally.
-      let actualSpineWidth = apiSpineWidth;
-      if (apiPageCount !== pageCount && apiPageCount > 0) {
-        const spinePerPage = apiSpineWidth / apiPageCount;
-        actualSpineWidth = Math.round(pageCount * spinePerPage * 100) / 100;
-        console.log(`[GELATO] Spine scaled: API=${apiSpineWidth}mm (${apiPageCount}pg) → ${actualSpineWidth}mm (${pageCount}pg) @ ${spinePerPage.toFixed(4)}mm/pg`);
-      } else {
-        console.log(`[GELATO] Spine width for ${pageCount} pages: ${actualSpineWidth}mm`);
-      }
-
-      // Full cover page size: try wraparoundInsideSize (hardcover), productInsideSize, then bleedSize (softcover)
-      const fullCoverSize = data.wraparoundInsideSize || data.productInsideSize || data.bleedSize;
-
-      let coverPageWidth = fullCoverSize?.width;
-      let coverPageHeight = fullCoverSize?.height;
-
-      // If we used bleedSize and spine was scaled, adjust the width to match
-      if (!data.wraparoundInsideSize && !data.productInsideSize && data.bleedSize && apiPageCount !== pageCount) {
-        // bleedSize.width is for apiPageCount; adjust for actual page count
-        coverPageWidth = data.bleedSize.width - apiSpineWidth + actualSpineWidth;
-        console.log(`[GELATO] Cover width adjusted: ${data.bleedSize.width}mm → ${coverPageWidth}mm (spine delta: ${(actualSpineWidth - apiSpineWidth).toFixed(2)}mm)`);
-      }
-
-      // Also adjust content areas for the wider spine
-      const spineDelta = actualSpineWidth - apiSpineWidth;
-      const contentFront = data.contentFrontSize ? { ...data.contentFrontSize, left: data.contentFrontSize.left + spineDelta } : null;
-
-      const result = {
-        spineWidth: actualSpineWidth,
-        // Full cover page dimensions (what Gelato expects as page 1 size)
-        coverPageWidth: coverPageWidth,
-        coverPageHeight: coverPageHeight,
-        // Content areas for image placement (where the actual cover images go)
-        contentBack: data.contentBackSize,   // { width, height, left, top } — unchanged, always starts from left
-        contentFront: contentFront,          // { width, height, left, top } — shifted right by spine delta
-        spineArea: { ...data.spineSize, width: actualSpineWidth },
-        raw: data
-      };
-      const source = data.wraparoundInsideSize ? 'wraparoundInsideSize' : data.productInsideSize ? 'productInsideSize' : data.bleedSize ? 'bleedSize' : 'none';
-      console.log(`[GELATO] Cover page size: ${result.coverPageWidth}x${result.coverPageHeight}mm (source: ${source})`);
-      return result;
-    }
-
-    console.log(`[GELATO] No spineSize in response, returning null`);
-    return null;
-  } catch (error) {
-    log.error('[GELATO] Error fetching cover dimensions:', error.message);
-    return null;
+  // Full cover page size: wraparoundInsideSize (hardcover), productInsideSize, then bleedSize (softcover)
+  const source = data.wraparoundInsideSize ? 'wraparoundInsideSize' : data.productInsideSize ? 'productInsideSize' : data.bleedSize ? 'bleedSize' : null;
+  if (!source || !data.spineSize) {
+    throw new Error(`Gelato cover-dimensions for ${productUid} (${pageCount} pages) has no ${source ? 'spineSize' : 'bleedSize'}: ${JSON.stringify(data)}`);
   }
+  const result = {
+    spineWidth: data.spineSize.width,
+    // Full cover page dimensions (what Gelato expects as page 1 size)
+    coverPageWidth: data[source].width,
+    coverPageHeight: data[source].height,
+    // Content areas for image placement (where the actual cover images go), { width, height, left, top } in mm
+    contentBack: data.contentBackSize,
+    contentFront: data.contentFrontSize,
+    spineArea: data.spineSize,
+    raw: data
+  };
+  console.log(`[GELATO] Cover page size: ${result.coverPageWidth}x${result.coverPageHeight}mm, spine ${result.spineWidth}mm (source: ${source})`);
+  return result;
 }
 
 /**
@@ -497,13 +454,9 @@ async function buildBookPrintPdf(dbPool, allStoryIds, coverType, layout, { fillM
   }
 
   // Step 3b: Get cover dimensions from Gelato API
-  let coverDims = null;
-  if (printProductUid) {
-    coverDims = await getCoverDimensions(printProductUid, snappedPageCount);
-    if (coverDims) {
-      log.debug(`📏 [BACKGROUND] Gelato cover: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
-    }
-  }
+  if (!printProductUid) throw new Error(`No Gelato product for format=${bookFormat}, coverType=${coverType}: cannot size the cover`);
+  const coverDims = await getCoverDimensions(printProductUid, snappedPageCount);
+  log.debug(`📏 [BACKGROUND] Gelato cover: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
 
   // Step 3b2: a SQUARE book prints square covers (made once per cover, normally already made while the customer
   // looked at them in the book builder; the stored ones are reused). Throws rather than print a crop.
