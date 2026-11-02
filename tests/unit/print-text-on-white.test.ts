@@ -71,6 +71,26 @@ describe('A4 single layout by reading level', () => {
     await expect(pdfLib.generateViewPdf(s, 'A4')).rejects.toThrow(/under the 40% floor/);
   }, 60000);
 
+  it('advanced: the story text under the picture is top-left aligned (prose, like the square text pages)', async () => {
+    const PDFDocument = cjs('pdfkit');
+    const spy = vi.spyOn(PDFDocument.prototype, 'text');
+    const s = await story('advanced', 120, 2);
+    // Page 2 much shorter than page 1: top alignment puts both at the same y, centring would not.
+    s.storyText = s.storyText.replace(/(--- Page 2 ---\n)[\s\S]*$/, '$1Wort0 Wort1 Wort2');
+    await pdfLib.generateViewPdf(s, 'A4');
+    const bodyCalls = spy.mock.calls.filter((c: any[]) => typeof c[0] === 'string' && c[0].includes('Wort0'));
+    expect(bodyCalls.length).toBe(2);
+    for (const c of bodyCalls) {
+      const opts = c.find((a: any) => a && typeof a === 'object' && 'align' in a);
+      expect(opts.align).toBe('left');
+      // Paragraph gap reduced for text on white (owner 2026-11-02): 0.2 x font size, below the strips' 0.5.
+      // The strips' 0.5 x font is at least 5 pt (10 pt floor); 0.2 x at most 12 pt is 2.4 pt.
+      expect(opts.paragraphGap).toBeGreaterThan(0);
+      expect(opts.paragraphGap).toBeLessThanOrEqual(2.4 + 1e-9);
+    }
+    expect(bodyCalls[1][2]).toBeCloseTo(bodyCalls[0][2], 3);
+  }, 60000);
+
   it('advanced: a long page shrinks the picture for the whole book and still renders', async () => {
     const s = await story('advanced', 700, 2);
     const buf = await pdfLib.generateViewPdf(s, 'A4');

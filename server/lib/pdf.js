@@ -172,13 +172,13 @@ function parseStoryPages(storyData) {
  * @param {string} align - Text alignment ('left' or 'center')
  * @returns {{fontSize: number, lineGap: number, warning: string|null}}
  */
-function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHeight, startFontSize = 14, minFontSize = 6, align = 'left') {
+function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHeight, startFontSize = 14, minFontSize = 6, align = 'left', paragraphGapRatio = 0.5) {
   // Compress multiple newlines once
   const cleanedPages = pageTexts.map(p => p.trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n'));
 
   // Helper: does every page fit at this (fontSize, lineGap)?
   const allPagesFit = (fontSize, lineGap) => {
-    const paragraphGap = fontSize * 0.5;
+    const paragraphGap = fontSize * paragraphGapRatio;
     doc.fontSize(fontSize).font('Helvetica');
     for (let i = 0; i < cleanedPages.length; i++) {
       const h = doc.heightOfString(cleanedPages[i], { width: availableWidth, align, lineGap, paragraphGap });
@@ -201,7 +201,7 @@ function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHe
 
   if (stage1Success) {
     log.debug(`📄 [PDF] Font fit at ${startFontSize}pt (lineGap=${chosenLineGap}) for ${cleanedPages.length} pages`);
-    return { fontSize: startFontSize, lineGap: chosenLineGap, warning: null };
+    return { fontSize: startFontSize, lineGap: chosenLineGap, paragraphGap: startFontSize * paragraphGapRatio, warning: null };
   }
 
   // Stage 2: shrink font at tightest lineGap (chosenLineGap is now -4).
@@ -223,7 +223,7 @@ function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHe
   // Final verification at floor
   if (fontSize <= minFontSize && !allPagesFit(minFontSize, chosenLineGap)) {
     // Find which page fails for a useful error
-    const paragraphGap = minFontSize * 0.5;
+    const paragraphGap = minFontSize * paragraphGapRatio;
     doc.fontSize(minFontSize).font('Helvetica');
     for (let i = 0; i < cleanedPages.length; i++) {
       const h = doc.heightOfString(cleanedPages[i], { width: availableWidth, align, lineGap: chosenLineGap, paragraphGap });
@@ -236,7 +236,7 @@ function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHe
   }
 
   log.debug(`📄 [PDF] Consistent font size: ${fontSize}pt (lineGap=${chosenLineGap}) for ${cleanedPages.length} pages`);
-  return { fontSize, lineGap: chosenLineGap, warning };
+  return { fontSize, lineGap: chosenLineGap, paragraphGap: fontSize * paragraphGapRatio, warning };
 }
 
 /**
@@ -417,7 +417,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     const padBottom = textInImage || textOnWhite ? 0 : lineHeightAtStart;
     const budgetHeight = Math.max(1, availableTextHeight - padTop - padBottom);
 
-    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, textInImage ? 'center' : 'left');
+    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, textInImage ? 'center' : 'left', textOnWhite ? WHITE_TEXT_PARAGRAPH_GAP_RATIO : 0.5);
     consistentFontSize = fontResult.fontSize;
     fontSizeWarning = fontResult.warning;
 
@@ -426,6 +426,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     // Preview). textInImage === false keeps the legacy text-below-image strip.
     await addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize, bleed, textRatio, textInImage, {
       lineGap: fontResult.lineGap,
+      paragraphGap: fontResult.paragraphGap,
       textPadding: { top: padTop, bottom: padBottom },
       bookFormat,
       fillMethod: options.fillMethod,
@@ -490,6 +491,10 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
 // width, the text area is what is left below it. Breathing gap under the picture, in points.
 const WHITE_TEXT_PAD_TOP = 6;
 
+// Gap between paragraphs of text on white, x font size (the strip pages use 0.5). Owner 2026-11-02:
+// "Reduce also paragraph spacing". Fit, picture size and drawing all use it.
+const WHITE_TEXT_PARAGRAPH_GAP_RATIO = 0.2;
+
 // The picture of a text-on-white book is never smaller than this share of the interior page height
 // (decisions.md 2026-11-02 correction): below it the picture stops being the page's main content.
 const WHITE_TEXT_MIN_PICTURE_SHARE = 0.4;
@@ -509,7 +514,7 @@ function whiteTextRatio(doc, storyPages, pageWidth, pageHeight, bleed) {
   doc.fontSize(floorPt).font('Helvetica');
   const needed = Math.max(...storyPages.map((p) => {
     const t = p.trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n');
-    return doc.heightOfString(t, { width: pageWidth - textMargin * 2, align: 'left', lineGap: tightestGap, paragraphGap: floorPt * 0.5 });
+    return doc.heightOfString(t, { width: pageWidth - textMargin * 2, align: 'left', lineGap: tightestGap, paragraphGap: floorPt * WHITE_TEXT_PARAGRAPH_GAP_RATIO });
   }));
   // white text area = pageHeight + bleed - side; budget = that - margin - top gap; need budget >= needed (+0.5 pt slack)
   const largestSide = pageHeight + bleed - textMargin - WHITE_TEXT_PAD_TOP - needed - 0.5;
@@ -757,14 +762,17 @@ async function drawFilledStripPage(doc, image, g) {
 
   // Plain dark text on white: a page with no picture, or a text-on-white page under its whole picture.
   doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-  const textHeight = doc.heightOfString(text, { width: textWidth, align: 'center', lineGap, paragraphGap });
-  const textY = imageBottom + padTop + Math.max(0, (textBudgetHeight - textHeight) / 2);
+  // Long text under the picture reads as prose: top-left, right under the picture (owner 2026-11-02), measured
+  // the way the font was chosen ('left'); the other white-text pages stay centred.
+  const align = g.textOnWhite ? 'left' : 'center';
+  const textHeight = doc.heightOfString(text, { width: textWidth, align, lineGap, paragraphGap });
+  const textY = imageBottom + padTop + (g.textOnWhite ? 0 : Math.max(0, (textBudgetHeight - textHeight) / 2));
   if (g.textOnWhite) {
     // Never cut text: calculateConsistentFontSize throws first when a page cannot fit at the floor; this is the page-level check.
     if (textHeight > textBudgetHeight + 0.5) {
       throw new Error(`page ${pageNumber}: text needs ${Math.ceil(textHeight)} pt, white area is ${Math.floor(textBudgetHeight)} pt`);
     }
-    doc.text(text, textX, textY, { width: textWidth, align: 'center', lineGap, paragraphGap });
+    doc.text(text, textX, textY, { width: textWidth, align, lineGap, paragraphGap });
     return;
   }
   doc.text(text, textX, textY, { width: textWidth, align: 'center', lineGap, paragraphGap, height: Math.max(0, textBottom - textY), ellipsis: true });
@@ -810,7 +818,7 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
 
   // paragraphGap matches what calculateConsistentFontSize measured with, so the
   // rendered text height tracks the fit-time budget instead of drifting.
-  const paragraphGap = fontSize * 0.5;
+  const paragraphGap = (typeof opts.paragraphGap === 'number') ? opts.paragraphGap : fontSize * 0.5;
 
   // Grok fill: start every classic page's strip now so the calls run together (overlay mode
   // draws its text into the picture and needs no strip, so nothing is prefetched for it).
@@ -1116,10 +1124,12 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
 
     // Use the shared 2-stage fit (tighten lineGap first, then font) for one
     // consistent font + lineGap across all pages of this story.
-    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, 'center');
+    const fontResult = textOnWhite
+      ? calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, 'left', WHITE_TEXT_PARAGRAPH_GAP_RATIO)
+      : calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, 'center');
     const consistentFont = fontResult.fontSize;
     const lineGap = fontResult.lineGap;
-    const paragraphGap = consistentFont * 0.5;
+    const paragraphGap = fontResult.paragraphGap;
     const effectiveTextHeight = budgetHeight;
 
     for (let index = 0; index < storyPages.length; index++) {
@@ -1440,9 +1450,10 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
     const padTop = useTextOverlay ? 0 : textOnWhite ? WHITE_TEXT_PAD_TOP : lineHeightAtStart;
     const padBottom = useTextOverlay || textOnWhite ? 0 : lineHeightAtStart;
     const budgetHeight = Math.max(1, availableTextHeight - padTop - padBottom);
-    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, useTextOverlay ? 'center' : 'left');
+    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, useTextOverlay ? 'center' : 'left', textOnWhite ? WHITE_TEXT_PARAGRAPH_GAP_RATIO : 0.5);
     await addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, fontResult.fontSize, 0, textRatio, useTextOverlay, {
       lineGap: fontResult.lineGap,
+      paragraphGap: fontResult.paragraphGap,
       textPadding: { top: padTop, bottom: padBottom },
       bookFormat,
       // The free customer download and the trial email PDF keep the mirror fill; only the paid
