@@ -252,6 +252,17 @@ const TEXT_MODELS = {
     maxOutputTokens: 32768,
     description: 'Qwen3-VL 235B (vision) via OpenRouter - larger, ~$0.21/$1.90 per 1M'
   },
+  // Claude Sonnet 5.5 as an OpenRouter vision judge, so runVisualInventory (which
+  // routes OpenRouter / xAI / Gemini only) can reach it. Owner, 2026-11-02: the
+  // page inventory moves to an Anthropic model, Sonnet, because qwen3-vl (32B)
+  // was retired by OpenRouter on 2026-10-09. OpenRouter drops the temperature
+  // the caller sends (Claude 5.x accepts only 1.0), as for bookReviewModel.
+  'claude-sonnet-5.5-vision': {
+    provider: 'openrouter',
+    modelId: 'anthropic/claude-sonnet-5.5',
+    maxOutputTokens: 64000,
+    description: 'Claude Sonnet 5.5 (vision) via OpenRouter - $2/$10 per 1M'
+  },
   'gpt-4o-mini': {
     provider: 'openrouter',
     modelId: 'openai/gpt-4o-mini',
