@@ -69064,3 +69064,10 @@ Revisit if: the preview is cheap enough to generate at order time for every cust
 **Considered:** removing the bar (it is still the only proof of life the customer sees); a time estimate in the UI (owner's second option, needs a client change).
 **Revisit if:** the post-budget arc create median differs clearly from 250 s (re-measure with `verify-run`-recorded stories and refit `seconds`).
 **Touched files:** server/lib/beatsStageTable.js, server/lib/beatsPipeline.js, tests/unit/beats-stage-table.test.ts, tasks/verify.json
+
+## 2026-11-02 - One Claude Code hook instead of five (scripts/admin/claude-hook.js)
+**Context:** Owner, 2026-11-02: "what are all the fucking hooks about. One hook not 100x, this is annoying." `.claude/settings.json` ran five scripts: settled-reminder (pre Edit/Write), prompt-rules and sibling-reminder (post Edit/Write), lab-only and paid-run-guard (pre Bash). Every edit started three node processes and three status lines, every shell call two.
+**Decision:** One script, `scripts/admin/claude-hook.js`, registered once: PreToolUse on `Edit|Write|Bash`, no status message. It runs every check in one process and merges their answers into one reply. Each rule is unchanged: the paid-run check still ASKS (and still honours `.claude/paid-run-preapproval.json`); everything else is advisory context. The two former PostToolUse reminders (prompt rules, sibling paths) now arrive just before the edit instead of just after it; the text says the same thing, reworded from "you just wrote" to "you write".
+**Considered:** keeping a separate PostToolUse registration for the two after-edit reminders (two hooks, not one; the owner asked for one); dropping the advisory reminders (they encode rules from decisions.md entries cited in the script header).
+**Revisit if:** a reminder is measurably ignored because it now arrives before the edit rather than after it.
+**Touched files:** scripts/admin/claude-hook.js (new), scripts/admin/{settled-reminder,lab-only,paid-run-guard,prompt-rules,sibling-reminder}-hook.js (deleted), .claude/settings.json, tests/unit/claude-hook.test.ts (was paid-run-guard-hook.test.ts), CLAUDE.md
