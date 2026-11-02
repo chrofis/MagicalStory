@@ -4585,6 +4585,16 @@
       "status": "fixed",
       "fixedIn": "3616eb9a1",
       "fix": "getCoverDimensions queries ?pageCount and uses Gelato sizes unchanged; throws instead of returning null. Replay over 9 production orders: both refusals now get the exact required size, hardcovers unchanged."
+    },
+    {
+      "id": "trial-failed-job-keeps-slot",
+      "title": "A trial whose story job fails keeps its one trial slot used, so the user cannot try again although the error tells them to",
+      "reportedAt": "2026-11-02",
+      "source": "Prod trial job_1793628697289_lf75a2z71 (2026-11-02 15:12 CH) failed with MissingRequiredCostumeSheetError (\"No credits are charged for a failed story; please try again\"). users row 2122303b: stories_generated=1, story_quota=1; the only story_jobs row is the failed one, so create-story answers 409 TRIAL_USED.",
+      "rootCause": "server/routes/trial.js create-story takes the slot atomically (stories_generated + 1) and releases it only on exits BEFORE the job row exists (releaseSlot). A job that fails later never gives the slot back.",
+      "status": "fixed",
+      "fixedIn": "b1a23a0b4",
+      "fix": "settleJobWithRefund releases the trial slot (stories_generated - 1, is_trial only) in the same transaction when a trialMode job transitions into failed; once only, not after the story was saved. Regression: tests/unit/job-credits.test.ts 'trial slot'."
     }
   ]
 }
