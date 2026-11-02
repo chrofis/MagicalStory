@@ -23,7 +23,7 @@ const { getPool, rehydrateStoryImages, logActivity } = require('../services/data
 
 // Lib modules
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf, pdfContentDisposition } = require('../lib/pdf');
-const { processBookOrder, resumeBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo, isBlankPagesAckMissing, BLANK_PAGES_ACK_FROM, shippingFromSession } = require('../lib/gelato');
+const { processBookOrder, resumeBookOrder, createGelatoOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo, isBlankPagesAckMissing, BLANK_PAGES_ACK_FROM, shippingFromSession } = require('../lib/gelato');
 const { stripDataUriPrefix } = require('../lib/r2');
 const { attachSquareCovers } = require('../lib/squareCovers');
 const email = require('../../email');
@@ -256,23 +256,15 @@ router.post('/print-provider/order', authenticateToken, async (req, res) => {
       }
     };
 
-    // Call print provider API
-    const printResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-KEY': printApiKey
-      },
-      body: JSON.stringify(orderPayload)
-    });
-
-    const printData = await printResponse.json();
-
-    if (!printResponse.ok) {
-      log.error('Print provider API error:', printData);
-      return res.status(printResponse.status).json({
+    let printData;
+    try {
+      printData = await createGelatoOrder(orderPayload);
+    } catch (err) {
+      if (!err.status) throw err;
+      log.error('Print provider API error:', err.details);
+      return res.status(err.status).json({
         error: 'Print provider order failed',
-        details: printData
+        details: err.details
       });
     }
 

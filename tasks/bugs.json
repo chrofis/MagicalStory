@@ -4602,7 +4602,9 @@
       "reportedAt": "2026-11-02",
       "source": "Prod order 102 admin draft retry 2026-11-02 22:38 CH: log \"Print provider API error: 504\" -> orders row gelato_status=failed, payment_status=failed, gelato_order_id still the cancelled 6f9ce74b; Gelato orders:search shows draft c723c52d-a3dd-4cb5-86c3-a9e05758b36d created 22:38:30 CH with orderReferenceId story-job_1793561351885_kkg5gxkbj-1793655479409 (the PDF of that very run, 12 pt).",
       "rootCause": "server/lib/gelato.js processBookOrder: a non-2xx create response throws before gelatoOrderId is set, so the catch takes the \"nothing was ordered\" branch (marks failed, emails). A 5xx/timeout does not prove Gelato did not create the order. The orderReferenceId is built inline (story-<id>-<Date.now()>), so it is not known afterwards to look the order up.",
-      "status": "open"
+      "status": "fixed",
+      "fixedIn": "PENDING",
+      "fix": "gelato.createGelatoOrder: on a 5xx or no answer it looks the order up by orderReferenceId (orders:search, 3 x 10 s) and uses the order Gelato holds; a 4xx throws at once; a failed lookup throws telling the admin to check Gelato before ordering again. processBookOrder and the admin print route both create through it. Regression: tests/unit/gelato-create-order.test.ts; live lookup checked against prod draft b0c61998."
     }
   ]
 }

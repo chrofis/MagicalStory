@@ -591,7 +591,6 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
 
     // Use CHF currency for print orders
     const currency = 'CHF';
-    const printApiKey = process.env.GELATO_API_KEY; // buildBookPrintPdf already refused to run without it
 
     // Create order reference using first story ID or combined if multiple
     const orderRefId = storyIds.length === 1 ? storyIds[0] : `multi-${storyIds.length}-${storyIds[0]}`;
@@ -630,21 +629,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
 
     log.debug(`📦 [BACKGROUND] Print order payload: productUid=${printProductUid}, pageCount=${printPageCount}, orderType=${gelatoOrderType}`);
 
-    const printResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-KEY': printApiKey
-      },
-      body: JSON.stringify(printOrderPayload)
-    });
-
-    if (!printResponse.ok) {
-      const errorText = await printResponse.text();
-      throw new Error(`Print provider API error: ${printResponse.status} - ${errorText}`);
-    }
-
-    const printOrder = await printResponse.json();
+    const printOrder = await createGelatoOrder(printOrderPayload);
     // Gelato v4 API returns 'id', not 'orderId'
     gelatoOrderId = printOrder.id || printOrder.orderId;
     console.log('✅ [BACKGROUND] Print order created:', gelatoOrderId);
@@ -798,6 +783,72 @@ async function fetchGelatoOrder(gelatoOrderId, { fetchImpl = fetch } = {}) {
   return res.json();
 }
 
+/** The Gelato order carrying this orderReferenceId, or null. Throws on any HTTP error. */
+async function findGelatoOrderByReference(orderReferenceId, { fetchImpl = fetch } = {}) {
+  const key = process.env.GELATO_API_KEY;
+  if (!key) throw new Error('GELATO_API_KEY not configured');
+  const res = await fetchImpl('https://order.gelatoapis.com/v4/orders:search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-KEY': key },
+    body: JSON.stringify({ orderReferenceIds: [orderReferenceId], limit: 2 }),
+  });
+  if (!res.ok) throw new Error(`Gelato order search ${orderReferenceId}: HTTP ${res.status} ${await res.text()}`);
+  const orders = (await res.json()).orders || [];
+  if (orders.length > 1) throw new Error(`Gelato holds ${orders.length} orders with reference ${orderReferenceId}`);
+  return orders[0] || null;
+}
+
+// After a 5xx or no answer on create, how often and how far apart the order is looked up.
+const GELATO_CREATE_LOOKUP_ATTEMPTS = 3;
+const GELATO_CREATE_LOOKUP_WAIT_MS = 10000;
+
+/**
+ * Create a Gelato order and return it. A 5xx or no answer does not prove Gelato did not create
+ * it (order 102, 2026-11-02: a 504, yet the draft existed), so the order is then looked up by its
+ * orderReferenceId before the create counts as failed. A 4xx is a refusal and throws at once.
+ * An error from a Gelato answer carries `status` and `details`.
+ */
+async function createGelatoOrder(payload, { fetchImpl = fetch, attempts = GELATO_CREATE_LOOKUP_ATTEMPTS, waitMs = GELATO_CREATE_LOOKUP_WAIT_MS } = {}) {
+  const key = process.env.GELATO_API_KEY;
+  if (!key) throw new Error('GELATO_API_KEY not configured');
+  let res;
+  let failure;
+  try {
+    res = await fetchImpl('https://order.gelatoapis.com/v4/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-KEY': key },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    failure = err;
+  }
+  if (res) {
+    if (res.ok) return res.json();
+    const text = await res.text();
+    let details;
+    try { details = JSON.parse(text); } catch { details = text; }
+    failure = Object.assign(new Error(`Print provider API error: ${res.status} - ${text}`), { status: res.status, details });
+    if (res.status < 500) throw failure;
+  }
+  const ref = payload.orderReferenceId;
+  for (let i = 0; i < attempts; i++) {
+    await new Promise(r => setTimeout(r, waitMs));
+    let found;
+    try {
+      found = await findGelatoOrderByReference(ref, { fetchImpl });
+    } catch (lookupErr) {
+      failure.message += `; looking the order up failed too (${lookupErr.message}): check Gelato for reference ${ref} before ordering again`;
+      throw failure;
+    }
+    if (found) {
+      log.warn(`⚠️ [GELATO] Create answered "${failure.message}" but Gelato holds order ${found.id} with reference ${ref}; using it`);
+      return found;
+    }
+  }
+  failure.message += ` (no Gelato order with reference ${ref} after ${attempts} lookups)`;
+  throw failure;
+}
+
 /** Gelato statuses after which the order will never be printed: a new order replaces it, it cannot double it. */
 const GELATO_DEAD_STATUSES = ['failed', 'canceled'];
 
@@ -903,6 +954,8 @@ module.exports = {
   resolveBookOrderInputs,
   resumeBookOrder,
   fetchGelatoOrder,
+  findGelatoOrderByReference,
+  createGelatoOrder,
   gelatoRefusalReasons,
   sweepStuckBookOrders,
   processBookOrder,
