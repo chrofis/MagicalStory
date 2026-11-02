@@ -92,7 +92,7 @@ describe('A4 single layout by reading level', () => {
   }, 60000);
 
   it('advanced: a long page shrinks the picture for the whole book and still renders', async () => {
-    const s = await story('advanced', 700, 2);
+    const s = await story('advanced', 400, 2);
     const buf = await pdfLib.generateViewPdf(s, 'A4');
     expect(buf.length).toBeGreaterThan(1000);
   }, 60000);
@@ -107,7 +107,7 @@ describe('whiteTextRatio (one picture size per book)', () => {
 
   it('keeps the full interior width when the text fits (order-story case)', () => {
     const bleed = f.bleed;
-    const r = pdfLib.whiteTextRatio(doc(), pages(150), f.pageWidth, f.pageHeight, bleed);
+    const r = pdfLib.whiteTextRatio(doc(), pages(80), f.pageWidth, f.pageHeight, bleed);
     expect(side(r, bleed)).toBeCloseTo(f.pageWidth + 2 * bleed, 3);
   });
 
@@ -117,6 +117,40 @@ describe('whiteTextRatio (one picture size per book)', () => {
     const s = side(r, bleed);
     expect(s).toBeLessThan(f.pageWidth + 2 * bleed);
     expect(s).toBeGreaterThan((f.pageHeight + 2 * bleed) * 0.4);
+  });
+
+  // Owner 2026-11-02 on order 102 (11.5 pt on a 0.81x line height, "the text looks crammed"): chose
+  // "12 pt, book spacing 1.2x"; the picture gives up the room.
+  const margin = (3 * 72) / 25.4;
+  const fit = (r: number, text: string[]) =>
+    pdfLib.calculateConsistentFontSize(doc(), text, f.pageWidth - 2 * margin, f.pageHeight * r - margin - 6, 12, 10, 'left', 0.2, 1.2);
+  const lineHeight = (pt: number, gap: number) => { const d = doc(); d.fontSize(pt).font('Helvetica'); return d.currentLineHeight(true) + gap; };
+
+  it('shrinks the picture so the longest page prints at 12 pt on a 1.2x line height', () => {
+    const text = pages(300);
+    const r = pdfLib.whiteTextRatio(doc(), text, f.pageWidth, f.pageHeight, f.bleed);
+    expect(side(r, f.bleed)).toBeLessThan(f.pageWidth + 2 * f.bleed);
+    const got = fit(r, text);
+    expect(got.fontSize).toBe(12);
+    expect(lineHeight(12, got.lineGap) / 12).toBeCloseTo(1.2, 5);
+  });
+
+  it('steps the font down (same 1.2x line height) only when 12 pt would push the picture under the 40% floor', () => {
+    // The shortest page that cannot print at 12 pt above the floor.
+    let n = 300;
+    while (fit(pdfLib.whiteTextRatio(doc(), pages(n), f.pageWidth, f.pageHeight, f.bleed), pages(n)).fontSize === 12) n += 10;
+    const text = pages(n);
+    const r = pdfLib.whiteTextRatio(doc(), text, f.pageWidth, f.pageHeight, f.bleed);
+    expect(side(r, f.bleed)).toBeGreaterThanOrEqual((f.pageHeight + 2 * f.bleed) * 0.4);
+    const got = fit(r, text);
+    expect(got.fontSize).toBeLessThan(12);
+    expect(got.fontSize).toBeGreaterThanOrEqual(10);
+    expect(lineHeight(got.fontSize, got.lineGap) / got.fontSize).toBeCloseTo(1.2, 5);
+  });
+
+  it('strip layouts keep their own line-gap ladder (no line height passed)', () => {
+    const got = pdfLib.calculateConsistentFontSize(doc(), pages(60), 400, 400, 12, 10, 'left', 0.5);
+    expect(got.lineGap).toBe(-2);
   });
 
   it('throws when even the minimum picture cannot fit', () => {

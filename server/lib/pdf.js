@@ -172,7 +172,14 @@ function parseStoryPages(storyData) {
  * @param {string} align - Text alignment ('left' or 'center')
  * @returns {{fontSize: number, lineGap: number, warning: string|null}}
  */
-function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHeight, startFontSize = 14, minFontSize = 6, align = 'left', paragraphGapRatio = 0.5) {
+function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHeight, startFontSize = 14, minFontSize = 6, align = 'left', paragraphGapRatio = 0.5, lineHeightRatio = null) {
+  // lineHeightRatio (text-on-white books): the line height is that multiple of the font size at every
+  // size tried, so the fit only changes the font, never squeezes the lines (WHITE_TEXT_LINE_HEIGHT).
+  const gapFor = (fontSize, ladderGap) => {
+    if (lineHeightRatio == null) return ladderGap;
+    doc.fontSize(fontSize).font('Helvetica');
+    return lineHeightRatio * fontSize - doc.currentLineHeight(true);
+  };
   // Compress multiple newlines once
   const cleanedPages = pageTexts.map(p => p.trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n'));
 
@@ -188,7 +195,7 @@ function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHe
   };
 
   // Stage 1: keep startFontSize, try tightening lineGap.
-  const lineGapLadder = [-2, -2.5, -3, -3.5, -4];
+  const lineGapLadder = lineHeightRatio == null ? [-2, -2.5, -3, -3.5, -4] : [gapFor(startFontSize)];
   let chosenLineGap = lineGapLadder[0];
   let stage1Success = false;
   for (const lg of lineGapLadder) {
@@ -207,11 +214,12 @@ function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHe
   // Stage 2: shrink font at tightest lineGap (chosenLineGap is now -4).
   let fontSize = startFontSize - 0.5;
   while (fontSize > minFontSize) {
-    if (allPagesFit(fontSize, chosenLineGap)) break;
+    if (allPagesFit(fontSize, gapFor(fontSize, chosenLineGap))) break;
     fontSize -= 0.5;
   }
   // Clamp at minFontSize
   if (fontSize < minFontSize) fontSize = minFontSize;
+  chosenLineGap = gapFor(fontSize, chosenLineGap);
 
   // Warning if below readable threshold
   let warning = null;
@@ -417,7 +425,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     const padBottom = textInImage || textOnWhite ? 0 : lineHeightAtStart;
     const budgetHeight = Math.max(1, availableTextHeight - padTop - padBottom);
 
-    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, textInImage ? 'center' : 'left', textOnWhite ? WHITE_TEXT_PARAGRAPH_GAP_RATIO : 0.5);
+    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, textInImage ? 'center' : 'left', textOnWhite ? WHITE_TEXT_PARAGRAPH_GAP_RATIO : 0.5, textOnWhite ? WHITE_TEXT_LINE_HEIGHT : null);
     consistentFontSize = fontResult.fontSize;
     fontSizeWarning = fontResult.warning;
 
@@ -499,31 +507,44 @@ const WHITE_TEXT_PARAGRAPH_GAP_RATIO = 0.2;
 // (decisions.md 2026-11-02 correction): below it the picture stops being the page's main content.
 const WHITE_TEXT_MIN_PICTURE_SHARE = 0.4;
 
+// Text-on-white books set their text like a printed book: 12 pt (the fit function's start font for these
+// levels) on a line height of 1.2x, at every size the fit tries. Owner 2026-11-02 on order 102 (printed at
+// 11.5 pt on a 0.81x line height, "the text looks crammed"), shown book/newspaper norms (1.2-1.5x), chose
+// "12 pt, book spacing 1.2x"; the picture gives up the room (85% on that book).
+const WHITE_TEXT_TARGET_PT = 12;
+const WHITE_TEXT_LINE_HEIGHT = 1.2;
+
 /**
  * Text area share of the trim page height for a text-on-white book. ONE picture size for the whole book:
- * the full interior width when every page's text fits the white area at the 10 pt floor, otherwise the
- * largest square (still whole, uncropped, centered, top-aligned) that lets the longest page fit at the
- * floor. Throws when that square would be under WHITE_TEXT_MIN_PICTURE_SHARE of the page height.
- * The picture side equals imageBottom (top-aligned at y=0), so callers only need the ratio.
+ * the largest square, up to the full interior width, that lets the longest page fit at WHITE_TEXT_TARGET_PT
+ * on WHITE_TEXT_LINE_HEIGHT. Only when that square would be under WHITE_TEXT_MIN_PICTURE_SHARE of the page
+ * height does the font step down (0.5 pt steps, same line height) to the 10 pt floor; past the floor it
+ * throws. The picture is whole, uncropped, centered and top-aligned; its side equals imageBottom (y=0), so
+ * callers only need the ratio.
  */
 function whiteTextRatio(doc, storyPages, pageWidth, pageHeight, bleed) {
   const interiorW = pageWidth + 2 * bleed;
   const interiorH = pageHeight + 2 * bleed;
   const textMargin = mmToPoints(3);
-  const floorPt = 10, tightestGap = -4; // the fit function's floor and tightest lineGap
-  doc.fontSize(floorPt).font('Helvetica');
-  const needed = Math.max(...storyPages.map((p) => {
-    const t = p.trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n');
-    return doc.heightOfString(t, { width: pageWidth - textMargin * 2, align: 'left', lineGap: tightestGap, paragraphGap: floorPt * WHITE_TEXT_PARAGRAPH_GAP_RATIO });
-  }));
+  const floorPt = 10; // the fit function's floor
+  const minSide = interiorH * WHITE_TEXT_MIN_PICTURE_SHARE;
+  const neededAt = (pt) => {
+    doc.fontSize(pt).font('Helvetica');
+    const lineGap = WHITE_TEXT_LINE_HEIGHT * pt - doc.currentLineHeight(true);
+    return Math.max(...storyPages.map((p) => {
+      const t = p.trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n');
+      return doc.heightOfString(t, { width: pageWidth - textMargin * 2, align: 'left', lineGap, paragraphGap: pt * WHITE_TEXT_PARAGRAPH_GAP_RATIO });
+    }));
+  };
   // white text area = pageHeight + bleed - side; budget = that - margin - top gap; need budget >= needed (+0.5 pt slack)
-  const largestSide = pageHeight + bleed - textMargin - WHITE_TEXT_PAD_TOP - needed - 0.5;
-  const side = Math.min(interiorW, largestSide);
-  if (side < interiorH * WHITE_TEXT_MIN_PICTURE_SHARE) {
-    throw new Error(`text-on-white page layout: the longest page needs ${Math.ceil(needed)} pt at ${floorPt} pt, the picture would shrink to ${Math.floor(side)} pt, under the ${Math.round(WHITE_TEXT_MIN_PICTURE_SHARE * 100)}% floor of ${Math.ceil(interiorH * WHITE_TEXT_MIN_PICTURE_SHARE)} pt`);
+  const largestSideAt = (pt) => pageHeight + bleed - textMargin - WHITE_TEXT_PAD_TOP - neededAt(pt) - 0.5;
+  for (let pt = WHITE_TEXT_TARGET_PT; pt >= floorPt; pt -= 0.5) {
+    const side = Math.min(interiorW, largestSideAt(pt));
+    if (side < minSide) continue;
+    if (side < interiorW) log.info(`📄 [PDF] text on white: picture ${Math.floor(side)} pt of ${Math.round(interiorW)} pt so the longest page fits at ${pt} pt, line height ${WHITE_TEXT_LINE_HEIGHT}x`);
+    return 1 - (side - bleed) / pageHeight;
   }
-  if (side < interiorW) log.info(`📄 [PDF] text on white: picture shrunk to ${Math.floor(side)} pt of ${Math.round(interiorW)} pt so the longest page fits at ${floorPt} pt`);
-  return 1 - (side - bleed) / pageHeight;
+  throw new Error(`text-on-white page layout: the longest page needs ${Math.ceil(neededAt(floorPt))} pt at ${floorPt} pt, the picture would shrink to ${Math.floor(largestSideAt(floorPt))} pt, under the ${Math.round(WHITE_TEXT_MIN_PICTURE_SHARE * 100)}% floor of ${Math.ceil(minSide)} pt`);
 }
 
 /**
@@ -1125,7 +1146,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
     // Use the shared 2-stage fit (tighten lineGap first, then font) for one
     // consistent font + lineGap across all pages of this story.
     const fontResult = textOnWhite
-      ? calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, 'left', WHITE_TEXT_PARAGRAPH_GAP_RATIO)
+      ? calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, 'left', WHITE_TEXT_PARAGRAPH_GAP_RATIO, WHITE_TEXT_LINE_HEIGHT)
       : calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, 'center');
     const consistentFont = fontResult.fontSize;
     const lineGap = fontResult.lineGap;
@@ -1450,7 +1471,7 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
     const padTop = useTextOverlay ? 0 : textOnWhite ? WHITE_TEXT_PAD_TOP : lineHeightAtStart;
     const padBottom = useTextOverlay || textOnWhite ? 0 : lineHeightAtStart;
     const budgetHeight = Math.max(1, availableTextHeight - padTop - padBottom);
-    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, useTextOverlay ? 'center' : 'left', textOnWhite ? WHITE_TEXT_PARAGRAPH_GAP_RATIO : 0.5);
+    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, useTextOverlay ? 'center' : 'left', textOnWhite ? WHITE_TEXT_PARAGRAPH_GAP_RATIO : 0.5, textOnWhite ? WHITE_TEXT_LINE_HEIGHT : null);
     await addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, fontResult.fontSize, 0, textRatio, useTextOverlay, {
       lineGap: fontResult.lineGap,
       paragraphGap: fontResult.paragraphGap,
