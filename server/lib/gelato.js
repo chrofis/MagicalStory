@@ -512,7 +512,7 @@ async function buildBookPrintPdf(dbPool, allStoryIds, coverType, layout, { fillM
  * @param {number} quantity
  * @param {'single'|'spread'} [layout] - the layout the customer paid for (session metadata bookLayout); throws when unavailable
  */
-async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInfo, shippingAddress, isTestPayment = false, coverType = 'softcover', quantity = 1, layout = undefined) {
+async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInfo, shippingAddress, isTestPayment = false, coverType = 'softcover', quantity = 1, layout = undefined, { notifyCustomer = true } = {}) {
   // Normalize storyIds to array (backwards compatible with single storyId)
   const allStoryIds = Array.isArray(storyIds) ? storyIds : [storyIds];
 
@@ -697,10 +697,11 @@ The book IS ordered. Write gelato_order_id onto the orders row by hand; do NOT r
       log.error('❌ [BACKGROUND] Failed to update order status:', updateError);
     }
 
-    // Send failure emails: customer notification + admin alert
+    // Send failure emails: customer notification + admin alert. An admin retry (notifyCustomer: false)
+    // alerts the admin only: the customer was already told once (owner, 2026-11-02, order 102).
     try {
       const { sendOrderFailedEmail, sendAdminOrderFailureAlert } = require('../../email.js');
-      await sendOrderFailedEmail(customerInfo.email, customerInfo.name, error.message, customerInfo.language);
+      if (notifyCustomer) await sendOrderFailedEmail(customerInfo.email, customerInfo.name, error.message, customerInfo.language);
       await sendAdminOrderFailureAlert(sessionId, customerInfo.email, customerInfo.name, error.message);
     } catch (emailError) {
       log.error('❌ [BACKGROUND] Failed to send failure emails:', emailError);
@@ -809,7 +810,7 @@ const GELATO_DEAD_STATUSES = ['failed', 'canceled'];
  * still alive (re-running would order the book twice). `replaceDead` lets an admin replace a
  * Gelato order that Gelato itself reports failed or canceled (order 102, a refused print file).
  */
-async function resumeBookOrder(dbPool, orderRow, stripe, { run = processBookOrder, draft = false, replaceDead = false, getGelatoOrder = fetchGelatoOrder } = {}) {
+async function resumeBookOrder(dbPool, orderRow, stripe, { run = processBookOrder, draft = false, replaceDead = false, notifyCustomer = true, getGelatoOrder = fetchGelatoOrder } = {}) {
   if (orderRow.gelato_order_id) {
     if (!replaceDead) throw new Error(`Order ${orderRow.id} already has Gelato order ${orderRow.gelato_order_id}`);
     const existing = await getGelatoOrder(orderRow.gelato_order_id);
@@ -825,7 +826,7 @@ async function resumeBookOrder(dbPool, orderRow, stripe, { run = processBookOrde
   const inp = await resolveBookOrderInputs(dbPool, session);
   const asDraft = draft || orderRow.stripe_mode === 'test';
   return run(dbPool, session.id, inp.userId, inp.validatedStoryIds, inp.customerInfo, inp.address,
-    asDraft, inp.coverType, inp.quantity, inp.layout);
+    asDraft, inp.coverType, inp.quantity, inp.layout, { notifyCustomer });
 }
 
 /**

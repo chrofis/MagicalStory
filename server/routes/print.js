@@ -1223,7 +1223,8 @@ router.post('/admin/orders/:orderId/retry-print-order', authenticateToken, async
       return res.status(400).json({ error: 'Order already has a print order ID (send replaceDead: true to replace a failed/canceled one)', printOrderId: order.gelato_order_id });
     }
     log.info(`🔄 [ADMIN] Retrying print order for order ${orderId} (session ${order.stripe_session_id}, stripe_mode=${order.stripe_mode || 'live'}, draft=${draft}, replaceDead=${replaceDead})`);
-    resumeBookOrder(getDbPool(), order, stripe, { draft, replaceDead }).catch(err => {
+    // An admin retry never emails the customer on failure; the admin alert still goes out.
+    resumeBookOrder(getDbPool(), order, stripe, { draft, replaceDead, notifyCustomer: false }).catch(err => {
       log.error(`❌ [ADMIN] Retry of print order ${orderId} failed: ${err.message}`);
     });
     res.status(202).json({ success: true, message: 'Print order retry started', orderId: order.id });

@@ -147,6 +147,14 @@ describe('resumeBookOrder (P2)', () => {
     }
     expect(ran).toBe(2);
   });
+  it('notifyCustomer: an admin retry tells processBookOrder not to email the customer on failure', async () => {
+    let args: any[] = [];
+    const run = async (...a: any[]) => { args = a; };
+    await resumeBookOrder(dbPool, { id: 1, stripe_session_id: 'cs_9', stripe_mode: 'live' }, stripeFor(session), { run, notifyCustomer: false });
+    expect(args[10]).toEqual({ notifyCustomer: false });
+    await resumeBookOrder(dbPool, { id: 1, stripe_session_id: 'cs_9', stripe_mode: 'live' }, stripeFor(session), { run });
+    expect(args[10]).toEqual({ notifyCustomer: true });
+  });
   it('gelatoRefusalReasons lists each refused item\'s reason', () => {
     expect(gelatoRefusalReasons({ items: [{ refusalReason: 'page 1 too small' }, { refusalReason: null }] })).toEqual(['page 1 too small']);
     expect(gelatoRefusalReasons({})).toEqual([]);
