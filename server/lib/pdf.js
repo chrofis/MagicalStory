@@ -400,7 +400,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     // height adapts to the actual text length (#4 — variable text area).
     const textOnWhite = !textInImage && printsTextOnWhite(storyData.languageLevel);
     const textRatio = textOnWhite
-      ? whiteTextRatio(pageWidth, pageHeight, bleed)
+      ? whiteTextRatio(doc, storyPages, pageWidth, pageHeight, bleed)
       : textInImage
         ? getPictureBookTextRatio(storyData.languageLevel)
         : computeTextBelowRatio(storyPages, storyData.languageLevel);
@@ -490,9 +490,35 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
 // width, the text area is what is left below it. Breathing gap under the picture, in points.
 const WHITE_TEXT_PAD_TOP = 6;
 
-/** Fraction of the trim page height left under a full-interior-width square picture (bleed on both sides). */
-function whiteTextRatio(pageWidth, pageHeight, bleed) {
-  return 1 - (pageWidth + bleed) / pageHeight;
+// The picture of a text-on-white book is never smaller than this share of the interior page height
+// (decisions.md 2026-11-02 correction): below it the picture stops being the page's main content.
+const WHITE_TEXT_MIN_PICTURE_SHARE = 0.4;
+
+/**
+ * Text area share of the trim page height for a text-on-white book. ONE picture size for the whole book:
+ * the full interior width when every page's text fits the white area at the 10 pt floor, otherwise the
+ * largest square (still whole, uncropped, centered, top-aligned) that lets the longest page fit at the
+ * floor. Throws when that square would be under WHITE_TEXT_MIN_PICTURE_SHARE of the page height.
+ * The picture side equals imageBottom (top-aligned at y=0), so callers only need the ratio.
+ */
+function whiteTextRatio(doc, storyPages, pageWidth, pageHeight, bleed) {
+  const interiorW = pageWidth + 2 * bleed;
+  const interiorH = pageHeight + 2 * bleed;
+  const textMargin = mmToPoints(3);
+  const floorPt = 10, tightestGap = -4; // the fit function's floor and tightest lineGap
+  doc.fontSize(floorPt).font('Helvetica');
+  const needed = Math.max(...storyPages.map((p) => {
+    const t = p.trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n');
+    return doc.heightOfString(t, { width: pageWidth - textMargin * 2, align: 'left', lineGap: tightestGap, paragraphGap: floorPt * 0.5 });
+  }));
+  // white text area = pageHeight + bleed - side; budget = that - margin - top gap; need budget >= needed (+0.5 pt slack)
+  const largestSide = pageHeight + bleed - textMargin - WHITE_TEXT_PAD_TOP - needed - 0.5;
+  const side = Math.min(interiorW, largestSide);
+  if (side < interiorH * WHITE_TEXT_MIN_PICTURE_SHARE) {
+    throw new Error(`text-on-white page layout: the longest page needs ${Math.ceil(needed)} pt at ${floorPt} pt, the picture would shrink to ${Math.floor(side)} pt, under the ${Math.round(WHITE_TEXT_MIN_PICTURE_SHARE * 100)}% floor of ${Math.ceil(interiorH * WHITE_TEXT_MIN_PICTURE_SHARE)} pt`);
+  }
+  if (side < interiorW) log.info(`📄 [PDF] text on white: picture shrunk to ${Math.floor(side)} pt of ${Math.round(interiorW)} pt so the longest page fits at ${floorPt} pt`);
+  return 1 - (side - bleed) / pageHeight;
 }
 
 /**
@@ -700,7 +726,8 @@ async function drawFilledStripPage(doc, image, g) {
     try {
       const pictureBuffer = await resolveImageBuffer(image.imageData);
       if (!pictureBuffer) throw new Error('image source unresolvable');
-      doc.image(pictureBuffer, 0, 0, { fit: [interiorW, imageBottom], align: 'center', valign: 'top' });
+      // The picture is the square imageBottom x imageBottom (full width unless this book's picture was shrunk), centered.
+      doc.image(pictureBuffer, (interiorW - imageBottom) / 2, 0, { fit: [imageBottom, imageBottom], align: 'center', valign: 'top' });
     } catch (imgErr) {
       log.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
     }
@@ -1059,7 +1086,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
     const textInImageForRatio = typeof sceneTextInImage === 'boolean' ? sceneTextInImage : layoutFromLevel.textInImage;
     const textOnWhite = !textInImageForRatio && printsTextOnWhite(storyData.languageLevel);
     const textRatio = textOnWhite
-      ? whiteTextRatio(pageWidth, pageHeight, bleed)
+      ? whiteTextRatio(doc, storyPages, pageWidth, pageHeight, bleed)
       : textInImageForRatio
         ? getPictureBookTextRatio(storyData.languageLevel)
         : computeTextBelowRatio(storyPages, storyData.languageLevel);
@@ -1396,7 +1423,7 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
     const textRatio = trialLayout
       ? (pageHeight - pageWidth) / pageHeight
       : textOnWhite
-        ? whiteTextRatio(pageWidth, pageHeight, 0)
+        ? whiteTextRatio(doc, storyPages, pageWidth, pageHeight, 0)
         : (textOverlay
           ? getPictureBookTextRatio(storyData.languageLevel)
           : computeTextBelowRatio(storyPages, storyData.languageLevel));
@@ -1491,6 +1518,7 @@ module.exports = {
   generateCombinedBookPdf,
   parseStoryPages,
   calculateConsistentFontSize,
+  whiteTextRatio,
   getCoverImageData,
   printCoverSource,
   mmToPoints,

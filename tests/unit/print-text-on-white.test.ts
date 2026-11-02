@@ -66,8 +66,40 @@ describe('A4 single layout by reading level', () => {
     expect(spy).toHaveBeenCalledTimes(2);
   }, 60000);
 
-  it('advanced: text that cannot fit the white area throws instead of being cut', async () => {
-    const s = await story('advanced', 900, 1);
-    await expect(pdfLib.generateViewPdf(s, 'A4')).rejects.toThrow(/too long|white area/);
+  it('advanced: text too long for any allowed picture size throws instead of being cut', async () => {
+    const s = await story('advanced', 2500, 1);
+    await expect(pdfLib.generateViewPdf(s, 'A4')).rejects.toThrow(/under the 40% floor/);
   }, 60000);
+
+  it('advanced: a long page shrinks the picture for the whole book and still renders', async () => {
+    const s = await story('advanced', 700, 2);
+    const buf = await pdfLib.generateViewPdf(s, 'A4');
+    expect(buf.length).toBeGreaterThan(1000);
+  }, 60000);
+});
+
+describe('whiteTextRatio (one picture size per book)', () => {
+  const PDFDocument = cjs('pdfkit');
+  const f = pdfLib.BOOK_FORMATS.A4;
+  const pages = (n: number) => [Array.from({ length: n }, (_, i) => `Wort${i}`).join(' ')];
+  const side = (ratio: number, bleed: number) => f.pageHeight * (1 - ratio) + bleed; // picture side = imageBottom
+  const doc = () => new PDFDocument({ size: [f.pageWidth, f.pageHeight] });
+
+  it('keeps the full interior width when the text fits (order-story case)', () => {
+    const bleed = f.bleed;
+    const r = pdfLib.whiteTextRatio(doc(), pages(150), f.pageWidth, f.pageHeight, bleed);
+    expect(side(r, bleed)).toBeCloseTo(f.pageWidth + 2 * bleed, 3);
+  });
+
+  it('shrinks the square (whole, never wider than the page) when the text does not fit at full width', () => {
+    const bleed = f.bleed;
+    const r = pdfLib.whiteTextRatio(doc(), pages(500), f.pageWidth, f.pageHeight, bleed);
+    const s = side(r, bleed);
+    expect(s).toBeLessThan(f.pageWidth + 2 * bleed);
+    expect(s).toBeGreaterThan((f.pageHeight + 2 * bleed) * 0.4);
+  });
+
+  it('throws when even the minimum picture cannot fit', () => {
+    expect(() => pdfLib.whiteTextRatio(doc(), pages(2500), f.pageWidth, f.pageHeight, f.bleed)).toThrow(/floor/);
+  });
 });
