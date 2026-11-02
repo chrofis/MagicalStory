@@ -123,6 +123,7 @@ async function generateWithGrok(prompt, options = {}) {
       const err = new Error(`Grok API error (${response.status}): ${errorText.substring(0, 200)}`);
       err.statusCode = response.status;
       err.moderated = isGrokModerationBody(errorText);
+      err.inputRejected = isGrokInputRejectionBody(errorText);
       log.error(`❌ [GROK] API error ${response.status}: ${errorText.substring(0, 300)}`);
       throw err;
     }
@@ -268,6 +269,14 @@ async function fetchGrokWithRetry(doFetch, label, { sleep = (ms) => new Promise(
 
 function isGrokModerationBody(errorText) {
   return /content-moderated/i.test(String(errorText || ''));
+}
+
+/**
+ * Grok refused an INPUT image (the code CONTENT_POLICY_VIOLATION, "Input image rejected by content moderation"), not the picture it
+ * drew (`imagine:content-moderated`). A different input can pass where this one did not (decisions 2026-11-02).
+ */
+function isGrokInputRejectionBody(errorText) {
+  return /CONTENT_POLICY_VIOLATION/.test(String(errorText || ''));
 }
 
 function assertGrokPromptFits(prompt, model, logLabel) {
@@ -561,6 +570,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
       const err = new Error(`Grok edit API error (${response.status}): ${errorText.substring(0, 200)}`);
       err.statusCode = response.status;
       err.moderated = isGrokModerationBody(errorText);
+      err.inputRejected = isGrokInputRejectionBody(errorText);
       log.error(`❌ [GROK] Edit API error ${response.status}: ${errorText.substring(0, 300)}`);
       warnIfCreditsExhausted(response.status, errorText);
       throw err;
@@ -2121,6 +2131,7 @@ module.exports = {
   fetchGrokWithRetry,
   isGrokCapacityError,
   isGrokModerationBody,
+  isGrokInputRejectionBody,
   generateWithGrok,
   editWithGrok,
   isGrokConfigured,

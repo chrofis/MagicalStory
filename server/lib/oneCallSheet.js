@@ -80,12 +80,27 @@ async function generateJudgedOneCallSheet(character, { artStyle, kind, costumeDe
     }
   };
 
-  const first = await generate(character, gen);
+  // Grok sometimes refuses an innocent uploaded body photo (prod trial 2026-11-02: a 4-year-old in T-shirt and jeans, refused for
+  // the standard and the costume sheet alike, story lost). The face crop alone passed (Lab 70/71), so a refused body reference is
+  // retried ONCE with the face photo only, and the redo keeps it (owner 2026-11-02, decisions.md). A refused face fails loudly.
+  let bodyPhotoRefused = false;
+  let first;
+  try {
+    first = await generate(character, gen);
+  } catch (err) {
+    if (!err.inputRejected || (gen.references || MODEL_DEFAULTS.avatarSheetReferences) !== 'face+body') throw err;
+    bodyPhotoRefused = true;
+    gen.references = 'face';
+    countMetric('avatar_sheet_body_photo_refused');
+    log.error(`❌ [AVATAR SHEET] ${name}/${kind}: Grok refused the input photos (${err.message}) — retrying once with the face photo only, the clothes then come from the text`);
+    first = await generate(character, gen);
+  }
   countMetric('avatar_sheet_check_ran');
   const j1 = await judgeSheet(first.imageData, 'first');
   const check = {
     kind, model: first.modelId || null, judged: !j1.error, judgeError: j1.error || null, judgeMs: j1.ms,
     firstFlags: j1.defects || null, redone: false, secondFlags: null, redoError: null, shipped: 'first', totalMs: 0,
+    bodyPhotoRefused,
   };
   const done = (shipped) => {
     check.totalMs = Date.now() - startedAt;
