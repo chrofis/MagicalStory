@@ -10695,7 +10695,7 @@
         "97b2d4e46"
       ],
       "addedAt": "2026-10-24",
-      "status": "pending",
+      "status": "confirmed",
       "claim": "On a going-to-bed story (full and trial): clothingRequirements gives every person the plan puts in bed a nightwear outfit (two-piece pyjamas, covered torso) and nobody else; a styled-nightwear sheet exists for each of them; the pages that put them in bed carry clothing nightwear and draw those pyjamas, the day pages around them draw the day outfit; no page shows a child bathing; the front, initial and back covers show the day outfit (never pyjamas) and primaryClothing is not nightwear. A pyjama sheet that fails twice fails the book (refunded) rather than drawing day clothes.",
       "runShape": [
         "full-story",
@@ -10705,7 +10705,18 @@
         "kind": "human",
         "what": "Open the story: clothingRequirements[child].nightwear.used is true with a pyjama top and bottoms description, characterAvatars[child] has styled-nightwear, the bed pages (pageClothing) are nightwear and look like pyjamas, the other pages and all three covers are the day outfit, and no page shows bathing. For a trial, the topic id must be going-to-bed and the pyjama sheet is drawn at prepare-title (the waiting-page slides include it). Also confirm the log shows no 'NIGHTWEAR CACHE MISS'."
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "storyId": "job_1793619414606_k3c6p7w5d",
+          "env": "staging",
+          "build": "204c7eb4216a8659a4a5d49d91289958526428ab",
+          "runDate": "2026-11-02 12:36:54 CH",
+          "checkedAt": "2026-11-02 14:33:31 CH",
+          "result": "HUMAN-CONFIRMED",
+          "by": "claude",
+          "note": "Showcase 2026-11-02 (going-to-bed, 10 pages): Lea in purple polka-dot pyjamas on every night page p1-p10, no bathing, front/back cover and dedication page in day clothes."
+        }
+      ],
       "lastChecked": {
         "storyId": "job_1793619414606_k3c6p7w5d",
         "env": "staging",
