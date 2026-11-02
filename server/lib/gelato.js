@@ -788,22 +788,52 @@ async function resolveBookOrderInputs(dbPool, fullSession) {
   return { userId, customerInfo, address, coverType, quantity, layout, validatedStoryIds };
 }
 
+/** One Gelato order as the order API returns it. Throws on any HTTP error. */
+async function fetchGelatoOrder(gelatoOrderId, { fetchImpl = fetch } = {}) {
+  const key = process.env.GELATO_API_KEY;
+  if (!key) throw new Error('GELATO_API_KEY not configured');
+  const res = await fetchImpl(`https://order.gelatoapis.com/v4/orders/${gelatoOrderId}`, { headers: { 'X-API-KEY': key } });
+  if (!res.ok) throw new Error(`Gelato order ${gelatoOrderId}: HTTP ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+/** Gelato statuses after which the order will never be printed: a new order replaces it, it cannot double it. */
+const GELATO_DEAD_STATUSES = ['failed', 'canceled'];
+
 /**
  * Re-run processBookOrder for an existing paid order, from the Stripe session it was paid
  * with. The Gelato order type follows the ORDER's stripe_mode (a test-mode order is a draft,
- * a live order is real) - never the caller's role. Refuses when the order already has a
- * Gelato id (re-running would order the book twice) or the session is not paid.
+ * a live order is real) - never the caller's role - unless the admin asks for `draft`, which
+ * creates a Gelato draft to inspect and approve in the Gelato dashboard (owner, 2026-11-02).
+ * Refuses when the session is not paid, or when the order already has a Gelato id that is
+ * still alive (re-running would order the book twice). `replaceDead` lets an admin replace a
+ * Gelato order that Gelato itself reports failed or canceled (order 102, a refused print file).
  */
-async function resumeBookOrder(dbPool, orderRow, stripe, { run = processBookOrder } = {}) {
-  if (orderRow.gelato_order_id) throw new Error(`Order ${orderRow.id} already has Gelato order ${orderRow.gelato_order_id}`);
+async function resumeBookOrder(dbPool, orderRow, stripe, { run = processBookOrder, draft = false, replaceDead = false, getGelatoOrder = fetchGelatoOrder } = {}) {
+  if (orderRow.gelato_order_id) {
+    if (!replaceDead) throw new Error(`Order ${orderRow.id} already has Gelato order ${orderRow.gelato_order_id}`);
+    const existing = await getGelatoOrder(orderRow.gelato_order_id);
+    if (!GELATO_DEAD_STATUSES.includes(existing.fulfillmentStatus)) {
+      throw new Error(`Order ${orderRow.id}: Gelato order ${orderRow.gelato_order_id} is ${existing.fulfillmentStatus}, not ${GELATO_DEAD_STATUSES.join('/')}; replacing it could print the book twice`);
+    }
+    log.warn(`🔁 [ORDER] Order ${orderRow.id}: replacing Gelato order ${orderRow.gelato_order_id} (${existing.fulfillmentStatus})`);
+  }
   if (!stripe) throw new Error(`No Stripe client for stripe_mode=${orderRow.stripe_mode || 'live'}`);
   const session = await stripe.checkout.sessions.retrieve(orderRow.stripe_session_id, { expand: ['customer', 'line_items'] });
   const coveredByVoucher = session.payment_status === 'no_payment_required' && session.metadata?.voucherBook === '1';
   if (session.payment_status !== 'paid' && !coveredByVoucher) throw new Error(`Stripe session ${session.id} is ${session.payment_status}, not paid`);
   const inp = await resolveBookOrderInputs(dbPool, session);
-  const isTestPayment = orderRow.stripe_mode === 'test';
+  const asDraft = draft || orderRow.stripe_mode === 'test';
   return run(dbPool, session.id, inp.userId, inp.validatedStoryIds, inp.customerInfo, inp.address,
-    isTestPayment, inp.coverType, inp.quantity, inp.layout);
+    asDraft, inp.coverType, inp.quantity, inp.layout);
+}
+
+/**
+ * Gelato's refusal reasons for an order it reported `failed` (one per item that carries one),
+ * e.g. "Document page dimension is smaller than product requirements ...".
+ */
+function gelatoRefusalReasons(gelatoOrder) {
+  return (gelatoOrder?.items || []).map(i => i.refusalReason).filter(Boolean);
 }
 
 const STUCK_ORDER_IDLE_MINUTES = 30;
@@ -871,6 +901,8 @@ module.exports = {
   shippingFromSession,
   resolveBookOrderInputs,
   resumeBookOrder,
+  fetchGelatoOrder,
+  gelatoRefusalReasons,
   sweepStuckBookOrders,
   processBookOrder,
   getCoverDimensions,

@@ -1207,19 +1207,23 @@ router.post('/admin/orders/:orderId/retry-print-order', authenticateToken, async
       return res.status(404).json({ error: 'Order not found' });
     }
     const order = orderResult.rows[0];
-    if (order.gelato_order_id) {
-      return res.status(400).json({ error: 'Order already has a print order ID', printOrderId: order.gelato_order_id });
-    }
     const { getStripeClientForOrder } = req.app.locals;
     const stripe = typeof getStripeClientForOrder === 'function' ? getStripeClientForOrder(order) : null;
     if (!stripe) {
       return res.status(500).json({ error: `No Stripe client for stripe_mode=${order.stripe_mode || 'live'}` });
     }
 
-    log.info(`🔄 [ADMIN] Retrying print order for order ${orderId} (session ${order.stripe_session_id}, stripe_mode=${order.stripe_mode || 'live'})`);
     // PDF generation takes minutes: run in the background like the webhook does. processBookOrder
     // marks the order failed and alerts the admin itself if the retry fails.
-    resumeBookOrder(getDbPool(), order, stripe).catch(err => {
+    // { draft: true } makes a Gelato draft to check before it prints; { replaceDead: true } replaces a
+    // Gelato order that Gelato reports failed/canceled (resumeBookOrder verifies that with Gelato first).
+    const draft = req.body?.draft === true;
+    const replaceDead = req.body?.replaceDead === true;
+    if (order.gelato_order_id && !replaceDead) {
+      return res.status(400).json({ error: 'Order already has a print order ID (send replaceDead: true to replace a failed/canceled one)', printOrderId: order.gelato_order_id });
+    }
+    log.info(`🔄 [ADMIN] Retrying print order for order ${orderId} (session ${order.stripe_session_id}, stripe_mode=${order.stripe_mode || 'live'}, draft=${draft}, replaceDead=${replaceDead})`);
+    resumeBookOrder(getDbPool(), order, stripe, { draft, replaceDead }).catch(err => {
       log.error(`❌ [ADMIN] Retry of print order ${orderId} failed: ${err.message}`);
     });
     res.status(202).json({ success: true, message: 'Print order retry started', orderId: order.id });

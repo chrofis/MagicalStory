@@ -12,7 +12,7 @@ const database = require('../../server/services/database');
 database.getPool = () => ({});
 const { releaseReferralClaim } = require('../../server/lib/referral.js');
 const { recordPostPaymentFailure, bufferWebhookEvent } = require('../../server/lib/stripeWebhookRetry.js');
-const { sweepStuckBookOrders, resumeBookOrder } = require('../../server/lib/gelato.js');
+const { sweepStuckBookOrders, resumeBookOrder, gelatoRefusalReasons } = require('../../server/lib/gelato.js');
 
 describe('releaseReferralClaim (P3)', () => {
   it('clears the claim for an unpaid session and reports it', async () => {
@@ -128,6 +128,28 @@ describe('resumeBookOrder (P2)', () => {
   });
   it('refuses an order that already has a Gelato id (would order the book twice)', async () => {
     await expect(resumeBookOrder(dbPool, { id: 1, gelato_order_id: 'g1' }, stripeFor(session), { run: noop })).rejects.toThrow(/already has Gelato/);
+  });
+  it('draft: an admin-requested draft of a LIVE order goes to Gelato as a draft', async () => {
+    let args: any[] = [];
+    await resumeBookOrder(dbPool, { id: 1, stripe_session_id: 'cs_9', stripe_mode: 'live' }, stripeFor(session), { run: async (...a: any[]) => { args = a; }, draft: true });
+    expect(args[6]).toBe(true);
+  });
+  it('replaceDead: replaces a Gelato order only when Gelato itself reports it failed or canceled (order 102)', async () => {
+    const order = { id: 102, gelato_order_id: 'g1', stripe_session_id: 'cs_9', stripe_mode: 'live' };
+    let ran = 0;
+    const run = async () => { ran++; };
+    await resumeBookOrder(dbPool, order, stripeFor(session), { run, replaceDead: true, getGelatoOrder: async () => ({ fulfillmentStatus: 'failed' }) });
+    await resumeBookOrder(dbPool, order, stripeFor(session), { run, replaceDead: true, getGelatoOrder: async () => ({ fulfillmentStatus: 'canceled' }) });
+    expect(ran).toBe(2);
+    for (const alive of ['passed', 'in_production', 'shipped', 'draft']) {
+      await expect(resumeBookOrder(dbPool, order, stripeFor(session), { run, replaceDead: true, getGelatoOrder: async () => ({ fulfillmentStatus: alive }) }))
+        .rejects.toThrow(/could print the book twice/);
+    }
+    expect(ran).toBe(2);
+  });
+  it('gelatoRefusalReasons lists each refused item\'s reason', () => {
+    expect(gelatoRefusalReasons({ items: [{ refusalReason: 'page 1 too small' }, { refusalReason: null }] })).toEqual(['page 1 too small']);
+    expect(gelatoRefusalReasons({})).toEqual([]);
   });
   it('refuses a session that is not paid', async () => {
     await expect(resumeBookOrder(dbPool, { id: 1, stripe_session_id: 'cs_9' }, stripeFor({ ...session, payment_status: 'unpaid' }), { run: noop })).rejects.toThrow(/not paid/);

@@ -1227,6 +1227,20 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
 
       log.info('✅ [GELATO WEBHOOK] Order status updated to:', newStatus);
 
+      // Gelato refused the order (e.g. a print file it cannot process): the customer has paid and
+      // no book will print, so alert the admin with Gelato's reason (owner, 2026-11-02, order 102).
+      if (fulfillmentStatus === 'failed') {
+        try {
+          const { fetchGelatoOrder, gelatoRefusalReasons } = require('./server/lib/gelato');
+          const reasons = gelatoRefusalReasons(await fetchGelatoOrder(orderId));
+          await email.sendAdminOrderFailureAlert(`order ${order.id}`, order.customer_email, order.customer_name,
+            `Gelato refused print order ${orderId}: ${reasons.join(' | ') || '(no refusal reason given)'}`);
+          log.error(`❌ [GELATO WEBHOOK] Order ${order.id} refused by Gelato: ${reasons.join(' | ')}`);
+        } catch (alertErr) {
+          log.error(`❌ [GELATO WEBHOOK] Order ${order.id} failed at Gelato and the admin alert could not be sent: ${alertErr.message}`);
+        }
+      }
+
       // Send order confirmation email when Gelato validates the order (passed or in_production)
       // This ensures customers only receive "Order Confirmed" after Gelato accepts the order
       if ((fulfillmentStatus === 'passed' || fulfillmentStatus === 'in_production') && order.customer_email) {
