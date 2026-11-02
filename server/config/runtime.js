@@ -200,7 +200,12 @@ const SETTINGS = {
   // and a single upstream vendor. The fallback to Gemini 2.5 Flash on an
   // OpenRouter throw, timeout or non-2xx STAYS (evalPipeline.js:112-133) — it
   // is a provider-failure path, not a second implementation.
-  inventoryModel: 'qwen3-vl',
+  // REPLACED 2026-11-02 by Gemini 3.7 Flash (owner): OpenRouter retired qwen3-vl (32B)
+  // on 2026-10-09, so every call had fallen back to Gemini 2.5 Flash since. Lab 1795-1802
+  // on the stored inventory sets: only gemini-3.7-flash flagged the headless dragon (set 25
+  // p7), 0 false alarms on 5 intact dragons; Sonnet 5.5 and qwen3-vl-235b called it
+  // complete. About USD 0.010-0.016 per call. docs/decisions.md 2026-11-02.
+  inventoryModel: 'gemini-3.7-flash',
 
   // ── Stories in the making per account ──────────────────────────────────
   // Up to 3 stories (status pending/processing) per account at once (owner,

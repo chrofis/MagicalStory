@@ -15,8 +15,8 @@ import { describe, it, expect, afterAll, vi } from 'vitest';
 // These tests pin the BEHAVIOUR that promotion bought — every environment
 // resolves to the SAME stage-1 model — rather than the literal id, which is a
 // routing choice that may change again. One test does name the id, because the
-// promotion evidence (Lab exps 1038-1054, 1053/1054, 1060-1063) is about
-// qwen3-vl specifically and a silent revert should be visible.
+// replacement evidence (Lab exps 1795-1802, 2026-11-02: the only model of three that
+// flagged the headless dragon) is about gemini-3.7-flash specifically.
 
 const ORIGINAL_ENV = process.env.RAILWAY_ENVIRONMENT_NAME;
 
@@ -57,10 +57,10 @@ describe('stage-1 inventory model', () => {
     expect(distinct.size, `stage-1 model differs per environment: ${JSON.stringify(resolved)}`).toBe(1);
   });
 
-  it('is qwen3-vl everywhere since the 2026-09-19 promotion', async () => {
+  it('is gemini-3.7-flash everywhere since the 2026-11-02 replacement of the retired qwen3-vl', async () => {
     for (const env of ENVIRONMENTS) {
       const { runtime } = await loadRuntimeFor(env);
-      expect(runtime('inventoryModel'), `env=${env ?? '(unset)'}`).toBe('qwen3-vl');
+      expect(runtime('inventoryModel'), `env=${env ?? '(unset)'}`).toBe('gemini-3.7-flash');
     }
   });
 
@@ -69,7 +69,7 @@ describe('stage-1 inventory model', () => {
     // config change that does not reach it changes nothing.
     for (const env of ENVIRONMENTS) {
       const { MODEL_DEFAULTS } = await loadModelsFor(env);
-      expect(MODEL_DEFAULTS.inventoryModel, `env=${env ?? '(unset)'}`).toBe('qwen3-vl');
+      expect(MODEL_DEFAULTS.inventoryModel, `env=${env ?? '(unset)'}`).toBe('gemini-3.7-flash');
     }
   });
 
@@ -78,7 +78,7 @@ describe('stage-1 inventory model', () => {
       const { runtimeSnapshot } = await loadRuntimeFor(env);
       const snap = runtimeSnapshot();
       expect(snap.environment, `env=${env}`).toBe(env);
-      expect(snap.inventoryModel, `env=${env}`).toBe('qwen3-vl');
+      expect(snap.inventoryModel, `env=${env}`).toBe('gemini-3.7-flash');
     }
   });
 
