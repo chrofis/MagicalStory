@@ -93,7 +93,21 @@ function resolveStoryPageAspect(storyData) {
   return aspect;
 }
 
+/**
+ * The ONE rule for which reading level prints its page text on plain white under a whole, square,
+ * uncropped picture (A4 single layout) instead of in a strip filled from the picture. Long text
+ * (advanced) does not fit a strip without covering the picture, and the owner will not have the
+ * picture cut (docs/decisions.md 2026-11-02 "Long text prints on white"). Print, combined, view and
+ * the book preview (which renders the print PDF) all read this.
+ * @param {string} languageLevel
+ * @returns {boolean}
+ */
+function printsTextOnWhite(languageLevel) {
+  return languageLevel === 'advanced';
+}
+
 module.exports = {
+  printsTextOnWhite,
   resolveLayout,
   resolveStoryPageAspect,
   isLegacy2Page,

@@ -12,6 +12,7 @@ const { generateTextOverlay } = require('./textOverlayRenderer');
 // the text-overlay renderer needs the same trim geometry to size the story
 // font, and importing it from here would close a require cycle.
 const { mmToPoints, BOOK_FORMATS, DEFAULT_FORMAT } = require('../config/print');
+const { printsTextOnWhite } = require('./layout');
 
 // Legacy constants (for backwards compatibility)
 const COVER_WIDTH = BOOK_FORMATS.square.coverWidth;
@@ -397,9 +398,12 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     // standard=20%, advanced=35%). Target font: 14pt for 1st-grade, 12pt
     // for the others. Min font: 10pt floor. When textInImage=false the strip
     // height adapts to the actual text length (#4 — variable text area).
-    const textRatio = textInImage
-      ? getPictureBookTextRatio(storyData.languageLevel)
-      : computeTextBelowRatio(storyPages, storyData.languageLevel);
+    const textOnWhite = !textInImage && printsTextOnWhite(storyData.languageLevel);
+    const textRatio = textOnWhite
+      ? whiteTextRatio(pageWidth, pageHeight, bleed)
+      : textInImage
+        ? getPictureBookTextRatio(storyData.languageLevel)
+        : computeTextBelowRatio(storyPages, storyData.languageLevel);
     const startFont = storyData.languageLevel === '1st-grade' ? 14 : 12;
     const textMargin = mmToPoints(3);
     const textWidth = pageWidth - (textMargin * 2);
@@ -409,8 +413,8 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     // We approximate line-height as startFont + 2 (loose lineGap baseline so the
     // budget is safe even if the fit function ends up using a tighter lineGap).
     const lineHeightAtStart = startFont + 2;
-    const padTop = textInImage ? 0 : lineHeightAtStart;
-    const padBottom = textInImage ? 0 : lineHeightAtStart;
+    const padTop = textInImage ? 0 : textOnWhite ? WHITE_TEXT_PAD_TOP : lineHeightAtStart;
+    const padBottom = textInImage || textOnWhite ? 0 : lineHeightAtStart;
     const budgetHeight = Math.max(1, availableTextHeight - padTop - padBottom);
 
     const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, textInImage ? 'center' : 'left');
@@ -426,6 +430,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
       bookFormat,
       fillMethod: options.fillMethod,
       fillStats: options.fillStats,
+      textOnWhite,
     });
   } else {
     // Standard 2-page layout (square format only). Text page on left, image on right.
@@ -479,6 +484,15 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   console.log(`✅ [PRINT PDF] Generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB), PDF pages: ${actualPdfPages}, Gelato pageCount: ${gelatoPageCount}, font: ${isSpread ? 'spread' : consistentFontSize + 'pt'}`);
 
   return { pdfBuffer, pageCount: gelatoPageCount, fontSizeWarning };
+}
+
+// Text-on-white pages (layout.printsTextOnWhite): the picture is the whole square at full interior
+// width, the text area is what is left below it. Breathing gap under the picture, in points.
+const WHITE_TEXT_PAD_TOP = 6;
+
+/** Fraction of the trim page height left under a full-interior-width square picture (bleed on both sides). */
+function whiteTextRatio(pageWidth, pageHeight, bleed) {
+  return 1 - (pageWidth + bleed) / pageHeight;
 }
 
 /**
@@ -681,8 +695,19 @@ function requireFillMethod(fillMethod, who) {
 async function drawFilledStripPage(doc, image, g) {
   const { interiorW, interiorH, imageBottom, pageNumber, text, fontSize, lineGap, paragraphGap, textX, textWidth, padTop, textBudgetHeight, textBottom, bookFormat, languageLevel } = g;
 
+  // Text on white (layout.printsTextOnWhite): the whole picture, never cropped, no strip, no Grok call.
+  if (g.textOnWhite && image?.imageData) {
+    try {
+      const pictureBuffer = await resolveImageBuffer(image.imageData);
+      if (!pictureBuffer) throw new Error('image source unresolvable');
+      doc.image(pictureBuffer, 0, 0, { fit: [interiorW, imageBottom], align: 'center', valign: 'top' });
+    } catch (imgErr) {
+      log.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
+    }
+  }
+
   // g.background = this page's prefetched promise (grok); without it the fill is built here.
-  const filled = await (g.background || buildStripBackground(image, g, g.fillStats));
+  const filled = g.textOnWhite ? null : await (g.background || buildStripBackground(image, g, g.fillStats));
 
   if (filled) {
     const { buffer, edge } = filled;
@@ -703,10 +728,18 @@ async function drawFilledStripPage(doc, image, g) {
     return;
   }
 
-  // No picture: plain text page.
+  // Plain dark text on white: a page with no picture, or a text-on-white page under its whole picture.
   doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
   const textHeight = doc.heightOfString(text, { width: textWidth, align: 'center', lineGap, paragraphGap });
   const textY = imageBottom + padTop + Math.max(0, (textBudgetHeight - textHeight) / 2);
+  if (g.textOnWhite) {
+    // Never cut text: calculateConsistentFontSize throws first when a page cannot fit at the floor; this is the page-level check.
+    if (textHeight > textBudgetHeight + 0.5) {
+      throw new Error(`page ${pageNumber}: text needs ${Math.ceil(textHeight)} pt, white area is ${Math.floor(textBudgetHeight)} pt`);
+    }
+    doc.text(text, textX, textY, { width: textWidth, align: 'center', lineGap, paragraphGap });
+    return;
+  }
   doc.text(text, textX, textY, { width: textWidth, align: 'center', lineGap, paragraphGap, height: Math.max(0, textBottom - textY), ellipsis: true });
 }
 
@@ -755,7 +788,7 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
   // Grok fill: start every classic page's strip now so the calls run together (overlay mode
   // draws its text into the picture and needs no strip, so nothing is prefetched for it).
   requireFillMethod(opts.fillMethod, 'addPictureBookPages');
-  const stripBackgrounds = textOverlay ? new Map()
+  const stripBackgrounds = (textOverlay || opts.textOnWhite) ? new Map()
     : prefetchStripBackgrounds(storyData, storyPages,
       { interiorW, interiorH, imageBottom: bleed + classicImageHeight }, opts.fillMethod, opts.fillStats);
 
@@ -824,7 +857,7 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       await drawFilledStripPage(doc, image, {
         interiorW, interiorH, imageBottom: bleed + classicImageHeight, pageNumber,
         fillMethod: opts.fillMethod, fillStats: opts.fillStats, background: stripBackgrounds.get(pageNumber),
-        bookFormat: opts.bookFormat, languageLevel: storyData.languageLevel,
+        bookFormat: opts.bookFormat, languageLevel: storyData.languageLevel, textOnWhite: !!opts.textOnWhite,
         text: flowText, fontSize, lineGap, paragraphGap,
         textX: bleed + textMargin, textWidth,
         padTop: textPadTop, textBudgetHeight: effectiveTextHeight, textBottom: bleed + pageHeight - textPadBottom,
@@ -1024,10 +1057,13 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
     const layoutFromLevel = resolveLayout(storyData.languageLevel);
     const sceneTextInImage = storyData.sceneImages?.[0]?.textInImage;
     const textInImageForRatio = typeof sceneTextInImage === 'boolean' ? sceneTextInImage : layoutFromLevel.textInImage;
-    const textRatio = textInImageForRatio
-      ? getPictureBookTextRatio(storyData.languageLevel)
-      : computeTextBelowRatio(storyPages, storyData.languageLevel);
-    return { textInImageForRatio, textRatio, imageHeight: pageHeight * (1 - textRatio) };
+    const textOnWhite = !textInImageForRatio && printsTextOnWhite(storyData.languageLevel);
+    const textRatio = textOnWhite
+      ? whiteTextRatio(pageWidth, pageHeight, bleed)
+      : textInImageForRatio
+        ? getPictureBookTextRatio(storyData.languageLevel)
+        : computeTextBelowRatio(storyPages, storyData.languageLevel);
+    return { textInImageForRatio, textOnWhite, textRatio, imageHeight: pageHeight * (1 - textRatio) };
   };
 
   const addStoryContentPages = async (storyData, storyPages, stripBackgrounds) => {
@@ -1036,7 +1072,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       return;
     }
     const textMarginMm = mmToPoints(3);
-    const { textInImageForRatio, textRatio, imageHeight } = contentGeometry(storyData, storyPages);
+    const { textInImageForRatio, textOnWhite, textRatio, imageHeight } = contentGeometry(storyData, storyPages);
     const textAreaHeight = pageHeight * textRatio;
     const textWidth = pageWidth - (textMarginMm * 2);
     const availableTextHeight = textAreaHeight - textMarginMm;
@@ -1047,8 +1083,8 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
     // Reserve one-line breathing room top + bottom in classic mode (text-below).
     // Skip in textInImage mode where text is baked into the image.
     const lineHeightAtStart = startFont + 2;
-    const padTop = textInImage ? 0 : lineHeightAtStart;
-    const padBottom = textInImage ? 0 : lineHeightAtStart;
+    const padTop = textInImage ? 0 : textOnWhite ? WHITE_TEXT_PAD_TOP : lineHeightAtStart;
+    const padBottom = textInImage || textOnWhite ? 0 : lineHeightAtStart;
     const budgetHeight = Math.max(1, availableTextHeight - padTop - padBottom);
 
     // Use the shared 2-stage fit (tighten lineGap first, then font) for one
@@ -1096,7 +1132,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       await drawFilledStripPage(doc, image, {
         interiorW: interiorPageWidth, interiorH: interiorPageHeight, imageBottom: bleed + imageHeight, pageNumber,
         fillMethod: options.fillMethod, fillStats: options.fillStats, background: stripBackgrounds.get(pageNumber),
-        bookFormat, languageLevel: storyData.languageLevel,
+        bookFormat, languageLevel: storyData.languageLevel, textOnWhite,
         text: flowText, fontSize: consistentFont, lineGap, paragraphGap,
         textX: bleed + textMarginMm, textWidth,
         padTop, textBudgetHeight: effectiveTextHeight, textBottom: bleed + pageHeight - padBottom,
@@ -1111,8 +1147,8 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
   const storyStrips = stories.map(({ data: storyData }) => {
     if (options.layout === 'spread') return new Map();
     const storyPages = parseStoryPages(storyData);
-    const { textInImageForRatio, imageHeight } = contentGeometry(storyData, storyPages);
-    return textInImageForRatio ? new Map() : prefetchStripBackgrounds(storyData, storyPages,
+    const { textInImageForRatio, textOnWhite, imageHeight } = contentGeometry(storyData, storyPages);
+    return (textInImageForRatio || textOnWhite) ? new Map() : prefetchStripBackgrounds(storyData, storyPages,
       { interiorW: interiorPageWidth, interiorH: interiorPageHeight, imageBottom: bleed + imageHeight },
       options.fillMethod, options.fillStats, stripPainter);
   });
@@ -1355,9 +1391,13 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
   if (isPictureBook) {
     // Trial layout pins the image area to a perfect 210×210 square, so the
     // text strip is whatever's left at the bottom (70mm on A4 → ratio = 0.25).
+    // Trial layout pins its own square geometry and keeps the strip at every level.
+    const textOnWhite = !trialLayout && !textOverlay && printsTextOnWhite(storyData.languageLevel);
     const textRatio = trialLayout
       ? (pageHeight - pageWidth) / pageHeight
-      : (textOverlay
+      : textOnWhite
+        ? whiteTextRatio(pageWidth, pageHeight, 0)
+        : (textOverlay
           ? getPictureBookTextRatio(storyData.languageLevel)
           : computeTextBelowRatio(storyPages, storyData.languageLevel));
     const startFont = storyData.languageLevel === '1st-grade' ? 14 : 12;
@@ -1370,8 +1410,8 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
     // Reserve one-line breathing room top + bottom in classic mode (text-below).
     // Skip for text-overlay mode where text is baked into the image, not placed below.
     const lineHeightAtStart = startFont + 2;
-    const padTop = useTextOverlay ? 0 : lineHeightAtStart;
-    const padBottom = useTextOverlay ? 0 : lineHeightAtStart;
+    const padTop = useTextOverlay ? 0 : textOnWhite ? WHITE_TEXT_PAD_TOP : lineHeightAtStart;
+    const padBottom = useTextOverlay || textOnWhite ? 0 : lineHeightAtStart;
     const budgetHeight = Math.max(1, availableTextHeight - padTop - padBottom);
     const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, budgetHeight, startFont, 10, useTextOverlay ? 'center' : 'left');
     await addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, fontResult.fontSize, 0, textRatio, useTextOverlay, {
@@ -1381,6 +1421,7 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
       // The free customer download and the trial email PDF keep the mirror fill; only the paid
       // order PDF is outpainted by Grok (decisions.md 2026-10-26, two routings).
       fillMethod: 'mirror',
+      textOnWhite,
     });
   } else {
     const marginOuter = 20;
@@ -1449,6 +1490,7 @@ module.exports = {
   generateViewPdf,
   generateCombinedBookPdf,
   parseStoryPages,
+  calculateConsistentFontSize,
   getCoverImageData,
   printCoverSource,
   mmToPoints,

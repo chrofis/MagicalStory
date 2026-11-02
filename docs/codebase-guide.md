@@ -349,7 +349,7 @@ Stripe `bookFormat` metadata, the order, the Gelato product match and the PDF us
 - Test: `npx vitest run tests/unit/short-book-layout.test.ts tests/unit/book-price-quote.test.ts` and
   `node --test server/lib/gelato.test.js`. Decision: `docs/decisions.md` 2026-10-26 and 2026-10-27 (the book product model replaces "the customer picks the layout and format").
 
-- Text strip fill (single layout): the strip below the picture is not white. `server/lib/pageFill.js`
+- Text strip fill (single layout, short and medium only; the long level `advanced` prints text on plain white under the whole square picture, no strip and no Grok call, `layout.printsTextOnWhite`, decisions.md 2026-11-02): the strip below the picture is not white. `server/lib/pageFill.js`
   (`buildFilledPageBackground`) builds the whole page as one 300 dpi JPEG: picture on top, below it the
   picture's lower half flipped, blurred and lightened with a feathered seam, nothing else drawn on it.
   `pdf.js` `drawFilledStripPage` renders the text into the strip with `generateTextOverlay` (the one
