@@ -10646,6 +10646,10 @@ function titleCriteria(age) {
   return `every word of it is true of the pages you wrote, a title naming a condition, a lack or an inability is one the story shows happening on a page, never one a character only mentions; it names the adventure or the bond the story is about, not a vehicle, object or place that merely carries it; it gives away no ending; a child of ${age} can say it out loud.`;
 }
 
+// The trial's low point (owner, 2026-11-03: "the story writer should write one setback"). The old line, "the setback or loss
+// gets a scene of its own", let a planner count the fear itself as the low point: 9 of 20 stored prod trial stories had no
+// setback, 5 of the 6 age-4 ones (evals/runs/2026-11-03_trial-story-setback). One constant for both trial prompts.
+const TRIAL_SETBACK_RULE = 'One setback, and it is something that happens, never a feeling alone: the main character tries something and it does not work, or something goes wrong that makes the problem harder. It gets a scene of its own between the problem and the resolution, and the resolution is a different act that comes after it; the setback and its resolution never share a scene.';
 const RISK_FRAMING_RULE = '- Where a child does something with real physical risk, the risk is present in the telling: someone is careful, names it aloud, or the child feels it â€” and the close does not treat it as nothing. An adult who permits it still says what to watch for.';
 
 /**
@@ -13431,6 +13435,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       // trial runs no refine, no audit and no arc review, so these reach a
       // trial story through this prompt or not at all. Zero extra calls.
       PERIL_CEILING: PERIL_CEILING_RULE,
+      TRIAL_SETBACK: TRIAL_SETBACK_RULE,
       // The trial writer is its own arc creator: the stakes rule the arc
       // creator, critique and panel read (arcStakesRules) is a writer rule here.
       ARC_QUESTIONS_ANSWERED: ARC_QUESTIONS_ANSWERED_RULE,
@@ -14341,6 +14346,7 @@ module.exports = {
   PLACE_INSIDE_OUTSIDE_RULE,
   ONE_SIDED_FEATURE_RULE,
   OBJECT_NOT_PLACED_RULE,
+  TRIAL_SETBACK_RULE,
   STATE_REPLACES_PART_RULE,
   STATE_FULL_DESCRIPTION_RULE,
   STATE_WINS_RULE,

@@ -1,0 +1,12 @@
+{
+  "rater": "agent:sonnet, blind",
+  "dataset": "local only: evals/datasets/trial-setback-2026-11-03/stories/trial-stories-prod-2026-11-03.jsonl (all 20 stored prod trial stories with pages)",
+  "metrics": {
+    "n": 20,
+    "setback": "11/20",
+    "solved_in_one_step": "8/20",
+    "mean_excitement": 3.1,
+    "age4_setback": "1/6"
+  },
+  "rubric": "# Rubric: does a short picture-book story have a setback?\n\nEach line of the dataset is one finished 6-page picture-book story (`pages`, in its own language) for a\nchild of the given `age`, with the one-paragraph `idea` it was written from. Read the pages, not the idea.\n\nFor every story answer:\n\n- `setback` (true/false): between the problem and the ending, on its own page, something goes wrong\n  for the main character or a first attempt fails, so they must try again or try something else.\n  A feeling alone (being scared, hesitating) is not a setback; neither is the opening problem itself.\n- `setback_page` (number or null): the page where it happens.\n- `solved_in_one_step` (true/false): the problem is solved by one single decision or act, with nothing\n  in between that pushes back.\n- `excitement` (1-5): how much a child of that age would want to hear what happens next.\n  1 = nothing really happens; 2 = one small problem, solved in one step; 3 = a real problem with\n  some tension; 4 = tension plus a turn or surprise; 5 = gripping for that age.\n- `why`: one short sentence, in English.\n\nOutput: one JSON object per line, `{\"id\", \"setback\", \"setback_page\", \"solved_in_one_step\", \"excitement\", \"why\"}`,\nfor every id in the dataset, in the same order. Nothing else in the file.\n"
+}
