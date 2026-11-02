@@ -303,6 +303,9 @@ describe('3. the client starts the account and the sheet at the photo', () => {
     const route = read('server/routes/trial.js');
     expect(route).toContain("router.put('/update-photo'");
     for (const k of ["'photoEstimate'", "'preGeneratedStyledAvatars'", "'preGeneratedAvatarSlides'", "'physical'"]) expect(route).toContain(k);
+    // The in-memory sheets of the old photo go too, or the next draw returns them (prod trial 62304b22, 2026-11-02).
+    const updatePhoto = route.slice(route.indexOf("router.put('/update-photo'"));
+    expect(updatePhoto.slice(0, 2500)).toContain("clearCacheScope(`trial-${userId}`, 'photo replaced')");
   });
   it('the provisional session is kept by the wizard, so a returning visitor reuses the account and a new photo goes to update-photo', () => {
     expect(step).toMatch(/\.then\(\(account\) => \{ if \(account\) onAccountCreated\?\.\(account\.sessionToken, account\.characterId\); return account; \}\)/);

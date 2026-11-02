@@ -1374,6 +1374,20 @@ function clearScopeEntries(scopeId, reason = 'clear') {
   return cleared;
 }
 
+/**
+ * Drop everything one scope holds, retained or not, from outside it. For an input change that makes
+ * every drawn sheet in the scope wrong: a trial photo replaced after a sheet was drawn from the old one
+ * (prod trial 62304b22, 2026-11-02: the redraw returned the old photo's cached sheet in 2 s).
+ */
+function clearCacheScope(scopeId, reason = 'clear') {
+  const handoff = pendingScopeHandoffs.get(scopeId);
+  if (handoff) {
+    clearTimeout(handoff.timer);
+    pendingScopeHandoffs.delete(scopeId);
+  }
+  return clearScopeEntries(scopeId, reason);
+}
+
 async function runInCacheScope(scopeId, fn) {
   log.debug(`🔒 [STYLED AVATARS] Running in cache scope: ${scopeId}`);
   // Entering a retained scope IS the handoff: cancel the TTL and keep the
@@ -2138,6 +2152,7 @@ module.exports = {
   // Cache access
   runInCacheScope,
   retainCacheScopeForHandoff,
+  clearCacheScope,
   getStyledAvatar,
   setStyledAvatar,
   hasStyledAvatar,

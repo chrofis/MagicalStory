@@ -7,6 +7,7 @@ import {
   hasStyledAvatar,
   clearStyledAvatarCache,
   retainCacheScopeForHandoff,
+  clearCacheScope,
 } from '../../server/lib/styledAvatars.js';
 
 // A trial shares ONE cache scope between the wizard's prepare-title prewarm
@@ -140,6 +141,28 @@ describe('styled avatar cache: prewarm → story job handoff', () => {
     // The job's clear was the last one out, so nothing is parked behind a TTL.
     await runInCacheScope(scope, async () => {
       expect(hasStyledAvatar('amian', 'standard', 'watercolor')).toBe(false);
+    });
+  });
+});
+
+// Prod trial 62304b22 (2026-11-02): the visitor replaced the photo twice after the standard sheet was
+// drawn; the cached sheet (keyed by character, not photo) came back in 2 s and the standard and
+// costumed avatars showed two different children. A photo change drops the whole scope.
+describe('styled avatar cache: clearCacheScope', () => {
+  it('drops a scope from outside it, including a retained handoff, and leaves other scopes alone', async () => {
+    const scope = 'trial-photo-replaced';
+    const other = 'trial-someone-else';
+    await runInCacheScope(other, async () => { setStyledAvatar('mia', 'standard', 'watercolor', 'data:image/jpeg;base64,b'); });
+    await runInCacheScope(scope, async () => {
+      setStyledAvatar('ilena', 'standard', 'watercolor', 'data:image/jpeg;base64,a');
+      retainCacheScopeForHandoff(scope);
+    });
+    expect(clearCacheScope(scope, 'photo replaced')).toBe(1);
+    await runInCacheScope(scope, async () => {
+      expect(hasStyledAvatar('ilena', 'standard', 'watercolor')).toBe(false);
+    });
+    await runInCacheScope(other, async () => {
+      expect(hasStyledAvatar('mia', 'standard', 'watercolor')).toBe(true);
     });
   });
 });

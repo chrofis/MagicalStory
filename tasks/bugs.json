@@ -4605,6 +4605,16 @@
       "status": "fixed",
       "fixedIn": "889884def",
       "fix": "gelato.createGelatoOrder: on a 5xx or no answer it looks the order up by orderReferenceId (orders:search, 3 x 10 s) and uses the order Gelato holds; a 4xx throws at once; a failed lookup throws telling the admin to check Gelato before ordering again. processBookOrder and the admin print route both create through it. Regression: tests/unit/gelato-create-order.test.ts; live lookup checked against prod draft b0c61998."
+    },
+    {
+      "id": "trial-photo-replace-keeps-old-sheet",
+      "title": "A trial visitor who replaces the photo gets the standard sheet drawn from the OLD photo, so the standard and costumed avatars show two different children",
+      "reportedAt": "2026-11-02",
+      "source": "Owner 2026-11-02 on prod trial job_1793646081141_xt7lbx47k (Ilena, user 62304b22): \"its 2 avatars have different photos\". Prod log deployment 41b680ed: photo 1 at 19:56 CH -> standard sheet drawn by Grok (36 s); photo replaced 19:58 and 19:59 (\"everything drawn from the old one is cleared\") -> \"Standard sheet (at the photo) ready ... in 2s\" / 3s, no Grok call; the costumed sheet was then drawn from photo 3. Stored standard sheet shows photo 1 (long loose hair), costumed shows photo 3; the row detailedHairAnalysis (source avatar) says mid-back hair, taken from the stale sheet.",
+      "rootCause": "server/routes/trial.js update-photo clears the row fields and standardSheetDraws but not the in-memory styled-avatar cache scope trial-<userId> (key #<charId>_standard_<style>, not photo-keyed). The first draw ran with two runners in the scope, each skipped clearing, so the photo-1 sheet stayed cached and the redraw returned it.",
+      "status": "fixed",
+      "fixedIn": "PENDING",
+      "fix": "update-photo drops the whole in-memory cache scope trial-<userId> (styledAvatars.clearCacheScope, also cancels a retained handoff) after the old draws finish, so the next draw starts from the new photo. Regression: tests/unit/styled-avatar-scope-guard.test.ts clearCacheScope, tests/unit/trial-photo-sheet-2026-10-10.test.ts update-photo."
     }
   ]
 }

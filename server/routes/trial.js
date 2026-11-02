@@ -1301,6 +1301,9 @@ router.put('/update-photo', verifySessionToken, async (req, res) => {
     await standardSheetDraws.get(userId)?.promise.catch(() => {});
     standardSheetDraws.delete(userId);
     await inFlightTraitSaves.get(userId);
+    // The sheets drawn from the old photo also sit in the in-memory cache, keyed by character, not photo:
+    // left there, the next draw returns them at once (prod trial 62304b22, 2026-11-02).
+    require('../lib/styledAvatars').clearCacheScope(`trial-${userId}`, 'photo replaced');
 
     const { stripExif } = require('../lib/imageMetadata');
     const [strippedFace, strippedBody, strippedBodyNoBg] = await Promise.all([
