@@ -1009,3 +1009,8 @@ Rule: before opening any generated report, assert that the per-item counts add u
 ## 2026-11-03 — claimed production storage was hit when staging has its own bucket
 Pattern: after a staging edit overwrote a v0 image, I told the owner the shared prod bucket was hit, trusting a skill doc that said the buckets are shared. The promote script's header said otherwise.
 Rule: before saying which environment a write reached, read the code that writes it (R2 config of that service, the promote script), not a doc's summary of it.
+
+## 2026-11-03 · Never read the shell clock and convert by hand
+The Git-bash `date` prints "WEST" (UTC+1, which in winter IS Swiss time); I added an hour on top and told the owner
+22:54 CH when it was 21:57 CH, and doubled an elapsed time ("busy for an hour" when it was 30 min). Rule: every time I
+state to the owner comes from `ch()` / `chTime()` in scripts/lib/chTime.js, never from `date` and never by hand arithmetic.
