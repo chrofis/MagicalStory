@@ -21,7 +21,7 @@ Picture defects found by eye, against whether the audit reported them:
 - [ ] Dedication page: white text runs across Lia's body. Audit: covers not read for this.
 - [ ] p8 Oma absent (shipped CRITICAL), stream open water not frozen.
 
-Audit false or useless: "over her shoulder" flagged 7 times across rounds on p14/p16 (the brief's wording, pictures fine); p1 sad vs curious flagged CRITICAL by the per-page judges, picture fine.
+Audit false or useless: "over her shoulder" flagged 6 times across rounds on p14/p16 (the brief's wording, pictures fine); p1 sad vs curious flagged CRITICAL by the per-page judges, picture fine.
 
 Text: strong arc (fear under the bed p2 pays off with the bear p15, tea p3 thaws ice p7, stiff tail p8 stops the fox p9, lantern p3 given away p16, spark on the tree p20). Weak: lantern parade set up p2 never happens; p18 too many events; p11 "es klang nicht, als wolle sie darüber reden" is above reading level.
 
