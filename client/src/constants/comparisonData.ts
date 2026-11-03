@@ -1683,10 +1683,10 @@ export const comparisons: ComparisonData[] = [
           it: 'Prima storia gratuita, poi CHF 9.90 digitale / CHF 29-37 stampa',
         },
         highlight: {
-          en: 'The only platform where every story is created from scratch for your child',
-          de: 'Die einzige Plattform, bei der jede Geschichte von Grund auf für dein Kind erstellt wird',
-          fr: 'La seule plateforme où chaque histoire est créée de zéro pour votre enfant',
-          it: 'L\'unica piattaforma in cui ogni storia viene creata da zero per tuo figlio',
+          en: 'Full control over your story: change the text, redo any picture, keep the version you like',
+          de: 'Volle Kontrolle über deine Geschichte: Text ändern, jedes Bild neu machen, die Version behalten, die dir gefällt',
+          fr: 'Le contrôle total de votre histoire : modifiez le texte, refaites chaque image, gardez la version qui vous plaît',
+          it: 'Pieno controllo sulla tua storia: cambia il testo, rifai ogni immagine, tieni la versione che ti piace',
         },
         features: {
           en: ['DE, EN, FR including Swiss German', 'Town-specific stories', '170+ themes, 14 art styles', 'Child\'s real face in illustrations', 'Free first story'],

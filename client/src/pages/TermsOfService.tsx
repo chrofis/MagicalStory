@@ -139,7 +139,19 @@ We reserve the right to refuse service, remove content, and terminate accounts t
 • The United Nations Convention on Contracts for the International Sale of Goods does not apply`
       },
       {
-        title: '17. Contact',
+        title: '17. Refunds, Cancellations and Complaints',
+        content: `Credits. Credits are a prepaid balance for creating stories. You can ask for a refund of credits you bought and have not used yet within 14 days of the purchase; write to us and we refund them to your original payment method. Credits that have been used for a story, and free credits (welcome credits, promotions, vouchers you received), are not refundable.
+
+Failed stories. If a story cannot be completed because of a technical problem on our side, the credits for it are returned to your account automatically.
+
+Printed books. Every book is personalised and printed to order, so it cannot be cancelled or returned once it has been sent to print. Please check the preview carefully before ordering. If your book arrives damaged, misprinted, or not matching the preview you approved, tell us within 30 days of delivery, with a photo of the problem. We reprint and send it again free of charge, or refund the book if a reprint is not possible.
+
+Vouchers. A gift voucher you bought does not expire. Promotional vouchers show their expiry date in your account. Vouchers cannot be exchanged for cash.
+
+Complaints. Send any complaint to the contact address in section 18. We answer within 5 working days.`
+      },
+      {
+        title: '18. Contact',
         content: `For questions about these Terms, please contact us at: legal@magicalstory.ch`
       }
     ]
@@ -279,7 +291,19 @@ Wir behalten uns das Recht vor, den Dienst zu verweigern, Inhalte zu entfernen u
 • Das Übereinkommen der Vereinten Nationen über Verträge über den internationalen Warenkauf findet keine Anwendung`
       },
       {
-        title: '17. Kontakt',
+        title: '17. Rückerstattung, Stornierung und Reklamationen',
+        content: `Credits. Credits sind ein vorausbezahltes Guthaben zum Erstellen von Geschichten. Gekaufte, noch nicht verwendete Credits erstatten wir auf Anfrage innerhalb von 14 Tagen nach dem Kauf auf das ursprüngliche Zahlungsmittel zurück. Bereits für eine Geschichte verwendete Credits sowie geschenkte Credits (Willkommens-Credits, Aktionen, erhaltene Gutscheine) werden nicht erstattet.
+
+Fehlgeschlagene Geschichten. Kann eine Geschichte wegen eines technischen Problems auf unserer Seite nicht fertiggestellt werden, erhältst du die Credits automatisch auf dein Konto zurück.
+
+Gedruckte Bücher. Jedes Buch wird persönlich gestaltet und auf Bestellung gedruckt. Sobald es in den Druck gegangen ist, kann es nicht storniert oder zurückgegeben werden. Bitte prüfe die Vorschau vor der Bestellung sorgfältig. Kommt dein Buch beschädigt, fehlerhaft gedruckt oder anders als die freigegebene Vorschau an, melde dich innerhalb von 30 Tagen nach Erhalt mit einem Foto des Problems. Wir drucken und senden es kostenlos neu oder erstatten den Buchpreis, wenn ein Neudruck nicht möglich ist.
+
+Gutscheine. Ein gekaufter Geschenkgutschein läuft nicht ab. Aktionsgutscheine zeigen ihr Ablaufdatum in deinem Konto. Gutscheine können nicht in Bargeld umgetauscht werden.
+
+Reklamationen. Reklamationen bitte an die Kontaktadresse in Abschnitt 18. Wir antworten innerhalb von 5 Arbeitstagen.`
+      },
+      {
+        title: '18. Kontakt',
         content: `Bei Fragen zu diesen Bedingungen kontaktieren Sie uns bitte unter: legal@magicalstory.ch`
       }
     ]
@@ -419,7 +443,19 @@ Nous nous réservons le droit de refuser le service, de supprimer le contenu et 
 • La Convention des Nations Unies sur les contrats de vente internationale de marchandises ne s'applique pas`
       },
       {
-        title: '17. Contact',
+        title: '17. Remboursements, annulations et réclamations',
+        content: `Crédits. Les crédits sont un solde prépayé pour créer des histoires. Vous pouvez demander le remboursement des crédits achetés et pas encore utilisés dans les 14 jours suivant l'achat ; écrivez-nous et nous les remboursons sur votre moyen de paiement d'origine. Les crédits déjà utilisés pour une histoire et les crédits gratuits (crédits de bienvenue, promotions, bons reçus) ne sont pas remboursables.
+
+Histoires échouées. Si une histoire ne peut pas être terminée à cause d'un problème technique de notre côté, les crédits sont automatiquement recrédités sur votre compte.
+
+Livres imprimés. Chaque livre est personnalisé et imprimé sur commande ; il ne peut donc plus être annulé ni retourné une fois envoyé à l'impression. Vérifiez bien l'aperçu avant de commander. Si votre livre arrive endommagé, mal imprimé ou différent de l'aperçu que vous avez validé, signalez-le-nous dans les 30 jours suivant la livraison, avec une photo du problème. Nous le réimprimons et le renvoyons gratuitement, ou remboursons le livre si une réimpression n'est pas possible.
+
+Bons. Un bon cadeau acheté n'expire pas. Les bons promotionnels indiquent leur date d'expiration dans votre compte. Les bons ne peuvent pas être échangés contre de l'argent.
+
+Réclamations. Envoyez toute réclamation à l'adresse de contact de la section 18. Nous répondons dans les 5 jours ouvrables.`
+      },
+      {
+        title: '18. Contact',
         content: `Pour toute question concernant ces Conditions, veuillez nous contacter à : legal@magicalstory.ch`
       }
     ]
@@ -559,7 +595,19 @@ Ci riserviamo il diritto di rifiutare il servizio, rimuovere contenuti e chiuder
 • La Convenzione delle Nazioni Unite sui contratti di compravendita internazionale di merci non si applica`
       },
       {
-        title: '17. Contatti',
+        title: '17. Rimborsi, annullamenti e reclami',
+        content: `Crediti. I crediti sono un saldo prepagato per creare storie. Puoi chiedere il rimborso dei crediti acquistati e non ancora utilizzati entro 14 giorni dall'acquisto; scrivici e li rimborsiamo sul metodo di pagamento originale. I crediti già utilizzati per una storia e i crediti gratuiti (crediti di benvenuto, promozioni, buoni ricevuti) non sono rimborsabili.
+
+Storie non riuscite. Se una storia non può essere completata per un problema tecnico da parte nostra, i crediti vengono riaccreditati automaticamente sul tuo account.
+
+Libri stampati. Ogni libro è personalizzato e stampato su ordinazione, quindi non può essere annullato né restituito una volta inviato in stampa. Controlla con attenzione l'anteprima prima di ordinare. Se il tuo libro arriva danneggiato, stampato male o diverso dall'anteprima che hai approvato, comunicacelo entro 30 giorni dalla consegna, con una foto del problema. Lo ristampiamo e lo rispediamo gratuitamente, oppure rimborsiamo il libro se una ristampa non è possibile.
+
+Buoni. Un buono regalo acquistato non scade. I buoni promozionali mostrano la data di scadenza nel tuo account. I buoni non possono essere convertiti in denaro.
+
+Reclami. Invia qualsiasi reclamo all'indirizzo di contatto della sezione 18. Rispondiamo entro 5 giorni lavorativi.`
+      },
+      {
+        title: '18. Contatti',
         content: `Per domande su questi Termini, contattaci all'indirizzo: legal@magicalstory.ch`
       }
     ]
