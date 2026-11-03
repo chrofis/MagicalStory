@@ -96,7 +96,21 @@ function getActiveIndexAfterPush(imageVersions, imageType) {
   return dbIndexFor(imageVersions[arrayIdx], arrayIdx, imageType);
 }
 
+/**
+ * True when a page or cover record lists no versions yet, so a route adding a version must first
+ * seed the original (DB version_index 0). A trial page is stored with `imageVersions: []` beside
+ * its version-0 image: treating [] as seeded put the new version in slot 0, which saved it over
+ * the original's R2 key (2026-11-03).
+ *
+ * @param {object|null} record - a sceneImages entry or a coverImages entry
+ * @returns {boolean}
+ */
+function needsOriginalSeed(record) {
+  return !Array.isArray(record?.imageVersions) || record.imageVersions.length === 0;
+}
+
 module.exports = {
+  needsOriginalSeed,
   arrayToDbIndex,
   dbToArrayIndex,
   dbIndexFor,

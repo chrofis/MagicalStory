@@ -165,7 +165,7 @@ const {
 } = require('../lib/visualBible');
 const { applyStyledAvatars } = require('../lib/styledAvatars');
 const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing, collectEntityAppearances, buildClothingDescription } = require('../lib/entityConsistency');
-const { getActiveIndexAfterPush, arrayToDbIndex, dbIndexFor, arrayIndexForDb } = require('../lib/versionManager');
+const { needsOriginalSeed, getActiveIndexAfterPush, arrayToDbIndex, dbIndexFor, arrayIndexForDb } = require('../lib/versionManager');
 const { hasPhotos: hasCharacterPhotos, getStandardAvatar } = require('../lib/characterPhotos');
 const { isGrokConfigured } = require('../lib/grok');
 const { coverKeyToType, coverTypeToKey, coverLabel, COVER_PAGE_NUMBERS } = require('../lib/coverKeys');
@@ -927,7 +927,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     log.debug(`📸 [REGEN] New image generated - score: ${imageResult.score}, attempts: ${imageResult.totalAttempts}, model: ${imageResult.modelId}`);
 
     // Initialize imageVersions if not present (migrate existing image as first version)
-    if (currentImage && !currentImage.imageVersions) {
+    if (currentImage && needsOriginalSeed(currentImage)) {
       currentImage.imageVersions = [{
         // Don't copy imageData — the original is already stored at DB version_index 0.
         description: currentImage.description || originalDescription,
@@ -1895,7 +1895,7 @@ router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) 
         const coverType = getCoverType(pageNumber);
         const cover = storyData.coverImages?.[coverType];
         if (cover) {
-          if (!cover.imageVersions) {
+          if (needsOriginalSeed(cover)) {
             cover.imageVersions = [{
               imageData: cover.imageData,
               modelId: cover.modelId || null,
@@ -1931,7 +1931,7 @@ router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) 
         // Scene page
         const sceneImage = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber);
         if (sceneImage) {
-          if (!sceneImage.imageVersions) {
+          if (needsOriginalSeed(sceneImage)) {
             sceneImage.imageVersions = [{
               imageData: sceneImage.imageData,
               modelId: sceneImage.modelId || null,
@@ -2464,7 +2464,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
 
       // --- Version management ---
       // Initialize imageVersions if needed (lazy migration)
-      if (!existingCover.imageVersions) {
+      if (needsOriginalSeed(existingCover)) {
         existingCover.imageVersions = [];
         if (existingCover.originalImage) {
           existingCover.imageVersions.push({
@@ -2874,7 +2874,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     };
 
     // Initialize imageVersions if needed
-    if (currentImage && !currentImage.imageVersions) {
+    if (currentImage && needsOriginalSeed(currentImage)) {
       currentImage.imageVersions = [{
         // Don't copy imageData — the original is already stored at DB version_index 0.
         description: currentImage.description,
@@ -3179,7 +3179,7 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     const existingCover = storyData.coverImages[coverKey] || {};
 
     // Initialize imageVersions array if missing (lazy migration from legacy format)
-    if (!existingCover.imageVersions) {
+    if (needsOriginalSeed(existingCover)) {
       existingCover.imageVersions = [];
 
       // Migrate originalImage as version 0 if exists
@@ -3610,7 +3610,7 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
 
       // --- Version management (same pattern as iterate endpoint) ---
       // Lazy-migrate imageVersions if missing
-      if (!scene.imageVersions) {
+      if (needsOriginalSeed(scene)) {
         scene.imageVersions = [{
           // Don't copy imageData — the original is already stored at DB version_index 0.
           description: scene.description,
@@ -3991,7 +3991,7 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
 
         // --- Version management (same pattern as iterate endpoint) ---
         // Lazy-migrate imageVersions if missing
-        if (!currentScene.imageVersions) {
+        if (needsOriginalSeed(currentScene)) {
           currentScene.imageVersions = [{
             // Don't copy imageData — the original is already stored at DB version_index 0.
             description: currentScene.description,
@@ -6401,7 +6401,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           const prevActive = existingImage.imageVersions?.[activeDbIdx];
           const carryForwardBbox = prevActive?.bboxDetection || existingImage.bboxDetection || null;
 
-          if (!existingImage.imageVersions) {
+          if (needsOriginalSeed(existingImage)) {
             existingImage.imageVersions = [{
               description: existingImage.description,
               prompt: existingImage.prompt,
@@ -6656,7 +6656,7 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
 
         if (repairResult.repaired && repairResult.imageData) {
           // Add to image versions
-          if (!scene.imageVersions) {
+          if (needsOriginalSeed(scene)) {
             scene.imageVersions = [{
               // Don't copy imageData — the original is already stored at DB version_index 0.
               // Including it here would cause saveStoryData to re-save it at version_index 1,
@@ -6898,7 +6898,7 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
 
     // --- Version management (same pattern as cover iterate endpoint) ---
     // Lazy-migrate imageVersions if missing
-    if (!existingCover.imageVersions) {
+    if (needsOriginalSeed(existingCover)) {
       existingCover.imageVersions = [];
       if (existingCover.imageData) {
         existingCover.imageVersions.push({
