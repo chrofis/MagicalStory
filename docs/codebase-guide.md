@@ -20,7 +20,7 @@ Two separate orchestrators share the same repair primitives:
 2. **Manual repair workflow** — `useRepairWorkflow.ts → runFullWorkflow()` (~1154), triggered
    from `RepairWorkflowPanel`. Orchestrates the HTTP endpoints in `server/routes/regeneration.js`.
 
-**Book-review mode (STAGING ONLY, 2026-10-29)** — runtime `pageJudgeMode` = `book_review` (staging; production `per_page`) turns the per-page picture judges off
+**Book-review mode (2026-10-29; every environment since 2026-11-03)** — runtime `pageJudgeMode` = `book_review` turns the per-page picture judges off
 (quality/inventory/semantic/absence/identity arbiter, entity consistency, eval consolidation, parent-shared, re-evals, style check; `plate_qc`, `vb_cell_gate` and
 Phase 5b-pre detection stay) and replaces the round loop with `bookReview.runBookReviewRounds`: one `auditStoryBook` call (`MODEL_DEFAULTS.bookReviewModel`, Opus 5.5) reads every
 page and cover and tags each IMG fault `[TOUCHUP|NEW|CHAR:<Name>]`; the tag picks inpaint / iterate / char-fix through the shared `runRepairMethod` closure and `buildRoundVersion`

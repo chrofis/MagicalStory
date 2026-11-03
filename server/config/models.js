@@ -855,7 +855,7 @@ const MODEL_DEFAULTS = {
   // Lived as a constant in jevAudit.js until 2026-09-30.
   jevModel: process.env.JEV_MODEL || 'typesafe/jev-1.13',
 
-  // The staging BOOK REVIEW (runtime pageJudgeMode 'book_review'): the one vision
+  // The BOOK REVIEW (runtime pageJudgeMode 'book_review'): the one vision
   // model that reads the whole finished book and routes each fault to its fix.
   // OpenRouter id, verified 2026-10-29; billed the same as Anthropic direct
   // ($4 in / $20 out per 1M). See docs/decisions.md 2026-10-29.

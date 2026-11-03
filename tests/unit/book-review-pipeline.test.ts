@@ -5,8 +5,8 @@ const require = createRequire(import.meta.url);
 
 /**
  * runUnifiedRepairPipeline end to end (every paid call replaced by a spy):
- *  - production (pageJudgeMode 'per_page') still runs the per-page judges,
- *  - staging ('book_review') runs NONE of them, reviews the whole book once with
+ *  - the old mode (pageJudgeMode 'per_page', no environment runs it now) runs the per-page judges,
+ *  - 'book_review' (every environment since 2026-11-03) runs NONE of them, reviews the whole book once with
  *    the review model, repairs by the route the review names, re-reviews with the
  *    old and the new picture, and ships a result whose scores are the reviewer's.
  * docs/decisions.md 2026-10-29.
@@ -94,8 +94,9 @@ describe('runUnifiedRepairPipeline by pageJudgeMode', () => {
     return { faults: byRoute.IMG.length, byRoute, raw: lines, usage: {}, modelId: 'x', pagesRead: [1, 2], pagesSkipped: [], objectScale: null, betterVerdicts: {}, ...extra };
   };
 
-  it('PRODUCTION: the per-page judges run and the book-review model is never used', async () => {
+  it('per_page (the old mode): the per-page judges run and the book-review model is never used', async () => {
     process.env.RAILWAY_ENVIRONMENT_NAME = 'production';
+    patch(mod('../../server/config/runtime.js').SETTINGS, 'pageJudgeMode', 'per_page');
     const calls = installSpies();
     calls.audit.mockResolvedValue(auditResult(''));
     const { runUnifiedRepairPipeline } = mod('../../server/lib/repairPipeline.js');
@@ -107,8 +108,8 @@ describe('runUnifiedRepairPipeline by pageJudgeMode', () => {
     expect(out.results).toHaveLength(2);
   });
 
-  it('STAGING: no per-page judge runs; the review reads the book, TOUCHUP goes to inpaint, the re-review compares both pictures', async () => {
-    process.env.RAILWAY_ENVIRONMENT_NAME = 'staging';
+  it('PRODUCTION: no per-page judge runs; the review reads the book, TOUCHUP goes to inpaint, the re-review compares both pictures', async () => {
+    process.env.RAILWAY_ENVIRONMENT_NAME = 'production';
     const calls = installSpies();
     calls.audit
       .mockResolvedValueOnce(auditResult('FAULT[IMG][MAJOR][object_presence][TOUCHUP]: p1 — Remove the hat.'))

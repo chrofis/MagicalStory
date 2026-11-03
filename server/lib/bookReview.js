@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * THE BOOK REVIEW — Opus as the single picture reviewer (STAGING ONLY).
+ * THE BOOK REVIEW — Opus as the single picture reviewer (every environment since 2026-11-03).
  *
  * Owner decision 2026-10-29 (docs/decisions.md, tasks/opus-book-review-2026-10-29.md):
  * with runtime `pageJudgeMode` = 'book_review', every per-page picture judge is

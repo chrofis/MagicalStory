@@ -167,16 +167,16 @@ describe('scores come from the reviewer\'s findings through applyScore', () => {
   });
 });
 
-describe('flag gating: production keeps the per-page judges, staging runs the book review', () => {
+describe('flag gating: every environment runs the book review', () => {
   const runtimeMod = () => { delete require.cache[require.resolve('../../server/config/runtime.js')]; return require('../../server/config/runtime.js'); };
   const saved = process.env.RAILWAY_ENVIRONMENT_NAME;
   afterEach(() => { if (saved === undefined) delete process.env.RAILWAY_ENVIRONMENT_NAME; else process.env.RAILWAY_ENVIRONMENT_NAME = saved; });
 
-  it('production and local read per_page; staging reads book_review', () => {
+  it('production, local and staging all read book_review', () => {
     process.env.RAILWAY_ENVIRONMENT_NAME = 'production';
-    expect(runtimeMod().runtime('pageJudgeMode')).toBe('per_page');
+    expect(runtimeMod().runtime('pageJudgeMode')).toBe('book_review');
     delete process.env.RAILWAY_ENVIRONMENT_NAME;
-    expect(runtimeMod().runtime('pageJudgeMode')).toBe('per_page');
+    expect(runtimeMod().runtime('pageJudgeMode')).toBe('book_review');
     process.env.RAILWAY_ENVIRONMENT_NAME = 'staging';
     expect(runtimeMod().runtime('pageJudgeMode')).toBe('book_review');
   });

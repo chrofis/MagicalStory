@@ -685,10 +685,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const { runEntityConsistencyChecks, getStyledAvatarForClothing } = require('./entityConsistency');
   const { extractSceneMetadata } = getStoryHelpers();
 
-  // STAGING ONLY (runtime pageJudgeMode 'book_review', docs/decisions.md 2026-10-29): the
+  // Runtime pageJudgeMode 'book_review' (docs/decisions.md 2026-10-29, 2026-11-03): the
   // per-page picture judges are off and one whole-book review (bookReview.js) finds the
-  // faults and picks the fix. Production reads 'per_page' and runs every line below as it
-  // always has.
+  // faults and picks the fix. 'per_page' is the old mode; no environment runs it now.
   const bookReview = require('./bookReview');
   const bookReviewMode = bookReview.bookReviewActive();
 
@@ -3206,7 +3205,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   }
 
   // =========================================================================
-  // BOOK REVIEW (staging, pageJudgeMode 'book_review') — replaces Step 1's judges and
+  // BOOK REVIEW (pageJudgeMode 'book_review') — replaces Step 1's judges and
   // the round loop above. ONE vision review of the whole finished book (every page
   // and cover, with its text) finds the faults and names the fix per fault; the
   // repair runs through the SAME dispatch the round loop uses (runRepairMethod);

@@ -673,10 +673,10 @@ async function auditStoryBook(storyData, opts = {}) {
     // The cross-page object-scale pass. On by default; a caller that only
     // wants the reader's-eye faults (a replay, a Lab arm) turns it off.
     objectScale: objectScaleEnabled = true,
-    // The staging BOOK REVIEW (pageJudgeMode 'book_review'): { title } makes
+    // The BOOK REVIEW (pageJudgeMode 'book_review'): { title } makes
     // this call route every IMG fault to a fix, check the cover title and, for
     // pages carrying `previousImageData`, compare the two pictures. Absent =
-    // the production audit, byte-identical.
+    // the plain audit, byte-identical.
     bookReview = null,
   } = opts;
   const storyId = opts.storyId || storyData?.id || null;
