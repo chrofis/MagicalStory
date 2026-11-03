@@ -4624,7 +4624,7 @@
       "rootCause": "storyJobPipeline.js skipQualityEval branch (trials) stores imageVersions: [] beside the version-0 image. The eleven version-adding routes in server/routes/regeneration.js seeded the original only when imageVersions was missing (!x.imageVersions), so on [] the new version took array slot 0 and dbIndexFor mapped it to version_index 0: saveStoryImage upserted the row and R2 key of the original.",
       "status": "fixed",
       "fixedIn": "bc14aeef2",
-      "fix": "versionManager.needsOriginalSeed (missing OR empty list) guards all eleven seeds, so the original is seeded first and the new version lands at version_index 1+. Regression: tests/unit/version-seed-empty-array-2026-11-03.test.ts. The overwritten staging-test key was restored from the CDN copy (same ETag)."
+      "fix": "versionManager.needsOriginalSeed (missing OR empty list) guards all eleven seeds, so the original is seeded first and the new version lands at version_index 1+. Regression: tests/unit/version-seed-empty-array-2026-11-03.test.ts. The overwritten key was in the staging bucket (separate from production); production was never touched. Verified on staging 0aa25809: the same edit landed as version 1 (list original,edit), version 0 kept ETag 0e4ff1ce."
     }
   ]
 }

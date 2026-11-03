@@ -13,10 +13,12 @@ kills in-flight generations and makes iteration impossible.
 
 **Pull it to staging, iterate freely, promote it back when it's actually good.**
 
-This works because **staging and production share the same R2 bucket**
-(`magicalstory-images` / `images.magicalstory.ch`). No image bytes ever move:
-prod image URLs resolve on staging, and images generated on staging are already
-in the bucket prod reads from.
+Staging and production have **separate R2 buckets** (`images-staging.magicalstory.ch`
+vs `images.magicalstory.ch`). The pull copies no bytes: prod image URLs are public and
+resolve on staging. Images made on staging land in the staging bucket, and the promote
+copies each one to the production bucket and rewrites its URL. The promote needs the
+production service's R2 credentials (`railway variables --service MagicalStory
+--environment production`); a stale local secret fails the upload before any DB write.
 
 ## The loop
 
@@ -73,4 +75,4 @@ so a half-promoted story is never visible.
 - Deploying to production to test a story fix → use this loop instead
 - Passing `--force` without reading what the guard said
 - Promoting without opening the story on staging first
-- Assuming images need copying → they never do, the bucket is shared
+- Copying images by hand → the promote copies staging-bucket images and rewrites the URLs
