@@ -1005,3 +1005,7 @@ Rule: before opening any generated report, assert that the per-item counts add u
 ## 2026-11-02 - Prose under a picture is top-left; prove a staging boot before a prod push
 - Owner: "Isn't text normally left aligned???" / "Should be top left aligned". The long-text print pages reused the centered drawing of short captions. Rule: running prose (several sentences, paragraphs) is left-aligned and starts at the top of its box; only short captions are centered. Check the layout convention of the text TYPE before reusing a drawing path.
 - I pushed a fix to master while staging still served the previous commit (its deploy had not booted), so the "verify on staging" step was skipped. Rule: before a master push, `/api/health/config` on staging must report the commit being pushed.
+
+## 2026-11-03 — claimed production storage was hit when staging has its own bucket
+Pattern: after a staging edit overwrote a v0 image, I told the owner the shared prod bucket was hit, trusting a skill doc that said the buckets are shared. The promote script's header said otherwise.
+Rule: before saying which environment a write reached, read the code that writes it (R2 config of that service, the promote script), not a doc's summary of it.
