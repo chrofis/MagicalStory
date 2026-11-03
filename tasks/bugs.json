@@ -4615,6 +4615,16 @@
       "status": "fixed",
       "fixedIn": "51cb0f6ce",
       "fix": "update-photo drops the whole in-memory cache scope trial-<userId> (styledAvatars.clearCacheScope, also cancels a retained handoff) after the old draws finish, so the next draw starts from the new photo. Regression: tests/unit/styled-avatar-scope-guard.test.ts clearCacheScope, tests/unit/trial-photo-sheet-2026-10-10.test.ts update-photo."
+    },
+    {
+      "id": "empty-image-versions-overwrites-v0",
+      "title": "Editing a trial story's page overwrites the original picture instead of adding a version, and the reader keeps seeing the old one",
+      "reportedAt": "2026-11-03",
+      "source": "Staging edit (POST /api/stories/:id/edit/image/1) of prod trial job_1793690027654_nan1zutp1h copied to staging, 2026-11-03 09:06 CH: response success, score 100, but story_images held only version 0, image_version_meta p1 {activeVersion 0, pinned}, the page's imageVersions[0] was the edit entry, and R2 stories/job_1793690027654_nan1zutp1h/scene/p1/v0.jpg LastModified 08:06:49Z with the edited bytes while the CDN still served the original (ETag 0e4ff1ce, 540063 bytes). Prod: 60 stories / 359 pages store imageVersions [].",
+      "rootCause": "storyJobPipeline.js skipQualityEval branch (trials) stores imageVersions: [] beside the version-0 image. The eleven version-adding routes in server/routes/regeneration.js seeded the original only when imageVersions was missing (!x.imageVersions), so on [] the new version took array slot 0 and dbIndexFor mapped it to version_index 0: saveStoryImage upserted the row and R2 key of the original.",
+      "status": "fixed",
+      "fixedIn": "bc14aeef2",
+      "fix": "versionManager.needsOriginalSeed (missing OR empty list) guards all eleven seeds, so the original is seeded first and the new version lands at version_index 1+. Regression: tests/unit/version-seed-empty-array-2026-11-03.test.ts. The overwritten staging-test key was restored from the CDN copy (same ETag)."
     }
   ]
 }
