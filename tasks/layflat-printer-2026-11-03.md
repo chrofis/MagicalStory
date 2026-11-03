@@ -18,3 +18,16 @@ BindingType = glued-left, checked 2026-11-03). Web research by agent, USD 0, all
 - [ ] Prodigi: free account + sandbox key → quote layflat 210x210 and A4 portrait to CH; ask support about DDP/DAP to CH,
   which EU lab, minimum pages. Then one live sample order to CH (first sample 50% refunded).
 - [ ] Our side: our pages would need re-layout for 210x297 / 210x210 (not 210x280 / 200x200).
+
+## Prices (second research pass, 2026-11-03, USD 0)
+No published WHOLESALE layflat price anywhere: Prodigi/Peecho show only "From £17.51" (excl. tax and shipping, size and
+page count unstated) or a calculator. Real wholesale needs the Prodigi quote API.
+
+Swiss CONSUMER layflat benchmarks (what a parent pays for a self-designed book, VAT incl, plus shipping):
+- ifolor.ch Premium Photo Paper (layflat), A4 portrait: 26 pp CHF 42.95 list (38.65 sale), 36 pp CHF 56.95 list
+  (51.25 sale), 60 pp CHF 90.55 list; shipping from CHF 5.95. ifolor.ch/en/photo-book/premium-photo-paper/a4/portrait/matt/matt/26-pages
+- Saal Digital CH (layflat standard), 21x28: "ab SFr 29.90" (promo until 09.11.2026, page count of the "ab" price unstated),
+  28x28 ab SFr 39.00; shipping extra, amount unstated. saal-digital.ch/fotobuch/
+- Blurb UK layflat 8x10": £83.00 base + £2.67/page, shipping extra. blurb.co.uk/pricing
+Reading: a CHF 59-69 layflat tier sits ~CHF 10-30 above a parent's DIY layflat cost at ifolor/Saal; whether it pays
+depends on the Prodigi quote.
