@@ -40,3 +40,16 @@ Also needed from MagicalStory for the monthly report to Master: a way to read si
 
 Monthly report: the daily report mail (server/lib/adminActivity.js) counts new users, trial starts, stories, book orders and
 credit purchases. It does **not** count voucher sales (it has no voucher query), so it is complete except for vouchers.
+
+## Update 2026-11-03 (later): fixed on staging, production push pending
+Commits 90f27d878 + d0b8c7715, live on staging.magicalstory.ch (checked in the shipped JS):
+1 FAQ now says 21 × 28 cm main book, square 20 × 20 cm for short stories; 2 FAQ and How-it-works say 14 styles;
+4 privacy policy lists Railway, Cloudflare R2, Anthropic, Google Gemini, xAI, Runware, OpenRouter, Gelato, Stripe, Resend,
+Google login (OpenAI, Firebase, AWS removed; OpenAI-named models reach us through OpenRouter); 5 terms have a new section 17
+"Refunds, Cancellations and Complaints" (owner approved: unused bought credits refundable within 14 days, used and free credits not;
+failed stories refunded automatically; damaged or misprinted books reported within 30 days are reprinted free or refunded;
+complaints answered within 5 working days); 6 Impressum shows Roger Fischer, Rütenenweg 24, 5408 Ennetbaden;
+7 "top sellers" became "popular picks", "the only AI platform offering Swiss German" became "Stories in Swiss German dialects",
+and "the only platform where every story is created from scratch" became "Full control over your story: change the text, redo
+any picture, keep the version you like" (owner: the focus is full control of the story).
+Still open: Pricing page does not mention the square book (needs a layout change), 9 delivery time (needs prod order data).
