@@ -72,7 +72,7 @@ const faqContent: Record<string, {
           },
           {
             question: 'What illustration styles are available?',
-            answer: 'We offer 8+ styles including Pixar-style 3D, watercolor, comic, anime, and more. Each style is applied consistently across all pages of your story.',
+            answer: 'We offer 14 styles including Pixar-style 3D, watercolor, comic, anime, and more. Each style is applied consistently across all pages of your story.',
           },
           {
             question: 'Can I edit the story after it\'s generated?',
@@ -97,7 +97,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'How is the book printed?',
-            answer: 'Books are professionally printed on high-quality paper in A4 format. You can choose between hardcover and softcover binding. Print quality is comparable to professionally published children\'s books.',
+            answer: 'Books are professionally printed on high-quality paper. The format follows the length of your story: a full-length story prints as a 21 × 28 cm book, a story too short for that as a square 20 × 20 cm book with the picture on one page and the text on the facing page. You choose between hardcover and softcover binding. Print quality is comparable to professionally published children\'s books.',
           },
           {
             question: 'Can I download my story as a PDF?',
@@ -189,7 +189,7 @@ const faqContent: Record<string, {
           },
           {
             question: 'Welche Illustrationsstile gibt es?',
-            answer: 'Wir bieten 8+ Stile an, darunter Pixar-ähnliches 3D, Aquarell, Comic, Anime und mehr. Jeder Stil wird einheitlich auf allen Seiten deiner Geschichte angewendet.',
+            answer: 'Wir bieten 14 Stile an, darunter Pixar-ähnliches 3D, Aquarell, Comic, Anime und mehr. Jeder Stil wird einheitlich auf allen Seiten deiner Geschichte angewendet.',
           },
           {
             question: 'Kann ich die Geschichte nach der Erstellung bearbeiten?',
@@ -214,7 +214,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Wie wird das Buch gedruckt?',
-            answer: 'Bücher werden professionell auf hochwertigem Papier im A4-Format gedruckt. Du kannst zwischen Hardcover und Softcover wählen. Die Druckqualität ist vergleichbar mit professionell veröffentlichten Kinderbüchern.',
+            answer: 'Bücher werden professionell auf hochwertigem Papier gedruckt. Das Format richtet sich nach der Länge deiner Geschichte: Eine Geschichte in voller Länge wird als Buch im Format 21 × 28 cm gedruckt, eine dafür zu kurze Geschichte als quadratisches Buch im Format 20 × 20 cm, mit dem Bild auf einer und dem Text auf der gegenüberliegenden Seite. Du kannst zwischen Hardcover und Softcover wählen. Die Druckqualität ist vergleichbar mit professionell veröffentlichten Kinderbüchern.',
           },
           {
             question: 'Kann ich die Geschichte als PDF herunterladen?',
@@ -306,7 +306,7 @@ const faqContent: Record<string, {
           },
           {
             question: 'Quels styles d\'illustration sont disponibles ?',
-            answer: 'Nous proposons 8+ styles dont le 3D façon Pixar, l\'aquarelle, la bande dessinée, l\'anime et plus. Chaque style est appliqué de manière cohérente sur toutes les pages de votre histoire.',
+            answer: 'Nous proposons 14 styles dont le 3D façon Pixar, l\'aquarelle, la bande dessinée, l\'anime et plus. Chaque style est appliqué de manière cohérente sur toutes les pages de votre histoire.',
           },
           {
             question: 'Puis-je modifier l\'histoire après sa création ?',
@@ -331,7 +331,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Comment le livre est-il imprimé ?',
-            answer: 'Les livres sont imprimés professionnellement sur du papier de haute qualité au format 20 × 20 cm. Vous pouvez choisir entre couverture rigide et souple. La qualité d\'impression est comparable aux livres pour enfants publiés professionnellement.',
+            answer: 'Les livres sont imprimés professionnellement sur du papier de haute qualité. Le format dépend de la longueur de votre histoire : une histoire de longueur complète est imprimée en livre de 21 × 28 cm, une histoire trop courte pour cela en livre carré de 20 × 20 cm, avec l\'image sur une page et le texte sur la page en regard. Vous pouvez choisir entre couverture rigide et souple. La qualité d\'impression est comparable aux livres pour enfants publiés professionnellement.',
           },
           {
             question: 'Puis-je télécharger mon histoire en PDF ?',
@@ -423,7 +423,7 @@ const faqContent: Record<string, {
           },
           {
             question: 'Quali stili di illustrazione sono disponibili?',
-            answer: 'Offriamo oltre 8 stili, tra cui 3D in stile Pixar, acquerello, fumetto, anime e altro ancora. Ogni stile viene applicato in modo coerente su tutte le pagine della tua storia.',
+            answer: 'Offriamo 14 stili, tra cui 3D in stile Pixar, acquerello, fumetto, anime e altro ancora. Ogni stile viene applicato in modo coerente su tutte le pagine della tua storia.',
           },
           {
             question: 'Posso modificare la storia dopo che è stata generata?',
@@ -448,7 +448,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Come viene stampato il libro?',
-            answer: 'I libri sono stampati professionalmente su carta di alta qualità nel formato A4. Puoi scegliere tra copertina rigida e copertina morbida. La qualità di stampa è paragonabile a quella dei libri per bambini pubblicati professionalmente.',
+            answer: 'I libri sono stampati professionalmente su carta di alta qualità. Il formato dipende dalla lunghezza della tua storia: una storia di lunghezza completa viene stampata in un libro di 21 × 28 cm, una storia troppo breve per questo in un libro quadrato di 20 × 20 cm, con l\'immagine su una pagina e il testo sulla pagina di fronte. Puoi scegliere tra copertina rigida e copertina morbida. La qualità di stampa è paragonabile a quella dei libri per bambini pubblicati professionalmente.',
           },
           {
             question: 'Posso scaricare la mia storia in PDF?',

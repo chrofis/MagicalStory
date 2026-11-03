@@ -155,7 +155,7 @@ export const comparisons: ComparisonData[] = [
         'Your child\'s actual face appears in every illustration',
         '170+ themes including life challenges, educational, and Swiss history',
         '14 art styles to choose from (watercolor, 3D, anime, and more)',
-        'Swiss German dialect support — the only AI platform offering this',
+        'Stories in Swiss German dialects',
         'Free first story — try before you buy',
       ],
       de: [
@@ -163,7 +163,7 @@ export const comparisons: ComparisonData[] = [
         'Das echte Gesicht deines Kindes erscheint in jeder Illustration',
         '170+ Themen inkl. Lebenskompetenzen, Lernthemen und Schweizer Geschichte',
         '14 Kunststile zur Auswahl (Aquarell, 3D, Anime und mehr)',
-        'Schweizerdeutsch-Unterstützung — die einzige KI-Plattform mit diesem Angebot',
+        'Geschichten in Schweizer Dialekten',
         'Erste Geschichte gratis — testen ohne Risiko',
       ],
       fr: [
@@ -171,7 +171,7 @@ export const comparisons: ComparisonData[] = [
         'Le vrai visage de votre enfant apparaît dans chaque illustration',
         '170+ thèmes dont les défis de la vie, l\'éducation et l\'histoire suisse',
         '14 styles artistiques au choix (aquarelle, 3D, anime et plus)',
-        'Support du suisse allemand — la seule plateforme IA à l\'offrir',
+        'Histoires en dialectes suisses allemands',
         'Première histoire gratuite — essayez avant d\'acheter',
       ],
       it: [
@@ -179,7 +179,7 @@ export const comparisons: ComparisonData[] = [
         'Il vero volto di tuo figlio appare in ogni illustrazione',
         '170+ temi tra cui sfide di vita, educazione e storia svizzera',
         '14 stili artistici tra cui scegliere (acquerello, 3D, anime e altro)',
-        'Supporto ai dialetti svizzero tedeschi — l\'unica piattaforma IA a offrirlo',
+        'Storie nei dialetti svizzero tedeschi',
         'Prima storia gratuita — prova prima di acquistare',
       ],
     },
@@ -221,7 +221,7 @@ export const comparisons: ComparisonData[] = [
         a: {
           en: 'They take different approaches. Magical Story uses AI to create unique stories, while Wonderbly uses professionally designed templates. Both produce high-quality printed books. Wonderbly has more brand trust (11M+ books sold), while Magical Story offers more personalization (your child\'s photo, 14 art styles, Swiss German).',
           de: 'Sie verfolgen unterschiedliche Ansätze. Magical Story nutzt KI für einzigartige Geschichten, während Wonderbly professionell gestaltete Vorlagen verwendet. Beide produzieren hochwertige gedruckte Bücher. Wonderbly hat mehr Markenvertrauen (11 Mio.+ Bücher verkauft), während Magical Story mehr Personalisierung bietet (Foto des Kindes, 14 Kunststile, Schweizerdeutsch).',
-          fr: 'Ils ont des approches différentes. Magical Story utilise l\'IA pour créer des histoires uniques, tandis que Wonderbly utilise des modèles professionnels. Les deux produisent des livres imprimés de qualité. Wonderbly a plus de confiance de marque (11M+ livres vendus), tandis que Magical Story offre plus de personnalisation (photo de l\'enfant, 8 styles, suisse allemand).',
+          fr: 'Ils ont des approches différentes. Magical Story utilise l\'IA pour créer des histoires uniques, tandis que Wonderbly utilise des modèles professionnels. Les deux produisent des livres imprimés de qualité. Wonderbly a plus de confiance de marque (11M+ livres vendus), tandis que Magical Story offre plus de personnalisation (photo de l\'enfant, 14 styles, suisse allemand).',
           it: 'Seguono approcci diversi. Magical Story usa l\'IA per creare storie uniche, mentre Wonderbly usa modelli progettati professionalmente. Entrambi producono libri stampati di alta qualità. Wonderbly ha più fiducia di marchio (oltre 11 milioni di libri venduti), mentre Magical Story offre più personalizzazione (foto di tuo figlio, 14 stili artistici, svizzero tedesco).',
         },
       },
@@ -1228,10 +1228,10 @@ export const comparisons: ComparisonData[] = [
       {
         q: { en: 'Why use Magical Story instead of LoveToRead?', de: 'Warum Magical Story statt LoveToRead?', fr: 'Pourquoi Magical Story plutôt que LoveToRead ?', it: 'Perché usare Magical Story invece di LoveToRead?' },
         a: {
-          en: 'If you need German, French, or Swiss German stories — Magical Story is your only option. We also offer town-specific stories, 14 art styles, character consistency verification, and your child\'s actual face in illustrations. LoveToRead is English-only.',
-          de: 'Wenn du deutsche, französische oder schweizerdeutsche Geschichten brauchst — ist Magical Story deine einzige Option. Wir bieten auch Ortsgeschichten, 14 Kunststile, Figurenkonsistenz-Prüfung und das echte Gesicht deines Kindes.',
-          fr: 'Si vous avez besoin d\'histoires en allemand, français ou suisse allemand — Magical Story est votre seule option. Nous offrons aussi des histoires locales, 14 styles artistiques et le vrai visage de votre enfant.',
-          it: 'Se hai bisogno di storie in tedesco, francese o svizzero tedesco — Magical Story è la tua unica opzione. Offriamo anche storie ambientate in città specifiche, 14 stili artistici, verifica della coerenza dei personaggi e il vero volto di tuo figlio nelle illustrazioni. LoveToRead è solo in inglese.',
+          en: 'If you need German, French, or Swiss German stories — Magical Story is a good fit. We also offer town-specific stories, 14 art styles, character consistency verification, and your child\'s actual face in illustrations. LoveToRead is English-only.',
+          de: 'Wenn du deutsche, französische oder schweizerdeutsche Geschichten brauchst — passt Magical Story gut. Wir bieten auch Ortsgeschichten, 14 Kunststile, Figurenkonsistenz-Prüfung und das echte Gesicht deines Kindes.',
+          fr: 'Si vous avez besoin d\'histoires en allemand, français ou suisse allemand — Magical Story est un bon choix. Nous offrons aussi des histoires locales, 14 styles artistiques et le vrai visage de votre enfant.',
+          it: 'Se hai bisogno di storie in tedesco, francese o svizzero tedesco — Magical Story fa al caso tuo. Offriamo anche storie ambientate in città specifiche, 14 stili artistici, verifica della coerenza dei personaggi e il vero volto di tuo figlio nelle illustrazioni. LoveToRead è solo in inglese.',
         },
       },
     ],

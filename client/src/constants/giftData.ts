@@ -1376,7 +1376,7 @@ export const giftPages: GiftPageData[] = [
       },
       {
         q: { en: 'Which theme is most popular for 4-year-olds?', de: 'Welches Thema ist bei 4-Jährigen am beliebtesten?', fr: 'Quel thème est le plus populaire pour les 4 ans ?', it: 'Quale tema è più popolare per i bambini di 4 anni?' },
-        a: { en: 'Superhero, pirate, and unicorn are our top sellers for this age group. But every child is different — choose what matches their current passion!', de: 'Superheld, Pirat und Einhorn sind unsere Bestseller für diese Altersgruppe. Aber jedes Kind ist anders — wähle, was zur aktuellen Begeisterung passt!', fr: 'Super-héros, pirate et licorne sont nos meilleures ventes. Choisissez ce qui correspond à la passion actuelle !', it: 'Supereroe, pirata e unicorno sono i più venduti per questa fascia d\'età. Ma ogni bambino è diverso — scegli ciò che rispecchia la sua passione del momento!' },
+        a: { en: 'Superhero, pirate, and unicorn are popular picks for this age group. But every child is different — choose what matches their current passion!', de: 'Superheld, Pirat und Einhorn sind beliebte Themen für diese Altersgruppe. Aber jedes Kind ist anders — wähle, was zur aktuellen Begeisterung passt!', fr: 'Super-héros, pirate et licorne sont des choix très appréciés. Choisissez ce qui correspond à la passion actuelle !', it: 'Supereroe, pirata e unicorno sono scelte molto apprezzate per questa fascia d\'età. Ma ogni bambino è diverso — scegli ciò che rispecchia la sua passione del momento!' },
       },
     ],
   },

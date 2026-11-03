@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 const privacyContent = {
   en: {
     title: 'Privacy Policy',
-    lastUpdated: 'Last updated: January 2025',
+    lastUpdated: 'Last updated: November 2026',
     sections: [
       {
         title: '1. Introduction',
@@ -102,10 +102,13 @@ Payment Information:
         content: `We share data only with:
 
 Service Providers (under Data Processing Agreements):
-• Cloud hosting (Railway, AWS)
-• AI processing (Google Cloud, OpenAI)
+• Cloud hosting (Railway)
+• Image storage (Cloudflare R2)
+• AI processing (Anthropic, Google Gemini, xAI, Runware, OpenRouter)
+• Printing and shipping of ordered books (Gelato)
 • Payment processing (Stripe)
-• Email services
+• Email services (Resend)
+• Login with Google (Google)
 
 We never sell your personal data to third parties.
 
@@ -192,7 +195,7 @@ If you believe we have violated your privacy rights, you have the right to lodge
   },
   de: {
     title: 'Datenschutzrichtlinie',
-    lastUpdated: 'Zuletzt aktualisiert: Januar 2025',
+    lastUpdated: 'Zuletzt aktualisiert: November 2026',
     sections: [
       {
         title: '1. Einleitung',
@@ -288,10 +291,13 @@ Zahlungsinformationen:
         content: `Wir teilen Daten nur mit:
 
 Dienstleistern (unter Datenverarbeitungsvereinbarungen):
-• Cloud-Hosting (Railway, AWS)
-• KI-Verarbeitung (Google Cloud, OpenAI)
+• Cloud-Hosting (Railway)
+• Bildspeicherung (Cloudflare R2)
+• KI-Verarbeitung (Anthropic, Google Gemini, xAI, Runware, OpenRouter)
+• Druck und Versand bestellter Bücher (Gelato)
 • Zahlungsabwicklung (Stripe)
-• E-Mail-Dienste
+• E-Mail-Dienste (Resend)
+• Anmeldung mit Google (Google)
 
 Wir verkaufen Ihre personenbezogenen Daten niemals an Dritte.
 
@@ -378,7 +384,7 @@ Wenn Sie glauben, dass wir Ihre Datenschutzrechte verletzt haben, haben Sie das 
   },
   fr: {
     title: 'Politique de confidentialité',
-    lastUpdated: 'Dernière mise à jour : janvier 2025',
+    lastUpdated: 'Dernière mise à jour : novembre 2026',
     sections: [
       {
         title: '1. Introduction',
@@ -474,10 +480,13 @@ Informations de Paiement :
         content: `Nous partageons des données uniquement avec :
 
 Prestataires de Services (sous Accords de Traitement des Données) :
-• Hébergement cloud (Railway, AWS)
-• Traitement IA (Google Cloud, OpenAI)
+• Hébergement cloud (Railway)
+• Stockage d'images (Cloudflare R2)
+• Traitement IA (Anthropic, Google Gemini, xAI, Runware, OpenRouter)
+• Impression et expédition des livres commandés (Gelato)
 • Traitement des paiements (Stripe)
-• Services de messagerie
+• Services de messagerie (Resend)
+• Connexion avec Google (Google)
 
 Nous ne vendons jamais vos données personnelles à des tiers.
 
@@ -564,7 +573,7 @@ Si vous pensez que nous avons violé vos droits à la vie privée, vous avez le 
   },
   it: {
     title: 'Informativa sulla Privacy',
-    lastUpdated: 'Ultimo aggiornamento: gennaio 2025',
+    lastUpdated: 'Ultimo aggiornamento: novembre 2026',
     sections: [
       {
         title: '1. Introduzione',
@@ -660,10 +669,13 @@ Informazioni di Pagamento:
         content: `Condividiamo i dati solo con:
 
 Fornitori di Servizi (nell'ambito di Accordi sul Trattamento dei Dati):
-• Hosting cloud (Railway, AWS)
-• Elaborazione IA (Google Cloud, OpenAI)
+• Hosting cloud (Railway)
+• Archiviazione delle immagini (Cloudflare R2)
+• Elaborazione IA (Anthropic, Google Gemini, xAI, Runware, OpenRouter)
+• Stampa e spedizione dei libri ordinati (Gelato)
 • Elaborazione dei pagamenti (Stripe)
-• Servizi email
+• Servizi email (Resend)
+• Accesso con Google (Google)
 
 Non vendiamo mai i tuoi dati personali a terzi.
 

@@ -11,7 +11,9 @@ const impressumContent = {
       {
         title: 'Contact',
         content: `Roger Fischer
-Ennetbaden, Switzerland
+Rütenenweg 24
+5408 Ennetbaden
+Switzerland
 
 Email: info@magicalstory.ch`
       },
@@ -34,7 +36,9 @@ Obligations to remove or block the use of information in accordance with general
       {
         title: 'Kontakt',
         content: `Roger Fischer
-Ennetbaden, Schweiz
+Rütenenweg 24
+5408 Ennetbaden
+Schweiz
 
 E-Mail: info@magicalstory.ch`
       },
@@ -57,7 +61,9 @@ Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach 
       {
         title: 'Contact',
         content: `Roger Fischer
-Ennetbaden, Suisse
+Rütenenweg 24
+5408 Ennetbaden
+Suisse
 
 E-mail : info@magicalstory.ch`
       },
@@ -80,7 +86,9 @@ Les obligations de supprimer ou de bloquer l'utilisation d'informations conform�
       {
         title: 'Contatto',
         content: `Roger Fischer
-Ennetbaden, Svizzera
+Rütenenweg 24
+5408 Ennetbaden
+Svizzera
 
 Email: info@magicalstory.ch`
       },

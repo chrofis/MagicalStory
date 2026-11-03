@@ -32,8 +32,11 @@ const CUSTOMER_TEXT_FILES = [
   'email.js',
 ];
 
-describe('print size: A4, never the legacy 20x20 square, in customer text', () => {
-  it.each(CUSTOMER_TEXT_FILES)('%s states no 20x20 book size', (f) => {
+// Superseded in part by the 2026-10-27 book product model (docs/decisions.md): short stories print as a square
+// 20x20 facing-pages book. The FAQ print answer is the one customer text that names it; everywhere else stays 21x28.
+const SQUARE_FORMAT_DOCUMENTED = ['client/src/pages/FAQ.tsx'];
+describe('print size: no 20x20 book size in customer text except the FAQ print answer', () => {
+  it.each(CUSTOMER_TEXT_FILES.filter((f) => !SQUARE_FORMAT_DOCUMENTED.includes(f)))('%s states no 20x20 book size', (f) => {
     expect(read(f)).not.toMatch(/20 ?(x|×) ?20/);
   });
 });
