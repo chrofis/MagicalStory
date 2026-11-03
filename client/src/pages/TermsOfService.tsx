@@ -444,11 +444,11 @@ Nous nous réservons le droit de refuser le service, de supprimer le contenu et 
       },
       {
         title: '17. Remboursements, annulations et réclamations',
-        content: `Crédits. Les crédits sont un solde prépayé pour créer des histoires. Vous pouvez demander le remboursement des crédits achetés et pas encore utilisés dans les 14 jours suivant l'achat ; écrivez-nous et nous les remboursons sur votre moyen de paiement d'origine. Les crédits déjà utilisés pour une histoire et les crédits gratuits (crédits de bienvenue, promotions, bons reçus) ne sont pas remboursables.
+        content: `Crédits. Les crédits sont un solde prépayé pour créer des histoires. Vous pouvez demander le remboursement des crédits achetés et pas encore utilisés dans les 14 jours suivant l'achat ; écrivez-nous et nous les remboursons sur votre moyen de paiement d'origine. Les crédits déjà utilisés pour une histoire et les crédits gratuits (crédits de bienvenue, promotions, bons reçus) ne sont pas remboursables.
 
 Histoires échouées. Si une histoire ne peut pas être terminée à cause d'un problème technique de notre côté, les crédits sont automatiquement recrédités sur votre compte.
 
-Livres imprimés. Chaque livre est personnalisé et imprimé sur commande ; il ne peut donc plus être annulé ni retourné une fois envoyé à l'impression. Vérifiez bien l'aperçu avant de commander. Si votre livre arrive endommagé, mal imprimé ou différent de l'aperçu que vous avez validé, signalez-le-nous dans les 30 jours suivant la livraison, avec une photo du problème. Nous le réimprimons et le renvoyons gratuitement, ou remboursons le livre si une réimpression n'est pas possible.
+Livres imprimés. Chaque livre est personnalisé et imprimé sur commande ; il ne peut donc plus être annulé ni retourné une fois envoyé à l'impression. Vérifiez bien l'aperçu avant de commander. Si votre livre arrive endommagé, mal imprimé ou différent de l'aperçu que vous avez validé, signalez-le-nous dans les 30 jours suivant la livraison, avec une photo du problème. Nous le réimprimons et le renvoyons gratuitement, ou remboursons le livre si une réimpression n'est pas possible.
 
 Bons. Un bon cadeau acheté n'expire pas. Les bons promotionnels indiquent leur date d'expiration dans votre compte. Les bons ne peuvent pas être échangés contre de l'argent.
 

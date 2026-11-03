@@ -1685,7 +1685,7 @@ export const comparisons: ComparisonData[] = [
         highlight: {
           en: 'Full control over your story: change the text, redo any picture, keep the version you like',
           de: 'Volle Kontrolle über deine Geschichte: Text ändern, jedes Bild neu machen, die Version behalten, die dir gefällt',
-          fr: 'Le contrôle total de votre histoire : modifiez le texte, refaites chaque image, gardez la version qui vous plaît',
+          fr: 'Le contrôle total de votre histoire : modifiez le texte, refaites chaque image, gardez la version qui vous plaît',
           it: 'Pieno controllo sulla tua storia: cambia il testo, rifai ogni immagine, tieni la versione che ti piace',
         },
         features: {
