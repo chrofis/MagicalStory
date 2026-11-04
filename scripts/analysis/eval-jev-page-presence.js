@@ -19,7 +19,7 @@ const argv = Object.fromEntries(process.argv.slice(3).map(a => { const [k, v] = 
 // Phrasings. Generic: the name is filled in at run time.
 const PHRASINGS = {
   A: (n) => `${n} is drawn in the picture this description gives: a figure of ${n} is visible in the image.`,
-  B: (n) => `${n} is physically present in the scene and visible to the viewer, as opposed to only being named, owning an object, being somewhere else, or being remembered.`,
+  B: (n) => require('../../server/lib/jevPagePresence').presenceQuestion(n).instructions, // the shipped wording
   C: (n) => `The illustration shows ${n} as one of the figures in the frame.`,
 };
 

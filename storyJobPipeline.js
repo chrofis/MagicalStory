@@ -69,6 +69,7 @@ const {
   loadLandmarkPhotoDescriptions,
   isSwissCountry
 } = require('./server/lib/landmarkPhotos');
+const { rejectedScanCandidates } = require('./server/lib/jevPagePresence');
 const {
   getCharactersInScene,
   unionPageCast,
@@ -4323,10 +4324,16 @@ ${trialWriter.pagesPrompt}`;
         // job_1789207854566_l43qgl34w p3 and p11 the outline commissioned no
         // people at all and still emitted a clothing entry for all five, which
         // put a cast of five onto two empty pages.
+        // A name the scan alone found (the brief's own cast list is empty) is only
+        // a candidate: Jev rules whether it is DRAWN or merely named, e.g. a
+        // garment's owner (docs/decisions.md 2026-11-04). Asked only in that case.
+        // A Jev outage throws JevDecisionError; there is no fallback to the scan.
+        const notDrawn = await rejectedScanCandidates(scene.sceneDescription, scene.characters || [], inputData.characters);
         const sceneCharacters = unionPageCast(
           scene.sceneDescription,
           scene.characters || [],
-          inputData.characters
+          inputData.characters,
+          { notDrawn }
         );
         // Characters section takes priority over scene metadata JSON (may have stale costume data)
         const sceneMetadataForClothing = extractSceneMetadata(scene.sceneDescription);

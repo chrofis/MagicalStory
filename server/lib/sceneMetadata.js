@@ -1571,8 +1571,20 @@ function castOfRewrittenBrief(sceneDescription, characters) {
  * @returns {Array} Characters that appear in this scene
  */
 function getCharactersInScene(sceneDescription, characters) {
+  return sceneCastWithSource(sceneDescription, characters).cast;
+}
+
+/**
+ * getCharactersInScene, plus whether the answer came from the whole-word name
+ * scan (step 2) rather than from the brief's own typed cast. A scan hit only
+ * proves a name is MENTIONED (a garment's owner, someone elsewhere); the
+ * full-mode page-cast sites ask Jev whether such a candidate is DRAWN
+ * (server/lib/jevPagePresence.js, docs/decisions.md 2026-11-04).
+ * @returns {{cast: Array, fromScan: boolean}}
+ */
+function sceneCastWithSource(sceneDescription, characters) {
   if (!sceneDescription || typeof sceneDescription !== 'string' || !characters || characters.length === 0) {
-    return [];
+    return { cast: [], fromScan: false };
   }
 
   // Step 0: Try JSON metadata block first (most reliable)
@@ -1580,7 +1592,7 @@ function getCharactersInScene(sceneDescription, characters) {
   if (metadata && metadata.characters && metadata.characters.length > 0) {
     const matchedCharacters = matchRosterByListedNames(metadata.characters, characters);
     if (matchedCharacters.length > 0) {
-      return matchedCharacters;
+      return { cast: matchedCharacters, fromScan: false };
     }
   }
 
@@ -1590,7 +1602,7 @@ function getCharactersInScene(sceneDescription, characters) {
   if (parsedNames.length > 0) {
     const matchedCharacters = matchRosterByListedNames(parsedNames, characters);
     if (matchedCharacters.length > 0) {
-      return matchedCharacters;
+      return { cast: matchedCharacters, fromScan: false };
     }
   }
 
@@ -1599,7 +1611,7 @@ function getCharactersInScene(sceneDescription, characters) {
   // name only when it is unambiguous).
   const roster = characters.filter(c => c && c.name);
   const found = new Set(entriesMentioned(sceneDescription, buildCastIndex({ characters: roster }, null), { firstToken: true }).map(e => e.entry));
-  return roster.filter(c => found.has(c));
+  return { cast: roster.filter(c => found.has(c)), fromScan: true };
 }
 
 /**
@@ -1624,17 +1636,20 @@ function getCharactersInScene(sceneDescription, characters) {
  * @param {string} sceneDescription - brief prose (+ any ---METADATA--- block)
  * @param {Array<string>} hintNames - names the outline hint commissioned
  * @param {Array} characters - the story's photo-backed character records
+ * @param {{notDrawn?: Set}} [opts] - roster records Jev ruled merely MENTIONED
+ *   (jevPagePresence.rejectedScanCandidates); dropped from the prose side only,
+ *   never from what the hint commissioned
  * @returns {Array} character records, in `characters` order, deduped
  */
-function unionPageCast(sceneDescription, hintNames, characters) {
+function unionPageCast(sceneDescription, hintNames, characters, { notDrawn = null } = {}) {
   const all = Array.isArray(characters) ? characters : [];
   if (all.length === 0) return [];
   // Hint entries arrive as plain names or as records, and may carry a
   // parenthetical qualifier ("Sarah (background)") — castResolver folds both.
-  const wanted = new Set([
-    ...getCharactersInScene(sceneDescription, all),
-    ...matchRosterByListedNames(hintNames, all),
-  ]);
+  const fromHint = matchRosterByListedNames(hintNames, all);
+  const fromBrief = getCharactersInScene(sceneDescription, all)
+    .filter(c => !notDrawn || !notDrawn.has(c) || fromHint.includes(c));
+  const wanted = new Set([...fromBrief, ...fromHint]);
   // Story order, not discovery order — every downstream roster compares by set,
   // and a stable order keeps logs and prompts diffable.
   return all.filter(c => c?.name && wanted.has(c));
@@ -2916,6 +2931,8 @@ module.exports = {
   collectSceneObjectFigureNames,
   findCastMissingFromMetadata,
   getCharactersInScene,
+  sceneCastWithSource,
+  matchRosterByListedNames,
   castOfRewrittenBrief,
   unionPageCast,
   parseSceneHintMetadata,

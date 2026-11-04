@@ -11168,6 +11168,22 @@
         "result": "HUMAN",
         "note": "human check | LOOK: Poll GET /api/jobs/:id/status every 30 s during a staging story and compare progress against the stage events in the generation log: progress should rise steadily across the arc stages, with no plateau longer than about 2 minutes between 1 and 57."
       }
+    },
+    {
+      "id": "page-presence-jev-garment-owner",
+      "title": "A name mentioned only as a garment owner no longer enters the page cast",
+      "commits": [],
+      "addedAt": "2026-11-04",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On a beats story page whose brief has an empty metadata cast and whose prose names a roster member only as an owner or as elsewhere, the stored page cast (sceneCharacters) excludes that member; a page whose prose describes real roster cast with an empty metadata cast keeps them. The log shows jev_decisions_page_presence only on such pages.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In a staging beats story with a worn item handed from one roster member to another character, read the stored sceneImages[].sceneCharacters for the handover page: the owner must not be in it. Check usage rows for label jev_decisions_page_presence: calls only on pages with an empty metadata cast."
+      }
     }
   ],
   "runs": [
