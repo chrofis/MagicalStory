@@ -10628,8 +10628,60 @@ async function runJudgeFixtureStage(target, { experimentId, params = {} }) {
   };
 }
 
+
+/**
+ * BOOK-REVIEW RERUN. Target: {storyId} of a story COPIED to staging
+ * (scripts/admin/copy-story-to-staging.js). Runs the real production
+ * book-review repair (runUnifiedRepairPipeline, pageJudgeMode 'book_review')
+ * from the ORIGINAL pictures (version 0 of every page, textless art of version 0
+ * of every cover) and stores the repair versions as Lab test versions beside
+ * the existing ones. The logic and its safety rules (staging only, no email)
+ * live in bookReviewRerun.js; this wires the real dependencies.
+ */
+async function runBookReviewRerunStage(target, { experimentId }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { runBookReviewRerun } = require('./bookReviewRerun');
+  const { runUnifiedRepairPipeline } = require('./repairPipeline');
+  const ledger = require('./costLedger');
+  const { REPAIR_DEFAULTS } = require('../config/models');
+  const { dbQuery } = require('../services/database');
+  const { resolveCoverEvalImage, restampRepairedCover } = require('./coverEvalLayer');
+  return runBookReviewRerun(target, { experimentId }, {
+    loadStory: async (storyId) => (await loadStoryDataFull(storyId, { rehydrate: false })).storyData,
+    loadOriginal: async (storyId, pageNumber) => {
+      if (pageNumber < 0) return resolveCoverEvalImage(storyId, COVER_KEY_BY_PAGE[String(pageNumber)], 0);
+      return { imageData: await loadActivePageImage(storyId, pageNumber, 0) };
+    },
+    runPipeline: runUnifiedRepairPipeline,
+    newTokenUsage: ledger.newTokenUsage,
+    recordCall: ledger.recordCall,
+    inferLegacyUsageArgs: ledger.inferLegacyUsageArgs,
+    ledgerTotal: ledger.ledgerTotal,
+    runWithUsageSink: require('./usageContext').runWithUsageSink,
+    maxPasses: REPAIR_DEFAULTS.maxPasses,
+    bookReviewRepairRounds: require('../config/runtime').runtime('bookReviewRepairRounds'),
+    latestCoverArtVersion: async (storyId, coverKey) => {
+      const rows = await dbQuery(
+        'SELECT MAX(version_index) AS m FROM story_images WHERE story_id = $1 AND image_type = $2 AND NOT is_test', [storyId, `${coverKey}Art`]);
+      return rows[0]?.m ?? null;
+    },
+    saveVersion: (storyId, pageNumber, imageData, expId) => saveTestVersion(storyId, 'scene', pageNumber, imageData, expId),
+    // A cover repair is textless art; the served image gets the app's text back, as in production.
+    saveCoverVersion: async (storyId, coverKey, art, layer, storyData, expId) => {
+      let served = art, artLayer = art, stampFailed = null;
+      try {
+        const res = await restampRepairedCover(storyData, coverKey, art, { restamp: layer === 'art' });
+        served = res.servedImageData; artLayer = res.artImageData || art;
+      } catch (err) { stampFailed = err.message; }
+      return { versionIndex: await saveTestCoverVersion(storyId, coverKey, served, artLayer, expId), stampFailed };
+    },
+  });
+}
+
 const STORY_STAGES = {
   judge_fixture: runJudgeFixtureStage,
+  book_review_rerun: runBookReviewRerunStage,
   trial_idea_variety: runTrialIdeaVarietyStage,
   trial_challenge_draw: runTrialChallengeDrawStage,
   vb_element_cell: runVbElementCellStage,

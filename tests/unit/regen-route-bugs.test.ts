@@ -87,8 +87,8 @@ describe('pipeline repair rounds carry the story layout', () => {
   // resolveStoryPageAspect refuses without layout.imageAspect, and the pipeline's
   // in-memory storyData for repair/iterate did not carry `layout`.
   it('pipelineStoryData includes layout: inputData.layout', () => {
-    const src = read('storyJobPipeline.js');
-    const block = src.slice(src.indexOf('const pipelineStoryData = {'), src.indexOf('const pipelineStoryData = {') + 600);
+    const src = read('server/lib/repairStoryData.js'); // buildRepairStoryData, called by the story run
+    const block = src.slice(src.indexOf('return {'), src.indexOf('return {') + 600);
     expect(block).toMatch(/\n\s+layout: inputData\.layout,/);
   });
 });

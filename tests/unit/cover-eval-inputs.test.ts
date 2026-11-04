@@ -154,7 +154,9 @@ describe('wiring guard — the cover eval call sites cannot drift back', () => {
   });
 
   it('the pipeline cover loop shares the same text-contract resolver', () => {
-    const pipeline = fs.readFileSync(new URL('../../storyJobPipeline.js', import.meta.url), 'utf8');
+    // The pipeline cover loop calls buildCoverRepairEntry (repairStoryData.js), which owns the resolver call.
+    const pipeline = fs.readFileSync(new URL('../../storyJobPipeline.js', import.meta.url), 'utf8')
+      + fs.readFileSync(new URL('../../server/lib/repairStoryData.js', import.meta.url), 'utf8');
     expect(pipeline).toContain('resolveCoverTextContract');
     // The inline copy that used to live here.
     expect(pipeline).not.toMatch(/const textMode = \(coverData\.titleBaked === true/);

@@ -15,7 +15,9 @@ const src = fs.readFileSync(new URL('../../storyJobPipeline.js', import.meta.url
 
 describe('the repair pipeline hands iterate each page\'s decided fields', () => {
   it('pipelineStoryData.sceneImages carries jevFixed from the raw page', () => {
-    const block = src.slice(src.indexOf('const pipelineStoryData = {'), src.indexOf('coverImages,  // a full-story cover'));
+    // The whitelist is repairStoryData.buildRepairStoryData (shared with the book_review_rerun Lab stage).
+    const builder = fs.readFileSync(new URL('../../server/lib/repairStoryData.js', import.meta.url), 'utf8');
+    const block = builder.slice(builder.indexOf('sceneImages: rawImages.map'), builder.indexOf('coverImages,  // a full-story cover'));
     expect(block).toContain('sceneImages: rawImages.map(r => ({');
     expect(block).toContain('jevFixed: r.scene?.jevFixed || null');
   });

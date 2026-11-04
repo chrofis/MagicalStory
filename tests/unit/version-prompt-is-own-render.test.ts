@@ -283,7 +283,9 @@ describe('the cover path carries the same render identity the page path does', (
     // carried none, so a cover's v0 version recorded modelId undefined and could
     // not say which model painted it.
     expect(pipeline).toContain('modelId: activeModelId,');
-    const push = pipeline.slice(pipeline.indexOf('rawImages.push({'));
+    // The cover push is buildCoverRepairEntry (repairStoryData.js) since 2026-11-04.
+    const builder = read('server/lib/repairStoryData.js');
+    const push = builder.slice(builder.indexOf('pageNumber: COVER_PAGE_NUMBERS'));
     const block = push.slice(0, push.indexOf('evaluationType:'));
     expect(block).toContain('modelId: coverData.modelId || null,');
   });

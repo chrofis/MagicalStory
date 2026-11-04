@@ -534,6 +534,8 @@ export const TESTLAB_STAGES = [
   { id: 'cover_title_paintin', label: 'Cover title paint-in (glyph-masked Qwen + OCR gate)', producesImage: true, overridable: true, storyLevel: true, noTemplate: true },
   { id: 'style_check', label: 'Style consistency check', producesImage: false, overridable: false, storyLevel: true },
   // Reader's-eye pass: each page's text next to the image that shipped on it.
+  // Staging only: the production book-review repair (Opus whole-book review + repair rounds) over a stored story, from its original pictures.
+  { id: 'book_review_rerun', label: 'Book-review rerun — production review + repair rounds from the original pictures (staging copy only)', producesImage: true, overridable: false, storyLevel: true, noTemplate: true },
   { id: 'book_audit', label: 'Book audit — page text + shipped image, in reading order', producesImage: false, overridable: true, storyLevel: true },
   // Auditor bake-off: the frozen artifact of one level vs a list of models.
   // level=beats retired 2026-09-01 with the rest of the beats-review/audit machinery.

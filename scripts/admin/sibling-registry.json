@@ -1489,9 +1489,9 @@
     {
       "id": "pipeline-page-record-vs-cover-record",
       "axis": "the page record vs the cover pseudo-page fed to the repair pipeline",
-      "reason": "storyJobPipeline builds the records the repair pipeline consumes at TWO sites: the per-page objects returned from the Phase-5a map, and the cover pseudo-pages pushed at `rawImages.push({...})`. They are read by ONE consumer (runUnifiedRepairPipeline, whose buildVersionEntry stamps v0 from whatever the record carries), so a provenance field the page side carries and the cover push does not is silently undefined on every cover. It has happened three times: `compressedScene` (added to the cover push after every cover root stored none), `modelId` (this set's anchor — the page path has carried `modelId: activeModelId` since it was written, the cover push carried nothing, so every cover's v0 recorded modelId undefined and no cover could say which model painted it), and the cover ROOT mirror further down the file, which moved `compressedScene` onto the shipped version and left `prompt` describing the first render. An absent field here raises no error anywhere, which is why all three survived. The block is measured exactly: `evaluationType: 'cover'` is the pushed object's last key and terminates it.",
-      "file": "storyJobPipeline.js",
-      "blockPattern": "rawImages\\.push\\(\\{|evaluationType: 'cover'",
+      "reason": "SINCE 2026-11-04 the cover pseudo-page is built in ONE place, repairStoryData.buildCoverRepairEntry (the story run and the book_review_rerun Lab stage both call it); this entry now guards that builder, whose v0 record must carry modelId. Before: storyJobPipeline built the records the repair pipeline consumes at TWO sites: the per-page objects returned from the Phase-5a map, and the cover pseudo-pages pushed at `rawImages.push({...})`. They are read by ONE consumer (runUnifiedRepairPipeline, whose buildVersionEntry stamps v0 from whatever the record carries), so a provenance field the page side carries and the cover push does not is silently undefined on every cover. It has happened three times: `compressedScene` (added to the cover push after every cover root stored none), `modelId` (this set's anchor — the page path has carried `modelId: activeModelId` since it was written, the cover push carried nothing, so every cover's v0 recorded modelId undefined and no cover could say which model painted it), and the cover ROOT mirror further down the file, which moved `compressedScene` onto the shipped version and left `prompt` describing the first render. An absent field here raises no error anywhere, which is why all three survived. The block is measured exactly: `evaluationType: 'cover'` is the pushed object's last key and terminates it.",
+      "file": "server/lib/repairStoryData.js",
+      "blockPattern": "pageNumber: COVER_PAGE_NUMBERS\\[coverKey\\]|evaluationType: 'cover'",
       "mustContain": "modelId:",
       "exclude": [
         "evaluationType: 'cover'"
@@ -1515,8 +1515,8 @@
     {
       "id": "iterate-storydata-carries-decided-fields",
       "axis": "the page record vs the iterate input the repair pipeline builds",
-      "reason": "iteratePageCore re-pins a rewrite from savedScene.jevFixed (pinBrief); the repair pipeline's own storyData.sceneImages whitelist lacked it, so no in-job iterate rewrite was pinned (essbv p3 v1: location, population and gaze moved, 2026-10-06).",
-      "file": "storyJobPipeline.js",
+      "reason": "(Moved 2026-11-04: the whitelist is now repairStoryData.buildRepairStoryData, shared with the book_review_rerun Lab stage.) iteratePageCore re-pins a rewrite from savedScene.jevFixed (pinBrief); the repair pipeline's own storyData.sceneImages whitelist lacked it, so no in-job iterate rewrite was pinned (essbv p3 v1: location, population and gaze moved, 2026-10-06).",
+      "file": "server/lib/repairStoryData.js",
       "blockPattern": "sceneImages: rawImages\\.map\\(r => \\(\\{|coverImages,  // a full-story cover's brief record",
       "mustContain": "jevFixed:",
       "exclude": [

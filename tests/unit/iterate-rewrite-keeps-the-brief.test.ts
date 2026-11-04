@@ -130,7 +130,7 @@ describe('A1 — wornItems survive an iterate round', () => {
     // `pipelineStoryData.sceneImages` is a whitelist; without this key
     // `savedScene.sceneMetadata` was `{}` on every pipeline iterate, so
     // carryForwardWornItems had nothing to carry FROM.
-    expect(read('storyJobPipeline.js')).toContain('sceneMetadata: r.sceneMetadata || null');
+    expect(read('server/lib/repairStoryData.js')).toContain('sceneMetadata: r.sceneMetadata || null');
   });
 
   it('…and iteratePageCore falls back to the page brief when that row has none', () => {

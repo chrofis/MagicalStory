@@ -68,7 +68,8 @@ describe('a cover records the prose its render actually received', () => {
     // resolveVersionCompressedScene falls back to the PAGE record for an
     // original-lineage version; without this the original cover version
     // resolves to null however the render went.
-    expect(pipeline).toContain('compressedScene: coverData.compressedScene || null');
+    // The cover pseudo-page is built by ONE builder since 2026-11-04 (repairStoryData.buildCoverRepairEntry).
+    expect(read('server/lib/repairStoryData.js')).toContain('compressedScene: coverData.compressedScene || null');
   });
 
   it('the shipped version\'s value is mirrored back onto the cover root', () => {

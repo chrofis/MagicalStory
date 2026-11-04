@@ -175,4 +175,27 @@ function providerBucketDrift(tokenUsage, providers = ['anthropic', 'gemini_text'
   return drift;
 }
 
-module.exports = { newTokenUsage, recordCall, ledgerTotal, modelIdOf, providerBucketDrift };
+
+/**
+ * Some legacy call sites (images.js) report a call as (null, usage, null, modelId).
+ * Infer the provider and the byFunction bucket from the model so the tokens are
+ * not lost. Moved here unchanged from the repair-pipeline usageTracker in
+ * storyJobPipeline.js so the Test Lab stage that drives that pipeline books the
+ * same way.
+ */
+function inferLegacyUsageArgs(provider, usage, funcName, modelId) {
+  if (provider == null && usage && modelId) {
+    const m = String(modelId).toLowerCase();
+    if (m.includes('claude') || m.includes('haiku') || m.includes('sonnet') || m.includes('opus')) {
+      provider = 'anthropic';
+      if (!funcName) funcName = 'scene_expansion';
+    } else if (m.includes('gemini')) {
+      // Default Gemini calls without a function name to quality eval
+      provider = 'gemini_quality';
+      if (!funcName) funcName = 'consistency_check';
+    }
+  }
+  return { provider, funcName };
+}
+
+module.exports = { newTokenUsage, recordCall, ledgerTotal, modelIdOf, providerBucketDrift, inferLegacyUsageArgs };
