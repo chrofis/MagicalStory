@@ -69164,3 +69164,9 @@ Revisit if: the preview is cheap enough to generate at order time for every cust
 **Finding:** the p8 damage was not the model ignoring the presence rule in prompts/book-audit.txt. It was told Oma belonged there: a garment owner's name in the brief prose entered the page cast (tasks/bugs.json garment-owner-name-enters-page-cast, 1 of 373 stored pages). No prompt change is needed for it.
 **Decision:** none yet. One story and one reader do not reverse the 2026-11-03 production switch. The customer's book is unchanged.
 **Revisit if:** the first production stories under the Opus review show the same damage pattern.
+
+## 2026-11-04 · The customer's Lia book takes five pictures from the Opus rerun, picked by eye
+**Context:** the Lab 1803 entry above left the book unchanged. Owner picked "mix the best pages" and asked for the p7 tail to be fixed first.
+**Decision:** prod job_1793736454070_0ir5y6hlh now shows Lab 1803's p1 v4, p3 v4, p12 v1, p19 v2, and p7 v3 (the Lab's p7 v2 plus one edit that joins the tail to the body), all pinned. The other 15 pages and the covers stay as shipped, including p8 and p20. No order existed and the promote tool has no email path. Backup: backups/story-promotions/job_1793736454070_0ir5y6hlh-2026-11-04T10-07-05-634Z.json.
+**Why a new tool:** the promote never moves Lab test rows, so scripts/admin/adopt-lab-versions.js makes chosen Lab versions real on the staging copy first.
+**Touched files:** scripts/admin/adopt-lab-versions.js, tests/unit/adopt-lab-versions.test.ts
