@@ -4633,7 +4633,7 @@
       "source": "Lab 1803 on staging copy of prod job_1793736454070_0ir5y6hlh p8: plan \"medium — Fridolin\", metadata.characters [], wornItems owner Oma Nicole, wearer the fox. Free replay of the real functions: getCharactersInScene returns [Oma Nicole] from the prose \"wrapped in Oma Nicole's fringed red wool scarf\"; auditPageBrief gives cast [Oma Nicole, Fridolin]. Opus then reported missing_character [NEW] and the redraw lost the shot. Scan of 37 recent prod stories: 1 of 373 pages.",
       "rootCause": "server/lib/sceneMetadata.js getCharactersInScene: with an empty metadata cast it falls through to a whole-word name scan of the brief prose, so any mention counts as presence. unionPageCast documents why the scan exists: a brief with characters [] can describe real cast in prose.",
       "status": "fixed",
-      "fixedIn": "PENDING"
+      "fixedIn": "79326ef1e"
     }
   ]
 }
