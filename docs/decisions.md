@@ -69152,3 +69152,8 @@ Revisit if: the preview is cheap enough to generate at order time for every cust
 **Replaces:** the "STAGING ONLY" scope of the 2026-10-29 entry. SETTLED.md lines 35, 37, 64, 65 updated.
 **Revisit if:** the first production stories show review failures, or a cover-title stop (bookReviewTitleRedraws: a title still wrong after the last round stops the story) hits a customer.
 **Touched files:** server/config/runtime.js, tests/unit/book-review.test.ts, tests/unit/book-review-pipeline.test.ts, tests/unit/inventory-model-unified.test.ts, comments in server/lib/{bookReview,repairPipeline,bookAudit,findingSources}.js and server/config/models.js, docs/SETTLED.md, docs/codebase-guide.md.
+
+## 2026-11-04 · Correction to the 2026-11-03 production entry: an empty page or a trimmed cast is not a defect
+**Context:** the 2026-11-03 entry cited "an empty p9 scored 100" and "12 defects found by eye". The owner corrected this: "An empty page is not a bug, it is a feature" and "We want to have diverse shots".
+**Decision:** no behaviour change. `EMPTY_PAGE_FITS_RULE` (server/lib/promptBuilders.js) already tells the book review and the Art Director this. The corrected count on prod job_1793736454070_0ir5y6hlh is 9 defects by eye (p9, p11, p18, Oma on p8 removed), of which the Gemini audit caught 1. The decision to switch stands; its evidence was the 3-book eval, not this count.
+**Replaces:** the p9 clause and the "12" of the 2026-11-03 entry.

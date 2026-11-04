@@ -1014,3 +1014,6 @@ Rule: before saying which environment a write reached, read the code that writes
 The Git-bash `date` prints "WEST" (UTC+1, which in winter IS Swiss time); I added an hour on top and told the owner
 22:54 CH when it was 21:57 CH, and doubled an elapsed time ("busy for an hour" when it was 30 min). Rule: every time I
 state to the owner comes from `ch()` / `chTime()` in scripts/lib/chTime.js, never from `date` and never by hand arithmetic.
+
+## 2026-11-04 · Reviewing a story: a missing character is not a defect by itself
+I listed an empty page and pages without a named character as defects, against the settled rule that page text is not a checklist. Owner: "An empty page is not a bug, it is a feature", "We want to have diverse shots". Rule: when eye-reviewing, judge the picture against what it chose to show; never count a trimmed cast or an empty page unless the picture contradicts the story.
