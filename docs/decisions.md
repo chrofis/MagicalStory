@@ -69157,3 +69157,10 @@ Revisit if: the preview is cheap enough to generate at order time for every cust
 **Context:** the 2026-11-03 entry cited "an empty p9 scored 100" and "12 defects found by eye". The owner corrected this: "An empty page is not a bug, it is a feature" and "We want to have diverse shots".
 **Decision:** no behaviour change. `EMPTY_PAGE_FITS_RULE` (server/lib/promptBuilders.js) already tells the book review and the Art Director this. The corrected count on prod job_1793736454070_0ir5y6hlh is 9 defects by eye (p9, p11, p18, Oma on p8 removed), of which the Gemini audit caught 1. The decision to switch stands; its evidence was the 3-book eval, not this count.
 **Replaces:** the p9 clause and the "12" of the 2026-11-03 entry.
+
+## 2026-11-04 · Measured: the Opus review on Lia against the old judges (Lab 1803), no behaviour change
+**Context:** owner asked to run the Opus review on prod job_1793736454070_0ir5y6hlh and compare it with what shipped. Run on a staging copy from the original pictures (Lab 1803, stage book_review_rerun), outside a story job, so no customer email path exists.
+**Result:** USD 1.375 against about USD 2.14 for the old review and repair (USD 1.48 measured, about USD 0.66 of redraws estimated from picture calls). By eye, one reader: Opus better on p1, p3, p7, p12, p19, worse on p8, p20, mixed on p2, level on p15, p16, p17. p7 is improved but not right: one tail, which does not join the body.
+**Finding:** the p8 damage was not the model ignoring the presence rule in prompts/book-audit.txt. It was told Oma belonged there: a garment owner's name in the brief prose entered the page cast (tasks/bugs.json garment-owner-name-enters-page-cast, 1 of 373 stored pages). No prompt change is needed for it.
+**Decision:** none yet. One story and one reader do not reverse the 2026-11-03 production switch. The customer's book is unchanged.
+**Revisit if:** the first production stories under the Opus review show the same damage pattern.

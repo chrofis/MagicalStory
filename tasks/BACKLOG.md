@@ -737,6 +737,7 @@ are listed stage by stage in the audit table.
 ---
 
 ## Verification pending (code shipped, proof not taken)
+- [ ] (2026-11-04) Read the first real production story under the Opus review: review failures, title stop, eye check → docs/decisions.md 2026-11-04 Lab 1803 entry
 - [ ] (2026-10-07) Next trial run: check verify entries trial-writer-shared-prose-rules, trial-page-grid-production-selector, trial-photo-glasses-and-features; review the last 2 weeks of prod trials (commands in the doc) → tasks/trial-quality-review-2026-10-07.md §6
 Run verifications now live in **`tasks/verify.json`** (judge a stored run: `node scripts/admin/verify-run.js <storyId> --write`); the lines below point at their registry ids. Non-run chores (UI, admin, SEO, state files) stay here only.
 

@@ -10804,6 +10804,12 @@
           "env": "staging",
           "result": "PARTIAL",
           "detail": "Test Lab #1768 (book_audit, bookReview:true, Opus 5.5) on 3 stored books: 20 faults, 20/20 route-tagged (11 TOUCHUP, 6 NEW, 3 CHAR), 6/6 spot-checked findings real, USD 0.879, 44-63 s per book. The repair loop and re-review are NOT exercised by the Lab stage; still needs a staging story run."
+        },
+        {
+          "date": "2026-11-04",
+          "env": "staging",
+          "result": "PARTIAL",
+          "detail": "Test Lab #1803 (book_review_rerun) on a staging copy of prod job_1793736454070_0ir5y6hlh, from the original pictures: 3 review calls, 2 repair rounds, 8 pages changed, USD 1.375, 314 s; repair loop and BETTER verdicts exercised. Eye check of all changed pages by one reader: better p1, p3, p7, p12, p19; worse p8, p20; p2 mixed. p7 still shows a tail that does not join the body and the last round accepted it. p8 damage traces to a wrong page cast (bug garment-owner-name-enters-page-cast). Still open: a real story through the job path."
         }
       ],
       "lastChecked": {
