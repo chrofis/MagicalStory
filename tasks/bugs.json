@@ -4634,6 +4634,15 @@
       "rootCause": "server/lib/sceneMetadata.js getCharactersInScene: with an empty metadata cast it falls through to a whole-word name scan of the brief prose, so any mention counts as presence. unionPageCast documents why the scan exists: a brief with characters [] can describe real cast in prose.",
       "status": "fixed",
       "fixedIn": "79326ef1e"
+    },
+    {
+      "id": "customer-edit-sends-raw-names",
+      "title": "The customer page and cover edit routes sent the customer's typed words raw to the image model, so a named character (\"polina ist kleiner als melodi\") was never identified and the model guessed the wrong girl; the repair name map also missed lowercase names and named a tracked accessory (a jump rope) ahead of the character's jacket",
+      "reportedAt": "2026-11-06",
+      "source": "Owner report from a customer's ten edits on job_1793893086454_ao77wh9j5 and job_1793959308869_fre2mb4d0, confirmed from stored prod data and a free replay of her sentences through buildPageRepairNameMap.",
+      "rootCause": "regeneration.js /:id/edit/image/:pageNum and /:id/edit/cover/:coverType passed editPrompt to editImageWithPrompt without nameRepairText; stripCharacterNames was case-sensitive only; repairGarmentPhrase step 1 returned any tracked worn item (an accessories-slot artifact) before the outfit's garments.",
+      "status": "fixed",
+      "fixedIn": "efa45e018"
     }
   ]
 }
