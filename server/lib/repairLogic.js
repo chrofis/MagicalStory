@@ -1916,7 +1916,7 @@ function repairGarmentPhrase({
 function describeFigureForRepair({
   name, characters = null, characterClothing = null, clothingRequirements = null,
   artStyle = null, detectedFigures = null, visualBible = null, sceneMetadata = null, pageNumber = null,
-  placeless = false,
+  placeless = false, withHair = false,
 } = {}) {
   const wanted = String(name || '').trim().toLowerCase();
   if (!wanted) return null;
@@ -1979,7 +1979,15 @@ function describeFigureForRepair({
     });
   }
 
-  const clauses = [garment ? `the ${noun} in the ${garment}` : `the ${noun}`];
+  // HAIR (customer edits only, `withHair`): girls dressed alike are told apart by it.
+  // The character's stored hair, composed by the one hair builder, spaces instead of commas.
+  let hair = '';
+  if (withHair && character) {
+    const raw = require('./promptBuilders').buildHairDescription(character.physical, character.physicalTraitsSource);
+    const words = String(raw || '').split(',').map(w => w.trim()).filter(Boolean).join(' ');
+    hair = !words ? '' : /bald/i.test(words) ? ' with a bald head' : ` with ${words} hair`;
+  }
+  const clauses = [garment ? `the ${noun}${hair} in the ${garment}` : `the ${noun}${hair}`];
   if (place) clauses.push(place);
   return clauses.join(', ');
 }
@@ -2039,7 +2047,7 @@ function describeVbFigure(entry, pool) {
  */
 function buildRepairNameMap({
   characters = null, visualBible = null, characterClothing = null, clothingRequirements = null,
-  artStyle = null, detectedFigures = null, pageNumber = null, sceneMetadata = null,
+  artStyle = null, detectedFigures = null, pageNumber = null, sceneMetadata = null, withHair = false,
 } = {}) {
   const names = [];
   const fallbackByName = new Map();
@@ -2050,13 +2058,13 @@ function buildRepairNameMap({
     if (!n || fallbackByName.has(n.toLowerCase())) return;
     const described = describeFigureForRepair({
       name: n, characters, characterClothing, clothingRequirements, artStyle, detectedFigures, visualBible,
-      sceneMetadata, pageNumber,
+      sceneMetadata, pageNumber, withHair,
     });
     names.push(n);
     fallbackByName.set(n.toLowerCase(), described || fallback);
     const bare = describeFigureForRepair({
       name: n, characters, characterClothing, clothingRequirements, artStyle, detectedFigures, visualBible,
-      sceneMetadata, pageNumber, placeless: true,
+      sceneMetadata, pageNumber, placeless: true, withHair,
     });
     possessiveByName.set(n.toLowerCase(), bare || fallback);
   };
@@ -2073,7 +2081,7 @@ function buildRepairNameMap({
  * paths that hold the story rather than the pieces (char-fix callers, the
  * manual repair route).
  */
-function buildPageRepairNameMap({ storyData, sceneDescription = '', detectedFigures = null, pageNumber = null, artStyle = null, characterClothing = null, sceneMetadata = null } = {}) {
+function buildPageRepairNameMap({ storyData, sceneDescription = '', detectedFigures = null, pageNumber = null, artStyle = null, characterClothing = null, sceneMetadata = null, withHair = false } = {}) {
   const { parseCharacterClothing } = require('./clothingResolve');
   const { extractSceneMetadata } = require('./sceneMetadata');
   return buildRepairNameMap({
@@ -2085,6 +2093,7 @@ function buildPageRepairNameMap({ storyData, sceneDescription = '', detectedFigu
     artStyle: storyData?.artStyle || artStyle || null,
     detectedFigures,
     pageNumber,
+    withHair,
     // The page's worn state: a garment this page takes off is never named.
     sceneMetadata: sceneMetadata || (sceneDescription ? extractSceneMetadata(sceneDescription) : null),
   });
@@ -2157,7 +2166,8 @@ function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = n
  * `characterClothing` / `sceneMetadata` because it has no metadata block in its prose.
  */
 function nameCustomerEditText(text, { storyData, pageNumber = null, sceneDescription = '', detectedFigures = null, characterClothing = null, sceneMetadata = null } = {}) {
-  const nameMap = buildPageRepairNameMap({ storyData, pageNumber, sceneDescription, detectedFigures, characterClothing, sceneMetadata });
+  // withHair: the customer's descriptor also carries the hair (decisions.md 2026-11-06, hair); pipeline repairs do not.
+  const nameMap = buildPageRepairNameMap({ storyData, pageNumber, sceneDescription, detectedFigures, characterClothing, sceneMetadata, withHair: true });
   return nameRepairText(text, nameMap, { caseSensitive: false });
 }
 

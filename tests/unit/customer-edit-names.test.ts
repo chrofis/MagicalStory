@@ -87,3 +87,26 @@ describe('nameCustomerEditText (what both customer edit routes call)', () => {
     expect(src.match(/nameCustomerEditText\(editPrompt/g)?.length).toBe(2);
   });
 });
+
+describe('customer edit descriptor carries the hair (decisions.md 2026-11-06, hair)', () => {
+  const hairy = [
+    { ...CAST[0], physical: { hairColor: 'brown', detailedHairAnalysis: { type: 'wavy', lengthTop: 'mid-back', styling: 'loose', bangsEndAt: 'no bangs' } } },
+    { ...CAST[1], physical: { hairColor: 'dark brown', detailedHairAnalysis: { type: 'straight', lengthTop: 'shoulder-length', styling: 'ponytail', bangsEndAt: 'no bangs' } } },
+  ];
+  const s = story({ characters: hairy });
+
+  it('puts colour, texture, length and style between the noun and the garment', () => {
+    const out = nameCustomerEditText('polina ist kleiner als melodi', { storyData: s, pageNumber: 6, characterClothing: CLOTHING });
+    expect(out).toBe('the 5-year-old girl with brown wavy mid-back loose hair in the green puffer jacket ist kleiner als the 5-year-old girl with dark brown straight shoulder-length ponytail hair in the blue rain jacket');
+  });
+
+  it('a character with no stored hair gets no hair clause', () => {
+    const out = nameCustomerEditText('polina', { storyData: story(), pageNumber: 6, characterClothing: CLOTHING });
+    expect(out).toBe('the 5-year-old girl in the green puffer jacket');
+  });
+
+  it('pipeline repair descriptors stay hair-free', () => {
+    const map = buildRepairNameMap({ characters: hairy, characterClothing: CLOTHING, clothingRequirements: REQS });
+    expect(nameRepairText('Polina is small', map)).toBe('the 5-year-old girl in the green puffer jacket is small');
+  });
+});
