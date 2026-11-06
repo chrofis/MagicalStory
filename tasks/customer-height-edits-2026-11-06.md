@@ -29,4 +29,20 @@ Janna, Melisa tallest.
       Same class as the back-cover caption (5561b70cc) on story pages; not measured beyond this one page.
 
 ## Results
-(filled in after the staging runs)
+- Her 9 edits replayed word for word with names → descriptors (staging `_edittest` clones): right girl changed 9/9
+  (before the fix ~3/9); size change exaggerated in ~7/9 ("a little smaller" → toddler, ~20-30%).
+- Page redraws with heights + apparent age set and the brief rewritten: Einhorn p9, Rubi p1, Rubi p10 right;
+  Einhorn p6/p10 and Rubi p6 not wrong but not comparable (depth/kneeling). Covers: order right on 4/5,
+  gaps too big on the Einhorn dedication; no back-cover caption on 3/3 (5561b70cc holds).
+- Phrasing test, 4 templates × 4 of her pictures (16 Grok edits via the real route, ~USD 1.60, measured by eye
+  as head-top-to-feet pixels):
+  - T1 end state + body landmark ("A stands with the top of her head level with B's eyebrows. Same poses, …"):
+    pairs near target (Einhorn p9: Polina ~3% shorter than Melodi; Rubi p1 and p6 small changes); on the
+    4-girl dedication 2 of 3 steps right (Melodi→Janna ~7%, Janna→Melisa ~3%) but Polina still ~19% below Melodi.
+  - T3 Google form with the same landmark: like T1 on pairs, worse on the 4-girl page (Polina smaller still).
+  - T5 "nearly the same height, just a little shorter": moderate overshoot on pairs.
+  - T6 "one finger's width shorter": the biggest overshoot (the other girl grows a lot).
+  - Research (no vendor/benchmark evidence on magnitude words; edit models apply one fixed strength):
+    see the agent report summarised in the session; sources docs.x.ai prompting guide, Google Gemini 2.5
+    Flash Image prompting blog, arXiv 2510.08532, 2511.09715.
+  - Raw images: session scratchpad `phrasing/` (not in the repo); sample is small (1 render per cell).
