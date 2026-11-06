@@ -115,6 +115,10 @@ Last full sweep: **2026-09-06**.
 
 ## Image quality — unresolved render defects
 
+- [ ] (2026-11-06, Janna family) Photo-derived apparent age overrides the family's real height order (Polina 5 rated school-age, drawn taller than Melodi 5); customer not told the form's height/apparent-age fields drive the pictures — owner decision pending → tasks/customer-height-edits-2026-11-06.md
+- [ ] (2026-11-06) Customer edit resizes overshoot ("a little smaller" → toddler size, score 20) even with the right girl named; edit call carries no target size → tasks/customer-height-edits-2026-11-06.md
+- [ ] (2026-11-06) Quoted speech in a page's THIS IMAGE DEPICTS line drawn as a caption strip (staging Rubi p6 «Alle still!»); story-page sibling of the back-cover caption fix 5561b70cc, not yet counted → tasks/customer-height-edits-2026-11-06.md
+
 - [ ] Order 102 fix 2026-11-02 left open: secondary character Nerina got no reference sheet (root cause 4); p9 hand not in water; picker ignores reader findings a repair fixed (p3/p24 shipped tail-less originals); deed-page cast drops a carrying parent (Papà missing on 9+ pages); VB child mermaid "no garment"; local R2/OpenRouter keys rejected; skill says shared R2 bucket → tasks/order102-fix-2026-11-02.md
 
 - [ ] (2026-10-26, prod story job_1792859316244_6429d0n83 "Léa, Pompon et la promesse du soir") **Children bathe fully clothed, judge scored it 83 and 100.** p4 shows Jules in his green sweater and Léa in her red cardigan, jeans and rubber boots sitting in the bubble bath; p5 (quality 100) repeats it. The per-page clothing contract carried the story outfit into a bath scene, and neither the quality nor the semantic judge flagged clothes-in-water. Class: a beat that implies undress (bath, swimming, pyjamas, bed) must override the standard outfit in the clothing line, and the judges need a plausibility check for it (sibling: generator↔critic). Count how often a bath/swim/bed beat appears with the full outfit over stored stories before coding. → tasks/BACKLOG.md
