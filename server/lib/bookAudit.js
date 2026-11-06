@@ -246,11 +246,26 @@ function auditPageBrief(scene, storyData = null) {
       extraNames: scene.outlineCharacters || [],
       storyData,
     });
-    return { cast: roster.names, sceneIntent, outfits: auditPageOutfits(scene, roster.names, storyData) };
+    return { cast: roster.names, sceneIntent, outfits: auditPageOutfits(scene, roster.names, storyData), heightLine: auditPageHeightLine(roster.names, storyData) };
   } catch (err) {
     log.error(`❌ [BOOK-AUDIT] p${scene.pageNumber}: cast roster failed (${err.message}) — the reader gets no cast for this page`);
     return { cast: null, sceneIntent };
   }
+}
+
+/**
+ * THE HEIGHT ORDER OF THE DRAWN FIGURES (2026-11-07). The image generator is
+ * told this order (promptBuilders.buildRelativeHeightDescription); the reader
+ * now reads the SAME line, built by the same function over the story characters
+ * that are in this page's drawn cast, so it can judge the picture against what
+ * the painter was asked for. '' when fewer than two drawn figures have a height.
+ * docs/decisions.md 2026-11-07.
+ */
+function auditPageHeightLine(names, storyData) {
+  const wanted = new Set((names || []).map(n => String(n).trim().toLowerCase()));
+  const drawn = (storyData?.characters || []).filter(c => c && wanted.has(String(c.name || '').trim().toLowerCase()));
+  if (drawn.length < 2) return '';
+  return require('./promptBuilders').buildRelativeHeightDescription(drawn);
 }
 
 /**
@@ -286,6 +301,7 @@ function briefLine(heading, brief) {
   if (brief.cast !== null) parts.push(`drawn with: ${brief.cast.length ? brief.cast.join(', ') : 'nobody — no character is in this picture by design'}`);
   const worn = Object.entries(brief.outfits || {}).map(([n, d]) => `${n}: ${d}`);
   if (worn.length) parts.push(`what each wears: ${worn.join('; ')}`);
+  if (brief.heightLine) parts.push(brief.heightLine);
   return `${heading} BRIEF — ${parts.join('. ')}`;
 }
 
@@ -867,6 +883,7 @@ module.exports = {
   auditStoryBook,
   buildAuditPages,
   auditPageBrief,
+  auditPageHeightLine,
   briefLine,
   shippedVersionIndex,
   parseRoutes,

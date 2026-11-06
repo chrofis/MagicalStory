@@ -1612,6 +1612,8 @@ const NOT_INPAINTABLE_TYPES = new Set([
   // inpaint: a local edit cannot re-stage a creature at several times its drawn
   // size. The page redo owns it — see ITERATE_ROUTED_TYPES and gate 2d.
   'creature_scale',
+  // height_order (2026-11-07): figures drawn in the wrong height order; a redraw, never an inpaint.
+  'height_order',
   // RE-STAGING defects (owner, 2026-10-07, reversing 2026-09-24 for these three):
   // a figure to remove or add, or a place drawn wrong, is a page that must be
   // painted again, and a whole-frame inpaint edit does not do that. Measured over
@@ -1640,7 +1642,7 @@ const NOT_INPAINTABLE_TYPES = new Set([
  * the p16 drop on staging job_1790373080139_vnx5l8iy7 told the log a
  * character repair would handle a dragon, and nothing ever did.
  */
-const ITERATE_ROUTED_TYPES = new Set(['creature_scale', 'extra_character', 'missing_character', 'setting', 'wrong_action', 'wrong_state']);
+const ITERATE_ROUTED_TYPES = new Set(['creature_scale', 'height_order', 'extra_character', 'missing_character', 'setting', 'wrong_action', 'wrong_state']);
 
 /**
  * Types that describe OUR entity-grid crop, not the page: a hard white gap or a

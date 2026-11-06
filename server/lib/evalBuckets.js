@@ -153,6 +153,10 @@ const BUCKETS = {
   // routes it to iterate; inpaint cannot re-stage a creature at several times
   // its drawn size, and char-fix has no reference to paint a creature from.
   creature_scale:       { owner: 'quality',  kind: 'graded', repair: 'regen' },
+  // Drawn figures in the wrong height order, or a gap far beyond the one the page's
+  // HEIGHT ORDER line gives (whole-book review only, 2026-11-07; image-evaluation D-29
+  // still never deducts for height order). A redraw: no local edit re-sizes a figure.
+  height_order:         { owner: 'quality',  kind: 'graded', repair: 'regen' },
   // One named prop rendered twice when the scene has one of it
   // (image-evaluation D-32) — the eval-side check for the worn-item dedupe the
   // creation side now does. Its own bucket, NOT an alias of `object_presence`:
@@ -236,6 +240,7 @@ const TYPE_TO_BUCKET = {
   scale: 'composition_textzone', position: 'composition_textzone', textzone: 'composition_textzone',
   structure_scale: 'structure_scale', undersized_structure: 'structure_scale',
   creature_scale: 'creature_scale',
+  height_order: 'height_order',
   wrong_action: 'wrong_action',
   wrong_state: 'wrong_state',
   duplicate_object: 'duplicate_object', duplicated_object: 'duplicate_object',
@@ -459,7 +464,7 @@ const CONSOLIDATED_TYPES = Object.freeze([
   'accessory', 'accessory_missing', 'hair', 'hair_nuance', 'face_drift', 'face_destroyed',
   'cutout_artifact', 'nudity', 'child_torso_uncovered', 'anatomy', 'body_build', 'figure_completeness', 'action_interaction', 'wrong_action', 'wrong_state',
   'object_presence', 'missing_element', 'object_count', 'duplicate_object', 'scale',
-  'structure_scale', 'creature_scale', 'setting', 'style_consistency', 'rendered_text', 'required_text',
+  'structure_scale', 'creature_scale', 'height_order', 'setting', 'style_consistency', 'rendered_text', 'required_text',
   'character_marking', 'anachronism', 'garment_colour', 'naturalness', 'emotion',
   'viewer_address', 'physics', 'unverified_absence', 'composite_seam',
 ]);

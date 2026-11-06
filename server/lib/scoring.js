@@ -196,6 +196,10 @@ const MAX_SEVERITY_TYPES = {
   // footing as an undersized structure (D-31). The cap keeps an evaluator's
   // escalation from outranking a missing or wrong character.
   creature_scale: 'major',
+  // height_order capped at MAJOR (2026-11-07): the whole-book review's weight for figures drawn in the
+  // wrong height order or with a far larger gap than the page's HEIGHT ORDER line; it must not outrank a
+  // missing or wrong character.
+  height_order: 'major',
   // wrong_action capped at MAJOR (2026-10-15): a different action drawn than
   // the brief states (flying for hopping) is a MAJOR by the semantic judge and
   // the reader's weights; it must not outrank a missing or wrong character.

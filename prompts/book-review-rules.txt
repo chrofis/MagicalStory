@@ -4,7 +4,7 @@ This book is reviewed once as a whole and every picture fault is also routed to 
 - TOUCHUP — a local edit of the existing picture repairs it: an object added, removed or moved, a hand or gaze or expression changed, a colour or detail corrected, while the rest of the picture stays as it is. A local edit cannot change a garment, hair or the form of a face: those are CHAR:<Name> (one figure) or NEW.
 - NEW — the picture has to be drawn again: the wrong moment, the wrong place, several things wrong at once, a figure missing or doubled, or a fault no local edit can reach.
 - CHAR:<Name> — one named character is wrongly drawn (face, hair, body or outfit) and redrawing only that figure repairs it. <Name> is that character's name exactly as the brief lists it.
-The sentence after the dash is the instruction for that fix, written as an order to the painter ("Remove the second hat", "Draw the hero looking at the door"), with the cause left out. A cover is routed the same way. A TEXT line carries no route.
+The sentence after the dash is the instruction for that fix, written as an order to the painter ("Remove the second hat", "Draw the hero looking at the door"), with the cause left out. A cover is routed the same way. A TEXT line carries no route. A `height_order` fault is always routed NEW: no local edit re-sizes a figure.
 
 No reference pictures of the characters are given to you. Never judge whether a figure looks like a particular person or like an earlier picture of them; judge what each picture shows against its page's words and brief.
 
