@@ -5616,9 +5616,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   if (!shotBlock.text && !isCoverRender) {
     log.warn(`[IMAGE PROMPT] Page ${pageNumber}: no shot declared and none readable from the scene prose — the illustrator gets no framing rule`);
   }
-  const sceneIntentLine = metadata?.sceneIntent
-    ? `**THIS IMAGE DEPICTS:** ${String(metadata.sceneIntent).trim()}`
-    : '';
+  // The back cover gets the scene sentence WITHOUT the bold header: on prod back
+  // covers the header read as a title and its sentence was drawn as a caption
+  // (job_1793893086454_ao77wh9j5, job_1793959308869_fre2mb4d0). docs/decisions.md
+  // 2026-11-06. images.js's refusal rewrite then finds no scene block here and
+  // rewrites the whole prompt, as it already does for custom prompts.
+  const sceneIntentText = metadata?.sceneIntent ? String(metadata.sceneIntent).trim() : '';
+  const sceneIntentLine = !sceneIntentText ? ''
+    : pageNumber === COVER_PAGE_NUMBERS.backCover ? sceneIntentText
+      : `**THIS IMAGE DEPICTS:** ${sceneIntentText}`;
 
   const appendExactPoses = (s) => exactPosesBlock ? `${s}\n\n${exactPosesBlock}` : s;
   // Final chokepoint — sanitises VB IDs that survived upstream builders.
