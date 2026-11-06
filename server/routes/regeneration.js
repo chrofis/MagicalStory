@@ -3560,8 +3560,18 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
     const previousReasoning = currentImage.qualityReasoning || null;
     log.debug(`📸 [EDIT] Capturing previous image (score: ${previousScore})`);
 
+    // The image model knows no names: a customer's "polina ist kleiner als melodi" names
+    // each girl by her descriptor first (repairLogic.nameCustomerEditText; docs/decisions.md 2026-11-06).
+    const editSceneDesc = (storyData.sceneDescriptions || []).find(s => s.pageNumber === pageNumber);
+    const namedEditPrompt = require('../lib/repairLogic').nameCustomerEditText(editPrompt, {
+      storyData, pageNumber,
+      sceneDescription: editSceneDesc?.description || editSceneDesc?.prompt || currentImage.sceneDescription || '',
+      detectedFigures: currentImage.bboxDetection?.figures || null,
+    });
+    log.debug(`✏️ Edit instruction as sent: "${namedEditPrompt}"`);
+
     // Edit the image (pure text/instruction based - no character photos to avoid regeneration artifacts)
-    const editResult = await editImageWithPrompt(currentImage.imageData, editPrompt);
+    const editResult = await editImageWithPrompt(currentImage.imageData, namedEditPrompt);
 
     // Log token usage for image editing
     if (editResult?.usage) {
@@ -6822,8 +6832,20 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       return res.status(409).json({ error: layerErr.message });
     }
 
+    // Names become descriptors (see the page edit route). A cover carries its clothing
+    // categories as a typed field, not in a metadata block.
+    const coverObj = typeof existingCover === 'object' ? existingCover : {};
+    const namedEditPrompt = require('../lib/repairLogic').nameCustomerEditText(editPrompt, {
+      storyData, pageNumber: COVER_PAGE_NUMBERS[coverKey],
+      sceneDescription: coverObj.sceneDescription || '',
+      detectedFigures: coverObj.bboxDetection?.figures || null,
+      characterClothing: coverObj.perCharClothing || null,
+      sceneMetadata: coverObj.sceneMetadata || null,
+    });
+    log.debug(`✏️ Edit instruction as sent: "${namedEditPrompt}"`);
+
     // Edit the cover image (pure text/instruction based - no character photos to avoid regeneration artifacts)
-    const editResult = await editImageWithPrompt(editBaseSrc, editPrompt);
+    const editResult = await editImageWithPrompt(editBaseSrc, namedEditPrompt);
 
     // Log token usage for cover editing
     if (editResult?.usage) {

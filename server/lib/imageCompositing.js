@@ -652,7 +652,7 @@ async function grokEditSceneExact(prompt, referenceUris, sceneBuf, sceneW, scene
  *   identifier there produced unreadable instructions (three copies of a
  *   30-word descriptor in two sentences, job_1788727233899 p7).
  */
-function stripCharacterNames(text, { names = [], vidByName = new Map(), fallbackByName = new Map(), possessiveByName = new Map(), ownVisualId = null, ownName = null } = {}) {
+function stripCharacterNames(text, { names = [], vidByName = new Map(), fallbackByName = new Map(), possessiveByName = new Map(), ownVisualId = null, ownName = null, caseSensitive = true } = {}) {
   if (!text || typeof text !== 'string' || names.length === 0) return text;
   const own = ownName ? String(ownName).toLowerCase() : null;
   // ownVisualId stands in for a name only when the caller gave no ownName
@@ -668,7 +668,7 @@ function stripCharacterNames(text, { names = [], vidByName = new Map(), fallback
     const bare = possessiveByName.get(name.toLowerCase());
     const planned = (own && name.toLowerCase() === own) || vidByName.get(name.toLowerCase()) || (own ? null : ownVisualId);
     return `${(!planned && bare) || vidFor(name)}'s`;
-  }, { caseSensitive: true })
+  }, { caseSensitive })
     .replace(/\s{2,}/g, ' ')
     .trim();
 }

@@ -1420,6 +1420,15 @@
   ],
   "withinFile": [
     {
+      "id": "customer-edit-routes-name-descriptors",
+      "axis": "customer page edit route vs customer cover edit route",
+      "reason": "Both customer edit routes (POST /:id/edit/image/:pageNum and /:id/edit/cover/:coverType) must send the customer's words through repairLogic.nameCustomerEditText, so a typed name becomes the character's descriptor. The page route once sent the raw text and the image model could not tell which girl 'polina' was (prod job_1793893086454_ao77wh9j5, ten edits). docs/decisions.md 2026-11-06.",
+      "file": "server/routes/regeneration.js",
+      "blockPattern": "router\\.post\\('/:id/edit/(image/:pageNum|cover/:coverType)'",
+      "mustContain": "nameCustomerEditText(editPrompt",
+      "severity": "block"
+    },
+    {
       "id": "trial-page-grid-vs-production-page-grid",
       "axis": "streamed trial page grid vs Phase 5a-pre-grid production page grid",
       "reason": "storyJobPipeline.js builds a page's Visual Bible grid at TWO sites: the streamed trial page (startTrialPageImageGeneration, pageRenderCall.buildPageVbGrid) and the full story's Phase 5a-pre-grid (pageRenderCall.keepPageGridElements over the Phase 5a selection). Both must rebuild the prompt's reference claim from the cells actually KEPT after the plate-borne filter, never from the selection or the grid's raw order. Until 2026-10-07 the trial hand-rolled its own selection (cap 6, no plate filter, no aboard withhold, landmark photos among the cells) and claimed the grid's rawElements; a grid rule changed at one site belongs at the other, and the cell-selection logic itself belongs in pageRenderCall.js where the Test Lab reads it too (set lab-vs-prod-page-render).",

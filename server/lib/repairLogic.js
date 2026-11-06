@@ -1808,12 +1808,14 @@ function detectionForRetryEntry(scene, entry, index = null) {
  * vocabulary (a dress, a robe) is the last resort.
  */
 const REPAIR_GARMENT_SLOTS = ['outer layer', 'top', 'bottom', 'headwear', 'footwear'];
+// Slots whose tracked items are accessories, not garments: named only when no garment is available.
+const ACCESSORY_SLOTS = new Set(['accessories', 'belt/waist']);
 
 /**
  * "blue anorak" - colour + garment, both TYPED fields, for one character on one
  * page. Sources, in order: a tracked worn item this character wears on the page
- * (its Visual Bible label), then the story outfit's typed `garments` list
- * (wornItems.GARMENT_LIST_RULE) by slot. Every garment the page's resolved worn
+ * (its Visual Bible label; an accessory-slot item only as the last resort), then
+ * the story outfit's typed `garments` list (wornItems.GARMENT_LIST_RULE) by slot. Every garment the page's resolved worn
  * state takes off this character is excluded, by its slot and by the words of
  * its name. Nothing is read out of the outfit's prose: the colour is the
  * author's `colour` field (docs/decisions.md, 2026-10-09; the word scan it
@@ -1845,20 +1847,34 @@ function repairGarmentPhrase({
     for (const w of words(r.name)) offNouns.add(w);
   }
 
-  // 1. A tracked item this character wears on this page - the story's own
-  //    distinguishing garment, including one handed to them.
-  for (const r of rows) {
-    if (r.state !== 'worn' || !sameName(r.wearer || r.owner, name)) continue;
-    const phrase = String((r.entry && r.entry.label) || r.name || '').trim();
+  // 1. A tracked GARMENT this character wears on this page - the story's own
+  //    distinguishing garment, including one handed to them. A tracked item in an
+  //    accessory-type slot (a jump rope, a belt, a scarf) is NOT named ahead of the
+  //    outfit: "the girl in the yellow jump rope" targets nobody (docs/decisions.md,
+  //    2026-11-06); it is the last resort, step 3.
+  const trackedWorn = rows.filter(r => r.state === 'worn' && sameName(r.wearer || r.owner, name));
+  const phraseOfTracked = (r) => String((r.entry && r.entry.label) || r.name || '').trim();
+  for (const r of trackedWorn) {
+    if (ACCESSORY_SLOTS.has(r.slot)) continue;
+    const phrase = phraseOfTracked(r);
     if (phrase) return phrase;
   }
+  const trackedAccessory = () => {
+    for (const r of trackedWorn) {
+      const phrase = phraseOfTracked(r);
+      if (phrase) return phrase;
+    }
+    return null;
+  };
 
   // 2. The story outfit's typed garment list, by slot, then any other garment.
   //    A character the page's brief does not dress is not on this page: no garment.
-  if (!category) return null;
+  if (!category) return trackedAccessory();
   const reqs = resolveCharacterReqs(clothingRequirements, name);
   const garments = reqs?.[String(category).startsWith('costumed') ? 'costumed' : category]?.garments;
   if (!Array.isArray(garments) || garments.length === 0) {
+    const acc = trackedAccessory();
+    if (acc) return acc;
     log.error(`[REPAIR-NAMES] ${where}: the ${category} outfit carries no typed garment list (stored before the field existed, or authored without it) - the descriptor carries no garment`);
     return null;
   }
@@ -1869,6 +1885,9 @@ function repairGarmentPhrase({
     if (g) return phraseOf(g);
   }
   if (usable.length > 0) return phraseOf(usable[0]);
+  // 3. No outfit garment is available: a tracked accessory still identifies the figure.
+  const acc = trackedAccessory();
+  if (acc) return acc;
   log.error(`[REPAIR-NAMES] ${where}: every garment of the ${category} outfit is off this page - the descriptor carries no garment`);
   return null;
 }
@@ -2054,19 +2073,20 @@ function buildRepairNameMap({
  * paths that hold the story rather than the pieces (char-fix callers, the
  * manual repair route).
  */
-function buildPageRepairNameMap({ storyData, sceneDescription = '', detectedFigures = null, pageNumber = null, artStyle = null } = {}) {
+function buildPageRepairNameMap({ storyData, sceneDescription = '', detectedFigures = null, pageNumber = null, artStyle = null, characterClothing = null, sceneMetadata = null } = {}) {
   const { parseCharacterClothing } = require('./clothingResolve');
   const { extractSceneMetadata } = require('./sceneMetadata');
   return buildRepairNameMap({
     characters: storyData?.characters || null,
     visualBible: storyData?.visualBible || null,
-    characterClothing: parseCharacterClothing(sceneDescription || '') || {},
+    // A cover stores its clothing categories as a typed field (`perCharClothing`), not in a metadata block.
+    characterClothing: characterClothing || parseCharacterClothing(sceneDescription || '') || {},
     clothingRequirements: storyData?.clothingRequirements || null,
     artStyle: storyData?.artStyle || artStyle || null,
     detectedFigures,
     pageNumber,
     // The page's worn state: a garment this page takes off is never named.
-    sceneMetadata: sceneDescription ? extractSceneMetadata(sceneDescription) : null,
+    sceneMetadata: sceneMetadata || (sceneDescription ? extractSceneMetadata(sceneDescription) : null),
   });
 }
 
@@ -2106,10 +2126,12 @@ function expressionEditBlocked({ types, characterName, sceneMetadata = null, fig
  * Repair text as the image model may read it: ids resolved, then every cast
  * and bible-figure name replaced by its descriptor (imageCompositing
  * stripCharacterNames, one pass). `keep` exempts one name — the char-fix
- * target, whose name travels with its reference image. The other options are
- * stripCharacterNames' own (a plan's visual identifiers, the entry's subject).
+ * target, whose name travels with its reference image. `caseSensitive` defaults
+ * true for pipeline text (names that are also words, "Rose"); a CUSTOMER's typed
+ * edit passes false ("polina"). The other options are stripCharacterNames' own
+ * (a plan's visual identifiers, the entry's subject).
  */
-function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = null, ownName = null } = {}) {
+function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = null, ownName = null, caseSensitive = true } = {}) {
   if (!text || typeof text !== 'string') return text;
   if (!nameMap) throw new Error('nameRepairText: no repair name map (buildRepairNameMap) — a name would reach the image model');
   const kept = keep ? String(keep).trim().toLowerCase() : null;
@@ -2119,10 +2141,26 @@ function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = n
     fallbackByName: nameMap.fallbackByName,
     possessiveByName: nameMap.possessiveByName,
     ...(vidByName ? { vidByName } : {}),
-    ownVisualId, ownName,
+    ownVisualId, ownName, caseSensitive,
   });
 }
 
+/**
+ * A CUSTOMER's typed edit ("polina ist kleiner als melodi") as the image model
+ * may read it: each cast / bible-figure name becomes the descriptor the repair
+ * paths use ("the 5-year-old girl in the green jacket"), because the model has
+ * never heard the cast's names and guessed which girl was meant (prod jobs
+ * job_1793893086454_ao77wh9j5 / job_1793959308869_fre2mb4d0, ten edits). Matches
+ * names case-INSENSITIVELY - customers type "polina" - unlike pipeline text.
+ * One helper for both customer edit routes (page and cover); docs/decisions.md 2026-11-06.
+ * `scene` is the page's (or cover's) own scene fields; a cover passes its typed
+ * `characterClothing` / `sceneMetadata` because it has no metadata block in its prose.
+ */
+function nameCustomerEditText(text, { storyData, pageNumber = null, sceneDescription = '', detectedFigures = null, characterClothing = null, sceneMetadata = null } = {}) {
+  const nameMap = buildPageRepairNameMap({ storyData, pageNumber, sceneDescription, detectedFigures, characterClothing, sceneMetadata });
+  return nameRepairText(text, nameMap, { caseSensitive: false });
+}
+
 module.exports = {
-  expressionEditBlocked, describeFigureForRepair, repairGarmentPhrase, buildRepairNameMap, buildPageRepairNameMap, nameRepairText, resolveRepairIds,
+  nameCustomerEditText, expressionEditBlocked, describeFigureForRepair, repairGarmentPhrase, buildRepairNameMap, buildPageRepairNameMap, nameRepairText, resolveRepairIds,
   repairAttemptFromResult, describeCharFixFailure, detectionForRetryEntry, findBadPages, findReaderMajorFinding, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, pagesWherePickMoved, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, isReviewerDecidedPlan, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, charFixEntityFindings, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX, scoredFindingPools };
