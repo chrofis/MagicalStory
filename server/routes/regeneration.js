@@ -276,6 +276,30 @@ async function rehydrateActivePageImage(storyId, storyData, pageNumber) {
 }
 
 
+// Cover counterpart of rehydrateActivePageImage: load ONLY this cover's active
+// bytes onto storyData.coverImages[coverKey].imageData. Images never live in the
+// stories JSONB (R2 / story_images), and the page-path cover render
+// (coverRender.iterateFullStoryCover) throws "no cover image to iterate" without
+// them. A full rehydrate would load every page too (the SPD-2 OOM). Active
+// version = image_version_meta[coverKey].activeVersion, falling back to version 0
+// — the same rule as getActiveStoryImages.
+async function rehydrateActiveCoverImage(storyId, storyData, coverKey) {
+  const cover = storyData.coverImages?.[coverKey];
+  // absent, a legacy bare-string cover, or bytes already inline: nothing to load
+  if (!cover || typeof cover !== 'object' || cover.imageData) return storyData;
+  const metaRows = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [storyId]);
+  const activeDbIndex = metaRows[0]?.image_version_meta?.[coverKey]?.activeVersion ?? 0;
+  const rows = await dbQuery(
+    `SELECT version_index, image_data, image_url FROM story_images
+     WHERE story_id = $1 AND image_type = $2 AND page_number IS NULL AND NOT is_test
+     ORDER BY version_index`,
+    [storyId, coverKey]
+  );
+  const activeRow = rows.find(r => r.version_index === activeDbIndex) || rows.find(r => r.version_index === 0);
+  if (activeRow) cover.imageData = await imgBytesAsync(activeRow);
+  return storyData;
+}
+
 // Atomically add repair cost to story analytics
 async function addRepairCost(storyId, cost, stepName) {
   if (cost <= 0) return;
@@ -3176,6 +3200,8 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     // returns the new result but we also surface previousImage/previousScore
     // in the response for the version-comparison UI.
     storyData.coverImages = storyData.coverImages || {};
+    // The story row carries no image bytes: load this cover's active ones (the page-path render needs them).
+    await rehydrateActiveCoverImage(id, storyData, coverKey);
     const existingCover = storyData.coverImages[coverKey] || {};
 
     // Initialize imageVersions array if missing (lazy migration from legacy format)

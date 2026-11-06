@@ -4643,6 +4643,13 @@
       "rootCause": "regeneration.js /:id/edit/image/:pageNum and /:id/edit/cover/:coverType passed editPrompt to editImageWithPrompt without nameRepairText; stripCharacterNames was case-sensitive only; repairGarmentPhrase step 1 returned any tracked worn item (an accessories-slot artifact) before the outfit's garments.",
       "status": "fixed",
       "fixedIn": "efa45e018"
+    },
+    {
+      "id": "cover-regenerate-no-image-bytes",
+      "title": "POST /api/stories/:id/regenerate/cover/:coverType failed for every full-story cover with \"no cover image to iterate\": the route reads story.data (no image bytes) and iterateFullStoryCover needs the cover active bytes on coverImages[key].imageData; nothing loaded them since covers became pages (6fbd2b599)",
+      "reportedAt": "2026-11-06",
+      "source": "Reproduced on staging 2026-11-06 (commit 6f20f5d32) on 5 covers of job_1793893086454_ao77wh9j5, job_1793959308869_fre2mb4d0, job_1793964466256_1tmyzh1do. server/routes/regeneration.js cover regenerate route; coverRender.js throws when record.imageData is missing.",
+      "status": "open"
     }
   ]
 }
