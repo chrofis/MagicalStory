@@ -2689,6 +2689,23 @@ function buildElementSizeRepairClause(visualBible, objectIds, figures, interacti
 }
 
 /**
+ * Height difference (cm, adjacent pair, child-sized figures) -> the landmark on
+ * the TALLER figure that the shorter figure's head top reaches. Staging test,
+ * 2026-11-06 (docs/decisions.md): an end state against a body landmark drew
+ * closer heights than "slightly taller". null = same height.
+ */
+const HEIGHT_LANDMARK_BANDS = [
+  { maxDiffCm: 2, landmark: null },
+  { maxDiffCm: 6, landmark: 'forehead' },
+  { maxDiffCm: 10, landmark: 'eyebrows' },
+  { maxDiffCm: 15, landmark: 'nose' },
+  { maxDiffCm: 22, landmark: 'chin' },
+  { maxDiffCm: 35, landmark: 'shoulders' },
+];
+/** Said once, in the height line every Art Director template and the image prompt carry. */
+const HEIGHT_NO_STAIRCASE_RULE = 'When several characters stand side by side, do not arrange them from shortest to tallest; mix the order so that no height staircase forms.';
+
+/**
  * Build relative height description for characters
  * Instead of absolute cm values, describes relative heights which AI understands better.
  * Characters without explicit height fall back to age+gender estimation so they
@@ -2710,36 +2727,26 @@ function buildRelativeHeightDescription(characters) {
 
   if (withHeight.length < 2) return '';
 
-  // Build relative description
-  const descriptions = [];
-
-  for (let i = 0; i < withHeight.length; i++) {
-    const char = withHeight[i];
-
-    if (i === 0) {
-      // First (shortest) character
-      descriptions.push(`${char.name} (shortest)`);
+  // The order header names the ranking only; HOW MUCH taller is stated as an end
+  // state against a body landmark (HEIGHT_LANDMARK_BANDS), because "slightly
+  // taller" was drawn as 3% to 30% steps (see docs/decisions.md, 2026-11-06).
+  const header = `**HEIGHT ORDER (shortest to tallest):** ${withHeight.map((c, i) => (i === 0 ? `${c.name} (shortest)` : c.name)).join(' -> ')}`;
+  const pairs = [];
+  for (let i = 1; i < withHeight.length; i++) {
+    const prev = withHeight[i - 1];
+    const cur = withHeight[i];
+    const band = HEIGHT_LANDMARK_BANDS.find(b => cur.height - prev.height <= b.maxDiffCm);
+    if (!band) {
+      // Beyond the last band (adult beside a child): the ratio wording already used elsewhere.
+      pairs.push(`${cur.name} is clearly taller than ${prev.name}.`);
+    } else if (band.landmark === null) {
+      pairs.push(`${cur.name} is about the same height as ${prev.name}.`);
     } else {
-      // Compare to previous character
-      const prev = withHeight[i - 1];
-      const diff = char.height - prev.height;
-
-      let descriptor;
-      if (diff <= 3) {
-        descriptor = 'similar height';
-      } else if (diff <= 10) {
-        descriptor = 'slightly taller';
-      } else if (diff <= 25) {
-        descriptor = 'taller';
-      } else {
-        descriptor = 'noticeably taller';
-      }
-
-      descriptions.push(`${char.name} (${descriptor})`);
+      pairs.push(`The top of ${prev.name}'s head is level with ${cur.name}'s ${band.landmark}.`);
     }
   }
-
-  return `**HEIGHT ORDER (shortest to tallest):** ${descriptions.join(' -> ')}`;
+  // ONE line: images.js drops the block by its first line when the prompt must shrink.
+  return `${header}. ${pairs.join(' ')} ${HEIGHT_NO_STAIRCASE_RULE}`;
 }
 
 /**
@@ -14213,6 +14220,8 @@ module.exports = {
   buildExpansionCastBlock,
   buildCharacterPromptBlock,
   buildRelativeHeightDescription,
+  HEIGHT_LANDMARK_BANDS,
+  HEIGHT_NO_STAIRCASE_RULE,
   figureHeightCm,
   elementPageScaleNote,
   elementContactNames,
