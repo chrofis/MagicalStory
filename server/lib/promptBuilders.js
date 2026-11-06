@@ -2712,9 +2712,13 @@ const HEIGHT_NO_STAIRCASE_RULE = 'When several characters stand side by side, do
  * can still be placed in the ordering — the output is just a rank order, not
  * absolute cm values, so approximate estimates are sufficient.
  * @param {Array} characters - Array of character objects with name and height properties
+ * @param {Object} [opts]
+ * @param {boolean} [opts.forPainter=true] - append HEIGHT_NO_STAIRCASE_RULE, an instruction to
+ *   the painter; a judge reading the same line (bookAudit) passes false, since where the
+ *   figures stand is not a height fault.
  * @returns {string} Description like "Height order: Emma (shortest) -> Max (taller) -> Dad (slightly taller)"
  */
-function buildRelativeHeightDescription(characters) {
+function buildRelativeHeightDescription(characters, { forPainter = true } = {}) {
   if (!characters || characters.length < 2) return '';
 
   const withHeight = characters
@@ -2746,7 +2750,7 @@ function buildRelativeHeightDescription(characters) {
     }
   }
   // ONE line: images.js drops the block by its first line when the prompt must shrink.
-  return `${header}. ${pairs.join(' ')} ${HEIGHT_NO_STAIRCASE_RULE}`;
+  return forPainter ? `${header}. ${pairs.join(' ')} ${HEIGHT_NO_STAIRCASE_RULE}` : `${header}. ${pairs.join(' ')}`;
 }
 
 /**

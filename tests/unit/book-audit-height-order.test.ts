@@ -25,10 +25,20 @@ const girls = [
 describe('auditPageHeightLine', () => {
   it('is the generator line over exactly the drawn cast', () => {
     const line = bookAudit.auditPageHeightLine(['Janna', 'polina', 'Melisa'], { characters: girls });
-    expect(line).toBe(buildRelativeHeightDescription([girls[0], girls[2], girls[3]]));
+    expect(line).toBe(buildRelativeHeightDescription([girls[0], girls[2], girls[3]], { forPainter: false }));
     expect(line).toContain('HEIGHT ORDER (shortest to tallest):** Polina (shortest) -> Janna -> Melisa');
     expect(line).not.toContain('Melodi');
   });
+  it('carries the order and landmarks but not the painter-only staircase sentence', () => {
+    const PB = require_('../../server/lib/promptBuilders.js');
+    const chars = [{ name: 'A', physical: { height: '106' } }, { name: 'B', physical: { height: '111' } }];
+    const reader = bookAudit.auditPageHeightLine(['A', 'B'], { characters: chars });
+    expect(reader).toContain('HEIGHT ORDER');
+    expect(reader).toContain("The top of A's head is level with B's forehead.");
+    expect(reader).not.toContain(PB.HEIGHT_NO_STAIRCASE_RULE);
+    expect(PB.buildRelativeHeightDescription(chars)).toContain(PB.HEIGHT_NO_STAIRCASE_RULE);
+  });
+
   it('is empty for one drawn figure, nobody, or unknown names', () => {
     expect(bookAudit.auditPageHeightLine(['Janna'], { characters: girls })).toBe('');
     expect(bookAudit.auditPageHeightLine([], { characters: girls })).toBe('');

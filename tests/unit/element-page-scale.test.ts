@@ -150,7 +150,8 @@ describe('one sentence, three readers', () => {
     const scoped = String(PB.buildImagePrompt(brief([LEVIN, JULIAN]), input, [LEVIN, JULIAN], bible(), 9, null,
       { pageScaleScope: { types: ['animal'], bands: ['adult-height', 'twice-adult-height'] } }));
     expect(scoped).toContain(`(object) — ${P['melon-sized']}`);
-    expect(scoped).not.toContain("Julian's head");
+    // The size note only — the HEIGHT ORDER line names heads too ("The top of Levin's head ...").
+    expect(scoped).not.toContain("about the size of Julian's head");
     expect(scoped).not.toContain(PB.ELEMENT_SIZE_PRECEDENCE_LINE);
   });
 

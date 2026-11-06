@@ -265,7 +265,9 @@ function auditPageHeightLine(names, storyData) {
   const wanted = new Set((names || []).map(n => String(n).trim().toLowerCase()));
   const drawn = (storyData?.characters || []).filter(c => c && wanted.has(String(c.name || '').trim().toLowerCase()));
   if (drawn.length < 2) return '';
-  return require('./promptBuilders').buildRelativeHeightDescription(drawn);
+  // forPainter false: the no-staircase sentence tells the painter where to stand
+  // the figures; it is no height rule, and the reader must not judge by it.
+  return require('./promptBuilders').buildRelativeHeightDescription(drawn, { forPainter: false });
 }
 
 /**
