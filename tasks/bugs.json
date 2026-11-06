@@ -4649,7 +4649,9 @@
       "title": "POST /api/stories/:id/regenerate/cover/:coverType failed for every full-story cover with \"no cover image to iterate\": the route reads story.data (no image bytes) and iterateFullStoryCover needs the cover active bytes on coverImages[key].imageData; nothing loaded them since covers became pages (6fbd2b599)",
       "reportedAt": "2026-11-06",
       "source": "Reproduced on staging 2026-11-06 (commit 6f20f5d32) on 5 covers of job_1793893086454_ao77wh9j5, job_1793959308869_fre2mb4d0, job_1793964466256_1tmyzh1do. server/routes/regeneration.js cover regenerate route; coverRender.js throws when record.imageData is missing.",
-      "status": "open"
+      "rootCause": "regeneration.js cover regenerate route never loaded the cover active bytes; iterateFullStoryCover (page path since 6fbd2b599) requires coverImages[key].imageData.",
+      "status": "fixed",
+      "fixedIn": "f1a34150f"
     }
   ]
 }
