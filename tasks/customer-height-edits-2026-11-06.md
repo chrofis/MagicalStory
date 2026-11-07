@@ -55,6 +55,18 @@ Janna, Melisa tallest.
       two pieces. Staging set back to the shipped versions (Einhorn p2 v1, Rubi p6 v5); prod untouched.
       Lesson: Opus's "rope not round the neck" on Einhorn p2 is a fault the owner does not count — the
       picture's focus matters more than the exact stage of the action.
+- Rubi p6 quiet version (owner picked "a picture without the rope's ends"): R6Q via regenerate customPrompt came
+  out orange/sunset unlike the book. Owner asked "Did you use a different background plate?" — yes: the
+  regenerate route sends a plate only for landmark pages (ensureStoryPagePlate), and a customPrompt is the whole
+  image prompt (no art-style template). The originals were drawn on the stored `empty_scene/p6/v0` plate.
+  Re-rendered through the Lab `image` stage (production page render + stored plate +
+  `sceneDescriptionOverride` = the R6Q brief): exp 1805, USD ~0.05 — same plate and style as p5/p7, one rope
+  with two handles, Polina about Melodi's height. Owner: promote. Lab-promoted v10 active, Rubi promoted
+  09:46 CH (--force; prod newest was our 08:22 promote, no orders); prod p6 v10 hash-identical, 0 staging URLs.
+  **Lesson: a corrected brief for a stored page goes through the Lab `image` stage (production render + stored
+  plate), not the regenerate route's customPrompt.**
+- Final state: Einhorn p2 original kept (owner); Einhorn p6 tied-alone kept (owner). Spend for the whole job
+  ~USD 4.30 of the 6 cap.
 - **Why the majors survived the original runs** (stored `finalChecksReport.bookAuditRounds`):
   Einhorn p2/p5 flagged in round 1 → repair added the hidden horn → round 2 said BETTER: PREVIOUS → rollback
   restored the rope fault, and round 2 is the last round, so nothing retried. Rubi p6 flagged in all 3 rounds;
