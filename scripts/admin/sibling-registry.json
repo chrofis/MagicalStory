@@ -203,6 +203,11 @@
             "critic": "objectNotPlacedRule()",
             "generator": "{OBJECT_NOT_PLACED}",
             "note": "One constant, OBJECT_NOT_PLACED_RULE, filled into both writers and appended to elementCellGatePrompt and stateCellsGatePrompt. That it reaches every built prompt is pinned in tests/unit/object-not-placed-2026-10-17.test.ts."
+          },
+          {
+            "critic": "HIDDEN_FEATURE_STATE_RULE",
+            "generator": "{HIDDEN_FEATURE_STATE}",
+            "note": "One constant, HIDDEN_FEATURE_STATE_RULE (2026-11-07): the writers author a hidden / revealed state pair for a feature the story hides until a reveal page, and stateCellsGatePrompt reads the same sentence so a hidden cell is never failed as 'feature missing'. Pinned in tests/unit/hidden-feature-state-2026-11-07.test.ts."
           }
         ]
       }

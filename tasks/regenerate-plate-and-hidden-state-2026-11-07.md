@@ -55,14 +55,14 @@ Log: tasks/customer-height-edits-2026-11-06.md.
       ("regenerate draws a non-landmark page with no plate").
 
 ## Build 2: hidden-then-revealed state
-- [ ] B2.1 visual-bible.txt + story-trial-arc.txt (vb-authoring-sites set; one constant in
+- [x] B2.1 (HIDDEN_FEATURE_STATE_RULE in promptBuilders, both templates) visual-bible.txt + story-trial-arc.txt (vb-authoring-sites set; one constant in
       promptBuilders like ONE_SIDED_FEATURE_RULE): a feature the story keeps hidden until a reveal page is
       a state — `hidden` (drawn with what hides it) for the pages before, `revealed` from the reveal page on.
-- [ ] B2.2 Check the state-cell gate in referenceSheets.js accepts a "hidden" cell (generator↔critic).
-- [ ] B2.3 Replay the VB planning step on >=20 stored stories (mostly nothing hidden; include Einhorn):
+- [x] B2.2 (stateCellsGatePrompt carries the constant; registry anchor added; the only critic on a state batch) Check the state-cell gate in referenceSheets.js accepts a "hidden" cell (generator↔critic).
+- [ ] B2.3 PENDING (paid, needs price approval: ~USD 0.35 one arm, 20 stories; `node scripts/analysis/replay-vb-hidden-feature.js --cap 0.6`; script + dataset prepared, dry run and --estimate done) Replay the VB planning step on >=20 stored stories (mostly nothing hidden; include Einhorn):
       rate of correct hidden states, rate of false states. Price asked first (text-only call, est. a few
       cents per story).
-- [ ] B2.4 decisions.md, SETTLED line 36 (states) is extended not reversed, verify.json, BACKLOG tick
+- [x] B2.4 (decisions.md 2026-11-07, SETTLED extended, verify.json; BACKLOG tick of 'VB has no hidden state' left to the replay result) decisions.md, SETTLED line 36 (states) is extended not reversed, verify.json, BACKLOG tick
       ("VB has no hidden state").
 
 ## Not in scope

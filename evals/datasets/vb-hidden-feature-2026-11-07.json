@@ -1,0 +1,169 @@
+{
+ "name": "vb-hidden-feature-2026-11-07",
+ "purpose": "Replay of the Visual Bible authoring step with HIDDEN_FEATURE_STATE_RULE (docs/decisions.md 2026-11-07). 20 stored beats-path stories on the STAGING database, two with a feature hidden until a reveal page, eighteen with none. Measures: rate of correct hidden/revealed state pairs on the positives, rate of false hidden/revealed states on the negatives.",
+ "db": "staging",
+ "basis": "Positives: story text read by hand (pages quoted in `evidence`). Negatives: storyText scanned for hide/reveal/uncover cues (de/fr/it/en); every hit was read and none is a feature of a Visual Bible entry that the story hides and then shows (an object put under leaves, a child hiding behind a sibling, a map found under a stone are placements of a thing, not a hidden feature of an entry). The negatives were NOT each read end to end: a miss is possible, so a hidden/revealed state the replay produces on a negative is hand-checked against the story text before it is counted as false.",
+ "stories": [
+  {
+   "id": "job_1793893086454_ao77wh9j5",
+   "title": "Janna und das Einhorn im Nebel",
+   "pages": 10,
+   "hiddenFeature": true,
+   "expected": {
+    "entry": "the unicorn (ANI001)",
+    "feature": "horn",
+    "hiddenPages": "before page 7 (hidden under the forelock)",
+    "revealedPages": "7-10 (page 7: the forelock slides back and a bright horn shows)"
+   },
+   "evidence": "Page 7 text: 'die lange Stirnmaehne rutschte zurueck, und ein helles Horn kam zum Vorschein'. Stored bible: one entry, no states."
+  },
+  {
+   "id": "job_1793959308869_fre2mb4d0",
+   "title": "Janna und Rubi im Buchenwald",
+   "pages": 10,
+   "hiddenFeature": true,
+   "expected": {
+    "entry": "the unicorn (ANI001)",
+    "feature": "horn",
+    "hiddenPages": "3-8 (leaves stuck on the forehead so dense one cannot see what is under them)",
+    "revealedPages": "9-10 (page 9: the leaves slide off, the horn shows)"
+   },
+   "evidence": "Page 3: 'An seiner Stirn steckten Blaetter, so dicht, dass man nicht sah, was darunter war'. Page 9: 'Die Blaetter rutschten ab'; Melodi: 'Er hat ein Horn!'. Stored bible: states unaltered@3,4,5,8 and glowing horn@9, no covered state."
+  },
+  {
+   "id": "job_1793964466256_1tmyzh1do",
+   "title": "Janna, Silbermond und die Laternen",
+   "pages": 10,
+   "hiddenFeature": false
+  },
+  {
+   "id": "job_1793736454070_0ir5y6hlh",
+   "title": "Lia und der verschwundene Weihnachtsstern",
+   "pages": 20,
+   "hiddenFeature": false
+  },
+  {
+   "id": "job_1793619414606_k3c6p7w5d",
+   "title": "Lea et le herisson du petit pont",
+   "pages": 10,
+   "hiddenFeature": false,
+   "note": "a plush rabbit is dragged under leaves: a placement"
+  },
+  {
+   "id": "job_1793557464719_txr1gqd28",
+   "title": "Lea et l'ombre qui dit non",
+   "pages": 10,
+   "hiddenFeature": false
+  },
+  {
+   "id": "job_1792226018737_lb65hzkqs",
+   "title": "Eliah und die Moewe im Nebel",
+   "pages": 20,
+   "hiddenFeature": false
+  },
+  {
+   "id": "job_1791551239260_a0dpn715x",
+   "title": "Das Ei unter der Linde",
+   "pages": 4,
+   "hiddenFeature": false,
+   "note": "an egg that hatches is a state change of the egg, not a hidden feature"
+  },
+  {
+   "id": "job_1791531449494_o0kaatvmq",
+   "title": "Vier Freunde und ein Drachenei",
+   "pages": 4,
+   "hiddenFeature": false
+  },
+  {
+   "id": "job_1791497309909_6quecrr9t",
+   "title": "Ein warmes Ei fuer Funka",
+   "pages": 4,
+   "hiddenFeature": false
+  },
+  {
+   "id": "job_1791489793707_2ir6nl5kw",
+   "title": "Vier Freunde waermen ein Ei",
+   "pages": 18,
+   "hiddenFeature": false,
+   "note": "an egg hidden between roots: a placement"
+  },
+  {
+   "id": "job_1791315635053_t0t8qpebu",
+   "title": "Emma und der Brief fuer Mira",
+   "pages": 14,
+   "hiddenFeature": false,
+   "note": "an octopus stays hidden in a cave: a creature hiding, not a feature of it"
+  },
+  {
+   "id": "job_1791267520938_essbvehs8",
+   "title": "Emma und das Lied der Meerjungfrau",
+   "pages": 14,
+   "hiddenFeature": false
+  },
+  {
+   "id": "job_1791040103540_atbttop6w",
+   "title": "Vier Freunde und ein Drachonei",
+   "pages": 18,
+   "hiddenFeature": false,
+   "note": "an egg under leaves: a placement"
+  },
+  {
+   "id": "job_1790539784661_6mjcny1c7",
+   "title": "Das Feuer von Funkenherz",
+   "pages": 18,
+   "hiddenFeature": false,
+   "priceBasis": "no stored beats_visual_bible usage (older combined call): estimated, see fallbackEstimateUsd",
+   "note": "a scale pushed under a jacket: a placement"
+  },
+  {
+   "id": "job_1790508305061_dka3jpog9",
+   "title": "Die Schuppe im Nebel",
+   "pages": 18,
+   "hiddenFeature": false,
+   "priceBasis": "no stored beats_visual_bible usage (older combined call): estimated, see fallbackEstimateUsd",
+   "note": "a wing blocks the view, a character hides her chest: not a hidden feature of an entry"
+  },
+  {
+   "id": "job_1790373080139_vnx5l8iy7",
+   "title": "Vier Freunde und das Drachenei",
+   "pages": 18,
+   "hiddenFeature": false,
+   "priceBasis": "no stored beats_visual_bible usage (older combined call): estimated, see fallbackEstimateUsd"
+  },
+  {
+   "id": "job_1790277448294_5herh01j7",
+   "title": "Das Ei in den Wurzeln",
+   "pages": 18,
+   "hiddenFeature": false,
+   "priceBasis": "no stored beats_visual_bible usage (older combined call): estimated, see fallbackEstimateUsd",
+   "note": "a bag of chestnuts carried under a jacket: a placement"
+  },
+  {
+   "id": "job_1790100385959_1nitlympp",
+   "title": "Das Ei im Laub",
+   "pages": 18,
+   "hiddenFeature": false,
+   "priceBasis": "no stored beats_visual_bible usage (older combined call): estimated, see fallbackEstimateUsd",
+   "note": "an egg under leaves, dug out: a placement"
+  },
+  {
+   "id": "job_1789853503332_riqncqg1i",
+   "title": "Vier Freunde und ein Klopfen",
+   "pages": 18,
+   "hiddenFeature": false,
+   "priceBasis": "no stored beats_visual_bible usage (older combined call): estimated, see fallbackEstimateUsd"
+  }
+ ],
+ "excluded": {
+  "job_1790618717512_n9wrh5u0j": "stored wardrobe has no standard day outfit, so coverBeats cannot rebuild the briefBeats (dry run 2026-11-07); not replayable",
+  "job_1791145238223_50osg2osm": "stored wardrobe has no standard day outfit, so coverBeats cannot rebuild the briefBeats (dry run 2026-11-07); not replayable",
+  "job_1791222889407_ypl33vk8u": "stored wardrobe has no standard day outfit, so coverBeats cannot rebuild the briefBeats (dry run 2026-11-07); not replayable",
+  "job_1791450210539_nwi88y9lr": "stored wardrobe has no standard day outfit, so coverBeats cannot rebuild the briefBeats (dry run 2026-11-07); not replayable",
+  "job_1792078014622_uh8tj6ht1": "stored wardrobe has no standard day outfit, so coverBeats cannot rebuild the briefBeats (dry run 2026-11-07); not replayable",
+  "job_1792482580699_3iiy0v4dj": "stored wardrobe has no standard day outfit, so coverBeats cannot rebuild the briefBeats (dry run 2026-11-07); not replayable",
+  "job_1793526073039_9nhq3ju59": "stored wardrobe has no standard day outfit, so coverBeats cannot rebuild the briefBeats (dry run 2026-11-07); not replayable",
+  "job_1793561351885_kkg5gxkbj": "stored wardrobe has no standard day outfit, so coverBeats cannot rebuild the briefBeats (dry run 2026-11-07); not replayable"
+ },
+ "fallbackEstimateUsd": 0.023,
+ "fallbackEstimateNote": "Mean cost of the Haiku-era 20-page VB calls (0.021, 0.020, 0.0265); used by --estimate for stories without stored beats_visual_bible usage."
+}

@@ -3438,6 +3438,7 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     ONE_SIDED_FEATURE: ONE_SIDED_FEATURE_RULE,
     // An object's description never names the support it rests on (2026-10-17).
     OBJECT_NOT_PLACED: OBJECT_NOT_PLACED_RULE,
+    HIDDEN_FEATURE_STATE: HIDDEN_FEATURE_STATE_RULE,
     // An invented child's clothing has a covering top: the SAME constant the wardrobe writer and reviewer hold, and the
     // image judge's D-05f child_torso_uncovered CRITICAL enforces (sibling set vb-secondary-clothing-vs-image-eval).
     CHILD_TOP_DEF: WARDROBE_RULES.CHILD_TOP_DEF,
@@ -9962,6 +9963,15 @@ const OBJECT_NOT_PLACED_RULE = "An object's `description` says what it IS and lo
  */
 const STATE_REPLACES_PART_RULE = "A `delta` that changes a part of the object names that part exactly as `description` names it and says what it is now: \"the <part> is now <new thing>\" or \"the <part> is <changed condition>\" (the door is now hanging from one hinge; the sail is now patched with a red cloth). It replaces that part wherever `description` names it and never adds a second one beside it. A delta that only adds a feature says so (\"a bandage is now wrapped around the <part>\").";
 const STATE_FULL_DESCRIPTION_RULE = "Every state carries `description` and `removed`. `description` is a complete standalone description of the object in that state: the entry's own `description` with the changed part already replaced, every other word kept, so the replaced part's old form is never mentioned (a door hanging from one hinge: the whole description again, with the door described as hanging from one hinge where it was described whole). `removed` lists the short names of the parts that are no longer there in that state, the old form of a replaced part or a part broken off or lost, as the entry names them; [] when nothing is gone.";
+/**
+ * A FEATURE THE STORY KEEPS HIDDEN UNTIL A REVEAL PAGE IS A STATE (owner, 2026-11-07; docs/decisions.md "Hidden-then-revealed
+ * feature is a state"). Prod job_1793893086454_ao77wh9j5: a creature's horn is hidden under its forelock until the reveal page,
+ * the Visual Bible drew one cell with the horn showing, and every render or edit of the head brought the horn back.
+ * ONE sentence read by both Visual Bible writers (visual-bible.txt, story-trial-arc.txt; registry set vb-authoring-sites) and by
+ * the state-consistency cell gate (referenceSheets.stateCellsGatePrompt). It ADDS a case to the states rules and keeps their
+ * restraint: an entry with no hidden feature still has no states.
+ */
+const HIDDEN_FEATURE_STATE_RULE = "A feature of a creature, an invented figure or an object that the story keeps hidden until a reveal page is a state of that entry: a `hidden` state, drawn with whatever hides it (hair over it, leaves stuck to it, a cloth wrapped round it) and showing the feature nowhere, covers every page before the reveal, and a `revealed` state, the feature in plain view and the cover gone, covers the reveal page and every page after it. Only a feature the story itself hides and then shows; a feature that is simply visible, or simply never mentioned, gets no states from this.";
 const STATE_WINS_RULE = "Where a cell's state change and its description name the same part, the state change wins: draw that part as the state says and not as the description says. The part is replaced, never drawn twice and never drawn beside the old one.";
 const BODY_CONDITION_MARKER_RULE = "A body condition the plot turns on (an injury, a hurt limb, a sign of illness) carries a visible marker a picture can show from any angle (a bandage, a splint, a sling, a plaster): the sentence that introduces the condition names the marker, the page text that first tells it names the marker, and the figure's Visual Bible description (where it has an entry) states the marker, so text and picture agree. How a limb hangs or moves is never the whole condition.";
 // The peak-of-motion instruction, anchored to the plan's own action (owner 2026-10-16, docs/decisions.md): the old wording
@@ -13482,6 +13492,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       // The trial writer's Visual Bible entries state a one-sided feature relationally (sibling of visual-bible.txt).
       ONE_SIDED_FEATURE: ONE_SIDED_FEATURE_RULE,
       OBJECT_NOT_PLACED: OBJECT_NOT_PLACED_RULE,
+      HIDDEN_FEATURE_STATE: HIDDEN_FEATURE_STATE_RULE,
       CHILD_TOP_DEF: WARDROBE_RULES.CHILD_TOP_DEF,
       STATE_REPLACES_PART: STATE_REPLACES_PART_RULE,
       STATE_FULL_DESCRIPTION: STATE_FULL_DESCRIPTION_RULE,
@@ -14368,6 +14379,7 @@ module.exports = {
   TRIAL_SETBACK_RULE,
   STATE_REPLACES_PART_RULE,
   STATE_FULL_DESCRIPTION_RULE,
+  HIDDEN_FEATURE_STATE_RULE,
   STATE_WINS_RULE,
   VB_CATEGORY_RULE,
   BODY_CONDITION_MARKER_RULE,

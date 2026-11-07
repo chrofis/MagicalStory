@@ -129,6 +129,7 @@ Each background describes a scene with no people, no human figures. Include: loc
 - {CREATURE_FEATURES}
 - {STATE_REPLACES_PART}
 - {STATE_FULL_DESCRIPTION}
+- {HIDDEN_FEATURE_STATE}
 - {ONE_SIDED_FEATURE} {OBJECT_NOT_PLACED} {BODY_CONDITION_MARKER}
 - **An invented child's `clothing` has a covering top.** {CHILD_TOP_DEF} A child's `clothing` never says "no garment", "bare shoulders" or "bare upper body", whatever creature or costume the child is.
 - A name the story gives an element lives in `properName` and nowhere else — never in `label`, `name`, `description` or the page prose. One `properName` belongs to one id: two entries never share a name. An object that transforms later in the story and the creature it becomes are separate ids, and only one of them carries the name.

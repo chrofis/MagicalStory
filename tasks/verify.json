@@ -11222,6 +11222,22 @@
         "kind": "human",
         "what": "In a staging book_review story with 3+ characters standing together on some page, read finalChecksReport.bookAuditRounds[].raw: every height_order fault must name a pair that is visibly out of order or far apart in the stored picture, no height_order fault on a page whose figures kneel, sit or stand at different depths, and a page with a height_order fault gets a redraw in the next round."
       }
+    },
+    {
+      "id": "vb-hidden-then-revealed-state",
+      "title": "A feature the story keeps hidden until a reveal page gets a hidden and a revealed reference cell",
+      "commits": [],
+      "addedAt": "2026-11-07",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On a story where a creature, invented figure or object has a feature the story hides until a reveal page (covered by hair, leaves or a cloth), the Visual Bible entry carries a `hidden` state on the pages before the reveal and a `revealed` state from the reveal page on, each drawn as its own reference cell, the hidden cell showing the feature nowhere; a story with no hidden feature gets no such states. Measured before the run: the stored-data replay of the Visual Bible step over 20 stored stories (evals/datasets/vb-hidden-feature-2026-11-07.json, scripts/analysis/replay-vb-hidden-feature.js), pending.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In a staging story whose text hides a feature of a creature or object until a reveal page, read the stored visualBible: the entry has states named for hidden and revealed with pages that split at the reveal page, the hidden reference cell shows the feature nowhere, and the pages before the reveal are drawn without it. In a story with no hidden feature, no entry gained such states."
+      }
     }
   ],
   "runs": [
