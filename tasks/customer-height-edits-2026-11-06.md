@@ -19,6 +19,11 @@ Janna, Melisa tallest.
       Laternen p1 lantern + heights). Promoted to production 08:21-08:22 CH (backups in
       backups/story-promotions/), read back 39/39 OK, no job row, no email. Code 1d4912caa..9572f01f on
       master. Marketing informed (Marketing/inbox/2026-11-07-magicalstory-janna-books-fixed.md).
+- [x] 2026-11-07 08:46 CH: Laternen p1 lantern was blue (p9 shows it white with blue stars + moon). One Grok
+      edit on staging recoloured only the lantern, rest of the picture unchanged (v5; the edit's quality score
+      10 is not a picture fault, checked by eye against v4). Laternen re-promoted (--force after checking prod
+      unchanged since 08:22: newest image 08:22 CH, no orders, p1 active v4); prod p1 active v5, bytes
+      identical to staging, 0 staging URLs. Total paid spend for the job ~USD 2.50 of the 6 cap.
 
 ## Open
 - [ ] Owner yes needed on the two-part fix proposal for the tied-unicorn class (below, "Proposal").
