@@ -15,16 +15,19 @@ meaningless rhymes, a rule the climax broke). See `tasks/janna-books-issues-2026
 - Build approved, with a paid text-stage test of about USD 1.50 (about 5 stored stories × USD 0.30).
 
 ## Plan
-- [ ] Starts after the plot-fix agent (F1–F3) has committed, because both edit the writer prompt.
-- [ ] Guide `[rhyming]`: the whole book is told in rhyming couplets at the child's reading level. The
+- [x] Starts after the plot-fix agent (F1–F3) has committed, because both edit the writer prompt.
+- [x] Guide `[rhyming]`: the whole book is told in rhyming couplets at the child's reading level. The
       plot is an ordinary plot; rhyme is the form, never a plot device or a rhyming creature. The
       guide stays language-neutral (decisions.md 2026-09 "A guide names no natural language").
-- [ ] Writer (unified + trial siblings, if trials can carry a learning topic): verse output for the
+- [x] Writer (unified + trial siblings, if trials can carry a learning topic): verse output for the
       topic, with line breaks kept.
-- [ ] Text passes (lector / refine / diff / audit): keep the rhyme and the line breaks for this topic,
+- [x] Text passes (lector / refine / diff / audit): keep the rhyme and the line breaks for this topic,
       and check that the lines rhyme and make sense (generator↔critic: one shared constant).
-- [ ] Idea stage: the rhyming topic must not turn into a rhyme gimmick in the premise.
-- [ ] Label in client + SEO meta.
-- [ ] Unit tests; then the paid test: `story_text_replay` (or equivalent) on about 5 stored stories,
+- [x] Idea stage (guide read whole by idea and arc; no code): the rhyming topic must not turn into a rhyme gimmick in the premise.
+- [x] Label in client + SEO meta.
+- [~] Unit tests done (tests/unit/verse-mode.test.ts); the validation was SKIPPED at the owner request, paid staging rerun is the check:: `story_text_replay` (or equivalent) on about 5 stored stories,
       shown to the owner in verse.
-- [ ] decisions.md, verify.json, prompt-inventory, sibling registry.
+- [x] decisions.md, verify.json, prompt-inventory, sibling registry.
+
+## Review (2026-11-07)
+Built per the owner-trimmed scope. See docs/decisions.md "verse mode". Open items are in tasks/BACKLOG.md (In flight).

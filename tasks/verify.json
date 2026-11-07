@@ -11322,6 +11322,22 @@
         "kind": "human",
         "what": "Read the page text of a staging story (1st-grade band included) against the MUST SAY lines in storyTextPrompts; count recitals."
       }
+    },
+    {
+      "id": "verse-mode-rhyming-2026-11-07",
+      "title": "A rhyming-topic book is told in rhyming couplets and the rhyme is not the plot",
+      "commits": [],
+      "addedAt": "2026-11-07",
+      "status": "pending",
+      "evidence": [],
+      "claim": "A staging text-only rerun of a rhyming-topic story (about USD 1.30, run by the main session) comes back as couplets that rhyme, with the line breaks kept through refine, lector, grammar check and the stored text; no rhyming creature, rhyme game or rhyme-solves-the-problem plot; no inverted word order or filler line. The free agent-as-model validation was SKIPPED at the owner's request.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read the page text of the staging rerun: share of couplets that rhyme, filler lines, inversions, line breaks preserved on every page, plot independent of rhyme; open the PDF and the viewer once."
+      }
     }
   ],
   "runs": [

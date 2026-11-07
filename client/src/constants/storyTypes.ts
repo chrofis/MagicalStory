@@ -303,7 +303,7 @@ export const educationalTopics: EducationalTopic[] = [
   // Letters & Reading
   { id: 'alphabet', name: { en: 'The Alphabet (ABC)', de: 'Das Alphabet (ABC)', fr: 'L\'alphabet (ABC)', it: 'L\'Alfabeto (ABC)' }, emoji: '🔤', group: 'letters' },
   { id: 'vowels', name: { en: 'Vowels (A, E, I, O, U)', de: 'Vokale (A, E, I, O, U)', fr: 'Voyelles (A, E, I, O, U)', it: 'Vocali (A, E, I, O, U)' }, emoji: '🅰️', group: 'letters' },
-  { id: 'rhyming', name: { en: 'Rhyming Words', de: 'Reimwörter', fr: 'Mots qui riment', it: 'Parole in rima' }, emoji: '🎵', group: 'letters' },
+  { id: 'rhyming', name: { en: 'Told in Rhyme', de: 'In Reimen erzählt', fr: 'Raconté en rimes', it: 'Raccontato in rima' }, emoji: '🎵', group: 'letters' },
   { id: 'spelling-name', name: { en: 'Spelling My Name', de: 'Meinen Namen schreiben', fr: 'Écrire mon nom', it: 'Scrivere il mio nome' }, emoji: '✏️', group: 'letters' },
 
   // Numbers & Math

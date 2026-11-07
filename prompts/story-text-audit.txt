@@ -39,4 +39,6 @@ Walk the pages in order and for every page answer the questions below:
 
 Also name every page whose text and picture conflict, tagged MISMATCH. {TEXT_VS_PICTURE} A page whose text tells a stretch of the story that belongs to the neighbouring page's picture is a MISMATCH too. A text that names a figure, object or action its picture does not show is not a MISMATCH.
 
+{VERSE_FORM}
+
 List every fault, one per line, as: "FAULT[<QUESTION>]: p<N> — <one sentence naming the missing reason>", where <QUESTION> is the name of the question that found it (e.g. FAULT[ASSUMED]:). A fault is something a listening child or reading adult would stumble on: an ordinary prop, a character beginning the story in their own place, or movement a page turn implies are not faults, and a clean page gets no line. State each fault once — never argue with, repeat or withdraw a line; a finding you doubt is omitted. After the list write one line: "FAULTS: <count>".

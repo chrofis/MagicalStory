@@ -1423,6 +1423,32 @@
         "client/src/pages/StoryWizard.tsx"
       ],
       "severity": "block"
+    },
+    {
+      "id": "verse-form-writers-vs-text-critics",
+      "axis": "generator-vs-critic",
+      "reason": "The learning topic `rhyming` means the book is TOLD in rhyming couplets (docs/decisions.md 2026-11-07). VERSE_FORM_RULE (promptBuilders) is ONE constant filled as {VERSE_FORM} into the page writers (story-text-from-beats.txt, story-trial-pages.txt), the rewrite pass (text-refine.txt) and every text critic (the two audits, the lector, the grammar check), each with its role tail (verseFormFor). A critic that judges verse the writer was never told to write, or a rewrite pass that does not know to keep the line breaks, flattens the book to prose or deducts for the form. The sentence-quoting passes carry the line breaks as ' / ' (applyLectorFindings, applyDiffEdits); the one-sentence-paragraph counter skips a verse book.",
+      "generators": [
+        "prompts/story-text-from-beats.txt",
+        "prompts/story-trial-pages.txt",
+        "prompts/text-refine.txt"
+      ],
+      "critics": [
+        "prompts/story-text-audit.txt",
+        "prompts/story-text-audit-blind.txt",
+        "prompts/story-text-proofread.txt",
+        "prompts/story-text-diff.txt"
+      ],
+      "severity": "block",
+      "parity": {
+        "ruleAnchors": [
+          {
+            "critic": "{VERSE_FORM}",
+            "generator": "{VERSE_FORM}",
+            "note": "One constant, VERSE_FORM_RULE, filled by verseFormFor(inputData, role); pinned in tests/unit/verse-mode.test.ts."
+          }
+        ]
+      }
     }
   ],
   "withinFile": [

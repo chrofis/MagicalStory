@@ -6548,6 +6548,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     LANGUAGE_NOTE: getLanguageNote(language),
     READING_LEVEL: getReadingLevel(inputData.languageLevel),
     PARAGRAPH_SHAPE: paragraphShapeRule(),
+    VERSE_FORM: verseFormFor(inputData, 'rewrite'),
     PAGE_COUNT: pages.length,
     CHARACTER_NAMES: cast.names.join(', '),
     CHARACTER_DETAILS: cast.details,
@@ -10629,6 +10630,45 @@ const NEIGHBOUR_PHRASE_RULE = 'No phrase is repeated from a neighbouring sentenc
 const NO_ABBREVIATION_RULE = 'No abbreviation or acronym reaches the page; write the thing the way a child says it.';
 
 /**
+ * VERSE MODE (owner, 2026-11-07, docs/decisions.md): the learning topic
+ * `rhyming` means the book is TOLD in rhyming couplets, not that it is about
+ * rhyming. ONE constant, injected as {VERSE_FORM} into every prompt that writes
+ * or rewrites page text and every judge that reads it (registry set
+ * `verse-form`), so the writer, the rewrite passes and the critics cannot drift.
+ * Empty for every other story. Language-neutral on purpose: no example words.
+ * The rhyme must come out of the story; the rule never lets rhyme become the plot.
+ */
+const VERSE_TOPIC = { category: 'educational', topic: 'rhyming' };
+const VERSE_FORM_RULE = 'VERSE FORM. This whole book is told in rhyming verse: rhyming couplets (AABB), short lines a first reader can say aloud, each verse line on its own line of the page, a blank line between stanzas of two or four lines. This form replaces the paragraph shape and the sentence-per-paragraph rules for this book: a stanza is the paragraph, and a stanza of one sentence is fine. Rhyme is only the FORM of the telling: the plot is an ordinary plot, and no character, game, rule or spell is built on rhyming. Every couplet rhymes when read aloud in this language. The words stay plain words a child at the reading level already uses; word order stays the natural order of a spoken sentence, and no line is padded with a word, or made to say something odd, only to rhyme. Spoken lines stay in the cast\'s ordinary speech.';
+const VERSE_ROLE_TAILS = {
+  write: 'Write every page in this form, with the line breaks in the page text.',
+  rewrite: 'Every rewritten page stays in this form: keep the couplets, the rhymes and the line breaks. A sentence is recast by changing words inside its lines, keeping the end-rhyme of each couplet, never by turning verse into prose or by moving a word into an unnatural position to keep a rhyme. A finding that asks for a rhyme the page lacks is closed by restoring the couplet.',
+  audit: 'Also file as a fault, under the question whose name fits best: a couplet whose two lines do not rhyme when read aloud; a line that says something senseless, or that has no work to do in the story, only to supply a rhyme word; and a line whose word order a first reader cannot follow because it was inverted to rhyme. A verse line break is the form, never a fault.',
+  lector: 'The pages are verse. Quote and correct ONE verse line at a time, exactly as it stands on a single line; where a fault spans two lines, write the line break as " / " in both the quote and the correction. A correction never changes the word that ends a line if that word rhymes with its partner line, and never turns a line into prose order.',
+  diff: 'The pages are verse. Sentences are shown with " / " between their verse lines. A FIX keeps every " / " where it stands, and never changes a word that ends a line and rhymes with its partner line. A RESTORE puts back the sentence with its " / " marks.',
+};
+/** True when the story is told in verse (the learning topic `rhyming`). */
+function isVerseStory(inputData) {
+  const d = inputData || {};
+  return d.storyCategory === VERSE_TOPIC.category
+    && String(d.storyTopic || '').toLowerCase().replace(/\s+/g, '-') === VERSE_TOPIC.topic;
+}
+/**
+ * The {VERSE_FORM} value for one role ('write' | 'rewrite' | 'audit' | 'lector' | 'diff').
+ * '' for a story that is not told in verse.
+ */
+function verseFormFor(inputData, role) {
+  if (!isVerseStory(inputData)) return '';
+  const tail = VERSE_ROLE_TAILS[role];
+  if (!tail) throw new Error(`verseFormFor: unknown role "${role}"`);
+  return `${VERSE_FORM_RULE} ${tail}`;
+}
+/** Line breaks of a page shown on one line, for the passes that quote text (lector, grammar check). */
+function verseLinesInline(text) {
+  return String(text || '').replace(/\s*\n\s*/g, ' / ');
+}
+
+/**
  * TEXT AND PICTURE (owner, 2026-10-16: "The text must not contradict the
  * picture. But it can go further. Text should be picture and more."). ONE
  * statement of the relation, filled into the text audit (its MISMATCH
@@ -12605,6 +12645,7 @@ function buildTextProofreadPrompt(inputData, pages = []) {
     LANGUAGE: lang,
     READING_LEVEL: getReadingLevel(inputData?.languageLevel, { pacing: false }),
     PAGES: body,
+    VERSE_FORM: verseFormFor(inputData, 'lector'),
     STYLE_RULEBOOK: styleRulebook(inputData?.language),
   });
 }
@@ -12613,11 +12654,11 @@ function buildTextProofreadPrompt(inputData, pages = []) {
  * A page as numbered sentences (`A1: …`), a blank line between paragraphs —
  * the grammar check edits by number (pageSentences is the one splitter).
  */
-function numberedSentences(text, prefix) {
+function numberedSentences(text, prefix, verse = false) {
   const sentences = pageSentences(text);
   if (!sentences.length) return '(empty)';
   return sentences
-    .map((x, i) => `${i > 0 && x.paragraph !== sentences[i - 1].paragraph ? '\n' : ''}${prefix}${i + 1}: ${x.text}`)
+    .map((x, i) => `${i > 0 && x.paragraph !== sentences[i - 1].paragraph ? '\n' : ''}${prefix}${i + 1}: ${verse ? verseLinesInline(x.text) : x.text}`)
     .join('\n');
 }
 
@@ -12653,6 +12694,7 @@ function buildTextDiffPrompt(inputData, pairs = []) {
   const lang = inputData?.language
     ? getLanguageNameEnglish(inputData.language)
     : 'the language of the pages';
+  const verse = isVerseStory(inputData);
   const body = pairs
     .map(p => {
       const line = f => `- p${f.pageNumber} [${f.category || 'UNTAGGED'}] ${String(f.text || '').trim()}`;
@@ -12660,10 +12702,10 @@ function buildTextDiffPrompt(inputData, pairs = []) {
       // Findings the rewrite ruled STANDS: the sentence they name was kept on purpose.
       const standing = (p.findings || []).filter(f => f.standing).map(line).join('\n');
       const standingBlock = standing ? `FINDINGS THE REWRITE RULED STANDS (the sentence each names was kept on purpose; never apply, fix or restore around them):\n${standing}\n\n` : '';
-      return `--- Page ${p.pageNumber} ---\nFINDINGS THE REWRITE ANSWERED:\n${answered || '(none)'}\n\n${standingBlock}BEFORE:\n${numberedSentences(p.before, 'B')}\n\nAFTER:\n${numberedSentences(p.after, 'A')}`;
+      return `--- Page ${p.pageNumber} ---\nFINDINGS THE REWRITE ANSWERED:\n${answered || '(none)'}\n\n${standingBlock}BEFORE:\n${numberedSentences(p.before, 'B', verse)}\n\nAFTER:\n${numberedSentences(p.after, 'A', verse)}`;
     })
     .join('\n\n');
-  return fillTemplate(template, { LANGUAGE: lang, PAGES: body, STYLE_RULEBOOK: styleRulebook(inputData?.language), PAYOFF_KEEP: PAYOFF_KEEP_RULE });
+  return fillTemplate(template, { LANGUAGE: lang, PAGES: body, VERSE_FORM: verseFormFor(inputData, 'diff'), STYLE_RULEBOOK: styleRulebook(inputData?.language), PAYOFF_KEEP: PAYOFF_KEEP_RULE });
 }
 
 /**
@@ -12690,7 +12732,7 @@ function buildTextAuditBlindPrompt(inputData, pages = []) {
   // so a rulebook breach the writer made survived the chain unless an audit
   // filed it. The blind reader files it, against the SAME constant the writer
   // and the repair were given — never a hand copy.
-  return fillTemplate(template, { PAGES: body, STYLE_RULEBOOK: styleRulebook(inputData?.language), CLOSING_MOMENT: CLOSING_MOMENT_RULE, SHOWN_CALLBACK: SHOWN_CALLBACK_RULE });
+  return fillTemplate(template, { PAGES: body, VERSE_FORM: verseFormFor(inputData, 'audit'), STYLE_RULEBOOK: styleRulebook(inputData?.language), CLOSING_MOMENT: CLOSING_MOMENT_RULE, SHOWN_CALLBACK: SHOWN_CALLBACK_RULE });
 }
 
 /**
@@ -12752,6 +12794,7 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '', { arcHints = '', 
     CHARACTER_DETAILS: storyCharacterDetails(inputData),
     CHARACTER_DETAILS_USE,
     PLAN_LINES: planLines || '(no page plan was recorded)',
+    VERSE_FORM: verseFormFor(inputData, 'audit'),
     // Question 15 COUNT (owner, 2026-09-28): the writer's own rule, judged
     // against the plan lines' who columns shown above.
     PICTURE_COUNT: PICTURE_COUNT_RULE,
@@ -13198,6 +13241,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     // Text stage: the full reading-level block, PACING rhythm included.
     READING_LEVEL: getReadingLevel(inputData.languageLevel),
     PARAGRAPH_SHAPE: paragraphShapeRule(),
+    VERSE_FORM: verseFormFor(inputData, 'write'),
     CHARACTER_DETAILS_USE,
     PAGE_COUNT: beats.length,
     PLAN_LINES: blocks,
@@ -13556,6 +13600,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       ARC_OBSTACLE_REMOVED: OBSTACLE_REMOVED_BY_CLIMAX_RULE,
       // Same string the arc creator is given in TELLING_RULES (owner, 2026-10-16).
       WORLD_FRAME: WORLD_FRAME_RULE,
+      VERSE_FORM: verseFormFor(inputData, 'write'),
       NO_DASH: NO_DASH_RULE,
       PAGE_CONTINUITY: PAGE_CONTINUITY_RULE,
       NEIGHBOUR_PHRASE: NEIGHBOUR_PHRASE_RULE,
@@ -14457,6 +14502,11 @@ module.exports = {
   PAGE_CONTINUITY_RULE,
   NEIGHBOUR_PHRASE_RULE,
   NO_ABBREVIATION_RULE,
+  VERSE_FORM_RULE,
+  VERSE_ROLE_TAILS,
+  isVerseStory,
+  verseFormFor,
+  verseLinesInline,
   TEXT_VS_PICTURE_RULE,
   NO_PLAN_STAGING_RULE,
   YOUNG_CHILD_SPEECH_RULE,

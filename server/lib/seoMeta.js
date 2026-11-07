@@ -133,7 +133,7 @@ const THEMES = {
   educational: {
     alphabet: { en: 'The Alphabet (ABC)', de: 'Das Alphabet (ABC)', fr: "L'alphabet (ABC)", it: "L'Alfabeto (ABC)" },
     vowels: { en: 'Vowels', de: 'Vokale', fr: 'Voyelles', it: 'Vocali' },
-    rhyming: { en: 'Rhyming Words', de: 'Reimwörter', fr: 'Mots qui riment', it: 'Parole in Rima' },
+    rhyming: { en: 'Told in Rhyme', de: 'In Reimen erzählt', fr: 'Raconté en rimes', it: 'Raccontato in rima' },
     'spelling-name': { en: 'Spelling My Name', de: 'Namen schreiben', fr: 'Écrire mon nom', it: 'Scrivere il mio nome' },
     'numbers-1-10': { en: 'Numbers 1-10', de: 'Zahlen 1-10', fr: 'Nombres 1-10', it: 'Numeri 1-10' },
     'numbers-1-20': { en: 'Numbers 1-20', de: 'Zahlen 1-20', fr: 'Nombres 1-20', it: 'Numeri 1-20' },

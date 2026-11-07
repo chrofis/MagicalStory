@@ -4,6 +4,8 @@ Readers: {READING_LEVEL} A correction replaces only the faulty words, with the p
 
 A word, spelling or form that is right in the variety of {LANGUAGE} named above is not a fault, even where another variety says it differently; it is never replaced by another variety's word.
 
+{VERSE_FORM}
+
 # PAGES
 
 {PAGES}

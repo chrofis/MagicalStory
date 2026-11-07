@@ -516,7 +516,7 @@ function capEditedPages({ base = [], next = [], original = [], cap, exempt = new
  *   applied/dropped entries carry {pageNumber, kind, quote, correction}; a
  *   restore also carries `restored: [sentence]` (settleLedgerAfterDiff reads it).
  */
-function applyDiffEdits(pages = [], beforeByPage = new Map(), edits = []) {
+function applyDiffEdits(pages = [], beforeByPage = new Map(), edits = [], { verse = false } = {}) {
   const { pageSentences } = require('./promptBuilders');
   const applied = [];
   const dropped = [];
@@ -533,10 +533,17 @@ function applyDiffEdits(pages = [], beforeByPage = new Map(), edits = []) {
     // AFTER sentence numbers an applied edit already owns: a fix rewrites one, a
     // restore removes the ones it replaces. A second edit on any of them is an overlap.
     const touched = new Set();
-    for (const e of list) {
+    for (let e of list) {
       if (e.kind === 'fix') {
         const target = after[e.afterIndex - 1];
         if (!target) { drop(e, 'no-such-sentence', `A${e.afterIndex}`, e.text); continue; }
+        // VERSE: the sentence is shown with " / " between its lines (buildTextDiffPrompt); the fix
+        // must carry the same number of lines, or it would flatten the stanza.
+        if (verse) {
+          const text = e.text.replace(/\s+\/\s+/g, '\n');
+          if (text.split('\n').length !== target.text.split('\n').length) { drop(e, 'verse-line-breaks', target.text, e.text); continue; }
+          e = { ...e, text };
+        }
         if (touched.has(e.afterIndex)) { drop(e, 'overlap', target.text, e.text); continue; }
         if (e.text === target.text) { drop(e, 'unchanged', target.text, e.text); continue; }
         if (pageSentences(e.text).length !== 1) { drop(e, 'not-one-sentence', target.text, e.text); continue; }
@@ -741,7 +748,10 @@ function buildWordBudgetFindings(pages = [], languageLevel) {
  * @returns {Array<{pageNumber:number, sentence:string}>}
  */
 const DIALOGUE_MARK_RE = /[«»‹›„“”"]/;
-function findOneSentenceParagraphs(pages = []) {
+function findOneSentenceParagraphs(pages = [], { verse = false } = {}) {
+  // A verse book (docs/decisions.md 2026-11-07): a stanza is the paragraph, and a stanza of one
+  // sentence is the form, not a habit. The counter does not apply.
+  if (verse) return [];
   const { pageSentences } = require('./promptBuilders');
   const hits = [];
   for (const p of pages) {
@@ -766,8 +776,8 @@ function findOneSentenceParagraphs(pages = []) {
  * finding: that sentence recast or joined into the one beside it.
  * @returns {string} newline-joined FAULT[STYLE] lines ('' when none)
  */
-function buildOneSentenceParagraphFindings(pages = []) {
-  return findOneSentenceParagraphs(pages)
+function buildOneSentenceParagraphFindings(pages = [], opts = {}) {
+  return findOneSentenceParagraphs(pages, opts)
     .map(h => `FAULT[STYLE]: p${h.pageNumber} — «${h.sentence}» stands alone as a one-sentence paragraph; join it into the paragraph beside it.`)
     .join('\n');
 }
@@ -997,18 +1007,28 @@ function locateQuote(pageText, quote) {
  * @param {Array<{pageNumber:number,quote:string,correction:string}>} findings
  * @returns {{pages:Array, applied:Array, dropped:Array}}
  */
-function applyLectorFindings(pages = [], findings = []) {
+function applyLectorFindings(pages = [], findings = [], { verse = false } = {}) {
   const byPage = new Map(pages.map(p => [p.pageNumber, String(p.text || '')]));
   const applied = [];
   const dropped = [];
   // Page -> the spans already claimed on it, in listing order.
   const claimed = new Map();
 
-  for (const f of findings) {
+  for (let f of findings) {
     const pageText = byPage.get(f.pageNumber);
     if (pageText === undefined) { dropped.push({ ...f, reason: 'no-such-page' }); continue; }
-    const span = locateQuote(pageText, f.quote);
+    // VERSE: the lector writes a line break as " / " (VERSE_ROLE_TAILS.lector). The quote is
+    // matched without the marks (matching ignores whitespace); the correction gets its breaks
+    // back, and one that does not carry the span's line count is dropped, never applied flat.
+    const quote = verse ? f.quote.replace(/\s\/\s/g, ' ') : f.quote;
+    const span = locateQuote(pageText, quote);
     if (!span) { dropped.push({ ...f, reason: 'quote-absent' }); continue; }
+    if (verse) {
+      const correction = f.correction.replace(/\s+\/\s+/g, '\n');
+      const lines = (t) => t.split('\n').length;
+      if (lines(correction) !== lines(pageText.slice(span.start, span.end))) { dropped.push({ ...f, reason: 'verse-line-breaks' }); continue; }
+      f = { ...f, correction };
+    }
     const taken = claimed.get(f.pageNumber) || [];
     if (taken.some(s => span.start < s.end && s.start < span.end)) {
       dropped.push({ ...f, reason: 'overlap' });
@@ -1685,8 +1705,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // THE ONE-SENTENCE COUNTER — a fourth finding source, free, on the writer's
   // text; its STYLE lines fold only into a blind STYLE finding that quotes the
   // same sentence (sameFault). Counted again on the shipped text below.
-  const oneSentenceRaw = buildOneSentenceParagraphFindings(current);
-  oneSentenceParagraphs = { writer: findOneSentenceParagraphs(current), shipped: null };
+  const verseBook = require('./promptBuilders').isVerseStory(storyData);
+  const oneSentenceRaw = buildOneSentenceParagraphFindings(current, { verse: verseBook });
+  oneSentenceParagraphs = { writer: findOneSentenceParagraphs(current, { verse: verseBook }), shipped: null };
   if (oneSentenceRaw) {
     log.info(`🔢 [TEXT-COUNTER] ${oneSentenceParagraphs.writer.length} one-sentence narration paragraph(s) on page(s) ${[...new Set(oneSentenceParagraphs.writer.map(h => h.pageNumber))].join(', ')} — STYLE findings for the repair`);
   }
@@ -2119,7 +2140,7 @@ ${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
         log.warn(`⚠️ [TEXT-DIFF] unreadable edit line — ${u.reason}: ${u.line}`);
       }
       const beforeByPage = new Map(original.map(o => [o.pageNumber, o.text]));
-      const result = applyDiffEdits(current, beforeByPage, diffParse.edits);
+      const result = applyDiffEdits(current, beforeByPage, diffParse.edits, { verse: require('./promptBuilders').isVerseStory(storyData) });
       diffFindings = [...result.applied, ...result.dropped].map(f => ({ pageNumber: f.pageNumber, kind: f.kind, quote: f.quote, correction: f.correction }));
       // A restore carries the writer sentence it put back — the input
       // settleLedgerAfterDiff needs to keep the ledger true.
@@ -2214,7 +2235,7 @@ ${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
       for (const u of lectorUnparsed) {
         log.warn(`⚠️ [LECTOR] unreadable finding line — ${u.reason}: ${u.line}`);
       }
-      const result = applyLectorFindings(current, lectorFindings);
+      const result = applyLectorFindings(current, lectorFindings, { verse: require('./promptBuilders').isVerseStory(storyData) });
       lectorApplied = result.applied;
       lectorDropped = result.dropped;
       for (const d of lectorDropped) {
@@ -2222,7 +2243,9 @@ ${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
           ? `the quoted words are not on page ${d.pageNumber}`
           : d.reason === 'overlap'
             ? `its span overlaps a correction already applied to page ${d.pageNumber}`
-            : `page ${d.pageNumber} is not in this story`;
+            : d.reason === 'verse-line-breaks'
+              ? `its correction does not keep the verse line breaks of the span on page ${d.pageNumber}`
+              : `page ${d.pageNumber} is not in this story`;
         log.warn(`⚠️ [LECTOR] dropped "${d.quote}" — ${why}`);
       }
       const next = result.pages;
@@ -2292,7 +2315,7 @@ ${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
   // kept, or the lector or the diff re-created, is visible here. Measured
   // only, no further pass.
   if (oneSentenceParagraphs) {
-    oneSentenceParagraphs.shipped = findOneSentenceParagraphs(current);
+    oneSentenceParagraphs.shipped = findOneSentenceParagraphs(current, { verse: require('./promptBuilders').isVerseStory(storyData) });
     for (const h of oneSentenceParagraphs.shipped) {
       log.warn(`⚠️ [TEXT-COUNTER] SHIPS a one-sentence narration paragraph on p${h.pageNumber}: «${h.sentence}»`);
     }

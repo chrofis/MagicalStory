@@ -17,6 +17,7 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - {PAGE_OPENING_VARIETY}
 - The arc lines each begin on a name by habit; the pages do not copy that. Settle the first words of all pages before you write any: page 1 may begin on a name, of the other pages at most one does, and every other page begins on the place, the time, a sound, a spoken line, or the thing that just happened (an object, an animal or an event as the subject). A page past the limit gets its first sentence turned around so the name comes later in it.
 - {UNNAMED_FIGURE}
+{VERSE_FORM}
 {STYLE_RULEBOOK}
 - {MOTIVE_AT_THE_ACT}
 - {BODY_CONDITION_MARKER}

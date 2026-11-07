@@ -12,6 +12,8 @@ Never write a sentence that neither BEFORE nor AFTER has, never join or split se
 
 {STYLE_RULEBOOK}
 
+{VERSE_FORM}
+
 # PAGES
 
 {PAGES}

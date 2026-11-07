@@ -46,6 +46,7 @@ Write the text for all {PAGE_COUNT} pages, in page order, plus a title. Each pag
 {PICTURE_COUNT}.
 {NO_DASH}
 Style, on every page:
+{VERSE_FORM}
 {STYLE_RULEBOOK}
 {PAGE_OPENING_VARIETY}.
 {UNNAMED_FIGURE}.

@@ -84,6 +84,8 @@ A rewritable page is changed for a real problem, never for stylistic preference.
 
 Never use an em-dash (—) or an en-dash (–), anywhere, for any purpose. Replace every one you find with a comma, a full stop, a colon, or parentheses, and recast the sentence if none of those fit.
 
+{VERSE_FORM}
+
 Every page you rewrite keeps the style rules below:
 
 {STYLE_RULEBOOK}
