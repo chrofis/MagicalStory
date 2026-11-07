@@ -11203,6 +11203,25 @@
         "result": "HUMAN",
         "note": "human check | LOOK: In a staging beats story with a worn item handed from one roster member to another character, read the stored sceneImages[].sceneCharacters for the handover page: the owner must not be in it. Check usage rows for label jev_decisions_page_presence: calls only on pages with an empty metadata cast."
       }
+    },
+    {
+      "id": "book-review-height-order",
+      "title": "The whole-book review flags a picture drawn in the wrong height order or with far too big a gap",
+      "commits": [
+        "1b825e9c1",
+        "972262ae2"
+      ],
+      "addedAt": "2026-11-07",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On a book_review story with 2+ characters of known height drawn upright side by side, each page brief line the reviewer reads carries the HEIGHT ORDER line (without the painter-only staircase sentence), and the reviewer files FAULT[IMG][MAJOR][height_order] on a page whose comparable figures are drawn out of order or a head apart where the line gives a forehead step; such a fault is routed NEW and redrawn. Measured before the run: 15 stored pictures, 6/7 wrong caught, 4/5 right left alone, 2/3 not-comparable left alone (tasks/customer-height-edits-2026-11-06.md).",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In a staging book_review story with 3+ characters standing together on some page, read finalChecksReport.bookAuditRounds[].raw: every height_order fault must name a pair that is visibly out of order or far apart in the stored picture, no height_order fault on a page whose figures kneel, sit or stand at different depths, and a page with a height_order fault gets a redraw in the next round."
+      }
     }
   ],
   "runs": [
