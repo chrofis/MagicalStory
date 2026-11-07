@@ -50,6 +50,11 @@ Janna, Melisa tallest.
 - [ ] Einhorn p2 + Rubi p6: owner said "try something else … a totally different picture without rope or with
       different focus". New compositions running (E2N: Silva side-on, head turned away drinking, girls find her,
       rope still coiled; R6N: Melodi's shout, rope slack in the leaves). Scripts: scratchpad `edits/newcomp.js`.
+      Owner rejected both (2026-11-07): Einhorn p2 original is fine ("girl and pony are the focus"; the new
+      girls look away from the pony); R6N reads as shouting on a be-quiet page and the rope looks yellow and in
+      two pieces. Staging set back to the shipped versions (Einhorn p2 v1, Rubi p6 v5); prod untouched.
+      Lesson: Opus's "rope not round the neck" on Einhorn p2 is a fault the owner does not count — the
+      picture's focus matters more than the exact stage of the action.
 - **Why the majors survived the original runs** (stored `finalChecksReport.bookAuditRounds`):
   Einhorn p2/p5 flagged in round 1 → repair added the hidden horn → round 2 said BETTER: PREVIOUS → rollback
   restored the rope fault, and round 2 is the last round, so nothing retried. Rubi p6 flagged in all 3 rounds;
