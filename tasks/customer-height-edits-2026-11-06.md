@@ -42,7 +42,14 @@ Janna, Melisa tallest.
       line + landmark heights (v6; Polina a little too short). Einhorn p2 ❌ twice (every edit that touches the
       head adds the hidden horn), Rubi p6 ❌ twice (edit dropped Melodi; redraw kept extra handles) — staging
       set back to the shipped versions. Review page: scratchpad `books/fixes.html`. NOT promoted yet.
-- [ ] Owner yes to promote the 3 fixes (Einhorn, Laternen re-promote).
+- [x] Owner yes → Einhorn + Laternen promoted 09:13-09:14 CH (--force after checking prod newest = our own
+      promotes, no orders); prod p5 v3 / p7 v2 / Laternen p1 v6 hash-identical to the staging fixes, 0 staging URLs.
+- **Unicorn references (owner asked):** Silva has ONE Visual Bible picture, horn visible; Rubi has two (horn
+  plain, horn glowing). No "horn hidden under forelock/leaves" picture exists although both stories hide the
+  horn until a reveal page — so every redraw/edit that copies the reference draws the horn (Einhorn p2 3 of 3).
+- [ ] Einhorn p2 + Rubi p6: owner said "try something else … a totally different picture without rope or with
+      different focus". New compositions running (E2N: Silva side-on, head turned away drinking, girls find her,
+      rope still coiled; R6N: Melodi's shout, rope slack in the leaves). Scripts: scratchpad `edits/newcomp.js`.
 - **Why the majors survived the original runs** (stored `finalChecksReport.bookAuditRounds`):
   Einhorn p2/p5 flagged in round 1 → repair added the hidden horn → round 2 said BETTER: PREVIOUS → rollback
   restored the rope fault, and round 2 is the last round, so nothing retried. Rubi p6 flagged in all 3 rounds;
