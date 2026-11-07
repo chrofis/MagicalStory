@@ -45,3 +45,25 @@ Most story faults (A1–A4) share one root. The plan states a want and an obstac
 that the hero's own act resolves it, that everyone's knowledge follows the page order, or that the
 cost of failing is said. The picture faults are mostly fixed or built. The story faults are where the
 next book can still go wrong.
+
+## D. Where the plot breaks: idea → arc → beats → text (traced 2026-11-07, stored prod data)
+
+| Stage | Einhorn | Rubi | Laternen |
+|---|---|---|---|
+| Idea (generated, customer picked) | Friends are the obstacle, each with a job: "Polina knotet ein Seil, Melisa hält es fest, Melodi geht voran" | Same pattern: "Melodi ruft, Polina schwingt ein Seil, Melisa spannt den Strick" (the customer swapped an apple for the rope) | The unicorn is the obstacle (it won't leave her coat), and the friends have jobs (Melodi leads, Melisa carries the lantern, Polina keeps the place) |
+| Arc: creator | Keeps every friend's job and lets them finish the story: Melisa lifts the loop, Melodi opens the gate | Melisa ties the cord and unties it at the end, a cliff and brambles close the side ways, "rope too short" is invented | Melodi stops the row and Melisa lifts the lantern; the climax is shared out to the friends |
+| Arc: panel (3 models) | 9+ MAJOR, e.g. "a child will ask why Silva does not just step back into the mist" | 7+ MAJOR, e.g. "rope and cord come from nowhere", "how does Janna know there is a herd" | 6+ MAJOR, e.g. "nothing stops Janna from taking off her coat" |
+| Arc: rewrite (1 round) | Patches each hole with a new fact or prop and keeps "everything else"; the friends' endings are kept explicitly | Same: adds the herd and leaves hiding the horn; keeps "cord … untied cord" | Same: adds "cannot be shaken off or handed on"; keeps "the roles of Polina, Melodi and Melisa" |
+| Arc: final self-critique | MINOR only, so no second round (1 configured) | MINOR only | MINOR only |
+| World rules | 5, over the limit | 5, over the limit | 5, over the limit |
+| Beats | Faithful to the arc. Adds an empty page (p6) and turns arc s9 into the logistics page p9 | Faithful (empty p2) | Faithful (empty p5). Keeps "the pairs will soon be fixed" |
+| Text (~650–710 words / 10 pages) | Lost little | Kept all the machinery (bank, herd, gap) that the pictures don't show | Lost the stakes ("pairs fixed for the song") and the unicorn's reason ("alone in the cold leaves") |
+
+Conclusion: the plot breaks at the ARC, seeded by the IDEA, and not mainly at the beats or the text.
+1. The idea gives every friend an action against the hero. The arc keeps those actions and has the
+   friends undo them at the end, so the hero's act is never what removes the obstacle.
+2. The panel finds the holes, but the one-round rewrite fills each hole with a new rule or prop and
+   keeps the structure. That is why all three end with world rules over the limit and a heavier plot,
+   not a simpler one.
+3. No panel lens asks "who removes the obstacle?" — the new rule (A1) is meant to cover that.
+4. The text loses stakes and motives on short first-reader pages (Laternen). The beats lose almost nothing.
