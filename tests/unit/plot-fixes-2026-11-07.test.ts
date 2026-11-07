@@ -1,6 +1,6 @@
 /**
- * Plot fixes F1 / F2 / F3 (owner, 2026-11-07; docs/decisions.md 2026-11-07 "Idea: the main character's own act",
- * "Arc re-tell: cut, don't add", "Writer must-say"). Each constant is pinned on every BUILT prompt that should
+ * Plot fixes F2 / F3 (owner, 2026-11-07; docs/decisions.md 2026-11-07 "Arc re-tell: cut, don't add",
+ * "Writer must-say"). F1 (idea main-character act) was removed the same day: no measured effect, clashed with the idea contract. Each constant is pinned on every BUILT prompt that should
  * carry it: both age bands, the full and the trial siblings.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -24,24 +24,8 @@ const input = (age: number) => ({
 
 beforeAll(async () => { await loadPromptTemplates(); });
 
-describe('F1 idea: the main character\'s own act', () => {
-  it('the shared rule carries it, with and without a commissioned topic', () => {
-    expect(co.coherenceRule()).toContain(co.MAIN_ACT_RULE);
-    expect(co.coherenceRule({ withTopic: false })).toContain(co.MAIN_ACT_RULE);
-  });
-  it('the trial commission rule carries it (trial idea path)', () => {
-    expect(trialCheck.TRIAL_IDEA_COMMISSION_RULE).toContain(co.MAIN_ACT_RULE);
-  });
-  it('the built trial idea prompts carry it in both arms', () => {
-    const { local, fantasy } = PB.buildTrialIdeaPrompts({
-      template: read('prompts/trial-idea.txt'),
-      characters: [{ name: 'Mia', age: 5, gender: 'female' }],
-      charDesc: 'Mia, 5 years old, female',
-      categoryContext: 'This is an adventure story.',
-    });
-    for (const p of [local, fantasy]) expect(p).toContain(co.MAIN_ACT_RULE);
-  });
-  it('both wizard idea templates take the rule through {IDEA_COHERENCE}', () => {
+describe('idea templates', () => {
+  it('both wizard idea templates take the shared idea rule through {IDEA_COHERENCE}', () => {
     for (const f of ['prompts/generate-story-idea-single.txt', 'prompts/generate-story-ideas.txt']) expect(read(f)).toContain('{IDEA_COHERENCE}');
   });
 });

@@ -39,11 +39,10 @@ const COMMISSIONED_ACT_PHRASE = 'the hard thing this story was asked for';
 const INSERTED_ACT_PHRASE = 'put in only to bring the topic or the theme into the story';
 
 /** The main character's own act (see MAIN ACT above). */
-const MAIN_ACT_RULE = "A friend or helper may have a part in the idea, to help or to get in the way, but the idea names what the main character does that gets them past what stands in the way, and a friend's part is never the thing that is undone at the end.";
 
 /** The generator's rule. `withTopic=false` (an adventure) drops the topic clause. */
 function coherenceRule({ withTopic = true } = {}) {
-  return `Every act follows from the situation set up before it: a reader of the sentences so far sees why the main character does it${withTopic ? `, and the situation itself calls for ${COMMISSIONED_ACT_PHRASE}` : ''}. An act ${INSERTED_ACT_PHRASE} is a fault: change the situation until it calls for the act, never bolt the act onto a situation that does not. ${MAIN_ACT_RULE}`;
+  return `Every act follows from the situation set up before it: a reader of the sentences so far sees why the main character does it${withTopic ? `, and the situation itself calls for ${COMMISSIONED_ACT_PHRASE}` : ''}. An act ${INSERTED_ACT_PHRASE} is a fault: change the situation until it calls for the act, never bolt the act onto a situation that does not.`;
 }
 
 /** What the visitor chose, as the check needs it: the topic only when it is a commissioned hard thing (a life challenge). */
@@ -54,7 +53,6 @@ function ideaCoherenceContext({ storyCategory, storyTopic, storyTheme } = {}) {
 module.exports = {
   COMMISSIONED_ACT_PHRASE,
   INSERTED_ACT_PHRASE,
-  MAIN_ACT_RULE,
   coherenceRule,
   ideaCoherenceContext,
 };

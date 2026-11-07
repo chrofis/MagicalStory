@@ -69313,3 +69313,11 @@ Revisit if: the preview is cheap enough to generate at order time for every cust
 **Considered:** adding the line to the arc sentences (rejected, the arc already holds it); making it a page-level checklist (rejected by the owner: "not a checklist per page").
 **Revisit if:** a real story shows recitals back (RECITAL per book above 1) or the audit files MUST SAY faults on pages that were fine.
 **Touched files:** server/lib/promptBuilders.js, prompts/story-text-from-beats.txt, story-text-audit.txt, text-refine.txt, story-trial-pages.txt, scripts/admin/sibling-registry.json, tests/unit/plot-fixes-2026-11-07.test.ts.
+
+## 2026-11-07 - Idea main-character-act rule (F1) removed the same day
+
+**Context:** the F1 rule `MAIN_ACT_RULE` in server/lib/ideaCoherence.js (entry "Idea: the main character's own act (F1)", 2026-11-07) was meant to stop ideas whose obstacle is made of the friends' own acts. The free blind replay over all 21 stored wizard idea prompts showed no effect: friend-act obstacles 10/21 → 8/21, the idea names the main character's act 4/21 → 3/21, all inside noise. The rule also pulls against the idea contract: the idea never says what decides the story and ends on a movement of the body.
+**Decision:** removed (owner, AskUserQuestion 2026-11-07: "Remove it again"). The fix for friend-resolved plots stays where it was measured to help: the arc obstacle clause (cc694a080 / 4d771c1b7), the re-tell "cut, don't add" (F2) and the writer MUST SAY (F3).
+**Replaces:** the F1 entry of the same date.
+**Revisit if:** a real-model idea round (>=30 ideas) shows friend-made obstacles reaching the arc and the arc checks failing to catch them. Then the rule belongs in the idea contract's slot wording, not beside it.
+**Touched files:** server/lib/ideaCoherence.js, tests/unit/plot-fixes-2026-11-07.test.ts, scripts/admin/sibling-registry.json, docs/prompt-inventory.md, tasks/verify.json (idea-main-character-act-2026-11-07 → superseded).
