@@ -69279,3 +69279,9 @@ Revisit if: the preview is cheap enough to generate at order time for every cust
 **Not covered / constraint:** an in-place promote copies staging objects to the SAME key, so a regenerated image that reused an existing key (same version index) overwrote the original object; a restore brings the old row back but the old bytes for that key are gone. Nothing in a backup can detect this.
 **Touched files:** scripts/admin/promote-story-to-prod.js, scripts/lib/promoteStoryUrls.js, tests/unit/promote-story-urls.test.ts, .claude/skills/iterating-on-production-stories/SKILL.md
 **Status:** ✅ exercised on staging (as-new, restore, delete)
+
+## 2026-11-07 — Scene version slots always come from story_images (getNextVersionIndex), stamped as dbVersionIndex
+**Context:** the page edit route (and the regenerate route) pushed onto `imageVersions[]` and let the save loop use the array position as the DB `version_index`. The Test Lab image stage writes `story_images` rows directly (`testlab.js` via `getNextVersionIndex`) and does not append to `imageVersions[]`, so after Lab runs the array was shorter than the row set and an edit overwrote a Lab version (staging job_1793959308869_fre2mb4d0 p5, v3). Bug `page-edit-overwrites-existing-version`.
+**Decision:** one source of truth: `getNextVersionIndex` (MAX+1 over `story_images`). Edit and regenerate now stamp `dbVersionIndex` from it, as iterate, repair, scale-repair, covers and manual-replace already did. The Lab stage stays as is (it already uses the same helper); nothing was added to `imageVersions[]` from the Lab, so no second mechanism exists.
+**Touched files:** server/routes/regeneration.js, tests/unit/edit-regenerate-db-version-index.test.ts
+**Status:** ✅ unit-tested (source-level regression); not exercised against staging

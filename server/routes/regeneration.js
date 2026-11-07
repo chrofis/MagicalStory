@@ -1005,6 +1005,10 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       },
     });
 
+    // DB-authoritative allocation (MAX(version_index)+1), stamped on the entry so the save
+    // loop writes there: imageVersions[] does not list versions the Test Lab image stage
+    // wrote, so an array-position index overwrites them (see decisions.md 2026-11-07).
+    newVersion.dbVersionIndex = await getNextVersionIndex(id, 'scene', pageNumber);
     if (existingIndex >= 0) {
       if (sceneImages[existingIndex].imageVersions) {
         sceneImages[existingIndex].imageVersions.push(newVersion);
@@ -3676,9 +3680,12 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
         log.debug(`✏️ [EDIT] Migrated legacy scene format to imageVersions[] (1 version)`);
       }
 
-      // Create new version entry
+      // Create new version entry. dbVersionIndex: DB-authoritative next slot (MAX+1), stamped so the
+      // save loop cannot land on a Lab-written row imageVersions[] does not list (bug
+      // page-edit-overwrites-existing-version).
       const timestamp = new Date().toISOString();
       scene.imageVersions.push({
+        dbVersionIndex: await getNextVersionIndex(id, 'scene', pageNumber),
         imageData: editResult.imageData,
         description: scene.description,
         prompt: scene.prompt,
