@@ -37,7 +37,18 @@ Janna, Melisa tallest.
       the families but no lanterns. Nothing changed in production by this review.
 
 ## Open
-- [ ] Owner call on the re-review faults above (fix which, if any). Laternen p1 height is a real height fault.
+- [x] Owner: "fix all major … show them to me first" (2026-11-07). On staging, max 2 paid tries per page:
+      Einhorn p5 ✅ edit (v3), Einhorn p7 ✅ 2nd edit (v2), Laternen p1 ✅ redraw with all three on one depth
+      line + landmark heights (v6; Polina a little too short). Einhorn p2 ❌ twice (every edit that touches the
+      head adds the hidden horn), Rubi p6 ❌ twice (edit dropped Melodi; redraw kept extra handles) — staging
+      set back to the shipped versions. Review page: scratchpad `books/fixes.html`. NOT promoted yet.
+- [ ] Owner yes to promote the 3 fixes (Einhorn, Laternen re-promote).
+- **Why the majors survived the original runs** (stored `finalChecksReport.bookAuditRounds`):
+  Einhorn p2/p5 flagged in round 1 → repair added the hidden horn → round 2 said BETTER: PREVIOUS → rollback
+  restored the rope fault, and round 2 is the last round, so nothing retried. Rubi p6 flagged in all 3 rounds;
+  every inpaint/char-fix left the extra grip (one regressed 96→85). Einhorn p7 never flagged in 3 rounds
+  (flagged today: same reviewer, different run). Laternen p1: brief put Melodi `foreground` on the doorstep;
+  the review had the HEIGHT ORDER line and still missed it.
 - [ ] Owner yes needed on the two-part fix proposal for the tied-unicorn class (below, "Proposal").
 - [ ] **Photo-derived apparent age overrides the family's real order.** Polina (5) was rated `young-school-age`
       from her photo, Melodi (5) `kindergartner`; every page prompt and Art Director brief then draws Polina as
