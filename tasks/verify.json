@@ -11226,7 +11226,9 @@
     {
       "id": "vb-hidden-then-revealed-state",
       "title": "A feature the story keeps hidden until a reveal page gets a hidden and a revealed reference cell",
-      "commits": [],
+      "commits": [
+        "3ed0f6bae"
+      ],
       "addedAt": "2026-11-07",
       "status": "pending",
       "evidence": [],
