@@ -6576,6 +6576,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     YOUNG_CHILD_SPEECH: YOUNG_CHILD_SPEECH_RULE,
     LOAD_BEARING: LOAD_BEARING_RULE,
     OWED_FACTS: buildOwedFacts(storyLogic),
+    MUST_SAY: buildMustSay(storyLogic),
     EDIT_CAP_PERCENT: Math.round(MODEL_DEFAULTS.textRefineMaxChangedRatio * 100),
   });
 }
@@ -10779,7 +10780,42 @@ const WORLD_TELLING_RULE = 'A story set anywhere but today\'s everyday world (an
 const ARC_SENTENCE_RULE = `Each arc sentence tells what a figure does and what changes by it. Its why stays in the STORY LOGIC: a sentence states a reason only where it is ${OWED_FACT_DEF}. ${BODY_CONDITION_MARKER_RULE}`;
 
 
-const LOAD_BEARING_RULE = `Only the OWED list (${OWED_FACT_DEF}) is owed. An owed fact is shown on the page where the story tests it: a figure meeting its limit in the moment (one who cannot follow stays behind, one too big sticks fast) or using its ability. Where no act can show it, one character says it, once in the book, in one short line at the moment it is needed, and that line carries no second fact, no reason behind it and no place or person the book has not shown. The exception is the world: the world or time the story is set in, the way into another world and the way back are told by the narration, plainly and inside the action (the style rules' world line), and are no character's line. The narrator never tells an owed fact as a reason, and no figure describes itself. A fact is never applied against the story's own turn: where a figure holds out until the event that breaks it, the page before shows the holding out, and the fact gives way on the page of the event. Past an owed limit nothing the fact rules out happens on any page: no sound, sight or reach crosses it that the fact says cannot. Everything else in the arc (motives, causes, stakes, feelings, background) is the arc\'s reasoning, and a page that leaves it out drops nothing. A size, an age or a look is owed only where something is lifted, hidden, held or fitted because of it.`;
+const LOAD_BEARING_RULE = `Only the OWED list (${OWED_FACT_DEF}) is owed. An owed fact is shown on the page where the story tests it: a figure meeting its limit in the moment (one who cannot follow stays behind, one too big sticks fast) or using its ability. Where no act can show it, one character says it, once in the book, in one short line at the moment it is needed, and that line carries no second fact, no reason behind it and no place or person the book has not shown. The exception is the world: the world or time the story is set in, the way into another world and the way back are told by the narration, plainly and inside the action (the style rules' world line), and are no character's line. The narrator never tells an owed fact as a reason, and no figure describes itself. A fact is never applied against the story's own turn: where a figure holds out until the event that breaks it, the page before shows the holding out, and the fact gives way on the page of the event. Past an owed limit nothing the fact rules out happens on any page: no sound, sight or reach crosses it that the fact says cannot. Everything else in the arc (motives, causes, feelings, background) is the arc\'s reasoning, and a page that leaves it out drops nothing - except what the MUST SAY lines hold (MUST_SAY_RULE). A size, an age or a look is owed only where something is lifted, hidden, held or fitted because of it.`;
+
+/**
+ * MUST SAY (owner, 2026-11-07; docs/decisions.md 2026-11-07 "Writer must-say"; partly replaces the stakes
+ * clause of text-v3, 2026-10-06). Two things a reader cannot do without are told in plain words somewhere
+ * on the pages: what the main character wants and what is lost if they fail, and why each figure the arc
+ * invents acts. On the stored first-reader books the writer dropped both (the stake line and the creature's
+ * motive), because text-v3 made everything outside the OWED list optional. ONE string, carried by the
+ * writer ({MUST_SAY}), the text repair, the audit's LOADBEARING question and the trial pages writer.
+ */
+const MUST_SAY_RULE = 'Each MUST SAY line is told in plain words somewhere on the pages, once: the narrator says it or a character does, at the page where it first matters. It is not a checklist to spread over every page and not a recital; a line that no page says is a fault.';
+
+/** The trial pages writer has no typed logic: it finds the two things in the arc itself. */
+const MUST_SAY_TRIAL_RULE = 'What the main character wants and what is lost if they fail, and the reason each figure the arc invents acts, are each told in plain words somewhere on the pages, once: the narrator says it or a character does, at the page where it first matters; never as a checklist on every page, never as a recital.';
+
+/**
+ * The MUST SAY block as the full-story text stages read it, from the stored STORY LOGIC's typed lines:
+ * the Want and stakes line, and the Motives line of each figure tagged (new). Names meet only through
+ * castResolver.canonicalName. Empty when the logic is missing or holds neither.
+ * @param {string} storyLogic - the logic block body (arcReviewReport.logic)
+ * @returns {string}
+ */
+function buildMustSay(storyLogic) {
+  const raw = String(storyLogic || '').trim();
+  if (!raw) return '';
+  const logic = parseStoryLogic(`STORY LOGIC:\n${raw}`);
+  const { canonicalName } = require('./castResolver');
+  const lines = [];
+  if (logic.want) lines.push(`- What is at stake: ${logic.want}`);
+  const invented = new Set(logic.invented.map(canonicalName));
+  for (const m of logic.motives) {
+    if (m.figure && m.motive && invented.has(canonicalName(m.figure))) lines.push(`- Why ${m.figure} acts: ${m.motive}`);
+  }
+  if (!lines.length) return '';
+  return `MUST SAY:\n${lines.join('\n')}\n${MUST_SAY_RULE}`;
+}
 
 /**
  * The OWED list as the text stages read it: one dash line per owed fact, taken
@@ -11293,6 +11329,13 @@ function happeningsLabel(inputData, pageCount) {
 // for #1483 without it; #1492 (Fiona) already had full coverage and kept it.
 // The generator half only: the critic of "each child acts" is plan-check Q12
 // on the pages (decisions.md 2026-09-25 "Every child acts, in the arc").
+// CUT, DON'T ADD (owner, 2026-11-07; docs/decisions.md 2026-11-07 "Arc re-tell: cut, don't add"). On the
+// three stored Janna arcs the panel found 6-9 MAJOR holes and the single re-telling closed each by adding a
+// rule, fact or prop (a rope "too short", a thing that "cannot be shaken off") while keeping the structure.
+// ONE string: the creator's principles (arcPrinciples, so arc-create and arc-retell), the re-telling's task,
+// and the refusal a re-telling gets when it still added rules past the cap (arcRetellRulesFeedback).
+const ARC_CUT_NOT_ADD_RULE = 'A hole in the logic is closed by making the story simpler or changing what happens, never by inventing a new rule of the world, a new fact or a new prop to explain it: cut the happening, the figure or the object that causes the hole, or change the act so that nothing needs explaining.';
+
 function arcPrinciples(inputData = {}, pageCount = 10) {
   const pages = Math.max(4, parseInt(pageCount, 10) || 10);
   return [
@@ -11309,6 +11352,7 @@ function arcPrinciples(inputData = {}, pageCount = 10) {
       : '- Every happening causes the ending; one that causes nothing is cut, not explained: a dead end costs a page and is forgotten.',
     `- ${arcLengthRange(pages)} sentences for ${pages} pages: the telling follows the book, about one sentence a page.`,
     '- Few new figures, each carrying the one thing the plot uses: every new figure is a name the child has to hold.',
+    `- ${ARC_CUT_NOT_ADD_RULE}`,
   ].join('\n');
 }
 
@@ -11350,7 +11394,7 @@ function arcLogicSpec(inputData = {}, pageCount = 10) {
     '"STORY LOGIC:" first — the ledger of facts the arc is told from, holding only what the plot uses, in labelled lines and dash lines, never numbered:',
     'Want and stakes: one line — what the main character wants, what is lost if they fail, and the deadline, where the story has one.',
     'Opposition: one line — the one force that stands in the way and the motive that drives it.',
-    `Facts: one dash line per named figure the plot runs on, "- <name> (commissioned) — <the one fact a happening turns on, or the word none>" or "- <name> (new) — …", one fact each: a single ability or a single limit, in one clause, never two joined by "and" or a semicolon, and most figures have none. A limit is a narrow physical fact of this world, stated as what the figure cannot do (cannot fly, too broad for the gap): stated no wider than the plot tests it (a limit that every happening must obey, when only one happening turns on it, contradicts the plot's own turn), a feeling, a trait, a want or an act is never a limit or an ability, and no line answers a "why not" the story never tests. Commissioned is ${commissionedCastDef(inputData)}. New is every other named figure — a person, an animal or a creature, including one on a single page, one who never speaks, and an adult who sets a rule, waits or permits. Not listed: places, vehicles and objects, a group named collectively, and ${UNNAMED_FIGURE_EXEMPT}. A figure the story needs stays listed; taking its name away does not take it off. This book has room for ${arcInventedAllowance(inputData)} new named figures. Then at most two dash lines for the rules of the world the plot runs on — what keeps a thing alive, open, warm or hidden, or what the world's magic does to a figure's body (a tail for legs, breathing under water), said once for everyone it changes, with where it ends in the same line — stated as the fact alone, with no reason, no consequence and no comparison size, one fact per line with no colon or "and" carrying a second. Figures that meet the same limit share one such line and carry no fact of their own. A story not set in today's everyday world also gets, outside that count, one dash line naming the world or time it is set in and, where the characters cross into another world, one for how they get there and one for how they get back (each a plain fact, no reason); a story set in today's everyday world gets none of these. A deadline is said in Want and stakes only, never again as a fact.`,
+    `Facts: one dash line per named figure the plot runs on, "- <name> (commissioned) — <the one fact a happening turns on, or the word none>" or "- <name> (new) — …", one fact each: a single ability or a single limit, in one clause, never two joined by "and" or a semicolon, and most figures have none. A limit is a narrow physical fact of this world, stated as what the figure cannot do (cannot fly, too broad for the gap): stated no wider than the plot tests it (a limit that every happening must obey, when only one happening turns on it, contradicts the plot's own turn), a feeling, a trait, a want or an act is never a limit or an ability, and no line answers a "why not" the story never tests. Commissioned is ${commissionedCastDef(inputData)}. New is every other named figure — a person, an animal or a creature, including one on a single page, one who never speaks, and an adult who sets a rule, waits or permits. Not listed: places, vehicles and objects, a group named collectively, and ${UNNAMED_FIGURE_EXEMPT}. A figure the story needs stays listed; taking its name away does not take it off. This book has room for ${arcInventedAllowance(inputData)} new named figures. Then at most two dash lines for the rules of the world the plot runs on — what keeps a thing alive, open, warm or hidden, or what the world's magic does to a figure's body (a tail for legs, breathing under water), said once for everyone it changes, with where it ends in the same line — stated as the fact alone, with no reason, no consequence and no comparison size, one fact per line with no colon or "and" carrying a second. Figures that meet the same limit share one such line and carry no fact of their own. A story not set in today's everyday world also gets, outside that count, one dash line naming the world or time it is set in, opening "World:" and, where the characters cross into another world, one for how they get there, opening "Way in:", and one for how they get back, opening "Way back:" (each a plain fact, no reason; those three labels are the only ones); a story set in today's everyday world gets none of these. A deadline is said in Want and stakes only, never again as a fact.`,
     'Motives: one dash line per figure that acts, "- <figure>: <motive> → <the act it causes>".',
     `Central figure: ${CENTRAL_FIGURE_DEF}, by the name the story calls it — two names separated by " / " only where the figure itself changes name (an egg that hatches into a named creature) — a commissioned character who plays the figure is named by their own name alone, never by the role they play — or "none" where the idea is about the main character.`,
     `Events: the number of happenings, ${links}.`,
@@ -11518,6 +11562,7 @@ function buildArcRetellPrompt(inputData, pageCount, arcBlock, repairFindings, { 
     TELLING_RULES: buildTellingRulesSection(inputData),
     // The event budget the re-telling may not exceed: cut before add.
     HAPPENINGS: happeningsLabel(inputData, pageCount),
+    ARC_CUT_NOT_ADD_RULE,
     HAPPENINGS_REPAIR: inputData.ownStory === true
       ? `a repair never adds a happening, and ${OWN_STORY_EVENT_STAYS}: only a happening the story added itself that causes nothing is cut.`
       : 'a repair that would add a happening cuts one first, and cutting a dead end is the preferred repair.',
@@ -11890,6 +11935,9 @@ function isNegativeFigureAnswer(name) {
 }
 
 const LOGIC_LABELS = ['Want and stakes', 'Opposition', 'Facts', 'Motives', 'Central figure', 'Events', 'Chain'];
+// The three labels a world line opens with (arcLogicSpec prescribes them). A dash line of the Facts
+// block that opens with one is outside the two-rule cap; any other untagged dash line is a rule.
+const ARC_WORLD_LINE_RE = /^(?:World|Way in|Way back)\s*:/i;
 const LOGIC_LABEL_RE = new RegExp(`^\\s*(?:[-*•]\\s*)?(?:\\*\\*|#+\\s*)?(${LOGIC_LABELS.join('|')})(?:\\s*\\*\\*)?\\s*:\\s*(?:\\*\\*)?\\s*(.*)$`, 'i');
 
 /**
@@ -11957,6 +12005,10 @@ function parseStoryLogic(raw) {
   const chain = dashLines(sections.Chain);
   if (!chain.length) throw new Error('STORY LOGIC has no chain links');
   const facts = dashLines(sections.Facts).filter(l => !/\((?:commissioned|new)\)/i.test(l));
+  // The cap counts rules of the world only; the World / Way in / Way back lines a story outside
+  // today's everyday world also writes are outside it (ARC_WORLD_LINE_LABELS, the labels arcLogicSpec
+  // prescribes - a format contract, never a reading of the line's words).
+  const rules = facts.filter(l => !ARC_WORLD_LINE_RE.test(l));
   // THE OWED LIST (owner, 2026-10-06, text-v3): what the page text must carry
   // out of the arc. The logic's Facts block already holds exactly the facts the
   // plot uses (one ability or limit per figure, at most two rules of the world),
@@ -11990,6 +12042,7 @@ function parseStoryLogic(raw) {
     invented: figures.filter(f => f.tag === 'new').map(f => f.name),
     centralFigure: centralFigure && centralFigure.length ? centralFigure : null,
     facts,
+    rules,
     owed,
     motives,
     eventsDeclared,
@@ -12184,9 +12237,11 @@ function arcShapeCounts({ sentences, logic, inputData, pageCount }) {
   const chainLinks = (logic?.chain || []).length;
   const invented = [...(logic?.invented || [])];
   const inventedAllowance = arcInventedAllowance(inputData);
-  // The block's caps (2026-09-25): at most two rules of the world. Logged,
-  // never enforced — the arc it describes is what the reader gets.
-  const worldRules = (logic?.facts || []).length;
+  // The block's caps (2026-09-25): at most two rules of the world. The world / way-in / way-back
+  // lines are not rules (parseStoryLogic `rules`); before 2026-11-07 they were counted, so every
+  // story set outside today's everyday world read as over the cap (5 against 2) while holding two.
+  // A RE-TELLING that adds rules past the cap is refused (retellRuleOvershoot, beatsPipeline).
+  const worldRules = (logic?.rules || logic?.facts || []).length;
   return {
     sentences,
     sentenceRange,
@@ -12206,6 +12261,23 @@ function arcShapeCounts({ sentences, logic, inputData, pageCount }) {
 
 // The cap the STORY LOGIC spec states for rules of the world ("at most two").
 const ARC_WORLD_RULES_MAX = 2;
+
+/**
+ * A RE-TELLING THAT ADDED RULES PAST THE CAP is a failed telling (owner, 2026-11-07): null when it did
+ * not, else { count, prior, max }. It fails only when the rules GREW and stand over the cap - a created
+ * arc that was already over is the creator's, not the re-telling's. Counts are code's (parseStoryLogic
+ * `rules`); nothing reads the logic's words.
+ */
+function retellRuleOvershoot(priorLogic, retoldLogic) {
+  const count = (retoldLogic?.rules || retoldLogic?.facts || []).length;
+  const prior = (priorLogic?.rules || priorLogic?.facts || []).length;
+  return count > ARC_WORLD_RULES_MAX && count > prior ? { count, prior, max: ARC_WORLD_RULES_MAX } : null;
+}
+
+/** What the second telling is told when the first added rules past the cap. */
+function arcRetellRulesFeedback({ count, prior, max }) {
+  return `\n\n# YOUR LAST TELLING WAS REFUSED\n\nIts Facts block held ${count} rules of the world (the arc you were given held ${prior}; at most ${max} are allowed). ${ARC_CUT_NOT_ADD_RULE} Tell the story again, with no more rules of the world than the arc you were given and never more than ${max}.`;
+}
 
 /**
  * Worst severity among a critique's numbered fault lines: 'CRITICAL' >
@@ -12697,6 +12769,7 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '', { arcHints = '', 
     TEXT_VS_PICTURE: TEXT_VS_PICTURE_RULE,
     LOAD_BEARING: LOAD_BEARING_RULE,
     OWED_FACTS: buildOwedFacts(storyLogic),
+    MUST_SAY: buildMustSay(storyLogic),
     PAGES: body,
   });
 }
@@ -13151,6 +13224,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     YOUNG_CHILD_SPEECH: YOUNG_CHILD_SPEECH_RULE,
     LOAD_BEARING: LOAD_BEARING_RULE,
     OWED_FACTS: buildOwedFacts(storyLogic),
+    MUST_SAY: buildMustSay(storyLogic),
   });
 }
 
@@ -13617,6 +13691,7 @@ function buildTrialPagesPrompt(inputData, sceneCount = null, arcText = '') {
   return fillTemplate(PROMPT_TEMPLATES.storyTrialPages, {
     ...trialFillValues(inputData, sceneCount),
     ARC_PLAN: String(arcText || '').trim(),
+    MUST_SAY: MUST_SAY_TRIAL_RULE,
     MANDATORY_CAST: buildTrialMandatoryCast(inputData),
   });
 }
@@ -14327,6 +14402,9 @@ module.exports = {
   arcLengthRange,
   arcLengthBounds,
   arcShapeCounts,
+  retellRuleOvershoot,
+  arcRetellRulesFeedback,
+  ARC_CUT_NOT_ADD_RULE,
   arcSentenceCount,
   twoThreadsAllowed,
   characterSourceRule,
@@ -14487,6 +14565,9 @@ module.exports = {
   WORLD_TELLING_RULE,
   ARC_SENTENCE_RULE,
   buildOwedFacts,
+  buildMustSay,
+  MUST_SAY_RULE,
+  MUST_SAY_TRIAL_RULE,
   PICTURE_COUNT_RULE,
   PAYOFF_KEEP_RULE,
   CLOSING_MOMENT_RULE,

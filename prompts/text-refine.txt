@@ -26,6 +26,8 @@ Characters: {CHARACTER_NAMES}
 OWED:
 {OWED_FACTS}
 
+{MUST_SAY}
+
 {ARC_HINTS}
 
 # THE PAGE PLAN (how the story was divided into pictures)

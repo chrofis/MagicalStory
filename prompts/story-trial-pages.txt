@@ -38,6 +38,7 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - {PERIL_CEILING}
 - {ARC_OBSTACLE_REMOVED}
 - {ARC_QUESTIONS_ANSWERED}
+- {MUST_SAY}
 
 # Story Parameters
 

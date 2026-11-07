@@ -11274,6 +11274,54 @@
         "kind": "human",
         "what": "In arcReviewReport.rounds of a staging story: read the panel findings for a STAKES issue about an obstacle removed by a figure other than the main character or by chance, tagged MAJOR; and read the final arc: the Opposition line of the story logic is what the climax sentence removes."
       }
+    },
+    {
+      "id": "idea-main-character-act-2026-11-07",
+      "title": "Story ideas give the main character an act aimed at the obstacle and no friend-made obstacle",
+      "commits": [],
+      "addedAt": "2026-11-07",
+      "status": "pending",
+      "evidence": [],
+      "claim": "A wizard or trial idea with friends gives them parts that help or hinder, names what the main character does against what stands in the way, and no friend's part is what must be undone at the end. Free replay (21 stored idea prompts, stand-ins) showed NO measurable effect (friend-made obstacle 10/21 old, 8/21 new); a real-model idea round is still to run.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read ideaGeneration.output of a staging story with 3+ characters: is the obstacle made of the friends' own acts?"
+      }
+    },
+    {
+      "id": "arc-retell-cut-not-add-2026-11-07",
+      "title": "The arc re-telling cuts instead of adding rules; an over-cap re-telling is refused",
+      "commits": [],
+      "addedAt": "2026-11-07",
+      "status": "pending",
+      "evidence": [],
+      "claim": "A staging story's arcReviewReport counts.worldRules excludes the World / Way in / Way back lines; a re-telling that grows the rules past 2 logs arc_retell_rules_over, is told once more with the refusal, then stops the story. Free replay: 20 stored arcs, added fact lines 6 old vs 4 new, over-cap 0/20 both.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In generationLog look for arc_retell_rules_over; in arcReviewReport.rounds[0] compare the Facts block before and after the re-telling: no new rule or fact line."
+      }
+    },
+    {
+      "id": "writer-must-say-2026-11-07",
+      "title": "The page text says the stakes and each invented figure's motive in plain words",
+      "commits": [],
+      "addedAt": "2026-11-07",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On a staging story the text says what the main character wants and what is lost, and why each (new) figure acts, somewhere in the pages, once, with no recital. Free replay: 20 stored books, lines said 26/46 old vs 44/46 new, no length growth; recital not measured.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read the page text of a staging story (1st-grade band included) against the MUST SAY lines in storyTextPrompts; count recitals."
+      }
     }
   ],
   "runs": [

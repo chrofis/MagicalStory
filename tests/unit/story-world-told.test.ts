@@ -51,7 +51,7 @@ describe('the world is an owed fact, on the arc side and the text side', () => {
   it('the arc logic spec asks for the world lines outside the two-rule cap, and none for today\'s everyday world', () => {
     const spec = pb.arcLogicSpec({}, 10);
     expect(spec).toMatch(/not set in today's everyday world also gets, outside that count/);
-    expect(spec).toMatch(/how they get there and one for how they get back/);
+    expect(spec).toMatch(/how they get there, opening "Way in:", and one for how they get back, opening "Way back:"/);
     expect(spec).toMatch(/a story set in today's everyday world gets none of these/);
   });
   it('a world, way-in and way-back line in the logic is on the OWED list the writer, the repair and the audit read', () => {

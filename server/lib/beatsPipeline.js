@@ -119,6 +119,8 @@ const {
   splitCommittedBlock,
   arcInventedAllowance,
   arcShapeCounts,
+  retellRuleOvershoot,
+  arcRetellRulesFeedback,
   critiqueMaxSeverity,
   buildPlanCheckPrompt,
   landmarksStagedBlock,
@@ -2620,13 +2622,28 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       if (!retellPrompt) throw new Error('arc-retell template unavailable');
       let retellRes = null;
       let retold = null;
+      let retellSentPrompt = retellPrompt;
       for (let attempt = 1; attempt <= 2 && !retold; attempt++) {
-        retellRes = await creatorCall(retellPrompt, 'arc_retell', arcRetellModel, MODEL_DEFAULTS.arcRetellTemperature, MODEL_DEFAULTS.arcRetellEffort);
+        retellRes = await creatorCall(retellSentPrompt, 'arc_retell', arcRetellModel, MODEL_DEFAULTS.arcRetellTemperature, MODEL_DEFAULTS.arcRetellEffort);
         try {
           retold = parseArcRetell(retellRes.text);
         } catch (parseErr) {
           log.warn(`⚠️ [ARC] re-tell parse failed (${parseErr.message})${attempt === 1 ? ' — one more telling' : ''}`);
           if (attempt === 2) throw parseErr;
+          continue;
+        }
+        // CUT, DON'T ADD (owner, 2026-11-07; decisions.md "Arc re-tell: cut, don't add"): a telling
+        // that grew the rules of the world past the cap is a failed telling, handled like a parse
+        // miss - one more telling with the refusal fed back, then a loud stop. No fallback to the arc
+        // it was meant to repair: no arc is correct, a quietly patched one is not.
+        const overshoot = retellRuleOvershoot(currentLogic, retold.logic);
+        if (overshoot) {
+          const failure = `the re-telling added rules of the world past the cap (${overshoot.count} against ${overshoot.prior} before, at most ${overshoot.max})`;
+          log.error(`❌ [ARC] Round ${round}: ${failure}${attempt === 1 ? ' — one more telling' : ''}`);
+          gl.error('arc_retell_rules_over', `Round ${round}: ${failure}${attempt === 1 ? '; telling again with the refusal fed back' : '; the second telling did the same, so the story stops'}`, null, { round, attempt, ...overshoot });
+          if (attempt === 2) throw new Error(`arc re-tell: ${failure}`);
+          retellSentPrompt = retellPrompt + arcRetellRulesFeedback(overshoot);
+          retold = null;
         }
       }
       approvedArc = retold.finalArc;
@@ -2692,7 +2709,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         // prompt regression hides. Same treatment the beats and text stages
         // already give their prompts (outlinePrompt, storyTextPrompts).
         panelPrompt,
-        retellPrompt,
+        retellPrompt: retellSentPrompt,
         // The re-telling's raw reply (2026-09-23). The parsed fields below drop
         // its "Challenges taken:" head and strip the [C###] tags, so without
         // the raw nothing they were parsed from could be audited.

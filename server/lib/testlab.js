@@ -9047,12 +9047,23 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
         const creatorCall = makeArcCreatorCall(null, (res) => retellCalls.push(res));
         let res = null;
         let parsed = null;
+        let sentPrompt = retellPrompt;
+        // Production's "cut, don't add" refusal (beatsPipeline, sibling set arc-retell-gate): a telling that
+        // grew the rules of the world past the cap is a failed telling - one more with the refusal fed back.
+        const priorLogic = H.parseStoryLogic(committed);
         for (let attempt = 1; attempt <= 2 && !parsed; attempt++) {
-          res = await creatorCall(retellPrompt, 'testlab_arc_retell_replay', retellModel, MODEL_DEFAULTS.arcRetellTemperature, MODEL_DEFAULTS.arcRetellEffort);
+          res = await creatorCall(sentPrompt, 'testlab_arc_retell_replay', retellModel, MODEL_DEFAULTS.arcRetellTemperature, MODEL_DEFAULTS.arcRetellEffort);
           try {
             parsed = H.parseArcRetell(res.text || '');
           } catch (parseErr) {
             if (attempt === 2) throw parseErr;
+            continue;
+          }
+          const overshoot = H.retellRuleOvershoot(priorLogic, parsed.logic);
+          if (overshoot) {
+            if (attempt === 2) throw new Error(`arc re-tell added rules of the world past the cap (${overshoot.count} against ${overshoot.prior}, at most ${overshoot.max})`);
+            sentPrompt = retellPrompt + H.arcRetellRulesFeedback(overshoot);
+            parsed = null;
           }
         }
         retell = {

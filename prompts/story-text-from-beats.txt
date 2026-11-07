@@ -24,6 +24,8 @@ Characters: {CHARACTER_NAMES}
 OWED:
 {OWED_FACTS}
 
+{MUST_SAY}
+
 {ARC_HINTS}
 
 # LOCKED ILLUSTRATIONS (given — one PLAN line per page, which the text never contradicts)

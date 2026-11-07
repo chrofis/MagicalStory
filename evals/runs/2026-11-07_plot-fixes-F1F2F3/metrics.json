@@ -1,0 +1,80 @@
+{
+ "F1": {
+  "old": {
+   "n": 21,
+   "friendObstacle": 10,
+   "ownAct": 4,
+   "multiN": 16,
+   "multiFriendObstacle": 9,
+   "multiOwnAct": 3,
+   "friendObstacleAndNoOwnAct": 7
+  },
+  "new": {
+   "n": 21,
+   "friendObstacle": 8,
+   "ownAct": 3,
+   "multiN": 16,
+   "multiFriendObstacle": 6,
+   "multiOwnAct": 2,
+   "friendObstacleAndNoOwnAct": 8
+  }
+ },
+ "F2": {
+  "old": {
+   "n": 20,
+   "parseFail": 0,
+   "addedFactLinesTotal": 6,
+   "addedFactLinesMean": 0.3,
+   "newRuleLines": 1,
+   "newFigureFacts": 5,
+   "retellsAddingAnyFact": 5,
+   "retellsRulesGrew": 0,
+   "worldRulesOver": 1,
+   "rulesGrewH": 1,
+   "rulesOverCapH": 0,
+   "rulesAddedPastCapH": 0,
+   "refusedByOvershoot": 0,
+   "newFiguresTotal": 0
+  },
+  "new": {
+   "n": 20,
+   "parseFail": 0,
+   "addedFactLinesTotal": 4,
+   "addedFactLinesMean": 0.2,
+   "newRuleLines": 1,
+   "newFigureFacts": 3,
+   "retellsAddingAnyFact": 4,
+   "retellsRulesGrew": 0,
+   "worldRulesOver": 1,
+   "rulesGrewH": 0,
+   "rulesOverCapH": 0,
+   "rulesAddedPastCapH": 0,
+   "refusedByOvershoot": 0,
+   "newFiguresTotal": 0
+  }
+ },
+ "F3": {
+  "old": {
+   "stories": 20,
+   "lines": 46,
+   "said": 26,
+   "stakeLine": 20,
+   "stakeSaid": 11,
+   "motiveLines": 26,
+   "motiveSaid": 15,
+   "allLinesSaidStories": 5,
+   "meanWords": 697
+  },
+  "new": {
+   "stories": 20,
+   "lines": 46,
+   "said": 44,
+   "stakeLine": 20,
+   "stakeSaid": 19,
+   "motiveLines": 26,
+   "motiveSaid": 25,
+   "allLinesSaidStories": 18,
+   "meanWords": 702
+  }
+ }
+}
