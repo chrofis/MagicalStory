@@ -21,11 +21,12 @@ describe('OBSTACLE_REMOVED_BY_CLIMAX_RULE', () => {
   const rule: string = PB.OBSTACLE_REMOVED_BY_CLIMAX_RULE;
 
   it('states the three faults and the one-problem condition, generically', () => {
-    expect(rule).toMatch(/want and the Opposition are one problem/);
-    expect(rule).toMatch(/own deciding act at the climax/);
+    expect(rule).toMatch(/answers a different problem/);
     expect(rule).toMatch(/open to them all along/);
-    expect(rule).toMatch(/simply stops/);
-    expect(rule).toMatch(/chance removes it/);
+    expect(rule).toMatch(/chance event/);
+    expect(rule).toMatch(/simply stopping with no act of the main character/);
+    // narrowed 2026-11-07: an Opposition that yields because of the climax act is not a break
+    expect(rule).toMatch(/yields, relents or is overcome because of the act of the main character does not break it/);
   });
 
   for (const age of [7, 3]) {

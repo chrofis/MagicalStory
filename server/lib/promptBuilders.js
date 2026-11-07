@@ -11145,10 +11145,13 @@ const ARC_QUESTIONS_ANSWERED_RULE = 'Every question the story raises is answered
 // stored arcs one resolved with an obstacle (a friend's cord across the path)
 // that the climax never touched: the want was answered by one act and the
 // obstacle vanished when another figure undid it, an act open to her all along;
-// five more arcs removed it by chance or contrivance. ONE clause in the stakes
+// five more arcs removed it by chance or contrivance. NARROWED the same day
+// (decisions.md 2026-11-07 second entry): the first wording fired on 7 of 38
+// holding arcs, mostly an Opposition that yields after the main character's
+// act, so it now names the one clear pattern. ONE clause in the stakes
 // list, so the creator, the re-teller, their critique and the panel's STAKES
 // lens read the same words; ARC_SEVERITY_DEF makes a break MAJOR.
-const OBSTACLE_REMOVED_BY_CLIMAX_RULE = 'What keeps the main character from the want is the Opposition line of the story logic: the want and the Opposition are one problem, never two. The main character\'s own deciding act at the climax removes it. It breaks this rule when another figure undoes it with an act that was open to them all along, when it simply stops, or when chance removes it.';
+const OBSTACLE_REMOVED_BY_CLIMAX_RULE = 'The climax act of the main character answers what keeps them from the want, the Opposition line of the story logic. It breaks this rule only when that act answers a different problem and the Opposition is then undone by someone or something else: another figure through an act that was open to them all along, a chance event, or the Opposition simply stopping with no act of the main character behind it. An Opposition that yields, relents or is overcome because of the act of the main character does not break it.';
 
 /** The stakes rules this band's arc is written to and checked against — one list, both sides. */
 function arcStakesRules(inputData = {}) {

@@ -11266,7 +11266,7 @@
       "addedAt": "2026-11-07",
       "status": "pending",
       "evidence": [],
-      "claim": "On an arc-machine story the creator writes the story so the Opposition is removed by the main character's own deciding act at the climax; the panel STAKES lens and the creator critique tag an arc where another figure, chance or nothing removes it as [MAJOR], and the re-telling runs on it. Free replay first: agent-as-model over 44 stored arcs gave recall 2/6 (old 0/6) and false positives 7/38 (old 1/38); a real-model arc_panel_replay on the same set is still to run.",
+      "claim": "On an arc-machine story the creator writes the story so the Opposition is removed by the main character's own deciding act at the climax; the panel STAKES lens and the creator critique tag an arc where another figure, chance or nothing removes it as [MAJOR], and the re-telling runs on it. The rule fires only when the climax act answers a different problem and the Opposition is undone by someone or something else (narrowed 2026-11-07). Free replay: agent-as-model over 44 stored arcs, recall 2/6 on the known faulty (old prompt 0/6), false positives 3/38 (first wording 7/38, old 1/38); a real-model arc_panel_replay on the same set is still to run.",
       "runShape": [
         "any"
       ],
