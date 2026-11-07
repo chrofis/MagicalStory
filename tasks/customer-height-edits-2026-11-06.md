@@ -166,3 +166,4 @@ Janna, Melisa tallest.
 - Promoted both stories (`--force` after checking prod text = staging-before, no prod images or credit rows since this morning's promote, no orders). Prod check: p9 v7 md5 = approved image, 0 staging URLs, every active picture loads.
 - Spend this round ≈ USD 0.25; Janna total ≈ USD 4.55 of 6.
 - Einhorn p4/p5 text (owner flagged both): Janna sees the friends' boot prints next to the hoofprints; Melisa answers «Ein Einhorn hat doch ein Horn». Promoted after prod text == staging-before2; reading page from prod shows both.
+- Einhorn knowledge timeline fixed (owner: "when do they detect that it is a unicorn?"): Janna glimpses the horn on p1; she never names Silva or the meadow; narrator states the fog rule. Promoted; reading page from prod shows all four sentences.

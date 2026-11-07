@@ -1020,3 +1020,10 @@ I listed an empty page and pages without a named character as defects, against t
 
 ## 2026-11-07 · Redraw a stored page through the production render, on its plate
 Owner caught it ("Did you use a different background plate?"). Three Rubi p6 redraws via the regenerate route with `customPrompt` came out in another palette: that route sends no plate for a non-landmark page and a customPrompt replaces the whole image prompt (no art-style template). Rule: a corrected brief for a stored page goes through the Lab `image` stage (`params.sceneDescriptionOverride`) — the production page render with the stored plate — then Lab promote. Check neighbour pages side by side before showing.
+
+## 2026-11-07 · Before changing story text, write the who-knows-what-when table
+My p5 rewrite let Janna call the animal a unicorn while the text never showed how she knew; the owner caught it
+("when do they detect that it is a unicorn?"). A page edit changes what a character KNOWS, and each fact must be
+learned on exactly one page before it is used. Rule: before proposing any story-text change, list each secret or
+fact, the page each character learns it, and check every page of the book against it, including names only the
+narrator knows.
