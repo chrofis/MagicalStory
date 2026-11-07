@@ -25,7 +25,19 @@ Janna, Melisa tallest.
       unchanged since 08:22: newest image 08:22 CH, no orders, p1 active v4); prod p1 active v5, bytes
       identical to staging, 0 staging URLs. Total paid spend for the job ~USD 2.50 of the 6 cap.
 
+- [x] 2026-11-07 ~09:10 CH: re-review of the shipped books (owner: "have opus review each one again, and you
+      review them as well"). Lab exp 1804 (book_audit, bookReview on, Opus 5.5, staging copies = prod), USD 0.48;
+      covers not in this stage (pages 1-10). Opus: 0 height faults; 10 IMG faults —
+      Einhorn p2 rope not round Silva's neck, p5 rope post→neck unclear, p6 Janna missing (owner chose the
+      tied-alone picture), p7 rope should still be on the neck + horn off-centre (minor);
+      Rubi p1 extra farm figures (minor), p5 cord too high (minor), p6 extra rope grips, p7 rope colour (minor);
+      Laternen p8 Polina's legs/shoes (minor). My eye review (sheets in scratchpad `books/prod/`): agrees with
+      those, plus **Laternen p1 Melodi drawn ~15% taller than Melisa** (head-to-foot ~720 vs ~625 px, same
+      depth; she should be ~8% shorter) — Opus missed it, and so did the picture selection; Laternen p4 shows
+      the families but no lanterns. Nothing changed in production by this review.
+
 ## Open
+- [ ] Owner call on the re-review faults above (fix which, if any). Laternen p1 height is a real height fault.
 - [ ] Owner yes needed on the two-part fix proposal for the tied-unicorn class (below, "Proposal").
 - [ ] **Photo-derived apparent age overrides the family's real order.** Polina (5) was rated `young-school-age`
       from her photo, Melodi (5) `kindergartner`; every page prompt and Art Director brief then draws Polina as
