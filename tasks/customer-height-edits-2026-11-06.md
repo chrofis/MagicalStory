@@ -14,7 +14,14 @@ Janna, Melisa tallest.
       (her profile untouched, owner choice).
 - [x] Back-cover "THIS IMAGE DEPICTS" header dropped (5561b70cc).
 
+- [x] 2026-11-07: all 39 pictures reviewed (height + story match); 29 kept, 7 switched to an older stored
+      version, 3 redrawn from corrected briefs (Einhorn p6 tied unicorn alone, Rubi p10 whole unicorn,
+      Laternen p1 lantern + heights). Promoted to production 08:21-08:22 CH (backups in
+      backups/story-promotions/), read back 39/39 OK, no job row, no email. Code 1d4912caa..9572f01f on
+      master. Marketing informed (Marketing/inbox/2026-11-07-magicalstory-janna-books-fixed.md).
+
 ## Open
+- [ ] Owner yes needed on the two-part fix proposal for the tied-unicorn class (below, "Proposal").
 - [ ] **Photo-derived apparent age overrides the family's real order.** Polina (5) was rated `young-school-age`
       from her photo, Melodi (5) `kindergartner`; every page prompt and Art Director brief then draws Polina as
       the older, taller child, and a HEIGHT ORDER line alone does not overcome it (staging Einhorn p9 redraw,
