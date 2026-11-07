@@ -158,3 +158,10 @@ Janna, Melisa tallest.
     figures gets them added back (Einhorn p6 E6S: "No people in the picture" → four girls).
 - Production check before promote: no print orders; production versions identical to the staging copies;
   last production picture 2026-11-06 12:05 CH, before the copy.
+
+## 2026-11-07 (late morning) — owner read the three books
+- Einhorn text rewritten on p1, p2, p6, p8, p9 (owner-approved drafts; stakes said out loud, the split and the knot made logical, p9 says a magic animal belongs to no one). Applied on staging through PUT /api/stories/:id/text, per-page copies synced.
+- Einhorn p9 picture: customer iterate (freeIterate + feedback) failed — redrew the old gate scene from the plan (USD ~0.10). Lab exp 1806 `image` stage with the p8 stable plate copied to p9 empty_scene v1 and the four-girl cast: accepted, v7.
+- Rubi front cover: the only version had the title on a strip with a hard seam; regenerate cover on staging (v1) painted it into the scene, spelled right.
+- Promoted both stories (`--force` after checking prod text = staging-before, no prod images or credit rows since this morning's promote, no orders). Prod check: p9 v7 md5 = approved image, 0 staging URLs, every active picture loads.
+- Spend this round ≈ USD 0.25; Janna total ≈ USD 4.55 of 6.
