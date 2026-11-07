@@ -46,3 +46,56 @@ Janna, Melisa tallest.
     see the agent report summarised in the session; sources docs.x.ai prompting guide, Google Gemini 2.5
     Flash Image prompting blog, arXiv 2510.08532, 2511.09715.
   - Raw images: session scratchpad `phrasing/` (not in the repo); sample is small (1 render per cell).
+
+## 2026-11-07 — Opus height check, root cause, fix route
+- **Root cause of "Janna drawn tallest" (4/4 Einhorn group renders, landmark wording included):** the
+  HEIGHT ORDER line was right in the sent prompt (AiN, initialPage v6). Janna's reference sheet has the
+  oldest-looking face of the four (narrow, high cheekbones) while Melisa's is round ("softly rounded
+  features"); the painter draws the oldest-looking child tallest. Wording alone cannot overrule it.
+- **Landmark wording in generation (3868cac5c):** gaps shrank (dedication spread 30% → 18%, back 23% → 11%),
+  order still wrong on Janna/Melisa in both covers; the mixed line-up was followed on 1 of 2.
+- **Opus book review with the height order (1b825e9c1, 972262ae2):** 15 stored pictures, committed rule,
+  Opus 5.5 via OpenRouter, USD 0.29 per pass: wrong caught 6/7 (missed only the borderline Einhorn back
+  v2 gaps), right left alone 4/5 (Laternen dedication flagged for Melisa too tall — a real, small gap
+  fault), not-comparable left alone 2/3. Run file: scratchpad `redraw/opus-height-v2.json`.
+- **Fixing a wrong original — edit vs redraw (Laternen p1):** the landmark edit ("Polina stands with the top
+  of her head level with Melisa's nose") left Polina unchanged and made Melisa taller (teen-looking): worse.
+  Redraw from a rewritten brief: see below. Verdict so far: edits do not fix size; redraw + Opus check does.
+- **Picture selection (agent, all 101 stored versions of 39 pages viewed):** 36 pages keep a stored
+  version, 7 switch to an older better version, 3 need a redraw (Einhorn p6 cast/horn, Rubi p10 unicorn
+  missing, Laternen p1 Polina a head short). Files: scratchpad `books/selection.json|html`.
+- **Einhorn p6, tied unicorn never drawn (analysis 2026-11-07, two read-only agents, USD 0):**
+  - Plan: the book's one mandatory peopleless page (story-beats.txt:35) went to the knot beat; the plan
+    grammar is `<names> | nobody` (:91) and a tracked animal counts as a name (:45), so "no people" became
+    "no Silva" → plan line "nobody — The rope drawn taut against the post". Text written later puts Janna
+    AND Silva in the instant; nothing re-syncs plan/brief/VB pages (Silva's VB pages exclude 6; Jev VB score
+    0.47 < 0.7).
+  - Judges: book_review mode, only the Opus whole-book review ran. book-audit.txt:11 tells it a figure the
+    words name but the brief did not draw is "absent by design … never a fault". Round 0/1 asked only for the
+    taut rope; round 2 (final, no repair after it) wrote "Draw Silva tethered by the knotted rope from the post
+    to her neck…".
+  - Repair: the round-1 rebrief (eval_calls 1669) DID add Silva tied from the page text;
+    `checkDeclaredSet` (iterateBeat.js:661-706, images.js:5041-5069) flagged her
+    `character_outside_declared_set` and the corrective re-ask removed her, backed by PLAN_LINE_CAST_RULE
+    (promptBuilders.js:9866). Humans are always allowed into a repair; a creature only when plan/brief/VB
+    pages carry it. A per-page judge later filed Silva on p6 as `extra_character`.
+  - Class of gap: picture contract fixed at plan time; text diverges after; every critic and repair is
+    defined against the contract. Raw: scratchpad `analysis/`.
+- **Proposal (owner picked both classes 2026-11-07; NOT built, needs the owner's yes on this shape):**
+  1. Planner — "no people" is not "no figure": the peopleless page may name tracked creatures only (who-column
+     lists only Visual Bible animals) and still counts as the book's peopleless page. Touches
+     story-beats.txt rule 2 + plan grammar :91, the peopleless counter (planCounters / castCoverage), plan-check
+     (its CHECK[11]/[20] ask only for humans), PLAN_LINE_CAST_RULE (promptBuilders.js:9866) and
+     scene-briefs-all.txt rule 3/10b. Test: free replay of the plan counters over stored plans + a Lab
+     planner stage over ≥20 stored arcs (paid, price asked first).
+  2. Opus review — narrow exception to "absent by design" (book-audit.txt:11, kept since c4f23b21b took
+     off-cast false faults 3 → 0): when a sentence of the page has a figure the brief left out ACT ON the
+     subject the picture shows, it is an IMG `missing_character` MAJOR fault, not a TEXT fault.
+     Required third part, or repair deletes the figure again: the iterate declared-set gate
+     (iterateBeat.js:661-706) must admit a figure the review finding names. Test: replay the review prompt on
+     stored pages with off-cast mentions (the c4f23b21b set, must stay 0 false faults) + this page.
+  - Also found: a user's edited scene is always re-expanded by the brief writer from the page TEXT
+    (regeneration.js shouldExpand when sceneWasEdited), so a scene the user writes without the text's
+    figures gets them added back (Einhorn p6 E6S: "No people in the picture" → four girls).
+- Production check before promote: no print orders; production versions identical to the staging copies;
+  last production picture 2026-11-06 12:05 CH, before the copy.
