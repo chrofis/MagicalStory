@@ -67,3 +67,10 @@ Conclusion: the plot breaks at the ARC, seeded by the IDEA, and not mainly at th
    not a simpler one.
 3. No panel lens asks "who removes the obstacle?" — the new rule (A1) is meant to cover that.
 4. The text loses stakes and motives on short first-reader pages (Laternen). The beats lose almost nothing.
+
+## E. Laternen redo with the new rules (2026-11-07, staging text-only rerun job_1794067759328_ud0gsxvn3r, same prod input_data)
+Not fixed. The stakes are now said (p3, the MUST SAY works). The unicorn's reason is still not said. The
+ending is still made by friends: Melodi calls «Halt!» (p8) and Melisa lifts the lantern (p9). Janna's own
+act (shouting «Laterne!») is a bit stronger. The rhyme gimmick is unchanged, as expected: verse mode is
+not built yet. Logs show 9 MAJOR panel findings went to the re-telling, but the text-only rerun stores no
+arc report, so why the obstacle rule did not hold cannot be read (BACKLOG line).
