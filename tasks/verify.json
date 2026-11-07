@@ -11258,6 +11258,22 @@
         "kind": "human",
         "what": "In a staging book_review story with a NEW-routed page: read finalChecksReport.bookAuditRounds[].raw (every [NEW] line ends with a background tag, none is logged 'carries no usable fix route'); for a keep page the redrawn version's story_images empty_scene row for that page is unchanged; for a redo page the empty_scene row is new and the redrawn picture's background follows the stated change; no page in the book was redrawn without a plate."
       }
+    },
+    {
+      "id": "arc-obstacle-removed-by-climax",
+      "title": "The arc panel and critique flag an obstacle the climax does not remove as MAJOR",
+      "commits": [],
+      "addedAt": "2026-11-07",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On an arc-machine story the creator writes the story so the Opposition is removed by the main character's own deciding act at the climax; the panel STAKES lens and the creator critique tag an arc where another figure, chance or nothing removes it as [MAJOR], and the re-telling runs on it. Free replay first: agent-as-model over 44 stored arcs gave recall 2/6 (old 0/6) and false positives 7/38 (old 1/38); a real-model arc_panel_replay on the same set is still to run.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In arcReviewReport.rounds of a staging story: read the panel findings for a STAKES issue about an obstacle removed by a figure other than the main character or by chance, tagged MAJOR; and read the final arc: the Opposition line of the story logic is what the climax sentence removes."
+      }
     }
   ],
   "runs": [

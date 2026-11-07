@@ -62,7 +62,7 @@ describe('stakes and open questions: one list, generator and critics', () => {
   it('the creator, the re-teller, their critique and the panel carry the same rules', () => {
     const data = input(7);
     const rules: string[] = PB.arcStakesRules(data);
-    expect(rules).toEqual([PB.ARC_OPPOSITION_HOLDS_RULE, PB.ARC_QUESTIONS_ANSWERED_RULE]);
+    expect(rules).toEqual([PB.ARC_OPPOSITION_HOLDS_RULE, PB.OBSTACLE_REMOVED_BY_CLIMAX_RULE, PB.ARC_QUESTIONS_ANSWERED_RULE]);
     const create = PB.buildArcCreatePrompt(data, 16);
     const retell = PB.buildArcRetellPrompt(data, 16, 'ARC: a committed arc', '1. [MAJOR] (s2) x — "y"');
     const panel = PB.buildArcPanelPrompt(data, 'ARC: a committed arc');
@@ -79,7 +79,7 @@ describe('stakes and open questions: one list, generator and critics', () => {
 
   it('a simple band, whose opposition is never a person, is neither told nor checked for one that yields', () => {
     const data = input(3);
-    expect(PB.arcStakesRules(data)).toEqual([PB.ARC_QUESTIONS_ANSWERED_RULE]);
+    expect(PB.arcStakesRules(data)).toEqual([PB.OBSTACLE_REMOVED_BY_CLIMAX_RULE, PB.ARC_QUESTIONS_ANSWERED_RULE]);
     for (const text of [
       PB.buildTellingRulesSection(data),
       PB.arcCritiqueSpec({ inputData: data }),

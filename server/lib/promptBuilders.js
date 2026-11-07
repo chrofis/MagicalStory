@@ -11141,11 +11141,20 @@ const ARC_PART_CHECK = 'a main character with no turn of their own that changes 
 const ARC_OPPOSITION_HOLDS_RULE = 'The opposition never gives way just because it is asked, and no limit the story logic gives it takes away its power at the turning point.';
 const ARC_QUESTIONS_ANSWERED_RULE = 'Every question the story raises is answered by its end, including who keeps what was sought, won or fought over; and every deadline or loss the story sets is met or paid by then — the children are in time, or the cost the story named comes due.';
 
+// OBSTACLE REMOVED BY THE CLIMAX (owner, 2026-11-07, docs/decisions.md). Over 44
+// stored arcs one resolved with an obstacle (a friend's cord across the path)
+// that the climax never touched: the want was answered by one act and the
+// obstacle vanished when another figure undid it, an act open to her all along;
+// five more arcs removed it by chance or contrivance. ONE clause in the stakes
+// list, so the creator, the re-teller, their critique and the panel's STAKES
+// lens read the same words; ARC_SEVERITY_DEF makes a break MAJOR.
+const OBSTACLE_REMOVED_BY_CLIMAX_RULE = 'What keeps the main character from the want is the Opposition line of the story logic: the want and the Opposition are one problem, never two. The main character\'s own deciding act at the climax removes it. It breaks this rule when another figure undoes it with an act that was open to them all along, when it simply stops, or when chance removes it.';
+
 /** The stakes rules this band's arc is written to and checked against — one list, both sides. */
 function arcStakesRules(inputData = {}) {
   return SIMPLE_BANDS.has(resolveAgeBand(inputData))
-    ? [ARC_QUESTIONS_ANSWERED_RULE]
-    : [ARC_OPPOSITION_HOLDS_RULE, ARC_QUESTIONS_ANSWERED_RULE];
+    ? [OBSTACLE_REMOVED_BY_CLIMAX_RULE, ARC_QUESTIONS_ANSWERED_RULE]
+    : [ARC_OPPOSITION_HOLDS_RULE, OBSTACLE_REMOVED_BY_CLIMAX_RULE, ARC_QUESTIONS_ANSWERED_RULE];
 }
 
 function arcExcitingDef(inputData = {}) {
@@ -11227,6 +11236,7 @@ function buildTellingRulesSection(inputData = {}) {
     `- ${ANIMAL_FATE_RULE}`,
     '- The story ends with the children safe and together, one of them showing a feeling a child can name, in an act or a spoken line. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.',
     `- ${CLOSING_MOMENT_RULE}`,
+    `- ${OBSTACLE_REMOVED_BY_CLIMAX_RULE}`,
     `- ${ARC_QUESTIONS_ANSWERED_RULE} What resolves the conflict has an origin — an earlier setup or a rule the story logic states. A figure singled out — the only one who can help, waited for, chosen — has a stated reason.`,
     noSplit
       ? '- The cast stays together on one path — never two groups going separate ways; where the commission itself splits them, keep them together and justify it in one line.'
@@ -11359,7 +11369,7 @@ function arcLogicSpec(inputData = {}, pageCount = 10) {
 // (MAJOR/CRITICAL only) filtered it out, it rode into the pages, and the text
 // repair invented hardware to close it. The generator half is ARC_SENSE_RULE
 // ("that could not happen").
-const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line, a main character with no turn, a figure on the character list with no act of their own, a want or quarrel given and never answered, an action at the turn or the climax that could not happen as the arc states it always are, and so are something impossible simply there in the real world and a crossing into the magical with no cause the reader sees; or [MINOR] — a blemish.';
+const ARC_SEVERITY_DEF = '[CRITICAL] — the story is broken; [MAJOR] — a real fault repairable inside the existing structure, which an act from no motive line, a main character with no turn, a figure on the character list with no act of their own, a want or quarrel given and never answered, an obstacle that the climax act of the main character does not remove, an action at the turn or the climax that could not happen as the arc states it always are, and so are something impossible simply there in the real world and a crossing into the magical with no cause the reader sees; or [MINOR] — a blemish.';
 
 /**
  * THE ARC CRITIQUE SPEC — ONE source, both arc templates (owner, 2026-09-19).
@@ -13466,6 +13476,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // The trial writer is its own arc creator: the stakes rule the arc
       // creator, critique and panel read (arcStakesRules) is a writer rule here.
       ARC_QUESTIONS_ANSWERED: ARC_QUESTIONS_ANSWERED_RULE,
+      ARC_OBSTACLE_REMOVED: OBSTACLE_REMOVED_BY_CLIMAX_RULE,
       // Same string the arc creator is given in TELLING_RULES (owner, 2026-10-16).
       WORLD_FRAME: WORLD_FRAME_RULE,
       NO_DASH: NO_DASH_RULE,
@@ -14332,6 +14343,7 @@ module.exports = {
   ARC_SEVERITY_DEF,
   ARC_OPPOSITION_HOLDS_RULE,
   ARC_QUESTIONS_ANSWERED_RULE,
+  OBSTACLE_REMOVED_BY_CLIMAX_RULE,
   arcStakesRules,
   COMMISSIONED_CAST_DEF,
   COMMISSIONED_CAST_DEF_CARD,
