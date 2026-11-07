@@ -69263,3 +69263,12 @@ Revisit if: the preview is cheap enough to generate at order time for every cust
 **Revisit if:** a real-model Lab `arc_panel_replay` on the same set shows more than about 3 of 38 flags, then demote to MINOR; or recall on the weak five must rise (4 of 5 stay unflagged by this rule; they fail on other lenses).
 **Touched files:** server/lib/promptBuilders.js, tests/unit/arc-obstacle-removed-by-climax.test.ts, tasks/verify.json, evals/results/results.jsonl
 **Status:** 🟡 conditional (real-model check pending)
+
+## 2026-11-07 — Label correction for the obstacle-rule replay (Refines the narrowing entry)
+**Context:** the owner read job_1793964466256_1tmyzh1do (Laternen) and calls its plot broken: the resolution comes from friends (one stops the parade, another raises a lantern that guides the main character into the gap), while the main character's own act only finds a friend. It is a POSITIVE, not a holding arc. ao77wh9j5 (the friend lifts the loop off) is borderline and is reported as disputed, in neither count. No new model calls: the stored answers are rescored.
+**Numbers, original labels (6 positives, 38 clean):** recall old 0/6, first wording 2/6, narrowed 2/6; flags on clean old 1/38, first 7/38, narrowed 3/38.
+**Numbers, corrected labels (7 positives, 36 clean, 1 disputed):** recall old 0/7, first wording 3/7 (adds 1tmyzh1do), narrowed 2/7; flags on clean old 0/36, first 5/36, narrowed 2/36 (50osg2osm, z3fw660ie). ao77wh9j5 is flagged by all three prompts.
+**Reading:** the narrowing gave up the one extra hit (1tmyzh1do, a case where friends resolve it) to drop 3 of 5 clean flags. The narrowed wording still fires on "friends resolve it" only when the model names the Opposition; in 1tmyzh1do the model raised a different issue instead.
+**Revisit if:** the real-model check shows the narrowed rule misses friend-resolved endings like 1tmyzh1do; the cheapest widening is to restore "yields after the main character's act is fine" only for an Opposition that is a thing or circumstance, not a figure who acts for the main character.
+**Touched files:** docs/decisions.md, evals/results/results.jsonl
+**Status:** 🟡 conditional
