@@ -129,8 +129,11 @@ describe('the wardrobe stage is stored with the story', () => {
   });
 
   it('the story data keeps them', () => {
-    expect(pipeline).toContain('const storyBibleReport = beatsResult?.storyBibleReport || null;');
-    expect(pipeline).toContain('const wardrobeBibleReport = beatsResult?.wardrobeBibleReport || null;');
+    // The beats result's reports are read in ONE place (textSideReports.js), shared with the text-only run.
+    const side = fs.readFileSync(path.join(root, 'server', 'lib', 'textSideReports.js'), 'utf8');
+    expect(side).toContain('storyBibleReport: b.storyBibleReport || null');
+    expect(side).toContain('wardrobeBibleReport: b.wardrobeBibleReport || null');
+    expect(pipeline).toMatch(/storyBibleReport,[^}]*wardrobeBibleReport,[^}]*\} = collectTextSideReports\(beatsResult/);
     expect(pipeline).toMatch(/storyBibleReport, \/\/ wardrobe contract call/);
     expect(pipeline).toMatch(/wardrobeBibleReport, \/\/ wardrobe contract vs Visual Bible/);
   });

@@ -532,6 +532,18 @@ Claude; judging it with Claude would be self-grading). Default `gemini-2.5-flash
 `server/lib/textQualityJudge.js` (prompt: `prompts/story-text-quality-judge.txt`). Robust JSON
 parse (regex-extract `{...}`, validate every criterion in [1,5], recompute `overall`).
 
+**What a text-only run stores** (2026-11-07, docs/decisions.md): the same text-side reports a full
+run keeps, assembled by the same function (`server/lib/textSideReports.js` `collectTextSideReports`).
+They are merged into the job's `stories.data` (id = job id; `metadata` untouched, so it is not a library
+entry): `arcReviewReport` (finalArc, STORY LOGIC `logic`, panel findings and re-telling rounds),
+`beatsReviewReport`, `jevDecisions`, `briefCheckReport`, `storyBibleReport`, `wardrobeBibleReport`,
+`clothingReviewReport`, `sceneExpansionReport`, `storyTextPrompts`, `challenge*`, plus `outline`,
+`outlinePrompt`, `tokenUsage`, `generationLog`, `visualBible`, `clothingRequirements`, `textOnly: true`.
+Read them at `GET /api/stories/<jobId>/metadata` or `SELECT data->'arcReviewReport' FROM stories WHERE id = '<jobId>'`.
+`story_jobs.result_data` (what `/judge-text` reads) keeps `title` + `pages[]` and gains `storyId`.
+No text refinement runs in a text-only job, so there is no `textRefineReport`. skipImages starts no
+avatar styling (`server/lib/earlyAvatarStyling.js`) and no cut-out preparation.
+
 **Underlying fix** — text-only jobs (`inputData.skipImages === true`) now persist `result_data` and
 set `status='completed'` in the `processUnifiedStoryJob` skipImages branch. Previously they hung at
 `status='processing'` (early-return skipped the normal completion write), which also broke the

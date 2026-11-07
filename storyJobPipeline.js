@@ -63,6 +63,8 @@ const {
   adoptReferenceRenders
 } = require('./server/lib/visualBible');
 const { rollUpScenePrompts, projectSceneCast } = require('./server/lib/storyShape');
+const { collectTextSideReports } = require('./server/lib/textSideReports');
+const { startEarlyAvatarStyling } = require('./server/lib/earlyAvatarStyling');
 const {
   prefetchLandmarkPhotos,
   getIndexedLandmarks,
@@ -637,7 +639,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
   // The Grok 2 sheet call needs each character's face + body cut-out. Produce a missing one now, or fail the job
   // now: a missing input must never surface after the writer (prod job_1791748539342_ikyl88w1h, 68 min).
-  if ((inputData.artStyle || 'pixar') !== 'realistic' && MODEL_DEFAULTS.avatarSheetReferences === 'face+body') {
+  // A text-only run (skipImages) draws no sheet, so it needs no cut-out either.
+  if (!skipImages && (inputData.artStyle || 'pixar') !== 'realistic' && MODEL_DEFAULTS.avatarSheetReferences === 'face+body') {
     await require('./server/lib/characterCutouts').ensureCharacterCutouts(inputData.characters || [], { userId, genLog });
   }
 
@@ -2128,9 +2131,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Realistic is no longer excluded: prepareStyledAvatars decides
         // per-category (skips unchanged outfits, redresses changed ones so
         // the reference avatar matches the story's clothing text).
-        if (!inputData.trialMode && !skipImages && !streamingAvatarStylingPromise) {
+        if (!streamingAvatarStylingPromise) {
+          streamingAvatarStylingPromise = startEarlyAvatarStyling({ trialMode: !!inputData.trialMode, skipImages, run: async () => {
           log.debug(`🎨 [STREAM] Starting early avatar styling (${reqCharCount} characters, ${artStyle} style)...`);
-          streamingAvatarStylingPromise = (async () => {
             try {
               const basicRequirements = avatarRequirementsFor(inputData.characters || [], requirements);
 
@@ -2140,7 +2143,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             } catch (error) {
               log.warn(`⚠️ [STREAM] Early avatar styling failed: ${error.message}`);
             }
-          })();
+          } });
         }
     };
 
@@ -3740,7 +3743,41 @@ ${trialWriter.pagesPrompt}`;
       // are pollable. Guard with `status = 'processing'` (mirroring the normal
       // completion write) so a watchdog/cancel that already flipped this job to
       // failed/cancelled isn't resurrected to 'completed'.
+      // The text-side reports a plot rerun is diagnosed from (arc, panel
+      // findings, beats review, ...) — the SAME assembly a full run stores in
+      // stories.data, merged into the pre-created row (docs/decisions.md
+      // 2026-11-07). Read them at GET /api/stories/<jobId>/metadata or
+      // stories.data->'arcReviewReport'. A save failure fails the job loudly.
+      const { saveTextOnlyStoryData } = require('./server/lib/textSideReports');
+      const textVb = visualBible ? {
+        ...visualBible,
+        locations: (visualBible.locations || []).map(loc => {
+          const { referencePhotoData, ...locMeta } = loc;
+          return { ...locMeta, hasPhoto: !!referencePhotoData };
+        }),
+      } : visualBible;
+      await saveTextOnlyStoryData(dbPool, jobId, {
+        id: jobId,
+        title,
+        textOnly: true,
+        generationMode: 'unified',
+        pipelineMode: beatsResult ? 'beats' : 'unified',
+        story: textPages.map(p => p.text).join('\n\n'),
+        outline: unifiedResponse,
+        outlinePrompt: unifiedPrompt,
+        outlineModelId: unifiedModelId,
+        outlineUsage: unifiedUsage,
+        outlineReview: outlineReviewMeta,
+        visualBible: textVb,
+        clothingRequirements: clothingRequirements || null,
+        tokenUsage: JSON.parse(JSON.stringify(tokenUsage, (k, v) => v instanceof Set ? [...v] : v)),
+        generationLog: genLog.getEntries(),
+        ...collectTextSideReports(beatsResult, { scenePromptTable: rollUpScenePrompts(expandedScenes).prompts }),
+        updatedAt: new Date().toISOString(),
+      });
+
       const textResultData = {
+        storyId: jobId,
         title,
         pages: textPages.map(p => ({
           pageNumber: p.pageNumber,
@@ -4177,61 +4214,18 @@ ${trialWriter.pagesPrompt}`;
         }
       }
     };
-    // The other two review stages' before/after (beats mode only). Same shape,
-    // captured inside generateStoryViaBeats at each rewrite; null on the
-    // unified path, which has no beats or scene review.
-    const beatsReviewReport = beatsResult?.beatsReviewReport || null;
-    // The Jev decision layer's report (2026-09-27): cast cuts, shots, light,
-    // VB citations, aboard, population, gaze — every decision per page, so a
-    // run can be replayed. docs/decisions.md "Jev decision layer wired".
-    const jevDecisions = beatsResult?.jevDecisions || null;
-    // Set when the Jev-outage backup ran (owner exception, 2026-09-27): {step, reason, at}.
-    // A trial's only Jev step is its landmark selection (trialJev below).
+    // Every text-side report of the beats run, assembled by ONE function that
+    // the text-only branch (skipImages, above) calls too — a plot rerun stores
+    // the same arc / beats / panel reports a full run does. `beatsResult` is
+    // null on the trial writer, so each is null there (docs/decisions.md
+    // 2026-11-07 "Text-only runs store the text-side reports"). The Jev backup
+    // also records a trial's own landmark-selection fallback (trialJev below).
+    const {
+      arcReviewReport, challengeDrawIds, challengeTakenIds, challengeDraw,
+      beatsReviewReport, jevDecisions, storyBibleReport, clothingReviewReport,
+      wardrobeBibleReport, briefCheckReport, sceneExpansionReport, storyTextPrompts,
+    } = collectTextSideReports(beatsResult, { scenePromptTable });
     const jevFallback = beatsResult?.jevFallback || trialJev.fallback || null;
-    // Drafted arc + the arc reviewer's analysis, so a shipped story can be read
-    // back against the arc it promised.
-    const arcReviewReport = beatsResult?.arcReviewReport || null;
-    // The challenges from this account's earlier books that the arc planner was
-    // told to avoid. Stored so a repeat can be audited against what was excluded.
-    const challengeDrawIds = beatsResult?.challengeDrawIds || null;
-    // Which drawn challenges the arc actually built on, by catalogue id — the
-    // join that makes "was the draw used" a query rather than a prose read.
-    const challengeTakenIds = beatsResult?.challengeTakenIds || null;
-    const challengeDraw = beatsResult?.challengeDraw || null;
-    const clothingReviewReport = beatsResult?.clothingReviewReport || null;
-    // The wardrobe call's prompt + raw reply, and the wardrobe-vs-Visual-Bible
-    // check's findings (adopt / conflict) — diagnostics, stored with the story.
-    const storyBibleReport = beatsResult?.storyBibleReport || null;
-    const wardrobeBibleReport = beatsResult?.wardrobeBibleReport || null;
-    // The brief checks and their one re-ask (2026-09-28) — the scene review's
-    // successor; before/after per re-asked page.
-    const briefCheckReport = beatsResult?.briefCheckReport || null;
-    // The prompt that WROTE the briefs, next to the one that reviewed them.
-    // Beats contributes the timings and which pages fell back to a per-page
-    // call; `prompts[]` is the story-wide prompt table every page references
-    // (see the roll-up above) and is the ONLY copy of the Art Director prompt.
-    const sceneExpansionReport = {
-      ...(beatsResult?.sceneExpansionReport || {}),
-      prompts: scenePromptTable,
-    };
-    // The page-text writer's own call (beats mode). storyTextPrompts is the
-    // EXISTING home for "the prompt that wrote the pages + its raw reply" and
-    // the dev-mode "Full API Output (Story Text)" panel already renders it —
-    // beats mode just shipped it empty, so the writer's Step-1 ---ANALYSIS---
-    // block (page-by-page continuity reasoning) was parsed and thrown away.
-    // One entry: beats writes every page in a single call.
-    const storyTextPrompts = beatsResult?.meta?.storyTextCall
-      ? [{
-        batch: 1,
-        startPage: beatsResult.meta.storyTextCall.startPage,
-        endPage: beatsResult.meta.storyTextCall.endPage,
-        prompt: beatsResult.meta.storyTextCall.prompt,
-        rawResponse: beatsResult.meta.storyTextCall.rawResponse,
-        analysis: beatsResult.meta.storyTextCall.analysis,
-        modelId: beatsResult.meta.storyTextCall.modelId,
-        usage: beatsResult.meta.storyTextCall.usage,
-      }]
-      : [];
     let allImages;
     let pipelineEntityReport = null;
     let pipelineEntityHistory = null;
