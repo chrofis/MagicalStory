@@ -1352,12 +1352,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // Reuse the saved empty-scene plate via the explicit sceneBackground
         // above; never regenerate a fresh plate during repair.
         singlePassScene: !img.emptySceneImage,
+        // The book review's keep / redo decision for the background (bookReview.chooseMethod);
+        // null in the per-page loop, which keeps the plate it holds.
+        backgroundPin: latestEval?.backgroundPin || null,
         // The round loop scores + detects this result itself (round detect
         // + batch eval) — skip the in-iterate eval so pages are evaluated
         // exactly once per version.
         skipEval: true,
       });
       // iteratePage tracks its own usage internally; nothing to add here
+      // A plate painted for this redraw (none was stored, or a background redo) becomes the page's plate.
+      if (result?.freshPlate) img.emptySceneImage = result.freshPlate;
     } else {
       const feedbackSuffix = buildRegenFeedback(latestEval);
       const regenPrompt = feedbackSuffix

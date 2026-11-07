@@ -99,20 +99,38 @@ async function loadStoredPagePlate(storyId, pageNumber) {
 }
 
 /**
- * The scene references a REPAIR render of a stored page sends (calm-zone
- * re-render, regenerate without a story). A landmark page that is not cast-0
- * gets its own plate — the one passed in, else the stored `empty_scene` row —
- * and fails when it has none. Other pages are returned unchanged (no plate
- * added, their landmark photo keeps its cast-0 role when exempt).
+ * THE ONE PLATE RESOLVER for re-rendering a page of a STORED story (page
+ * regenerate, repair re-render, calm-zone re-render, the Lab image stages).
+ * docs/decisions.md 2026-11-07 "A re-render keeps the page's plate".
+ *
+ * Every page that is not cast-0 is redrawn on ITS plate, not only landmark
+ * pages: the plate the caller holds, else the stored `empty_scene` row. A page
+ * with none gets one rendered through `renderPlate` (the caller saves it as the
+ * page's `empty_scene`); a refused or failed render throws. A page redrawn
+ * with no plate came out in a palette unlike the rest of its book (Rubi p6,
+ * 2026-11-07). The cast-0 exemption is unchanged: that page's landmark photo
+ * IS its scene and it has no plate. Covers are not routed here.
+ *
+ * Without `renderPlate` (an in-run caller that cannot render), a landmark page
+ * with no plate throws and any other page is left without one.
  */
-async function resolveRepairScene({ page, landmarkPhotos, plate = null, storyId = null, pageNumber = null, label = 'REPAIR' } = {}) {
-  if (!pageNeedsPlate(page, landmarkPhotos)) {
+async function resolveRepairScene({ page, landmarkPhotos, plate = null, storyId = null, pageNumber = null, label = 'REPAIR', renderPlate = null } = {}) {
+  if (landmarkPhotoIsPageScene(page)) {
     return { sceneBackground: null, landmarkScene: pageLandmarkScene(page) };
   }
   // Through module.exports so the one DB read is stubbable in tests.
-  const sceneBackground = (await toPlateDataUri(plate)) || (await module.exports.loadStoredPagePlate(storyId, pageNumber));
+  let sceneBackground = (await toPlateDataUri(plate)) || (await module.exports.loadStoredPagePlate(storyId, pageNumber));
+  if (!sceneBackground && typeof renderPlate === 'function') {
+    sceneBackground = await toPlateDataUri(await renderPlate());
+    if (!sceneBackground) {
+      throw new PlateRequiredError(`${label} page ${pageNumber ?? '?'}: the page has no stored plate and none could be rendered — not redrawn without one`);
+    }
+  }
   if (!sceneBackground) {
-    throw new PlateRequiredError(`${label} page ${pageNumber ?? '?'}: landmark page has no stored plate — not rendered on the raw photo`);
+    if (pageNeedsPlate(page, landmarkPhotos)) {
+      throw new PlateRequiredError(`${label} page ${pageNumber ?? '?'}: landmark page has no stored plate — not rendered on the raw photo`);
+    }
+    return { sceneBackground: null, landmarkScene: null };
   }
   return { sceneBackground, landmarkScene: null };
 }

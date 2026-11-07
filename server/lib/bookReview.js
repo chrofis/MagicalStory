@@ -63,6 +63,18 @@ function toDedupedIssue(fault) {
 }
 
 /**
+ * The background decision of a redraw, from the page's NEW faults (each carries
+ * route.background, parsed from the reviewer's `background:` tag). One decision
+ * per redraw: when the faults disagree, redo wins and the changes are joined.
+ * @returns {{keep:true}|{keep:false, change:string}}
+ */
+function pinBackground(freshFaults) {
+  const redo = freshFaults.map(f => f.route.background).filter(b => b && b.keep === false);
+  if (redo.length > 0) return { keep: false, change: [...new Set(redo.map(b => b.change))].join('; ') };
+  return { keep: true };
+}
+
+/**
  * Which ONE repair method a page gets this round, from its faults' route tags.
  * One method per page per round (as in the per-page loop). Precedence: a page
  * the reviewer wants drawn again (NEW) is redrawn whatever else is wrong with it;
@@ -84,7 +96,10 @@ function chooseMethod(faults) {
   const fresh = routed.filter(f => f.route.kind === 'NEW');
   if (fresh.length > 0) {
     // A redraw answers every fault on the page, so it is told all of them.
-    return { method: 'iterate', faults: routed, charName: null, issueTypes: [], unroutable, reason: `NEW picture (${fresh.length} fault(s) routed NEW)` };
+    return {
+      method: 'iterate', faults: routed, charName: null, issueTypes: [], unroutable,
+      backgroundPin: pinBackground(fresh), reason: `NEW picture (${fresh.length} fault(s) routed NEW)`,
+    };
   }
   const chars = routed.filter(f => f.route.kind === 'CHAR');
   if (chars.length > 0) {
@@ -351,7 +366,7 @@ async function runBookReviewRounds(d) {
         ? { method: 'title-redraw', faults: best.reviewFaults.filter(f => f.route), charName: null, issueTypes: [], unroutable: best.reviewFaults.filter(f => !f.route), reason: 'the cover title is spelled wrong' }
         : chooseMethod(best.reviewFaults);
       for (const u of choice.unroutable) {
-        log.error(`❌ [BOOK-REVIEW] Round ${round} p${img.pageNumber}: the fault carries no fix route and is NOT repaired (no fallback router) — ${u.line}`);
+        log.error(`❌ [BOOK-REVIEW] Round ${round} p${img.pageNumber}: the fault carries no usable fix route${u.routeError ? ` (${u.routeError})` : ''} and is NOT repaired (no fallback router) — ${u.line}`);
       }
       if (!choice.method) continue;
       const failedBefore = (best.failedRepairs || []).some(f => f.method === choice.method);
@@ -393,7 +408,7 @@ async function runBookReviewRounds(d) {
           const plan = buildTouchupPlan(choice.faults, d.nameMapFor(img, best));
           latestEval = { fixableIssues: buildFixableIssues(choice.faults), consolidatedPlan: plan, reasoning: 'book review touch-up', pageNumber };
         } else if (choice.method === 'iterate' || choice.method === 'title-redraw') {
-          latestEval = { fixableIssues: buildFixableIssues(choice.faults), consolidatedPlan: null, reasoning: 'book review: draw the picture again', pageNumber };
+          latestEval = { fixableIssues: buildFixableIssues(choice.faults), consolidatedPlan: null, reasoning: 'book review: draw the picture again', pageNumber, backgroundPin: choice.backgroundPin || null };
         } else {
           latestEval = best.evaluation || null;
         }

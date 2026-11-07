@@ -89,6 +89,27 @@ function SCALE_COLLECTIONS_PRESENT(vb) {
 // its type — parseRoutes moves it back.
 const ROUTED_FAULT_RE = /^[ \t>*-]*FAULT\[(IMG|TEXT)\](?:\[(MINOR|MAJOR|CRITICAL|CATASTROPHIC)\])?(?:\[([a-z_]+)\])?(?:\[(TOUCHUP|NEW|CHAR:[^\]\r\n]*)\])?:\s*(?:p(-?\d+))?\s*(.*)$/gim;
 
+// THE BACKGROUND DECISION of a NEW line (owner, 2026-11-07, docs/decisions.md
+// "A re-render keeps the page's plate"): a NEW fault ends with
+// `background: keep` or `background: redo — <what to change>`. The generator
+// is prompts/book-review-rules.txt, which reads BACKGROUND_TAG_FORMS below as
+// {BACKGROUND_TAG}; this regex is the ONLY reader. A NEW line without one is
+// unroutable (parseRoutes), never guessed.
+const BACKGROUND_TAG_FORMS = '` | background: keep` or ` | background: redo — <what to change>`';
+const BACKGROUND_TAG_RE = /(?:\s*\|)?\s*(?<![A-Za-z])background:\s*(?:(keep)|redo\s*[—–-]\s*(\S.*?))\s*$/i;
+
+/**
+ * Split the background decision off the end of a fault's sentence.
+ * @returns {{detail:string, background:{keep:true}|{keep:false,change:string}|null}}
+ */
+function splitBackgroundTag(detail) {
+  const text = String(detail || '');
+  const m = text.match(BACKGROUND_TAG_RE);
+  if (!m) return { detail: text.trim(), background: null };
+  const background = m[1] ? { keep: true } : { keep: false, change: m[2].trim() };
+  return { detail: text.slice(0, m.index).replace(/[\s|]+$/, '').trim(), background };
+}
+
 // "BETTER: p5 — NEW" — the re-review's verdict on a repaired page's two pictures.
 const BETTER_RE = /^[ \t>*-]*BETTER:\s*p(-?\d+)\s*[—–-]?\s*(NEW|PREVIOUS|SAME)\b/gim;
 
@@ -452,7 +473,7 @@ function reviewRulesText(review, templates, fillTemplate) {
   if (review.hasRepairedPages && !rereview) throw new Error('bookReviewRereview template not loaded');
   // The cover outfit sentence is the one the brief check `cover_outfit_not_stated` sends back: one text for both readers.
   const { COVER_OUTFIT_RULE } = require('./clothingCategories');
-  return fillTemplate(rules, { BOOK_TITLE: title, RE_REVIEW_RULES: rereview || '', COVER_OUTFIT_RULE });
+  return fillTemplate(rules, { BOOK_TITLE: title, RE_REVIEW_RULES: rereview || '', COVER_OUTFIT_RULE, BACKGROUND_TAG: BACKGROUND_TAG_FORMS });
 }
 
 /** The native-Google call. Same body production has always sent. */
@@ -635,17 +656,26 @@ function parseRoutes(raw) {
     // `[MAJOR][TOUCHUP]` (no type): the type group swallowed the route.
     if (!routeTag && (type === 'touchup' || type === 'new')) { routeTag = type; type = null; }
     const page = m[5] != null ? parseInt(m[5], 10) : null;
+    let route = channel === 'IMG' ? parseRouteTag(routeTag) : null;
+    // The background decision rides on the sentence of an IMG line; it is cut off the instruction either way.
+    const split = channel === 'IMG' ? splitBackgroundTag(m[6]) : { detail: (m[6] || '').trim(), background: null };
+    let routeError = null;
+    if (route && route.kind === 'NEW') {
+      if (split.background) route = { ...route, background: split.background };
+      else { route = null; routeError = 'a NEW line carries no `background: keep` / `background: redo — <change>` decision'; }
+    }
     byRoute[channel].push({
       page,
       severity,
       type,
       // The fix route the reviewer chose (book review); null on every line that has none.
-      route: channel === 'IMG' ? parseRouteTag(routeTag) : null,
+      route,
+      ...(routeError ? { routeError } : {}),
       // The whole line, verbatim — the corrective text round is fed FAULT lines
       // in the same shape the text audit produces, so the refine template reads
       // them without a second format to learn.
       line: m[0].trim(),
-      detail: (m[6] || '').replace(/^[—–-]\s*/, '').trim(),
+      detail: split.detail.replace(/^[—–-]\s*/, '').trim(),
     });
   }
   return byRoute;
@@ -895,4 +925,6 @@ module.exports = {
   askObjectScale,
   MAX_PAGES_PER_CALL,
   reviewRulesText,
+  splitBackgroundTag,
+  BACKGROUND_TAG_FORMS,
 };

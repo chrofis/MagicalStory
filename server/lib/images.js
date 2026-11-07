@@ -4304,111 +4304,146 @@ async function renderStoryPagePlate({
 }
 
 /**
- * PLATE OR FAIL for a render of a STORED page outside the pipeline (page
- * regenerate, the dev test-models / style-lab routes). A landmark page that is
- * not cast-0 renders on its stored plate; with none stored, one is rendered
- * (renderStoryPagePlate); with neither, it throws. Returns the render's
- * { sceneBackground, landmarkScene } — other pages get { null, role }.
+ * The plate of a render of a STORED page outside the pipeline (page
+ * regenerate, the dev test-models / style-lab routes): the ONE resolver
+ * landmarkScene.resolveRepairScene, given a renderer. Every page that is not
+ * cast-0 renders on its stored plate (landmark or not); with none stored, one
+ * is rendered from the page's plate description and saved as the page's
+ * `empty_scene` (`save`); a refused render throws (docs/decisions.md
+ * 2026-11-07, "A re-render keeps the page's plate"). Covers are not routed here.
+ * Returns the render's { sceneBackground, landmarkScene }.
  */
 async function ensureStoryPagePlate({
   storyId, storyData, visualBible, pageNumber, sceneMetadata = null, sceneCharacters = null,
   landmarkPhotos = [], textPosition = null, aspectRatio = null, imageModelOverride = null,
-  save = null, logTag = 'PAGE',
+  save = null, logTag = 'PAGE', plate = null,
 }) {
-  const { loadStoredPagePlate } = require('./landmarkScene');
-  const page = { sceneMetadata, sceneCharacters };
-  if (!pageNeedsPlate(page, landmarkPhotos)) {
-    return { sceneBackground: null, landmarkScene: pageLandmarkScene(page) };
-  }
-  let sceneBackground = await loadStoredPagePlate(storyId, pageNumber);
-  if (sceneBackground) {
-    log.info(`🎬 [${logTag}] Page ${pageNumber}: reusing the stored plate`);
-  } else {
-    const { resolvePagePlate } = getStoryHelpers();
-    const plateDescription = sceneMetadata?.emptyScenePrompt
-      || resolvePagePlate({ pageNumber, sceneMetadata, visualBible, outlinePlate: null })?.text
-      || null;
-    log.info(`🎬 [${logTag}] Page ${pageNumber}: landmark page has no stored plate — rendering one`);
-    sceneBackground = await toPlateDataUri(await renderStoryPagePlate({
-      storyData, visualBible, pageNumber, sceneMetadata, landmarkPhotos,
-      plateDescription, textPosition, aspectRatio, imageModelOverride, save, logTag,
-    }));
-  }
-  if (!sceneBackground) {
-    log.error(`❌ [${logTag}] Page ${pageNumber}: landmark "${landmarkPhotos[0]?.name || 'unknown'}" has no plate and none could be rendered — not rendered on the raw photo`);
-    throw new PlateRequiredError(`${logTag} page ${pageNumber}: landmark page has no plate and none could be rendered`);
-  }
-  return { sceneBackground, landmarkScene: null };
+  const { resolveRepairScene } = require('./landmarkScene');
+  const scene = await resolveRepairScene({
+    page: { sceneMetadata, sceneCharacters }, landmarkPhotos, plate, storyId, pageNumber, label: logTag,
+    renderPlate: () => {
+      const { resolvePagePlate } = getStoryHelpers();
+      const plateDescription = sceneMetadata?.emptyScenePrompt
+        || resolvePagePlate({ pageNumber, sceneMetadata, visualBible, outlinePlate: null })?.text
+        || null;
+      log.info(`🎬 [${logTag}] Page ${pageNumber}: no stored plate — rendering one`);
+      return renderStoryPagePlate({
+        storyData, visualBible, pageNumber, sceneMetadata, landmarkPhotos,
+        plateDescription, textPosition, aspectRatio, imageModelOverride, save, logTag,
+      });
+    },
+  });
+  if (scene.sceneBackground) log.info(`🎬 [${logTag}] Page ${pageNumber}: redrawn on the page's plate`);
+  return scene;
 }
 
 /**
  * The plate an ITERATE render of a page uses (iteratePageCore). Kept apart so
  * the decision replays without the scene rewrite around it.
- * PLATE OR FAIL (server/lib/landmarkScene.js): a landmark page that is not
- * cast-0 always renders on a plate — the one passed in or stored, else a fresh
- * one, else it throws. singlePassScene does not apply to it.
- * @returns {Promise<{sceneBackground: string|null, iteratePageRef: Object}>}
+ *
+ * A page that is not cast-0 is redrawn on a plate (docs/decisions.md
+ * 2026-11-07, "A re-render keeps the page's plate"): the one passed in, else
+ * the stored one, else a fresh one, else it throws. Only an explicit
+ * singlePassScene (a dev setting) leaves a non-landmark page without one; a
+ * landmark page and a book-review pin always plate.
+ *
+ * Who decides keep or redo:
+ *  - `backgroundPin` (the book review, from the reviewer's `background:` tag):
+ *    {keep:true} redraws on the stored plate; {keep:false, change} paints a new
+ *    plate from the page's stored plate description plus the change, and the
+ *    redraw uses it. It overrides the rewriter's reuseEmptyScene.
+ *  - no pin (a customer's free-text edit, the repair loop): the rewriter's
+ *    explicit reuseEmptyScene:false paints a new plate from its emptyScenePrompt;
+ *    true, null or omitted keeps the stored plate - never "no plate".
+ * A plate painted here is returned as `freshPlate` (and saved through
+ * emptySceneCallbacks.save when given) so the caller can store it as the
+ * page's plate.
+ * @returns {Promise<{sceneBackground: string|null, iteratePageRef: Object, freshPlate: string|null}>}
  */
 async function resolveIteratePlate({
   pageNumber, storyData, visualBible, iterateSceneMetadata = null, sceneCharacters = null,
   pageLandmarkPhotos = [], sceneBackgroundIn = null, effectiveSinglePass = false,
   emptySceneCallbacks = null, lockedTextPosition = null, sceneAspect = null, imageModelOverride = null,
+  backgroundPin = null, storedPlatePrompt = null,
 }) {
-  // Resolve empty scene background.
-  // If sceneBackgroundIn was pre-supplied (pipeline), use it directly.
-  // If emptySceneCallbacks are provided (UI route), load/generate based on scene metadata.
-  // singlePassScene flag forces a one-pass render with no plate.
+  const { landmarkPhotoIsPageScene, loadStoredPagePlate } = require('./landmarkScene');
+  const { resolvePagePlate } = getStoryHelpers();
   // One fresh plate for this page (shared renderer, renderStoryPagePlate).
-  const renderFreshPlate = (plateDescription) => renderStoryPagePlate({
-    storyData, visualBible, pageNumber, sceneMetadata: iterateSceneMetadata,
-    landmarkPhotos: pageLandmarkPhotos, plateDescription, textPosition: lockedTextPosition,
-    aspectRatio: sceneAspect, imageModelOverride, save: emptySceneCallbacks?.save || null,
-  });
+  let freshPlate = null;
+  const renderFreshPlate = async (plateDescription) => {
+    const rendered = await renderStoryPagePlate({
+      storyData, visualBible, pageNumber, sceneMetadata: iterateSceneMetadata,
+      landmarkPhotos: pageLandmarkPhotos, plateDescription, textPosition: lockedTextPosition,
+      aspectRatio: sceneAspect, imageModelOverride, save: emptySceneCallbacks?.save || null,
+    });
+    if (rendered) freshPlate = rendered;
+    return rendered;
+  };
+  const loadStored = async () => {
+    try {
+      return (emptySceneCallbacks ? await emptySceneCallbacks.load(pageNumber) : null)
+        || await loadStoredPagePlate(storyData?.id || null, pageNumber);
+    } catch (e) {
+      log.debug(`[ITERATE] No empty scene for page ${pageNumber}: ${e.message}`);
+      return null;
+    }
+  };
 
-  // PLATE OR FAIL (server/lib/landmarkScene.js): a landmark page that is not
-  // cast-0 always renders on a plate — the stored one when it exists, else a
-  // fresh one, else it fails. singlePassScene does not apply to it.
   const iteratePageRef = { sceneMetadata: iterateSceneMetadata, sceneCharacters };
-  const iterateNeedsPlate = pageNeedsPlate(iteratePageRef, pageLandmarkPhotos);
+  const castless = landmarkPhotoIsPageScene(iteratePageRef);
+  // Covers keep their own plate behaviour (decisions 2026-11-07: out of scope).
+  const isCover = pageNumber < 0;
+  const pin = (castless || isCover) ? null : backgroundPin;
+  if (backgroundPin && !pin) {
+    log.info(`🎬 [ITERATE] Page ${pageNumber}: ${castless ? 'cast-0 page has no plate' : 'a cover keeps its own plate behaviour'} - background decision not applied`);
+  }
+  const landmarkNeedsPlate = pageNeedsPlate(iteratePageRef, pageLandmarkPhotos);
+  const mustPlate = !castless && (landmarkNeedsPlate || (!isCover && (!effectiveSinglePass || !!pin)));
 
   let sceneBackground = sceneBackgroundIn;
-  if (effectiveSinglePass && !iterateNeedsPlate) {
+  if (effectiveSinglePass && !mustPlate) {
     sceneBackground = null;
-    log.info(`🎛️ [ITERATE] Page ${pageNumber}: singlePassScene=true — skipping empty-scene plate`);
-  } else if (!sceneBackground && emptySceneCallbacks) {
-    // A landmark page reuses its stored plate unless the setting changed.
-    if (iterateSceneMetadata?.reuseEmptyScene || (iterateNeedsPlate && iterateSceneMetadata?.reuseEmptyScene !== false)) {
-      try {
-        const existing = await emptySceneCallbacks.load(pageNumber);
-        if (existing) {
-          sceneBackground = existing;
-          log.info(`🎬 [ITERATE] Page ${pageNumber}: reusing empty scene as style anchor`);
-        }
-      } catch (e) {
-        log.debug(`[ITERATE] No empty scene for page ${pageNumber}: ${e.message}`);
-      }
-    } else if (iterateSceneMetadata?.reuseEmptyScene === false && iterateSceneMetadata?.emptyScenePrompt) {
+    log.info(`🎛️ [ITERATE] Page ${pageNumber}: singlePassScene=true - skipping empty-scene plate`);
+  } else if (pin && !pin.keep) {
+    // REDO: a new plate from the stored plate's description plus the reviewer's change, saved as the page's plate.
+    const base = storedPlatePrompt
+      || resolvePagePlate({ pageNumber, sceneMetadata: iterateSceneMetadata, visualBible, outlinePlate: null })?.text
+      || null;
+    if (!base || !pin.change) {
+      throw new PlateRequiredError(`ITERATE page ${pageNumber}: background redo needs the stored plate description and the change`);
+    }
+    log.info(`🎬 [ITERATE] Page ${pageNumber}: background redo - painting a new plate (${pin.change})`);
+    sceneBackground = await renderFreshPlate(`${base}
+
+Change to the background: ${pin.change}`);
+  } else if (!sceneBackground) {
+    const rewriterRepaints = !pin && emptySceneCallbacks && iterateSceneMetadata?.reuseEmptyScene === false && iterateSceneMetadata?.emptyScenePrompt;
+    if (rewriterRepaints) {
       log.info(`🎬 [ITERATE] Page ${pageNumber}: generating fresh empty scene (setting changed)`);
       sceneBackground = await renderFreshPlate(iterateSceneMetadata.emptyScenePrompt);
+    } else if (mustPlate || (emptySceneCallbacks && iterateSceneMetadata?.reuseEmptyScene)) {
+      // KEEP (a pin, the rewriter's true, or no answer): the stored plate.
+      sceneBackground = await loadStored();
+      if (sceneBackground) log.info(`🎬 [ITERATE] Page ${pageNumber}: reusing empty scene as style anchor`);
     }
   }
   // Stored plates can arrive as raw base64 or a URL; the render only takes a
-  // data URI (anything else is silently not sent), and a landmark page must
+  // data URI (anything else is silently not sent), and a plated page must
   // not lose its plate that way.
-  if (iterateNeedsPlate) sceneBackground = await toPlateDataUri(sceneBackground);
-  if (iterateNeedsPlate && !sceneBackground) {
-    const { resolvePagePlate } = getStoryHelpers();
-    const plateText = iterateSceneMetadata?.emptyScenePrompt
+  if (mustPlate) sceneBackground = await toPlateDataUri(sceneBackground);
+  if (mustPlate && !sceneBackground) {
+    const plateText = storedPlatePrompt
+      || iterateSceneMetadata?.emptyScenePrompt
       || resolvePagePlate({ pageNumber, sceneMetadata: iterateSceneMetadata, visualBible, outlinePlate: null })?.text
       || null;
-    log.info(`🎬 [ITERATE] Page ${pageNumber}: landmark page has no stored plate — rendering one`);
+    log.info(`🎬 [ITERATE] Page ${pageNumber}: no stored plate - rendering one`);
     sceneBackground = await toPlateDataUri(await renderFreshPlate(plateText));
     if (!sceneBackground) {
-      log.error(`❌ [ITERATE] Page ${pageNumber}: landmark "${pageLandmarkPhotos[0]?.name || 'unknown'}" has no plate and none could be rendered — not rendered on the raw photo`);
-      throw new PlateRequiredError(`ITERATE page ${pageNumber}: landmark page has no plate and none could be rendered`);
+      log.error(`❌ [ITERATE] Page ${pageNumber}: no plate and none could be rendered - not redrawn without one`);
+      throw new PlateRequiredError(`ITERATE page ${pageNumber}: the page has no plate and none could be rendered`);
     }
   }
-  return { sceneBackground, iteratePageRef };
+  return { sceneBackground, iteratePageRef, freshPlate: freshPlate ? await toPlateDataUri(freshPlate) : null };
 }
 
 /**
@@ -4525,6 +4560,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     previewOnly = false,
     customImagePrompt = null,
     emptySceneCallbacks = null,
+    // The book review's background decision for this redraw ({keep:true} | {keep:false, change}):
+    // code pins keep/redo from it and the rewriter's reuseEmptyScene is not read (resolveIteratePlate).
+    backgroundPin = null,
     // Per-scene aspect override — caller (regeneration route or repair pipeline)
     // passes the scene's saved imageAspect so the regenerated image matches the
     // shape the layout expects. null/undefined falls back to the global default.
@@ -5448,10 +5486,14 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   const iterateImageBackend = imageModelOverride ? (IMAGE_MODELS[imageModelOverride]?.backend || null) : null;
 
   // Resolve empty scene background (resolveIteratePlate — plate or fail).
-  const { sceneBackground, iteratePageRef } = await resolveIteratePlate({
+  // The page's STORED plate description (before this rewrite) is what a background redo repaints.
+  const storedPlatePrompt = parentSceneMetadata.emptyScenePrompt
+    || getStoryHelpers().resolvePagePlate({ pageNumber, sceneMetadata: parentSceneMetadata, visualBible, outlinePlate: null })?.text
+    || null;
+  const { sceneBackground, iteratePageRef, freshPlate } = await resolveIteratePlate({
     pageNumber, storyData, visualBible, iterateSceneMetadata, sceneCharacters,
     pageLandmarkPhotos, sceneBackgroundIn, effectiveSinglePass, emptySceneCallbacks,
-    lockedTextPosition, sceneAspect, imageModelOverride,
+    lockedTextPosition, sceneAspect, imageModelOverride, backgroundPin, storedPlatePrompt,
   });
 
   // Build VB grid — when sceneBackground is set, vehicles/large structures/landmarks are
@@ -5740,6 +5782,8 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // the outline dropped but the page text mentions). Callers must evaluate
     // the result against THIS contract, not the original page metadata.
     newSceneCharacters: sceneCharacters,
+    // A plate painted for this redraw (none stored, or a background redo): the caller stores it as the page's plate.
+    freshPlate: freshPlate || null,
     previewMismatches,
     checksRun,
     compositionAnalysis: previewFeedback.composition,

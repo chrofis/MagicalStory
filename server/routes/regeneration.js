@@ -1290,11 +1290,17 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
     // PLATE OR FAIL: a landmark page (not cast-0) always renders on a plate —
     // the saved one, else one rendered now (not saved: this is an A/B harness).
     let testModelsLandmarkScene = null;
+    // The dev A/B harnesses (this and style-lab) keep their landmark-only plate: a
+    // non-landmark page stays on the saved background / singlePass setting under
+    // test (docs/decisions.md 2026-11-07 covers customer and repair re-renders).
     if (pageNumber > 0) {
-      const tmScene = await ensureStoryPagePlate({
-        storyId: id, storyData, visualBible, pageNumber, sceneMetadata,
-        landmarkPhotos, logTag: 'TEST-MODELS',
-      });
+      const tmPage = { sceneMetadata };
+      const tmScene = pageNeedsPlate(tmPage, landmarkPhotos)
+        ? await ensureStoryPagePlate({
+          storyId: id, storyData, visualBible, pageNumber, sceneMetadata,
+          landmarkPhotos, logTag: 'TEST-MODELS',
+        })
+        : { sceneBackground: null, landmarkScene: pageLandmarkScene(tmPage) };
       testModelsLandmarkScene = tmScene.landmarkScene;
       if (tmScene.sceneBackground) effectiveSceneBackground = tmScene.sceneBackground;
     }
@@ -2121,8 +2127,11 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
     log.info(`🧪 [STYLE-LAB] Story ${id}, page ${pageNumber}: run ${runId}, models: ${models.join(', ')}`);
     // PLATE OR FAIL: a landmark page (not cast-0) renders on its plate — the
     // stored one, else one rendered now (not saved: this is a style A/B lab).
+    const styleLabPage = { sceneMetadata: styleLabSceneMetadata };
     const styleLabScene = pageNumber > 0
-      ? await ensureStoryPagePlate({ storyId: id, storyData, visualBible, pageNumber, sceneMetadata: styleLabSceneMetadata, landmarkPhotos, logTag: 'STYLE-LAB' })
+      ? (pageNeedsPlate(styleLabPage, landmarkPhotos)
+        ? await ensureStoryPagePlate({ storyId: id, storyData, visualBible, pageNumber, sceneMetadata: styleLabSceneMetadata, landmarkPhotos, logTag: 'STYLE-LAB' })
+        : { sceneBackground: null, landmarkScene: pageLandmarkScene(styleLabPage) })
       : { sceneBackground: null, landmarkScene: null };
     // The grid, built the way the run builds it (pageRenderCall) once the plate is
     // known; its cell ids are what every model's prompt claims references for.

@@ -11240,6 +11240,22 @@
         "kind": "human",
         "what": "In a staging story whose text hides a feature of a creature or object until a reveal page, read the stored visualBible: the entry has states named for hidden and revealed with pages that split at the reveal page, the hidden reference cell shows the feature nowhere, and the pages before the reveal are drawn without it. In a story with no hidden feature, no entry gained such states."
       }
+    },
+    {
+      "id": "rerender-keeps-page-plate",
+      "title": "A redraw of a stored page keeps its plate, and the book review says keep or redo for the background",
+      "commits": [],
+      "addedAt": "2026-11-07",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On a book_review story, every NEW fault line the reviewer writes ends with `background: keep` or `background: redo — <change>`; a NEW page is redrawn on the page's stored plate on keep, and on a new plate (saved as the page's empty_scene) on redo; a page that has no plate and is not a landmark page is never redrawn without one. Before the run: parser and resolver unit tests, and a stored-data replay of the parser over 54 stored review rounds of 15 stories (old raws lack the tag, so all 57 NEW lines read as unroutable, which proves the parser, not the prompt). The prompt is unmeasured until a Lab book_audit on 3 stored books.",
+      "runShape": [
+        "needs-iterate-repair"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In a staging book_review story with a NEW-routed page: read finalChecksReport.bookAuditRounds[].raw (every [NEW] line ends with a background tag, none is logged 'carries no usable fix route'); for a keep page the redrawn version's story_images empty_scene row for that page is unchanged; for a redo page the empty_scene row is new and the redrawn picture's background follows the stated change; no page in the book was redrawn without a plate."
+      }
     }
   ],
   "runs": [

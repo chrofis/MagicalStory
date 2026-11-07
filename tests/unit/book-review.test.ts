@@ -20,8 +20,8 @@ describe('the fault line carries an optional FIX ROUTE (bookAudit.parseRoutes)',
   const raw = [
     'FAULT[IMG][MAJOR][wrong_action][TOUCHUP]: p3 — Remove the second hat.',
     'FAULT[IMG][CRITICAL][clothing][CHAR:Anna Maria]: p4 — Redraw her in the red coat.',
-    'FAULT[IMG][CATASTROPHIC][setting][NEW]: p5 — Draw the harbour, not the forest.',
-    'FAULT[IMG][CRITICAL][required_text][NEW]: p-1 — The title is misspelled.',
+    'FAULT[IMG][CATASTROPHIC][setting][NEW]: p5 — Draw the harbour, not the forest. | background: keep',
+    'FAULT[IMG][CRITICAL][required_text][NEW]: p-1 — The title is misspelled. | background: keep',
     '  > FAULT[TEXT][MINOR]: p7 — The sentence repeats.',
   ].join('\n');
   const parsed = bookAudit.parseRoutes(raw);
@@ -29,7 +29,8 @@ describe('the fault line carries an optional FIX ROUTE (bookAudit.parseRoutes)',
   it('reads the three route forms into a structured value', () => {
     expect(parsed.IMG[0].route).toEqual({ kind: 'TOUCHUP' });
     expect(parsed.IMG[1].route).toEqual({ kind: 'CHAR', charName: 'Anna Maria' });
-    expect(parsed.IMG[2].route).toEqual({ kind: 'NEW' });
+    expect(parsed.IMG[2].route).toEqual({ kind: 'NEW', background: { keep: true } });
+    expect(parsed.IMG[2].detail).toBe('Draw the harbour, not the forest.');
     expect(parsed.IMG[0].type).toBe('wrong_action');
     expect(parsed.IMG[1].detail).toBe('Redraw her in the red coat.');
   });
@@ -48,8 +49,8 @@ describe('the fault line carries an optional FIX ROUTE (bookAudit.parseRoutes)',
   });
 
   it('a route written without a type is not mistaken for the type', () => {
-    const r = bookAudit.parseRoutes('FAULT[IMG][MAJOR][NEW]: p5 — x\nFAULT[IMG][MINOR][touchup]: p6 — y');
-    expect(r.IMG[0]).toMatchObject({ type: null, route: { kind: 'NEW' } });
+    const r = bookAudit.parseRoutes('FAULT[IMG][MAJOR][NEW]: p5 — x | background: keep\nFAULT[IMG][MINOR][touchup]: p6 — y');
+    expect(r.IMG[0]).toMatchObject({ type: null, route: { kind: 'NEW', background: { keep: true } } });
     expect(r.IMG[1]).toMatchObject({ type: null, route: { kind: 'TOUCHUP' } });
   });
 
@@ -277,7 +278,7 @@ describe('D1: a failed review is retried once, then the book ships unrepaired', 
 
   it('a re-review that fails keeps the previous version: the unreviewed repair cannot win', async () => {
     const reviewBook = vi.fn()
-      .mockResolvedValueOnce(audit('FAULT[IMG][MAJOR][wrong_action][NEW]: p1 — Draw it again.'))
+      .mockResolvedValueOnce(audit('FAULT[IMG][MAJOR][wrong_action][NEW]: p1 — Draw it again. | background: keep'))
       .mockResolvedValue(null);
     const { deps, pageVersions } = mkDeps(reviewBook, { maxRepairRounds: 2 });
     const out = await review.runBookReviewRounds(deps);
@@ -318,7 +319,7 @@ describe('auditStoryBook builds the review request (fetch stubbed, nothing leave
     process.env.OPENROUTER_API_KEY = 'test-key';
     (globalThis as any).fetch = async (_url: string, init: any) => {
       sent.push(JSON.parse(init.body));
-      return { ok: true, json: async () => ({ choices: [{ message: { content: 'FAULT[IMG][MAJOR][required_text][NEW]: p-1 — Fix the title.\nFAULTS: 1' }, finish_reason: 'stop' }], usage: { prompt_tokens: 1000, completion_tokens: 200, cost: 0.0123 } }) };
+      return { ok: true, json: async () => ({ choices: [{ message: { content: 'FAULT[IMG][MAJOR][required_text][NEW]: p-1 — Fix the title. | background: keep\nFAULTS: 1' }, finish_reason: 'stop' }], usage: { prompt_tokens: 1000, completion_tokens: 200, cost: 0.0123 } }) };
     };
     const tracked: any[] = [];
     try {

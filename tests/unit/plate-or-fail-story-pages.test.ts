@@ -179,8 +179,9 @@ describe('the pipeline page paths', () => {
 describe('iterate and the regeneration routes', () => {
   const imgSrc = read('server/lib/images.js');
   it('iteratePageCore: a landmark page ignores singlePassScene, reuses or renders, else throws', () => {
-    expect(imgSrc).toContain('if (effectiveSinglePass && !iterateNeedsPlate) {');
-    expect(imgSrc).toContain("throw new PlateRequiredError(`ITERATE page ${pageNumber}: landmark page has no plate and none could be rendered`);");
+    // 2026-11-07: every non-cast-0 page plates (mustPlate); only a dev singlePassScene frees a non-landmark page.
+    expect(imgSrc).toContain('if (effectiveSinglePass && !mustPlate) {');
+    expect(imgSrc).toContain("throw new PlateRequiredError(`ITERATE page ${pageNumber}: the page has no plate and none could be rendered`);");
     expect(imgSrc).toContain('landmarkScene: pageLandmarkScene(iteratePageRef),');
   });
   it('page regenerate, test-models and style-lab all go through ensureStoryPagePlate', () => {
