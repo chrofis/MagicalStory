@@ -4652,6 +4652,14 @@
       "rootCause": "regeneration.js cover regenerate route never loaded the cover active bytes; iterateFullStoryCover (page path since 6fbd2b599) requires coverImages[key].imageData.",
       "status": "fixed",
       "fixedIn": "f1a34150f"
+    },
+    {
+      "id": "page-edit-overwrites-existing-version",
+      "title": "POST /api/stories/:id/edit/image/:pageNum saved its result over an existing story_images version (p5 v3, a Lab-rendered image) instead of a new version_index: the route pushes onto data.sceneImages[].imageVersions and derives the index from that array, which does not list versions created by the Test Lab image stage",
+      "reportedAt": "2026-11-07",
+      "source": "Reproduced on staging 2026-11-07 on job_1793959308869_fre2mb4d0 p5: Lab exp 1809 wrote v2, exp 1810 wrote v3; the edit call then returned image md5 2dc9f730… and scene/p5/v3.jpg now has that md5 (Lab image md5 1f4c71e2… gone; local copy in the session scratchpad). server/routes/regeneration.js:3539 edit route, imageVersions.push ~3620.",
+      "rootCause": "Version index taken from data.sceneImages[].imageVersions length instead of the story_images rows (suspected; confirm in the fix).",
+      "status": "open"
     }
   ]
 }
