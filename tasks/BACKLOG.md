@@ -131,6 +131,7 @@ Last full sweep: **2026-09-06**.
 - [ ] (2026-11-07, Janna family) A text edit does not update the scene plan, so a redraw after a text change draws the old scene (Einhorn p9) → tasks/janna-books-issues-2026-11-07.md B5
 - [ ] (2026-11-07, Janna family) Wrong girl at the story moment not caught (Laternen p9: Melodi where the text puts Polina) → tasks/janna-books-issues-2026-11-07.md B8
 - [ ] (2026-11-07) VB parser fails when the model writes the code fence before ---VISUAL BIBLE--- (1/20 in the horn replay, JSON valid) → evals/runs/2026-11-07_vb-hidden-feature-state/job_1793964466256_1tmyzh1do__new.json
+- [ ] (2026-11-07, owner-approved) Learning topic 'rhyming' becomes a book told in rhyme, labelled "In Reimen erzählt" (writer verse mode, text passes keep the rhyme), test about USD 1.50 → tasks/verse-mode-rhyming-topic-2026-11-07.md
 - [ ] (2026-11-07) Painter draws the oldest-looking reference face tallest regardless of HEIGHT ORDER (Janna tallest in 4/4 Einhorn group renders; Polina a head short on Laternen p1, 2 renders); wording cannot override it → tasks/customer-height-edits-2026-11-06.md
 
 - [ ] Order 102 fix 2026-11-02 left open: secondary character Nerina got no reference sheet (root cause 4); p9 hand not in water; picker ignores reader findings a repair fixed (p3/p24 shipped tail-less originals); deed-page cast drops a carrying parent (Papà missing on 9+ pages); VB child mermaid "no garment"; local R2/OpenRouter keys rejected; skill says shared R2 bucket → tasks/order102-fix-2026-11-02.md
