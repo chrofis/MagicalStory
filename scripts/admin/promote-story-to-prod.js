@@ -17,12 +17,15 @@
  * production) under the same key, then rewritten to the production public URL.
  * Uploads happen BEFORE the DB write; any failure aborts with nothing written.
  *
- * TWO MODES
+ * THREE MODES
  *   update (default): overwrite an existing production story, same id, same owner.
  *   --as-new --user=<prodUserId>: create a NEW production story (fresh id; the
  *     story id inside keys/URLs is rewritten too) in that user's library. The
  *     original is untouched. No story_jobs row is created, so nothing is emailed:
  *     the library lists a row with no job row as finished (routes/stories.js).
+ *
+ *   --restore-from=<backup.json>: put a story back EXACTLY as a promote backup captured it
+ *     (backups/story-promotions/<id>-<ts>.json). Needs no staging DB. See restoreFromBackup().
  *
  * WHAT MOVES: stories.data, stories.metadata, stories.image_version_meta, and
  * the story_images rows.
@@ -34,6 +37,11 @@
  *   node scripts/admin/promote-story-to-prod.js <storyId> [--force] [--yes]
  *   node scripts/admin/promote-story-to-prod.js <storyId> --dry-run
  *   node scripts/admin/promote-story-to-prod.js <storyId> --as-new --user=<prodUserId> [--dry-run|--yes]
+ *   node scripts/admin/promote-story-to-prod.js <storyId> --restore-from=<backupFile> [--dry-run|--yes]
+ *
+ * --target=staging (only with --as-new / --restore-from) points the WRITE at the staging DB and
+ * staging bucket instead of production, so the tooling can be exercised for real without touching
+ * production. R2_* env must then be the STAGING bucket's.
  */
 'use strict';
 
@@ -50,7 +58,10 @@ const FORCE = args.includes('--force');
 const DRY = args.includes('--dry-run');
 const YES = args.includes('--yes');
 const AS_NEW = args.includes('--as-new');
-const NEW_USER = (args.find((a) => a.startsWith('--user=')) || '').slice('--user='.length);
+const flagValue = (name) => (args.find((a) => a.startsWith(`${name}=`)) || '').slice(name.length + 1);
+const NEW_USER = flagValue('--user');
+const RESTORE_FROM = flagValue('--restore-from');
+const TARGET = flagValue('--target') || 'prod';
 
 if (!storyId) {
   console.error('Usage: node scripts/admin/promote-story-to-prod.js <storyId> [--force] [--dry-run] [--yes] [--as-new --user=<prodUserId>]');
@@ -58,15 +69,19 @@ if (!storyId) {
 }
 if (AS_NEW && !NEW_USER) { console.error('--as-new needs --user=<prodUserId>'); process.exit(1); }
 if (!AS_NEW && NEW_USER) { console.error('--user only applies with --as-new'); process.exit(1); }
+if (!['prod', 'staging'].includes(TARGET)) { console.error('--target must be prod or staging'); process.exit(1); }
+if (AS_NEW && RESTORE_FROM) { console.error('--as-new and --restore-from are different modes'); process.exit(1); }
+if (TARGET === 'staging' && !AS_NEW && !RESTORE_FROM) { console.error('--target=staging only applies with --as-new or --restore-from'); process.exit(1); }
 
 const prodUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
 const stagingUrl = process.env.STAGING_DATABASE_URL;
-if (!prodUrl || !stagingUrl) {
-  console.error('Need DATABASE_URL (prod) and STAGING_DATABASE_URL in .env');
-  process.exit(1);
-}
+if (TARGET === 'prod' && !prodUrl) { console.error('Need DATABASE_URL (prod) in .env'); process.exit(1); }
+if (!stagingUrl && (!RESTORE_FROM || TARGET === 'staging')) { console.error('Need STAGING_DATABASE_URL in .env'); process.exit(1); }
+// The DB and bucket every WRITE goes to. The story itself is always READ from staging.
+const targetDbUrl = TARGET === 'staging' ? stagingUrl : prodUrl;
+const targetBase = TARGET === 'staging' ? urls.STAGING_BASE : urls.PROD_BASE;
 const host = (u) => { const x = new URL(u); return `${x.hostname}:${x.port}${x.pathname}`; };
-if (host(prodUrl) === host(stagingUrl)) {
+if (TARGET === 'prod' && stagingUrl && host(prodUrl) === host(stagingUrl)) {
   console.error('REFUSED: source and target are the same DB');
   process.exit(1);
 }
@@ -77,44 +92,46 @@ const backupDir = path.resolve(__dirname, '..', '..', 'backups', 'story-promotio
 const CONTENT_TYPES = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' };
 
 /**
- * Everything the production DB will receive, rewritten for the production bucket,
- * plus the distinct staging URLs whose bytes must be copied. Throws if a staging
- * URL would survive the rewrite.
+ * Everything the target DB will receive, rewritten for the target bucket, plus the distinct
+ * source URLs whose bytes must be copied (other-bucket URLs, and as-new every URL whose key
+ * carries the old story id). Throws if a URL on the wrong bucket would survive the rewrite.
  */
 function preparePayload(staged, stagedImgs, oldId, newId) {
-  const rw = (v) => urls.rewriteDeep(v, oldId, newId);
-  const toCopy = urls.collectStagingUrls([staged.data, staged.metadata, staged.image_version_meta,
-    stagedImgs.map((r) => r.image_url)]);
+  const rw = (v) => urls.rewriteDeep(v, oldId, newId, targetBase);
+  const toCopy = urls.collectCopySources([staged.data, staged.metadata, staged.image_version_meta,
+    stagedImgs.map((r) => r.image_url)], oldId, newId, targetBase);
   const payload = {
     data: rw(staged.data),
     metadata: rw(staged.metadata),
     image_version_meta: rw(staged.image_version_meta),
     imgs: stagedImgs.map((r) => ({ ...r, image_url: r.image_url ? rw(r.image_url) : r.image_url })),
   };
-  urls.assertNoStagingUrls(payload, 'rewritten payload');
-  const mentions = urls.countStagingHostMentions(payload);
-  if (mentions) throw new Error(`${mentions} raw images-staging mention(s) left in rewritten payload`);
+  urls.assertAllOnBase(payload, targetBase, 'rewritten payload', oldId, newId);
+  if (TARGET === 'prod') {
+    const mentions = urls.countStagingHostMentions(payload);
+    if (mentions) throw new Error(`${mentions} raw images-staging mention(s) left in rewritten payload`);
+  }
   return { payload, toCopy: [...toCopy].sort() };
 }
 
-// The local R2_* env must be PRODUCTION's bucket, or the copy would land in the wrong place.
-function assertProdBucket() {
+// The local R2_* env must be the TARGET bucket's, or the copy would land in the wrong place.
+function assertTargetBucket() {
   const r2 = require('../../server/lib/r2');
   if (!r2.isConfigured()) throw new Error('R2_* env not configured');
-  if (process.env.R2_PUBLIC_URL.replace(/\/$/, '') !== urls.PROD_BASE) {
-    throw new Error(`R2_PUBLIC_URL is ${process.env.R2_PUBLIC_URL}, expected ${urls.PROD_BASE} (production bucket)`);
+  if (process.env.R2_PUBLIC_URL.replace(/\/$/, '') !== targetBase) {
+    throw new Error(`R2_PUBLIC_URL is ${process.env.R2_PUBLIC_URL}, expected ${targetBase} (${TARGET} bucket)`);
   }
   return r2;
 }
 
-/** Download every staging URL and upload it to the production bucket. Any failure throws. */
-async function copyToProdBucket(toCopy, oldId, newId) {
-  const r2 = assertProdBucket();
+/** Download every source URL and upload it to the target bucket under its (possibly re-identified) key. Any failure throws. */
+async function copyToTargetBucket(toCopy, oldId, newId) {
+  const r2 = assertTargetBucket();
   let done = 0;
   const queue = [...toCopy];
   const worker = async () => {
     for (let u = queue.shift(); u; u = queue.shift()) {
-      const key = urls.keyForStagingUrl(u, oldId, newId);
+      const key = urls.keyForUrl(u, oldId, newId);
       const buf = await r2.fetchImageBytes(u);
       if (!buf || !buf.length) throw new Error(`download failed: ${u}`);
       const ext = key.split('.').pop().toLowerCase();
@@ -124,22 +141,125 @@ async function copyToProdBucket(toCopy, oldId, newId) {
     }
   };
   await Promise.all(Array.from({ length: 6 }, worker));
-  console.log(`R2      : copied ${done} objects staging -> production bucket`);
+  console.log(`R2      : copied ${done} objects -> ${TARGET} bucket`);
+}
+
+/** Backup of the target story row + its image rows, written before any change. Returns the file path. */
+async function backupCurrent(targetPool, id, storyRow) {
+  fs.mkdirSync(backupDir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupFile = path.join(backupDir, `${id}-${stamp}.json`);
+  const imgRows = await targetPool.query('SELECT * FROM story_images WHERE story_id = $1', [id]);
+  fs.writeFileSync(backupFile, JSON.stringify({
+    takenAt: new Date().toISOString(), storyId: id, story: storyRow, story_images: imgRows.rows,
+  }, null, 2));
+  console.log(`Backup  : ${backupFile}`);
+  return backupFile;
+}
+
+/** HEAD every URL (public, free); returns the ones that do not answer 200 as "status url". */
+async function unreachableUrls(list) {
+  const queue = [...list];
+  const bad = [];
+  const worker = async () => {
+    for (let u = queue.shift(); u; u = queue.shift()) {
+      let status = 'error';
+      try { status = (await fetch(u, { method: 'HEAD', signal: AbortSignal.timeout(30000) })).status; } catch (e) { status = e.message; }
+      if (status !== 200) bad.push(`${status} ${u}`);
+    }
+  };
+  await Promise.all(Array.from({ length: 8 }, worker));
+  return bad;
+}
+
+async function columnTypes(pool, table) {
+  const r = await pool.query('SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1', [table]);
+  return Object.fromEntries(r.rows.map((x) => [x.column_name, x.data_type]));
+}
+
+/**
+ * --restore-from: put the story back exactly as the backup captured it (stories columns except
+ * user_id / share_token / is_shared / created_at, and every story_images row). Why a mode of this
+ * script and not a sibling: it shares the backup format, the pool/target/--dry-run/--yes plumbing
+ * and the backup-before-write step with promote; only the source of the rows differs.
+ * Image bytes are NOT copied: a promote backup is a row of the target environment, so its URLs are
+ * already in the target bucket (assertRestorable refuses any other bucket).
+ */
+async function restoreFromBackup(targetPool) {
+  const backup = JSON.parse(fs.readFileSync(path.resolve(RESTORE_FROM), 'utf8'));
+  urls.assertRestorable(backup, storyId, targetBase);
+  const { rows } = await targetPool.query('SELECT * FROM stories WHERE id = $1', [storyId]);
+  if (!rows.length) { console.error(`Story ${storyId} not found in ${TARGET}. A restore overwrites an existing row; it does not create one.`); process.exit(1); }
+  const live = rows[0];
+  const storyTypes = await columnTypes(targetPool, 'stories');
+  const imgTypes = await columnTypes(targetPool, 'story_images');
+  const storyCols = urls.restoreStoryColumns(backup.story, live);
+  const imgCols = [...new Set(backup.story_images.flatMap((r) => Object.keys(r)))].filter((c) => c !== 'id');
+  const unknownImg = imgCols.filter((c) => !(c in imgTypes));
+  if (unknownImg.length) throw new Error(`backup story_images column(s) not in the live table: ${unknownImg.join(', ')}`);
+  if (backup.story_images.some((r) => r.story_id !== storyId)) throw new Error('backup contains story_images rows of another story');
+
+  const job = await targetPool.query('SELECT status FROM story_jobs WHERE id = $1', [storyId]);
+  if (job.rows[0] && ['processing', 'pending', 'running'].includes(job.rows[0].status)) {
+    console.error(`REFUSED: the job for this story is '${job.rows[0].status}' - restoring now would race it.`); process.exit(1);
+  }
+  const orders = await targetPool.query('SELECT id FROM orders WHERE story_id = $1', [storyId]);
+  const liveImgCount = (await targetPool.query('SELECT COUNT(*)::int AS n FROM story_images WHERE story_id = $1', [storyId])).rows[0].n;
+  const reach = [...urls.collectBucketUrls(backup)].sort();
+
+  console.log(`Story   : ${storyId} (${TARGET})  owner ${live.user_id}, share_token / is_shared / created_at kept as they are now`);
+  console.log(`Backup  : taken ${backup.takenAt}, data sha ${sha(backup.story.data)} (live now ${sha(live.data)})`);
+  console.log(`Writes  : stories columns [${storyCols.join(', ')}]`);
+  console.log(`          story_images: delete ${liveImgCount} current rows, insert ${backup.story_images.length} from the backup`);
+  console.log(`Orders  : ${orders.rows.length} order(s) exist for this story (informational)`);
+  console.log(`R2      : no copy; checking ${reach.length} backup image URLs answer 200 ...`);
+  // The story's own objects (stories/<id>/...) are what a promote could have overwritten or pruned, so
+  // a miss there is fatal. A dead shared asset (landmark photo, character art) was already dead in the
+  // original; it is reported, not blocking.
+  const bad = await unreachableUrls(reach);
+  const own = bad.filter((b) => b.includes(`/stories/${storyId}/`));
+  if (own.length) throw new Error(`${own.length} of the story's own image URL(s) not reachable, e.g. ${own.slice(0, 3).join(' | ')}`);
+  console.log(`          story-owned URLs all reachable; ${bad.length} shared URL(s) already dead in the original${bad.length ? `: ${bad.slice(0, 3).join(' | ')}` : ''}`);
+  if (DRY) { console.log('\n--dry-run: no writes performed.'); return; }
+  if (!YES) { console.log('\nRe-run with --yes to restore (a backup of the current row is written first).'); return; }
+
+  await backupCurrent(targetPool, storyId, live);
+  const client = await targetPool.connect();
+  try {
+    await client.query('BEGIN');
+    const set = storyCols.map((c, i) => `"${c}" = $${i + 2}`).join(', ');
+    await client.query(`UPDATE stories SET ${set} WHERE id = $1`,
+      [storyId, ...storyCols.map((c) => urls.toDbValue(backup.story[c], storyTypes[c]))]);
+    await client.query('DELETE FROM story_images WHERE story_id = $1', [storyId]);
+    const cols = imgCols.map((c) => `"${c}"`).join(', ');
+    const marks = imgCols.map((_, i) => `$${i + 1}`).join(', ');
+    for (const r of backup.story_images) {
+      await client.query(`INSERT INTO story_images (${cols}) VALUES (${marks})`,
+        imgCols.map((c) => urls.toDbValue(r[c], imgTypes[c])));
+    }
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    console.error(`FAILED, rolled back: ${e.message}. ${TARGET} story ${storyId} is untouched.`);
+    process.exit(1);
+  } finally { client.release(); }
+  console.log(`\nRestored ${TARGET} story ${storyId}: ${storyCols.length} columns, ${backup.story_images.length} image rows.`);
 }
 
 function printPlan({ newId, userId, payload, toCopy, oldId }) {
   console.log(`New id  : ${newId}`);
   console.log(`Owner   : ${userId}`);
   console.log(`Rows    : 1 stories row + ${payload.imgs.length} story_images rows (non-test)`);
-  console.log(`R2 copy : ${toCopy.length} distinct staging URLs`);
+  console.log(`R2 copy : ${toCopy.length} distinct source URLs -> ${TARGET} bucket under stories/${newId}/ (a story delete prunes that prefix, so the copy owns its objects)`);
   console.log('Sample rewritten:');
   for (const u of toCopy.slice(0, 5)) console.log(`   ${u}
- -> ${urls.PROD_BASE}/${urls.keyForStagingUrl(u, oldId, newId)}`);
-  console.log(`Staging URLs left after rewrite: ${urls.collectStagingUrls(payload).size + urls.countStagingHostMentions(payload)}`);
+ -> ${targetBase}/${urls.keyForUrl(u, oldId, newId)}`);
+  console.log(`Story-id URLs off the target bucket after rewrite: ${[...urls.collectBucketUrls(payload)].filter((u) => u.includes(newId) && !u.startsWith(`${targetBase}/`)).length}`);
+  console.log(`Old id left in payload: ${JSON.stringify(payload).split(oldId).length - 1}`);
 }
 
 /**
- * --as-new: create a NEW production story in `NEW_USER`'s library. The row mirrors
+ * --as-new: create a NEW story in the target environment's `NEW_USER` library. The row mirrors
  * what the app writes for a finished story (database.js upsertStory: random
  * share_token, admin_draft false) so it lists exactly like any other story; staging's
  * is_shared / admin_draft / user_id are not carried. No story_jobs row is written:
@@ -149,7 +269,7 @@ function printPlan({ newId, userId, payload, toCopy, oldId }) {
 async function promoteAsNew(prod, stg, staged) {
   const oldId = staged.id;
   const u = await prod.query('SELECT id FROM users WHERE id = $1', [NEW_USER]);
-  if (!u.rows.length) { console.error(`REFUSED: user ${NEW_USER} not found in production.`); process.exit(1); }
+  if (!u.rows.length) { console.error(`REFUSED: user ${NEW_USER} not found in ${TARGET}.`); process.exit(1); }
   const newId = urls.makeJobId();
   if ((await prod.query('SELECT 1 FROM stories WHERE id = $1', [newId])).rows.length) throw new Error('generated id collides');
 
@@ -160,16 +280,16 @@ async function promoteAsNew(prod, stg, staged) {
   const { payload, toCopy } = preparePayload(staged, imgs.rows, oldId, newId);
   delete payload.metadata?.promotedFrom;
   printPlan({ newId, userId: NEW_USER, payload, toCopy, oldId });
-  console.log(`Source  : staging ${oldId} (data sha ${sha(staged.data)}); original production story untouched`);
+  console.log(`Source  : staging ${oldId} (data sha ${sha(staged.data)}); the original story is untouched`);
 
   if (DRY) { console.log('\n--dry-run: no uploads, no writes performed.'); return; }
   if (!YES) { console.log('\nRe-run with --yes to create the story.'); return; }
 
-  await copyToProdBucket(toCopy, oldId, newId);
+  await copyToTargetBucket(toCopy, oldId, newId);
   fs.mkdirSync(backupDir, { recursive: true });
   const manifest = path.join(backupDir, `${newId}-created.json`);
   fs.writeFileSync(manifest, JSON.stringify({ createdAt: new Date().toISOString(), newId, userId: NEW_USER, sourceStagingId: oldId,
-    uploadedKeys: toCopy.map((x) => urls.keyForStagingUrl(x, oldId, newId)) }, null, 2));
+    uploadedKeys: toCopy.map((x) => urls.keyForUrl(x, oldId, newId)) }, null, 2));
   console.log(`Manifest: ${manifest} (undo = delete story ${newId} + its story_images + R2 prefix stories/${newId}/)`);
 
   const client = await prod.connect();
@@ -190,23 +310,31 @@ async function promoteAsNew(prod, stg, staged) {
     await client.query('COMMIT');
   } catch (e) {
     await client.query('ROLLBACK');
-    console.error(`FAILED, rolled back: ${e.message}. Production DB untouched (uploaded R2 objects are orphans under stories/${newId}/).`);
+    console.error(`FAILED, rolled back: ${e.message}. Target DB untouched (uploaded R2 objects are orphans under stories/${newId}/).`);
     process.exit(1);
   } finally { client.release(); }
   console.log(`
-✅ Created production story ${newId} for user ${NEW_USER}: ${payload.imgs.length} image rows.`);
+✅ Created ${TARGET} story ${newId} for user ${NEW_USER}: ${payload.imgs.length} image rows.`);
 }
 
 (async () => {
-  const prod = new Pool({ connectionString: prodUrl, ssl: { rejectUnauthorized: false } });
-  const stg = new Pool({ connectionString: stagingUrl, ssl: { rejectUnauthorized: false } });
+  const mkPool = (u) => new Pool({ connectionString: u, ssl: { rejectUnauthorized: false } });
+  if (RESTORE_FROM) {
+    const t = mkPool(targetDbUrl);
+    await restoreFromBackup(t);
+    await t.end();
+    return;
+  }
+  const stg = mkPool(stagingUrl);
+  const prod = TARGET === 'staging' ? stg : mkPool(prodUrl);
+  const end = async () => { await stg.end(); if (prod !== stg) await prod.end(); };
 
   const [{ rows: sRows }, { rows: pRows }] = await Promise.all([
     stg.query('SELECT * FROM stories WHERE id = $1', [storyId]),
     prod.query('SELECT * FROM stories WHERE id = $1', [storyId]),
   ]);
   if (!sRows.length) { console.error(`Story ${storyId} not found in STAGING — nothing to promote.`); process.exit(1); }
-  if (AS_NEW) { await promoteAsNew(prod, stg, sRows[0]); await prod.end(); await stg.end(); return; }
+  if (AS_NEW) { await promoteAsNew(prod, stg, sRows[0]); await end(); return; }
   if (!pRows.length) { console.error(`Story ${storyId} not found in PRODUCTION. This tool UPDATES an existing story; it will not create one.`); process.exit(1); }
   const staged = sRows[0];
   const live = pRows[0];
@@ -261,7 +389,7 @@ async function promoteAsNew(prod, stg, staged) {
   console.log(`Data    : staging ${(JSON.stringify(staged.data).length / 1048576).toFixed(2)}MB (sha ${sha(staged.data)})`);
   // Same rewrite as --as-new, computed before --dry-run exits so a dry run proves it too.
   const { payload, toCopy } = preparePayload(staged, stagedImgs.rows, storyId, storyId);
-  console.log(`R2 copy : ${toCopy.length} distinct staging URLs`);
+  console.log(`R2 copy : ${toCopy.length} distinct source URLs`);
 
   if (DRY) { console.log('\n--dry-run: no writes performed.'); await prod.end(); await stg.end(); return; }
 
@@ -274,18 +402,10 @@ async function promoteAsNew(prod, stg, staged) {
   }
 
   // ── Backup BEFORE the write ─────────────────────────────────────────────
-  fs.mkdirSync(backupDir, { recursive: true });
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const backupFile = path.join(backupDir, `${storyId}-${stamp}.json`);
-  const liveImgRows = await prod.query('SELECT * FROM story_images WHERE story_id = $1', [storyId]);
-  fs.writeFileSync(backupFile, JSON.stringify({
-    takenAt: new Date().toISOString(), storyId,
-    story: live, story_images: liveImgRows.rows,
-  }, null, 2));
-  console.log(`Backup  : ${backupFile}`);
+  const backupFile = await backupCurrent(prod, storyId, live);
 
   // Bytes first: a story row must never point at objects that are not there yet.
-  await copyToProdBucket(toCopy, storyId, storyId);
+  await copyToTargetBucket(toCopy, storyId, storyId);
 
   // ── The write ───────────────────────────────────────────────────────────
   // One transaction: a half-promoted story (new data, old images) would render
