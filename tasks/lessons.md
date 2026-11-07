@@ -1017,3 +1017,6 @@ state to the owner comes from `ch()` / `chTime()` in scripts/lib/chTime.js, neve
 
 ## 2026-11-04 · Reviewing a story: a missing character is not a defect by itself
 I listed an empty page and pages without a named character as defects, against the settled rule that page text is not a checklist. Owner: "An empty page is not a bug, it is a feature", "We want to have diverse shots". Rule: when eye-reviewing, judge the picture against what it chose to show; never count a trimmed cast or an empty page unless the picture contradicts the story.
+
+## 2026-11-07 · Redraw a stored page through the production render, on its plate
+Owner caught it ("Did you use a different background plate?"). Three Rubi p6 redraws via the regenerate route with `customPrompt` came out in another palette: that route sends no plate for a non-landmark page and a customPrompt replaces the whole image prompt (no art-style template). Rule: a corrected brief for a stored page goes through the Lab `image` stage (`params.sceneDescriptionOverride`) — the production page render with the stored plate — then Lab promote. Check neighbour pages side by side before showing.
