@@ -11244,7 +11244,9 @@
     {
       "id": "rerender-keeps-page-plate",
       "title": "A redraw of a stored page keeps its plate, and the book review says keep or redo for the background",
-      "commits": [],
+      "commits": [
+        "0151f878c"
+      ],
       "addedAt": "2026-11-07",
       "status": "pending",
       "evidence": [],
