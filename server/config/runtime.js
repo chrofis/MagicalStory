@@ -163,6 +163,12 @@ const SETTINGS = {
   // 'book_review'.
   bookReviewRepairRounds: 2,
 
+  // Re-plan rounds of the beats page-plan check (check -> re-plan -> recheck). ONE round:
+  // stored data showed round 2 discarded in 13 of 15 stories and, when kept, changing
+  // findings by at most one (docs/decisions.md 2026-11-08 "plan check: main character
+  // claims kept, one re-plan round").
+  planReplanRounds: 1,
+
   // Redraws of the front cover per book-review round when the review reads its
   // title wrong (owner, 2026-11-01: "retry the title until right"). Each redraw
   // is checked against the title before it reaches the review; the first one

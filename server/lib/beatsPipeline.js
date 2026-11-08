@@ -1033,9 +1033,9 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
     // The recheck said so in those words and the story shipped that way.
     // A second round runs only when a MUST-FIX finding survives — the
     // ranking `replanRank` already computes, so an "also noted" line can
-    // never spend a round. Bounded at two re-plans; the plan model is the
-    // cheapest call in the stage and a third round has never been needed.
-    const MAX_REPLAN_ROUNDS = 2;
+    // never spend a round. Bounded by runtime `planReplanRounds` (one, since 2026-11-08: round 2
+    // was discarded in 13 of 15 stored stories).
+    const MAX_REPLAN_ROUNDS = require('../config/runtime').runtime('planReplanRounds');
     let pendingCheck = check1;
     // A round must EARN its keep. Measured 2026-09-09 on
     // job_1788903616404_iqvhj4l8m: round 2 re-wrote 17 of 18 pages to clear

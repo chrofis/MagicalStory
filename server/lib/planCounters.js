@@ -1001,6 +1001,15 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
     const instant = planSegments(r.planLine)[2] || '';
     const claimed = (row?.unlisted || []).map(n => String(n || '').trim()).filter(Boolean);
     const names = namesIn(instant, claimed).filter(n => !lowerPresent.has(String(n).toLowerCase()));
+    // A claim the instant does not contain is dropped as noise, EXCEPT one that names a MAIN
+    // character (resolved by castResolver from the structured main list, never by reading
+    // prose): replay of 25 stored replies, 3-4 of 5 dropped main claims were right
+    // (docs/decisions.md 2026-11-08). `mains` is defined in section 5 above.
+    for (const c of claimed) {
+      if (names.includes(c)) continue;
+      const main = namesIn(c, mains, cast.aliases)[0];
+      if (main && !lowerPresent.has(main.toLowerCase()) && !names.includes(main)) names.push(main);
+    }
     if (names.length) {
       unlistedPages.push(r.pageNumber);
       unlistedDetail.push(`page ${r.pageNumber}: ${names.join(', ')}`);
