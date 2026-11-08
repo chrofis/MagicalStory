@@ -130,3 +130,27 @@ Order: #1+#3 -> #4+#5 -> #6,#7,#10 -> #2,#8,#9 (at most 2 agents at a time).
 
   - Expected real: hero 1-3, drops 2-5.
   - GO. A Sonnet build agent is on it.
+- 2026-11-08, test I: blind A/B of the final Opus review (Opus agent stand-ins, 16 staging books, USD 0; evals/runs/2026-11-08_quality-tests-I/).
+  - Picture faults: A 3/12, B 4/12. Text-logic faults: A 0/18, B 2 + 1 partial.
+  - B's CONSISTENCY question: 24 new findings, 13 real, 1 false alarm. TEXT routes 0 → 10.
+  - Repair load +38% (MAJOR+ 2.6 → 3.6 per book).
+  - The narrowed absent rule added nothing.
+  - VERDICT ENJOY/BUY does not discriminate (16/16 and 15/16 YES, Janna originals included).
+  - Verdict: conditional GO on CONSISTENCY, with fixes: MAJOR weighting for Q1 only; one line per inconsistency; route TEXT when the pictures agree. NO-GO on the VERDICT lines as written (rewording proposed: tie them to the faults, WEAK as the default).
+  - Still missed by both arms: who removes the obstacle, stakes, who-knows-what (arc stage); b13 p9 wrong girl; the main character absent on her action pages.
+  - Owner 2026-11-08 on the verdicts: "it does not really matter, the question is what does it change, we do not use the rating for anything. Maybe ask the question different: what would you want different if you were a 5 year old kid. What would you want different if you were a parent. Or is there any show-stopper with the story for a 5 year old."
+    → Prompt D: drop the ENJOY/BUY ratings. Ask (1) as a five-year-old, what would you want different; (2) as a parent; (3) any show-stopper for a five-year-old. Every answer becomes a normal FAULT line with a fix (TEXT or IMG); show-stoppers are CRITICAL.
+    → Retest free with blind Opus agents on the same 16 books after the C grading.
+- 2026-11-08, test G3: narrowed deed rule (f40226f46), real planner exp 1841, USD 0.96.
+
+  | | A | 1840 | 1841 |
+  |---|---|---|---|
+  | hero moment without the main | 7 | 3 | 2 |
+  | deeds dropped | 2 | 8 | 9 |
+  | friends without a focal page | 1 | 4 | 2 |
+  | must-fix | 3 | 7 | 6 |
+  | invented | 1 | 1 | 2 |
+
+  - 6 of the 8 1840 drops were fixed, but 7 new ones appeared.
+  - NO-GO. Burn-loop: two paid attempts failed, so stop. No third run without the owner.
+  - Staging runs f40226f46 now; production has none of the planner changes.
