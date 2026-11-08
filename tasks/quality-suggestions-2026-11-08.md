@@ -154,3 +154,17 @@ Order: #1+#3 -> #4+#5 -> #6,#7,#10 -> #2,#8,#9 (at most 2 agents at a time).
   - 6 of the 8 1840 drops were fixed, but 7 new ones appeared.
   - NO-GO. Burn-loop: two paid attempts failed, so stop. No third run without the owner.
   - Staging runs f40226f46 now; production has none of the planner changes.
+- 2026-11-09: owner chose "Revert to quota tiers".
+  - Commit 6d6c90d17 reverts c3590467b and f40226f46; staging is deployed.
+  - Kept: Jev's group cut never removes a needed main character (tests/unit/jev-main-needed-keep-2026-11-08.test.ts).
+  - Decision entry: decisions.md 2026-11-09.
+- 2026-11-09, test I arm C graded:
+  - Consistency finds 18 real against 13 in B. 0% false.
+  - Routing sensible on 22 of 22.
+  - Recall drops: book13 p9 missed, about 28 per-page picture faults that B had.
+  - ENJOY/BUY verdicts do not separate weak books from good ones (BUY WEAK on 16 of 16), so they are dropped.
+- Arm D (scripts/build-prompt-d.js, prompt-D.txt):
+  - C without the verdicts.
+  - Adds the questions CHILD ("what would you want different"), PARENT and SHOW-STOPPER (CRITICAL). Each answer is a fault line.
+  - IMG faults get one line per picture.
+  - Two blind Opus stand-ins are running, USD 0.
