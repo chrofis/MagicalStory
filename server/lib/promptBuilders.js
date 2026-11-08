@@ -24,7 +24,7 @@ const { SCALE_CLASS_SPEC, ANIMAL_ANATOMY_SPEC, GROWN_CREATURE_SCALE_CLASSES, bui
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, CLOSEUP_KEPT_FIXED_SHOT_RULE, FOOTING_RULE, FOOTING_FIELD, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE, GROUP_STAGING_FIXED_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { SLOP_RULES } = require('./proseSlop');
-const { castCoverage, castCoverageRule, castActionRule, MAIN_IN_FRAME_CLAUSE, MAIN_MOMENT_RULE, CAST_ACTION_FINDINGS, FLOOR_REFUSED_ONLOOKER_RULE, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule, typedPlanTargets, typedTargetsRule, peoplelessTier, mainFloorRule, mainFloorPointer, noCommissionedRule, planInstantRule } = require('./castCoverage');
+const { castCoverage, castCoverageRule, castActionRule, FLOOR_REFUSED_ONLOOKER_RULE, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule, typedPlanTargets, typedTargetsRule, peoplelessTier, mainFloorRule, mainFloorPointer, noCommissionedRule, planInstantRule } = require('./castCoverage');
 const { PLAN_TYPE_IDS } = require('./shotVocabulary');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
 // clause and the judges' TEXT RULES block. Safe as a top-level require --
@@ -9164,9 +9164,6 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     CHARACTER_NAMES: ctx.CHARACTER_NAMES,
     MAIN_FLOOR: mainFloorRule(targets.mainMin, pickMainNames(inputData)),
     NO_COMMISSIONED_DEF: noCommissionedRule(targets.noCommissionedMax),
-    // The main character's moment and a friend's deed inside it (owner 2026-11-08, tests G/H): one constant each, also read by castActionRule / plan-check question 12.
-    MAIN_MOMENT: MAIN_MOMENT_RULE,
-    MAIN_IN_FRAME: MAIN_IN_FRAME_CLAUSE,
     // 'arc', not the default 'premise': this stage divides a story that is
     // already settled ("divide it, never retell or repair it"), so the document
     // that outranks a saved profile here is the ARC, never the commission.
@@ -12448,8 +12445,6 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     // checker read the range as a cap and faulted every child above it.
     // With the central figure's sentence when the arc named one — the same
     // string the planner's {CAST_COVERAGE} carries (2026-09-24, d4).
-    // Question 12's findings: the checker's side of the deed-source and main-moment rules (castCoverage.CAST_ACTION_FINDINGS).
-    CAST_ACTION_FINDINGS,
     CAST_ACTION: castActionRule(castCoverage({ pageCount: beats.length, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), { centralFigure, mayAddDeeds }),
     // THE HINTS THE DIVISION WAS ASKED TO APPLY (2026-09-23). The planner gets
     // them under FIX WHILE DIVIDING; the checker never saw them, so a hint put

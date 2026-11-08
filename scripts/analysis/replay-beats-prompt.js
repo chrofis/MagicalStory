@@ -39,7 +39,7 @@ function countReply(d, reply) {
     per[name] = { inFrame: inFrame.length, focalPages: focal, deedPage: deed, deedSharedWith: sharedWith, leads: !!(deed && focal.includes(deed) && !sharedWith.length) };
   }
   const target = Math.ceil(pageCount / 2);
-  return { pageCount, cov, mainName, mainPages: per[mainName] ? per[mainName].inFrame : null, mainFloor: target, perFigure: per, brokenPromises: res.broken.map(b => `${b.promise}:${b.page}:${b.name || ''}`) };
+  return { pageCount, cov, mainName, mainPages: per[mainName] ? per[mainName].inFrame : null, mainFloor: target, perFigure: per, sharedLead: res.sharedLead, brokenPromises: res.broken.map(b => `${b.promise}:${b.page}:${b.name || ''}`) };
 }
 
 module.exports = { countReply };

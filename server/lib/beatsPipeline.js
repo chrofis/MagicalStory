@@ -2947,7 +2947,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // block the check and the re-plan are shown. No second planner call: 9 of 12 stored lead-rule
       // tables broke the rule (decisions.md 2026-10-12), so a re-ask would be paid for on most books.
       const castCov = castCoverage({ pageCount, castCount: (inputData.characters || []).filter(c => c && c.name).length });
-      castTable = parsePlanCastBlock(plannerReply, { listed: commissionedCast(inputData).listed, leadEach: !!(castCov && castCov.leadEach), mains: pickMainNames(inputData) });
+      castTable = parsePlanCastBlock(plannerReply, { listed: commissionedCast(inputData).listed, leadEach: !!(castCov && castCov.leadEach) });
       if (castTable.rejected.length) {
         gl.warn('beats_cast_table_also_on_rejected', `The planner's CAST block gave ${castTable.rejected.map(c => `${c.name} page ${c.page} (${c.lead}'s deed page)`).join(', ')} as "also on"; refused — those pages leave the block the check and the re-plan are shown`, null, { rejected: castTable.rejected });
       }

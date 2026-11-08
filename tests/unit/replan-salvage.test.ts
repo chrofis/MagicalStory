@@ -67,12 +67,10 @@ describe('the stored round, replayed', () => {
     // without a commissioned character is allowed (castCoverage.NO_COMMISSIONED_PAGES_MAX), so a
     // stored finding naming a single page no longer fires; and PLAN_INSTANT_TOO_LONG is new and
     // counts the long instants of a book planned before the budget. Everything else is unchanged.
-    // A third (2026-10-07): an "also on" promise for a page ANOTHER character's deed page (the deed owner
-    // wins) is no longer a finding — answering it cast Levin into Julian's focal page 16 here. Since 2026-11-08
-    // the MAIN character is exempt (castCoverage.MAIN_IN_FRAME_CLAUSE): Levin is the main, so his page 16 promise is a finding again.
+    // A third (2026-10-07): an "also on" promise for a page ANOTHER character's deed page (the lead
+    // rule wins) is no longer a finding — answering it cast Levin into Julian's focal page 16 here.
     const deedPages = new Set(castTable.characters.map((c: any) => c.deedPage));
-    const mainsOf = new Set<string>(PB.pickMainNames(resolveReplayInputData(fx)).map((n: string) => n.toLowerCase()));
-    const leadWins = (l: string) => { const m = l.match(/^PLAN\[CAST_PROMISE_BROKEN\] page (\d+): the CAST block promises (\w+) on page/); return !!m && deedPages.has(Number(m[1])) && castTable.characters.find((c: any) => c.deedPage === Number(m[1])).name !== m[2] && !mainsOf.has(m[2].toLowerCase()); };
+    const leadWins = (l: string) => { const m = l.match(/^PLAN\[CAST_PROMISE_BROKEN\] page (\d+): the CAST block promises (\w+) on page/); return !!m && deedPages.has(Number(m[1])) && castTable.characters.find((c: any) => c.deedPage === Number(m[1])).name !== m[2]; };
     const stored = (lines: string[]) => lines
       .filter(l => !leadWins(l))
       .filter(l => !/^PLAN\[NO_COMMISSIONED_ON_PAGE\] page \d+:/.test(l))
@@ -89,7 +87,7 @@ describe('the stored round, replayed', () => {
   it('the whole round regresses 5 → 7 (6 → 8 before one commissioned-free page was allowed), and the guard discards it', () => {
     const v = PB.replanRoundRegressed(given, recheck, round.changedPages, { round: 1 });
     // 6 → 8 when stored; the one page without a commissioned character is now allowed, so 5 → 7.
-    expect([v.before, v.after, v.discard]).toEqual([6, 8, true]);  // 4 → 7 before 2026-10-30: the second main (Julian, 7/18 pages) now files his own MAIN_UNDER_HALF in both checks;   // 5 from 2026-10-07 to 2026-11-07: Levin's "also on 16" was a lead page's, no finding; the main character is exempt again since 2026-11-08
+    expect([v.before, v.after, v.discard]).toEqual([5, 8, true]);  // 4 → 7 before 2026-10-30: the second main (Julian, 7/18 pages) now files his own MAIN_UNDER_HALF in both checks;   // 5 before 2026-10-07: Levin's "also on 16" is a lead page's, no finding
     expect(whoOf(returned, 4)).toMatch(/Levin/);
     expect(whoOf(returned, 7)).toMatch(/Levin/);
   });

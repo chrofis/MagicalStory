@@ -128,8 +128,7 @@ describe('a friend focal page may hold the main character', () => {
     expect(r.stats.focalPages.Ben).toContain(2);
   });
   it('the CAST block promise "alone or with one companion" holds with the hero in frame', () => {
-    // a page after it: the last page is the exception (test J), so the deed page is not the last
-    const rows = [{ pageNumber: 2, present: ['Ana', 'Ben', 'Cara'] }, { pageNumber: 3, present: ['Ana'] }];
+    const rows = [{ pageNumber: 2, present: ['Ana', 'Ben', 'Cara'] }];
     const table = { characters: [{ name: 'Ben', deedPage: 2, deed: '', alsoOn: [] }], ending: null };
     const args = { rows, castTable: table, actions: [{ key: 'Ben', page: 2 }], cast: { all: CAST, aliases: {} }, focalEach: true, leadEach: false };
     expect(PC.castTablePromises({ ...args, mains: ['Ana'] }).broken).toEqual([]);
@@ -179,9 +178,9 @@ describe('prompt placeholders per tier', () => {
     expect(p).toContain('This book need not have such a page.');
   });
   it('the focal sentence lets the main character stand in a friend\'s page, in the planner and the cast rule', () => {
-    expect(planner(20)).toContain(CC.MAIN_IN_FRAME_CLAUSE);
+    expect(planner(20)).toContain('when the character acts for or with the main character, the main character may be in frame too, and the page stays the character\'s own');
     expect(CC.castActionRule(CC.castCoverage({ pageCount: 20, castCount: 3 }))).toContain(CC.MAIN_IN_FRAME_CLAUSE);
-    expect(CC.castTableSpec(CC.castCoverage({ pageCount: 20, castCount: 3 }), 20)).toContain(CC.MAIN_IN_FRAME_CLAUSE);
+    expect(CC.castTableSpec(CC.castCoverage({ pageCount: 20, castCount: 3 }), 20)).toContain('the main character may be in frame too when this character acts for or with them');
   });
   it('plan-check Q6 asks for the PEOPLELESS nomination only in a required book', () => {
     const req = checker(20);

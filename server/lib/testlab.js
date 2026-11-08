@@ -10133,7 +10133,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
     try {
       // leadEach as production (beatsPipeline Step 1b): an "also on" page that is another character's deed page is refused at the parse.
       const castCov = require('./castCoverage').castCoverage({ pageCount, castCount: (storyData.characters || []).filter(x => x && x.name).length });
-      return parsePlanCastBlock(reply, { listed: commissionedCast(storyData).listed, leadEach: !!(castCov && castCov.leadEach), mains: pickMainNames(storyData) });
+      return parsePlanCastBlock(reply, { listed: commissionedCast(storyData).listed, leadEach: !!(castCov && castCov.leadEach) });
     } catch (err) {
       castTableNote = `the planner's CAST block could not be read: ${err.message} — as in the run, no plan line is held to a cast table`;
       return null;

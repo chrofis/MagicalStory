@@ -69409,3 +69409,21 @@ Revisit if: the preview is cheap enough to generate at order time for every cust
 **Rationale.** Exp 1840 numbers above; test J numbers above. Free replay of the shipped counters (this commit, USD 0): the real `runPlanCounters` over the 48 variants of test J (12 books x A, G2, J1, J2) with their stored ACTION lines gives exactly test J's patched-counter column (NO_FOCAL_PAGE 1 / 4 / 0 / 0, must-fix 3 / 7 / 6 / 4), 0 differences against the stored counters.json. Not yet proven with the real planner: the A/B over the same 12 books follows after the staging deploy.
 **Revisit if.** The real planner A/B shows deeds dropped, moved or invented in more than 1 of 12 books, or hero-moment pages without the hero rising above 3-4, or a typed-mode book loses a focal page only for a last-page deed (then pass the ACTION lines into the typed counters).
 **Touched files.** server/lib/castCoverage.js, server/lib/planCounters.js, tests/unit/deed-source-rule-2026-11-08.test.ts, docs/decisions.md.
+
+## 2026-11-09 - Deed-source and narrowed deed rules reverted; the lead-page rule is back; Jev's main-character keep stays (exp 1841)
+**Context.** Both deed-rule versions failed their real-planner A/B on the same 12 stored books. A is the quota-tier build (exps 1838/1839); 1840 is c3590467b; 1841 is f40226f46.
+
+| | A | 1840 | 1841 |
+|---|---|---|---|
+| hero moment without the main (key pages) | 7 (3) | 3 (1) | 2 (0) |
+| deeds dropped / moved / invented | 2/0/1 | 8/1/1 | 9/0/2 |
+| friends without a focal page | 1 | 4 | 2 |
+| must-fix | 3 | 7 | 6 |
+
+The narrowed rule's own Revisit-if was met (deeds lost in far more than 1 of 12 books). Two paid attempts failed, so the burn-loop rule stops further tries.
+**Decision.** Owner, 2026-11-09: "Revert to quota tiers". c3590467b and f40226f46 are reverted in code, prompts and tests. LEAD_RULE, the old MAIN_IN_FRAME clause, noFocalFix and the counters are back as of cc47ffdd9/f7718b27d.
+Kept: `decideGroupCuts` makes a main character that Jev scored needed on a page `required` (typed score only). It is not part of the planner rule that failed. Its test moved to tests/unit/jev-main-needed-keep-2026-11-08.test.ts.
+Decision entries 2026-11-08 "Deed-source rule ..." and "Narrowed deed rule ..." stay as history; this entry replaces both.
+**Rationale.** Telling the planner to keep the hero in their moment trades away a friend's or adult's deed. Supporting deeds lost cost more than hero moments won: a friend with nothing to do breaks the cast promise, while a hero moment without the hero is a picture fix.
+**Revisit if.** A rule can be shown, on the same 12 stored books, to cut hero-moment pages without the hero below 7 while keeping deeds dropped at 2 or fewer. A free stand-in test comes first, then one paid run.
+**Touched files.** prompts/plan-check.txt, prompts/story-beats.txt, server/lib/castCoverage.js, planCounters.js, promptBuilders.js, beatsPipeline.js, testlab.js, scripts/analysis/replay-beats-prompt.js, tests (reverted); tests/unit/jev-main-needed-keep-2026-11-08.test.ts (new).

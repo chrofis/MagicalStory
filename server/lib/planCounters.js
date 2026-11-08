@@ -48,28 +48,13 @@ const { castCoverage, groupPageBudget, underCoveredFix, noFocalFix, NO_COMMISSIO
  * @param {string} name      the character whose focal page it would be
  * @param {Set<string>|string[]} mains every main character, lower-cased names (a Set) or any case (an array)
  */
-function isFocalPage(present, name, mains, lastPageDeed = false) {
+function isFocalPage(present, name, mains) {
   const lc = (n) => String(n || '').toLowerCase();
-  if (lastPageDeed) return true;
   const mainSet = mains instanceof Set ? mains : new Set((mains || []).map(lc));
   const list = Array.isArray(present) ? present : [];
   if (!list.some(n => lc(n) === lc(name))) return false;
   const others = mainSet.has(lc(name)) ? list : list.filter(n => !mainSet.has(lc(n)));
   return others.length <= 2;
-}
-
-/**
- * THE LAST PAGE HOLDS EVERYONE THE STORY KEEPS TOGETHER (castCoverage.DEED_SOURCE_RULE, owner 2026-11-08, test J), so it
- * is the focal page of a character whose own action the plan check's ACTION line (typed: key, page) puts on it, however
- * many are in frame. Pass the result as isFocalPage's fourth argument. One definition for runPlanCounters.focalOf,
- * castTablePromises and reviewPlanChanges; the typed counters get no ACTION lines and stay strict (docs/decisions.md
- * 2026-11-08 "Narrowed deed rule").
- * @param {number} pageNumber the page being tested
- * @param {number} lastPage   the book's last page number
- * @param {number|null} actionPage the page the ACTION line puts the character's own action on
- */
-function isLastPageDeed(pageNumber, lastPage, actionPage) {
-  return Number(lastPage) > 0 && Number(pageNumber) === Number(lastPage) && Number(actionPage) === Number(lastPage);
 }
 
 /** Words that look like names but never are, in the who-column's grammar. */
@@ -1090,11 +1075,8 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   //    requirement lives in the prompt. The "or named first in a close-up"
   //    half went with the planner's shot word (2026-09-27): no shot exists
   //    when the plan is checked.
-  const lastPageActors = new Set((Array.isArray(actions) ? actions : [])
-    .filter(a => a && Number(a.page) === pageCount)
-    .map(a => namesIn(String(a.key || ''), listed, cast.aliases)[0]).filter(Boolean));
   const focalOf = (name) => rows
-    .filter(r => isFocalPage(r.present, name, mainsLower, isLastPageDeed(r.pageNumber, pageCount, lastPageActors.has(name) ? pageCount : null))
+    .filter(r => isFocalPage(r.present, name, mainsLower)
       || (legacyShots && r.shot === 'close-up' && r.present[0] === name))
     .map(r => r.pageNumber);
   //
@@ -1105,13 +1087,12 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   //    a floor the planner was not given. Both rules apply to the commission's
   //    CHARACTER LIST (`listedNames`): a pet or companion the premise or a
   //    profile supplies is commissioned, never invented, but owes no page.
-  // A DEED PAGE IS THE DEED-OWNER'S (castCoverage.DEED_SOURCE_RULE, owner 2026-11-08).
-  // When the book owes every figure a page of their own, presence on a page of at
-  // most two is not enough: a small page that stages ANOTHER listed character's own
-  // action (the check's Q12 ACTION line) is that character's focal page, not the
-  // companion's. A page two characters' actions share (one action the story gives
-  // them together) is both of theirs; a page no listed character owns stays open
-  // to whoever is in frame on it.
+  // A PAGE LEADS WITH ONE CHARACTER (castCoverage.LEAD_RULE, owner 2026-10-06).
+  // When the book owes every figure a lead page, presence on a page of at most
+  // two is not enough: a small page that stages ANOTHER listed character's own
+  // action (the check's Q12 ACTION line) is that character's lead page, not
+  // the companion's. A page no listed character owns stays open to whoever is
+  // in frame on it.
   const ownerOfPage = new Map();
   if (coverageRule && coverageRule.leadEach) {
     for (const a of (Array.isArray(actions) ? actions : [])) {
@@ -1231,7 +1212,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
       groupPages: { pages: groupPages, budget: groupBudget ? groupBudget.max : null },
       mainCharacters: mains,
       // The table's promises as counted: null when no table was given.
-      castTable: castTableResult ? { kept: castTableResult.kept, broken: castTableResult.broken.length, unanswered: castTableResult.unanswered } : null,
+      castTable: castTableResult ? { kept: castTableResult.kept, broken: castTableResult.broken.length, unanswered: castTableResult.unanswered, sharedLead: castTableResult.sharedLead } : null,
       // Only when the arc named a central figure: the pages the check said
       // show it, or `unanswered` when it gave no CENTRAL line.
       ...(Array.isArray(centralFigure) && centralFigure.length
@@ -1247,8 +1228,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
  *   deed page   the check's ACTION line for the character names that page
  *               (Q12 reads the plan lines, never the table); and, when the book
  *               has room for a focal page each, the page holds the character
- *               alone or with one companion (the main character not counted against
- *               a friend) — the planner's own definition.
+ *               alone or with one companion — the planner's own definition.
  *   also on     the character is in frame on each page the line promises.
  *   ending      everyone the ending line names, that this book's cast knows,
  *               is in frame on that page.
@@ -1262,6 +1242,7 @@ function castTablePromises({ rows, castTable, actions, cast, focalEach, leadEach
   const byPage = new Map(rows.map(r => [Number(r.pageNumber), r]));
   const acts = Array.isArray(actions) ? actions : [];
   const broken = [];
+  const sharedLead = []; // not a finding: the table is not rewritten by a re-plan, so a plan page cannot answer it
   const unanswered = [];
   let kept = 0;
   const canon = n => namesIn(n, cast.all, cast.aliases)[0] || null;
@@ -1273,13 +1254,12 @@ function castTablePromises({ rows, castTable, actions, cast, focalEach, leadEach
     .filter(a => Number(a.page) === page)
     .map(a => canon(String(a.key || '')) || String(a.key || '').trim())
     .filter(n => n && n !== except);
-  const mainSet = mains instanceof Set ? mains : new Set((mains || []).map(m => String(m).toLowerCase()));
+  const firstClaim = new Map();
   const leadWins = [];
-  const lastPage = Math.max(0, ...rows.map(r => Number(r.pageNumber) || 0));
-  const deedOwner = new Map(); // deed page -> every character whose deed page it is (a shared deed has two), first claimant first
+  const deedOwner = new Map();
   for (const entry of castTable.characters || []) {
     const n = canon(entry.name);
-    if (n) deedOwner.set(Number(entry.deedPage), [...(deedOwner.get(Number(entry.deedPage)) || []), n]);
+    if (n && !deedOwner.has(Number(entry.deedPage))) deedOwner.set(Number(entry.deedPage), n);
   }
   for (const entry of castTable.characters || []) {
     const name = canon(entry.name);
@@ -1287,7 +1267,12 @@ function castTablePromises({ rows, castTable, actions, cast, focalEach, leadEach
     const deed = Number(entry.deedPage);
     const row = byPage.get(deed);
     const act = actionOf(name);
-    if (!row) {
+    const sharer = leadEach ? firstClaim.get(deed) : null;
+    if (leadEach && !sharer) firstClaim.set(deed, name);
+    if (sharer && sharer !== name) {
+      // A page leads with one character (castCoverage.LEAD_RULE): the table gave this page to two.
+      sharedLead.push({ page: deed, names: [sharer, name] });
+    } else if (!row) {
       broken.push({ page: deed, name, promise: 'deed', detail: `the CAST block promises ${name} page ${deed} as their deed page, but the book has no page ${deed}` });
     } else if (!act) {
       unanswered.push(name);
@@ -1296,19 +1281,17 @@ function castTablePromises({ rows, castTable, actions, cast, focalEach, leadEach
       const instead = others.length ? `page ${deed}'s instant is ${others.join(' and ')}'s` : `page ${deed}'s instant is not ${name}'s own action`;
       const where = act.page == null ? 'no page stages it' : `the check finds it on page ${act.page}`;
       broken.push({ page: deed, name, promise: 'deed', detail: `the CAST block promises ${name} page ${deed} as their deed page, but ${instead} (${where})` });
-    } else if (focalEach && !isFocalPage(row.present, name, mains, isLastPageDeed(deed, lastPage, act.page))) {
-      broken.push({ page: deed, name, promise: 'focal', detail: `the CAST block promises page ${deed} as ${name}'s deed page, alone or with one companion (the main character in frame when it is their moment), but it holds ${row.present.join(', ') || 'nobody'}` });
+    } else if (focalEach && !isFocalPage(row.present, name, mains)) {
+      broken.push({ page: deed, name, promise: 'focal', detail: `the CAST block promises page ${deed} as ${name}'s deed page, alone or with one companion (the main character may be in frame too), but it holds ${row.present.join(', ') || 'nobody'}` });
     } else {
       kept++;
     }
     for (const p of entry.alsoOn || []) {
-      // A page another character owns is not an "also on" promise (the deed
-      // owner wins): the table is not rewritten by a re-plan, so a plan page
-      // could not answer both, and job_1791315635053_t0t8qpebu's Sarah p13 held
-      // four figures to keep it. The main characters are exempt: a friend's deed
-      // page that falls in their moment holds them (castCoverage.MAIN_IN_FRAME_CLAUSE).
-      const owners = deedOwner.get(Number(p));
-      if (leadEach && owners && !owners.includes(name) && !mainSet.has(String(name).toLowerCase())) { leadWins.push({ page: Number(p), name, lead: owners[0] }); continue; }
+      // A page another character leads is not an "also on" promise (the lead
+      // rule wins, like a deed page the table gave to two): the table is not
+      // rewritten by a re-plan, so a plan page could not answer both, and
+      // job_1791315635053_t0t8qpebu's Sarah p13 held four figures to keep it.
+      if (leadEach && deedOwner.has(Number(p)) && deedOwner.get(Number(p)) !== name) { leadWins.push({ page: Number(p), name, lead: deedOwner.get(Number(p)) }); continue; }
       const r = byPage.get(Number(p));
       if (r && r.present.includes(name)) { kept++; continue; }
       broken.push({
@@ -1330,7 +1313,7 @@ function castTablePromises({ rows, castTable, actions, cast, focalEach, leadEach
       kept++;
     }
   }
-  return { broken, kept, unanswered, leadWins };
+  return { broken, kept, unanswered, sharedLead, leadWins };
 }
 
 /** The who-in-frame column of a plan line; the whole line when it has no segments. */
@@ -1628,8 +1611,7 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
   const mainSet = new Set((Array.isArray(mainNames) ? mainNames : []).flatMap(n => namesIn(String(n || ''), names, aliases)).map(n => n.toLowerCase()));
   const focalPagesIn = (pages, who, name) => (pages || []).filter((p) => {
     const w = who.get(Number(p.pageNumber)) || [];
-    const lastPage = Math.max(0, ...(pages || []).map(q => Number(q.pageNumber) || 0));
-    return isFocalPage(w, name, mainSet, isLastPageDeed(p.pageNumber, lastPage, actionPageOf.get(name)));
+    return isFocalPage(w, name, mainSet);
   }).map(p => Number(p.pageNumber));
   const focalSet = new Set((Array.isArray(focalNames) ? focalNames : []).flatMap(n => namesIn(String(n || ''), names, aliases)));
   const actionPageOf = new Map();
@@ -2122,7 +2104,6 @@ module.exports = {
   reissueLostPages,
   castTablePromises,
   isFocalPage,
-  isLastPageDeed,
   typedPlanCounters,
   countPlanTargets,
   parseTypedLine,

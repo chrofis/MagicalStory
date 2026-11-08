@@ -62,9 +62,9 @@ Requirements:
 - What a page establishes about a thing — stuck, heavy, hidden, out of reach — stays true until a later page changes it.
 - Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages. A page keeps its characters at one depth together; separate a figure into the background only when the page's own instant requires the separation, and keep such pages few.
 - Every page is visible: something happens that a picture can show. A character whose action is what a page's instant works against — a way blocked, a place kept, a thing taken or withheld, a refusal — is named in that page's plan line.
-- {MAIN_FLOOR} the others come and go in different combinations, not the whole group on every page. {MAIN_MOMENT} {CAST_COVERAGE}
+- {MAIN_FLOOR} the others come and go in different combinations, not the whole group on every page. {CAST_COVERAGE}
 - {WHO_DOES_WHAT}
-- A character's focal page stages them alone or with one companion — two people sharing one action carry it — and stages them doing something visible; {MAIN_IN_FRAME}. An internal decision gets a physical correlative — a held object, a step taken, a grip tightened; never a lone motionless figure.
+- A character's focal page stages them alone or with one companion — two people sharing one action carry it — and stages them doing something visible; when the character acts for or with the main character, the main character may be in frame too, and the page stays the character's own. An internal decision gets a physical correlative — a held object, a step taken, a grip tightened; never a lone motionless figure.
 - When a REAL LANDMARKS section is present, those are the landmarks the arc chose — keep them, add no others; an arc that stages none has chosen none. A landmark may be scenery — a tower on the horizon, a bridge behind the action — and never relocates the story. No page names more than one place.
 - A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.
 - A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle. The decision before and the relief after never replace it.

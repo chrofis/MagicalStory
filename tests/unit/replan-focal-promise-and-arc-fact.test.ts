@@ -16,8 +16,7 @@ const row = (n: number, present: string[]) => ({ pageNumber: n, present });
 describe('a focal-promise break is answered by taking a figure out', () => {
   const table = { characters: [{ name: 'Noah', deedPage: 5, deed: 'swims', alsoOn: [] }], ending: null };
   const actions = [{ key: 'Noah', page: 5, sentence: 5 }];
-  // a page after the deed page: the last page counts as focal for its own deed (test J, 2026-11-08)
-  const rows = [row(5, ['Noah', 'Emma', 'Berta']), row(6, ['Emma'])];
+  const rows = [row(5, ['Noah', 'Emma', 'Berta'])];
   const cast = { all: CAST, aliases: {} };
 
   it('castTablePromises reports it as the focal variant', () => {
