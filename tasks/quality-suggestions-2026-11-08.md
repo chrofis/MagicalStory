@@ -37,3 +37,34 @@ Order: #1+#3 -> #4+#5 -> #6,#7,#10 -> #2,#8,#9 (at most 2 agents at a time).
   - #2: Sonnet planner lowers key-page misses from 4 to 1 but not the total. NO-GO for now.
   - #6: the proposed wording is worse (2/8 vs 6/8). NO-GO.
   - #7: already shipped; stand-in A/B confirms (stakes recall 0 → 6/10, motives 0 → 8/9).
+
+## Owner decisions 2026-11-08 (after the tests)
+- Build (a) keep plan-check claims that name the main character, and (b) cap the re-plan at one round: approved; a Sonnet code agent is on it.
+- Paid real-model A/B of the text logic read (#3) and the narrowed picture-vs-text check (#4), on Opus and Sonnet: approved, hard cap USD 20, running in the Test Lab.
+  - Owner, later: "No less stories, try to get under 10.-". Total cap CHF 10 ≈ USD 11 across all paid tests (USD 9.50 for the text/picture test, about 1.20 for the planner test). Keep the full book sets.
+- Page quotas, test both changes A/B on stored plans:
+  - The people-free page goes in longer books only; in short books it is optional or dropped. Owner: "4 char and 10 pages leaves no space for empty page sometimes."
+  - A friend's solo picture may include the hero when the friend acts for her.
+  - Cut-off to measure: the page count, plus pages per cast member.
+- [x] (a) + (b) built in 3f81cbb55. 4 new unit tests plus 99 plan tests pass. Stored replay: main-character claims now kept on 7 pages in 5 stories (4 unique), USD 0. Not pushed. Open: typedPlan.js:384 has its own 2-round re-plan for code findings; untouched, no evidence yet.
+- 2026-11-08, test F, page quotas (stand-in, not blind, USD 0; evals/runs/2026-11-08_quality-tests-F/):
+  - Cut-off: people-free page REQUIRED at 18+ pages and pages ≥ 4 × cast, OPTIONAL at 14-17 pages, NONE under 14.
+  - Under 18 pages, 8 of 10 people-free pages took the hero's moment.
+  - A/B on 12 arcs:
+    - hero-moment pages without the hero: 14 shipped (A) vs 0 (B), key pages 7 vs 0;
+    - people-free page on someone's moment: 9/9 vs 0/1;
+    - must-fix findings: 15 vs 6.
+  - The focal counter must also count a friend page with the hero in frame (else 16 friends lack a focal page).
+  - The draft change and its siblings are in the agent's report (typed plan, plan-check Q6, reviewPlanChanges, beatsPipeline:958).
+  - Next: confirm with the production planner in the Lab (B prompt override; counters in the wrapper script) before building.
+- 2026-11-08, test E, paid real-model Lab (evals/runs/2026-11-08_quality-tests-E/REPORT.md; exps 1817-1837). Spent USD 11.30, over the new cap: the cap arrived after the Opus picture arms had finished; the Sonnet picture arms were aborted at USD 0.61.
+  - #3 text logic read, 16 staging books:
+    - Sonnet: 3 of the 6 known faults still in the text, 9 of 10 negative faults, 6% false alarms, USD 0.12 per book (about 0.04 text-only).
+    - Opus: about the same recall, USD 0.21 per book.
+    - Known faults still rate mostly MINOR.
+    - GO for Sonnet, once severity is calibrated and a text-only route is built. NO-GO for Opus on cost.
+  - #4 narrowed picture rule, Opus, 12 books: no extra recall (1 of 3 = A), more arguable flags, and a route-tag bug in the B prompt. NO-GO. Sonnet not run.
+- Owner 2026-11-08 after test E:
+  - Planner Lab test approved (about USD 1.20; today's total about 12.50).
+  - Logic read: build a text-only Sonnet read, tune what counts as MAJOR, test free on stored books with stand-ins, then ask before one cheap real-model check.
+  - The build waits for the quota agent: both may touch beatsPipeline.js, and only one code agent works per area.
