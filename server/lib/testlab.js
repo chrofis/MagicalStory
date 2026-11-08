@@ -9834,7 +9834,7 @@ function rawObstacleLines(text) {
 function analyzeReplanCompliance({
   replanText = '', checkText = '', standing = [], findings = [],
   castNames = [], aliases = {}, maxCast = 3,
-  focalNames = [], keep = [], castFloor = null,
+  focalNames = [], keep = [], castFloor = null, mainNames = [],
 } = {}) {
   const { parsePlanResponse, parsePlanChanges, parsePlanCheckObstacles, parsePlanCheckActions, findingPages, replanRank } = require('./promptBuilders');
   const { reviewPlanChanges, castLostByReplan, restoreRefusedChanges } = require('./planCounters');
@@ -9878,7 +9878,7 @@ function analyzeReplanCompliance({
   // characters that owe a focal page, and the must-fix ranking.
   const review = reviewPlanChanges({
     changes: declared.changes, standing, returned: merged, castNames, aliases, maxCast, obstacles,
-    focalNames,
+    focalNames, mainNames,
     protectedPages: new Map((keep || []).map(k => [Number(k.page), k.why])),
     actions: parsePlanCheckActions(String(checkText || '')),
     rankOf: replanRank,
@@ -10283,6 +10283,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
     aliases: (check1.counters.cast && check1.counters.cast.aliases) || {},
     maxCast,
     focalNames: coverageRule && coverageRule.focalEach ? commission.listed : [],
+    mainNames,
     keep,
     castFloor: coverageRule ? { names: commission.listed, min: coverageRule.appearances.min } : null,
   }) : null;

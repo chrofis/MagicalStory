@@ -67,7 +67,7 @@ describe('the lead rule: a page leads with one character', () => {
     { pageNumber: 1, planLine: 'wide — Emma, Noah — Emma and Noah swim — after' },
     { pageNumber: 2, planLine: 'wide — Daniel, Sarah — Daniel and Sarah spread the blanket — after' },
     { pageNumber: 3, planLine: 'wide — Emma, Noah, Daniel, Sarah — all wave — after' },
-    { pageNumber: 4, planLine: 'wide — Emma, Daniel, Sarah — they sit — after' },
+    { pageNumber: 4, planLine: 'wide — Noah, Daniel, Sarah — they sit — after' },
     ...[5, 6, 7, 8].map(n => ({ pageNumber: n, planLine: 'wide — Emma, Noah, Daniel — they walk — after' })),
   ];
   const roster = new Map(pages.map((p: any) => [p.pageNumber, { people: p.planLine.split(' — ')[1].split(', '), things: [], covers: [] }]));
@@ -78,6 +78,15 @@ describe('the lead rule: a page leads with one character', () => {
     // p2 is Daniel's action page; Sarah shares it but never leads one.
     const r = run([{ key: 'Emma', page: 1 }, { key: 'Noah', page: 1 }, { key: 'Daniel', page: 2 }, { key: 'Sarah', page: 3 }]);
     expect(noFocal(r)).toEqual(expect.arrayContaining(['Sarah']));
+  });
+
+  it('a page of a friend with the main character in frame is that friend focal page (test F, 2026-11-08)', () => {
+    // Emma is the main character: with her in frame, Sarah + one companion is still a focal page for Sarah.
+    const withHero = pages.map((p: any) => p.pageNumber === 4 ? { ...p, planLine: 'wide — Emma, Daniel, Sarah — they sit — after' } : p);
+    const rosterH = new Map(withHero.map((p: any) => [p.pageNumber, { people: p.planLine.split(' — ')[1].split(', '), things: [], covers: [] }]));
+    const r = PC.runPlanCounters({ pages: withHero, roster: rosterH, commissionedNames: LISTED, listedNames: LISTED, mainNames: ['Emma'], actions: [{ key: 'Emma', page: 1 }, { key: 'Noah', page: 1 }, { key: 'Daniel', page: 2 }, { key: 'Sarah', page: 3 }] });
+    expect(noFocal(r)).not.toContain('Sarah');
+    expect(r.stats.focalPages.Sarah).toContain(4);
   });
 
   it('without ACTION lines the old presence reading stands', () => {

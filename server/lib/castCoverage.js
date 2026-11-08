@@ -36,6 +36,28 @@
  */
 
 const { GROUP_STAGING_MAX } = require('./shotVocabulary');
+const { runtime } = require('../config/runtime');
+
+/**
+ * THE PEOPLE-FREE PAGE, BY BOOK SIZE (owner, 2026-11-08; docs/decisions.md "People-free page by book size";
+ * Lab test F, evals/runs/2026-11-08_quality-tests-F/). "Empty page only for longer books. Optional for short
+ * books. Or none. 4 char and 10 pages leaves no space for empty page sometimes." ONE function: the planner's
+ * question (promptBuilders.peoplelessQuestion), the coverage arithmetic below, the typed plan's scenery target,
+ * the counter NO_PEOPLELESS_PAGE and the plan check's Q6 all read it, so no side holds the book to a page
+ * another side was not told about. Thresholds: server/config/runtime.js (peopleless*).
+ *   'required'  the book owes one people-free page (must-fix when missing)
+ *   'optional'  the planner may have one on a moment no commissioned character acts, decides or feels in
+ *   'none'      every page has a character in it; a people-free page is noted, not required
+ * @param {{pageCount:number, castCount:number}} args castCount = the commission's character list
+ * @returns {'required'|'optional'|'none'}
+ */
+function peoplelessTier({ pageCount, castCount } = {}) {
+  const P = Math.floor(Number(pageCount));
+  const C = Math.max(1, Math.floor(Number(castCount)) || 1);
+  if (P >= runtime('peoplelessRequiredMinPages') && P >= runtime('peoplelessRequiredPagesPerCast') * C) return 'required';
+  if (P >= runtime('peoplelessOptionalMinPages')) return 'optional';
+  return 'none';
+}
 
 /** Named characters a page carries best (story-beats.txt: "Two or three named characters carry a page best"; "Stage a page with two people rather than three when two carry it"). */
 const PAGE_CAST_TYPICAL = 2;
@@ -58,8 +80,9 @@ function castCoverage({ pageCount, castCount } = {}) {
   // A page LEADS with one character (owner 2026-10-06; docs/decisions.md "Every named figure leads a page"): when the book has
   // a page to spare for each, no two characters share a focal page. Larger casts keep the pairing the floor above allows.
   const leadEach = C > 1 && C <= Math.floor(P / 2);
-  // Pages with people on them: every page but the one people-free page.
-  const peopled = Math.max(1, P - 1);
+  // Pages with people on them: every page but the one people-free page, which only a 'required' book owes.
+  const tier = peoplelessTier({ pageCount: P, castCount: C });
+  const peopled = Math.max(1, P - (tier === 'required' ? 1 : 0));
   const slots = peopled * PAGE_CAST_TYPICAL;
   // The main character appears on most pages; the rest share what is left.
   const perCharacter = C === 1
@@ -67,7 +90,7 @@ function castCoverage({ pageCount, castCount } = {}) {
     : Math.floor((slots - Math.ceil(P / 2)) / (C - 1));
   const max = Math.max(1, Math.min(APPEARANCES_TARGET_MAX, perCharacter));
   const min = max >= APPEARANCES_TARGET_MAX ? APPEARANCES_TARGET_MIN : max;
-  return { pageCount: P, castCount: C, focalEach, leadEach, focalPagesNeeded, appearances: { min, max } };
+  return { pageCount: P, castCount: C, peoplelessTier: tier, focalEach, leadEach, focalPagesNeeded, appearances: { min, max } };
 }
 
 const pagesWord = n => `${n} page${n === 1 ? '' : 's'}`;
@@ -165,7 +188,8 @@ function typedPlanTargets({ pageCount, listed = [], maxCharactersPerScene } = {}
   return {
     pageCount: P,
     faceMin: TYPED_FACE_MIN,
-    sceneryMin: TYPED_SCENERY_MIN,
+    // The scenery page is a people-free page: owed only where the book owes one (peoplelessTier).
+    sceneryMin: peoplelessTier({ pageCount: P, castCount: C }) === 'required' ? TYPED_SCENERY_MIN : 0,
     noCommissionedMax: NO_COMMISSIONED_PAGES_MAX,
     appearancesMin: cov && C > 1 ? cov.appearances.min : 0,
     focalEach: !!(cov && C > 1 && cov.focalEach),
@@ -230,7 +254,7 @@ function typedTargetsRule(t, mainNames = []) {
   const lines = [
     `- ${mainFloorSubject(mainNames)} on at least ${pagesWord(t.mainMin)} of ${t.pageCount}, each time taking part in that page's one action; count them as you plan.`,
     `- At least ${pagesWord(t.faceMin)} of type face, and a face page shows a commissioned character.`,
-    `- At least ${pagesWord(t.sceneryMin)} of type landscape or object; two are fine, ideally one of each.`,
+    ...(t.sceneryMin > 0 ? [`- At least ${pagesWord(t.sceneryMin)} of type landscape or object; two are fine, ideally one of each.`] : []),
     `- At most ${pagesWord(t.groupMax)} of type group.`,
     '- The who column names commissioned characters and the figures of the STORY LOGIC, nobody else: a figure you invent is a fault.',
   ];
@@ -265,7 +289,7 @@ function castActionRule(cov, { centralFigure = null, mayAddDeeds = false } = {})
   const cast = !cov || cov.castCount === 1
     ? ''
     : cov.focalEach
-      ? `Every commissioned character gets a focal page of their own whose instant is the action the story gives them.${cov.leadEach ? ` ${LEAD_RULE}` : ''}`
+      ? `Every commissioned character gets a focal page of their own whose instant is the action the story gives them; ${MAIN_IN_FRAME_CLAUSE}.${cov.leadEach ? ` ${LEAD_RULE}` : ''}`
       : 'This cast is too large for a focal page each: the characters share group moments, and each character\'s own action from the story is the instant of some page.';
   return [cast, cast && mayAddDeeds ? ADDED_DEED_RULE : '', centralFigureActionRule(centralFigure)].filter(Boolean).join(' ');
 }
@@ -275,6 +299,8 @@ function castActionRule(cov, { centralFigure = null, mayAddDeeds = false } = {})
  * the planner's cast rule and CAST block, and the plan check's question 12 (castActionRule); the counter is
  * planCounters.castTablePromises (a deed page named by two characters).
  */
+/** A friend's focal page may hold the main character (owner, 2026-11-08, test F); counters: planCounters.focalCompanions. */
+const MAIN_IN_FRAME_CLAUSE = "when the character acts for or with the main character, the main character may be in frame too, and the page stays the character's own";
 const LEAD_RULE = 'A page leads with one character: two characters never share a focal page.';
 
 /**
@@ -434,7 +460,7 @@ function castTableSpec(cov, pageCount, { replan = false, table = null } = {}) {
   }
   const also = castTableAlsoCount(cov);
   const where = cov.focalEach
-    ? `the page whose instant is their own action from the story, alone or with one companion${cov.leadEach ? `; ${LEAD_RULE} Every line names a different page, and a character's deed page is never another character's "also on" page` : ''}`
+    ? `the page whose instant is their own action from the story, alone or with one companion (the main character may be in frame too when this character acts for or with them)${cov.leadEach ? `; ${LEAD_RULE} Every line names a different page, and a character's deed page is never another character's "also on" page` : ''}`
     : 'the page whose instant is their own action from the story, which they may share with the group';
   const more = also > 0 ? `, and ${also} more page${also === 1 ? '' : 's'} they are in frame on` : '';
   return `Write the CAST block before the plan lines. One line per commissioned character: ${where}${more}. Then page ${pageCount}, the last: the names of everyone the story keeps together at the end. Every plan line keeps what the block promises.`;
@@ -553,6 +579,8 @@ function castTableBlock(table) {
 }
 
 module.exports = {
+  peoplelessTier,
+  MAIN_IN_FRAME_CLAUSE,
   CAST_TABLE_HEADER,
   castTableAlsoCount,
   LEAD_RULE,

@@ -233,9 +233,12 @@ describe('the roster contract is decidable, so one plan line yields one roster',
   });
 
   it('page 11 reads the same both ways once nothing outside the who column is expanded', () => {
-    const pages = [{ pageNumber: 11, planLine: P11 }, ...PAGES];
+    // Padded to 18 pages: a people-free page is owed only in a long book (castCoverage.peoplelessTier 'required').
+    const fillers = Array.from({ length: 12 }, (_, i) => ({ pageNumber: 100 + i, planLine: 'medium — Levin — Levin digs the hole deeper — the hole is deeper' }));
+    const pages = [{ pageNumber: 11, planLine: P11 }, ...PAGES, ...fillers];
     const roster = (covers: string[]) => {
       const out = new Map<number, any>(ROSTER_NAMES_ONLY);
+      for (const f of fillers) out.set(f.pageNumber, { people: ['Levin'], things: [], covers: [] });
       out.set(11, { people: [], things: ['Lindenhof', 'Grossmünster'], covers });
       return out;
     };

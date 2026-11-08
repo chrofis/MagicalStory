@@ -102,16 +102,18 @@ describe('NO_PEOPLELESS_PAGE names the move that answers it', () => {
   const { runPlanCounters } = require('../../server/lib/planCounters.js');
   const { PLAN_CHANGE_VOCABULARY } = require('../../server/lib/promptBuilders');
 
-  /** A three-page book, every page peopled. */
+  /** An 18-page book, every page peopled: long enough that a people-free page is owed (castCoverage.peoplelessTier 'required'). */
   const PAGES = [
     { pageNumber: 1, planLine: 'wide — Levin, Julian — Levin digs in the leaves — the egg is found' },
     { pageNumber: 2, planLine: 'medium — Levin — Levin lifts the egg — the egg knocks' },
     { pageNumber: 3, planLine: 'close-up — Julian — Julian holds the egg — the egg hatches' },
+    ...Array.from({ length: 15 }, (_, i) => ({ pageNumber: 4 + i, planLine: `medium — Levin, Julian — Levin and Julian carry the egg to stop ${i + 1} — the egg is nearer home` })),
   ];
   const ROSTER = new Map<number, any>([
     [1, { people: ['Levin', 'Julian'], things: [], covers: [] }],
     [2, { people: ['Levin'], things: ['egg'], covers: [] }],
     [3, { people: ['Julian'], things: ['egg'], covers: [] }],
+    ...Array.from({ length: 15 }, (_, i) => [4 + i, { people: ['Levin', 'Julian'], things: ['egg'], covers: [] }] as [number, any]),
   ]);
   const finding = () => runPlanCounters({
     pages: PAGES, commissionedNames: ['Levin', 'Julian'], placeNames: [],

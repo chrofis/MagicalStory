@@ -84,7 +84,8 @@ describe('a cast finding says how it is answered', () => {
   };
 
   it('UNDER_COVERED_CHARACTER carries the fix: cast the child in, never below another child\'s floor', () => {
-    const pages = [page(1, 'close-up', ['Ana']), page(2, 'wide', ['Ana', 'Ben']), page(3, 'medium', ['Ana', 'Ben']), page(4, 'ultra-wide', ['Cara'])];
+    // Ben is on 3 pages = the floor of a 4-page book (every page peopled, castCoverage.peoplelessTier 'none'); only Cara is under it.
+    const pages = [page(1, 'close-up', ['Ana', 'Ben']), page(2, 'wide', ['Ana', 'Ben']), page(3, 'medium', ['Ana', 'Ben']), page(4, 'ultra-wide', ['Cara'])];
     const floor = CC.castCoverage({ pageCount: 4, castCount: 3 }).appearances.min;
     const under = linesOf(pages)('UNDER_COVERED_CHARACTER');
     expect(under).toHaveLength(1);

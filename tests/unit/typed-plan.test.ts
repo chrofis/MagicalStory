@@ -113,7 +113,10 @@ describe('every book target is counted, from the object the planner is told', ()
   });
   it('flags no face page, no landscape/object page, neighbours, coverage, main share, group budget, no-commissioned pages', () => {
     const r = count(book(8));
-    for (const c of ['TYPED_NO_FACE_PAGE', 'TYPED_NO_SCENERY_PAGE', 'UNDER_COVERED_CHARACTER', 'NO_FOCAL_PAGE']) expect(codes(r)).toContain(c);
+    for (const c of ['TYPED_NO_FACE_PAGE', 'UNDER_COVERED_CHARACTER', 'NO_FOCAL_PAGE']) expect(codes(r)).toContain(c);
+    // The scenery page is a people-free page: owed only in a long book (castCoverage.peoplelessTier 'required'), 8 pages owe none.
+    expect(codes(r)).not.toContain('TYPED_NO_SCENERY_PAGE');
+    expect(codes(count(book(18)))).toContain('TYPED_NO_SCENERY_PAGE');
     const lines = [line('landscape', 'nobody'), line('landscape', 'nobody'), line('landscape', 'nobody'), line('face', 'Ana'), line('face', 'Ana'),
       line('group', 'Ana, Ben, Cy, Dora'), line('group', 'Ana, Ben, Cy, Dora'), line('group', 'Ana, Ben, Cy, Dora')];
     const r2 = count(lines);
@@ -329,10 +332,13 @@ describe('the targeted re-plan', () => {
     const c = count(lines);
     const castTable = { characters: [{ name: 'Ana', deedPage: 3, alsoOn: [5] }], ending: { page: 8, names: ['Ana'] } };
     const prot = TP.protectedPages({ rows: c.rows, castTable, targets, classOf: (n: string) => (LISTED.includes(n) ? 'commissioned' : 'invented') });
-    // the deed page (3), the sole face (2), the sole scenery page (4), the ending (8) and the first stay locked; a page
-    // the CAST block only promises Ana "also on" (5) may be rewritten, her promise kept by its keep list
-    for (const n of [1, 2, 3, 4, 8]) expect(prot.has(n)).toBe(true);
-    for (const n of [5, 6, 7]) expect(prot.has(n)).toBe(false);
+    // the deed page (3), the sole face (2), the ending (8) and the first stay locked; a page
+    // the CAST block only promises Ana "also on" (5) may be rewritten, her promise kept by its keep list.
+    // The sole scenery page (4) is a people-free page: locked only where the book owes one (peoplelessTier), not in 8 pages.
+    for (const n of [1, 2, 3, 8]) expect(prot.has(n)).toBe(true);
+    for (const n of [4, 5, 6, 7]) expect(prot.has(n)).toBe(false);
+    const owed = CC.typedPlanTargets({ pageCount: 18, listed: LISTED, maxCharactersPerScene: 6 });
+    expect(TP.protectedPages({ rows: c.rows, castTable, targets: owed, classOf: (n: string) => (LISTED.includes(n) ? 'commissioned' : 'invented') }).has(4)).toBe(true);
     // a Jev flag on a protected page is not sent back
     const scope = scopeOf(c, jevOf({ 2: { FELT: 0.95 }, 6: { DEED: 0.9 } }), { castTable });
     expect(scope.has(2)).toBe(false);
@@ -525,9 +531,10 @@ describe('calibration v2 on typed lines (fix 4)', () => {
     await loadPromptTemplates();
     expect(PB.PEOPLELESS_WEIGHT_DEF).toContain('danger or obstacle');
     expect(TP.PLAN_QUESTIONS.WEIGHT.virtue).toContain(PB.PEOPLELESS_WEIGHT_DEF);
-    const input = { characters: LISTED.map((name, i) => ({ name, age: 6 + i })), language: 'en', pages: 12, storyCategory: 'adventure' };
-    expect(PB.buildBeatsPrompt(input, 12, { finalArc: 'An arc.' })).toContain(PB.PEOPLELESS_WEIGHT_DEF);
-    expect(PB.buildBeatsPrompt(input, 12, { finalArc: 'An arc.', typedPlan: true })).toContain(PB.PEOPLELESS_WEIGHT_DEF);
+    // 18 pages: the book owes a people-free page, so the planner's question 2 carries the definition (peoplelessTier).
+    const input = { characters: LISTED.map((name, i) => ({ name, age: 6 + i })), language: 'en', pages: 18, storyCategory: 'adventure' };
+    expect(PB.buildBeatsPrompt(input, 18, { finalArc: 'An arc.' })).toContain(PB.PEOPLELESS_WEIGHT_DEF);
+    expect(PB.buildBeatsPrompt(input, 18, { finalArc: 'An arc.', typedPlan: true })).toContain(PB.PEOPLELESS_WEIGHT_DEF);
     expect(PB.buildPlanCheckPrompt(input, 'beats', 'An arc.', 'Page 1: x')).toContain(PB.PEOPLELESS_WEIGHT_DEF);
   });
   it('the flag level is the threshold plus its noise: one level for the flag, the scope margin and the acceptance', () => {
@@ -637,7 +644,7 @@ describe('a second, code-triggered re-plan round (BACKLOG 2026-10-06; 50osg2osm 
 
 describe('two characters that each need a focal page on a short book (50osg2osm)', () => {
   const L = ['Emma', 'Noah', 'Daniel', 'Sarah', 'Hans'];
-  const lines = [line('medium', 'Emma, Sarah, Hans'), line('medium', 'Daniel, Noah'), line('medium', 'Emma, Sarah, Hans'), line('medium', 'Emma'), line('medium', 'Emma, Daniel'), line('medium', 'Noah, Daniel'), line('medium', 'Emma, Noah'), line('medium', 'Daniel'), line('object', 'nobody'), line('group', 'Emma, Noah, Daniel, Sarah, Hans')];
+  const lines = [line('medium', 'Emma, Noah, Sarah, Hans'), line('medium', 'Daniel, Noah'), line('medium', 'Emma, Noah, Sarah, Hans'), line('medium', 'Emma'), line('medium', 'Emma, Daniel'), line('medium', 'Noah, Daniel'), line('medium', 'Emma, Noah'), line('medium', 'Daniel'), line('object', 'nobody'), line('group', 'Emma, Noah, Daniel, Sarah, Hans')];
   const c = PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: L, commissionedNames: L, mainNames: ['Emma'], maxCharactersPerScene: 6 });
   const t = CC.typedPlanTargets({ pageCount: 10, listed: L, maxCharactersPerScene: 6 });
   const scope = TP.replanScope({ rows: c.rows, findings: c.findings, jevPages: {}, castTable: null, targets: t, commissionedNames: L, arcNames: [] });
@@ -656,7 +663,7 @@ describe('two characters that each need a focal page on a short book (50osg2osm)
 
 describe('the face-page nomination names WHO takes the close-up (Lab 1686, 50osg2osm: offered only a page, ignored twice)', () => {
   const L = ['Emma', 'Noah', 'Daniel', 'Sarah', 'Hans'];
-  const lines = [line('medium', 'Emma, Sarah, Hans'), line('medium', 'Daniel, Noah'), line('medium', 'Emma, Sarah, Hans'), line('medium', 'Emma'), line('medium', 'Emma, Daniel'), line('medium', 'Noah, Daniel'), line('medium', 'Emma, Noah'), line('medium', 'Daniel'), line('object', 'nobody'), line('group', 'Emma, Noah, Daniel, Sarah, Hans')];
+  const lines = [line('medium', 'Emma, Noah, Sarah, Hans'), line('medium', 'Daniel, Noah'), line('medium', 'Emma, Noah, Sarah, Hans'), line('medium', 'Emma'), line('medium', 'Emma, Daniel'), line('medium', 'Noah, Daniel'), line('medium', 'Emma, Noah'), line('medium', 'Daniel'), line('object', 'nobody'), line('group', 'Emma, Noah, Daniel, Sarah, Hans')];
   const c = PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: L, commissionedNames: L, mainNames: ['Emma'], maxCharactersPerScene: 6 });
   const t = CC.typedPlanTargets({ pageCount: 10, listed: L, maxCharactersPerScene: 6 });
   const scope = TP.replanScope({ rows: c.rows, findings: c.findings, jevPages: {}, castTable: null, targets: t, commissionedNames: L, arcNames: [] });

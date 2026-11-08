@@ -32,7 +32,7 @@ The arc above delivers the commission; keep its names and world as written.
 
 {TYPED_TARGETS}Before dividing, plan the pictures — simple pages first:
 1. The story's emotional highlights: which moments earn a page of one character showing a strong feeling{CLOSE_UP_WORD}?
-2. Which moments earn a page with no people in frame? {PEOPLELESS_WEIGHT_DEF} A place with no story weight never gets its own page. At least one page in the book earns this. Choose one whose drama is a place, the weather, a vessel or an object{AFAR_WORD}; never a page whose drama is between people — a parting, a confrontation, tears, a promise, a handover. Those pages get faces, and so does every picture question 5 names as most wanted.
+2. {PEOPLELESS_QUESTION}
 3. Which pages gather the whole cast, and what one simple action do they all share there? {GROUP_PAGE_BUDGET}
 4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it. Where one is kept, {THIRD_CHARACTER_DEF}
 5. For each act — setup, middle, ending — which picture does a child most want to see there, and which page stages it as its instant? {ACT_SPANS} The ending's own event — the reunion, the goodbye, the parting — is always one of them. A picture that falls between two pages, or that only a page's change reports as already done, is not staged.
@@ -64,7 +64,7 @@ Requirements:
 - Every page is visible: something happens that a picture can show. A character whose action is what a page's instant works against — a way blocked, a place kept, a thing taken or withheld, a refusal — is named in that page's plan line.
 - {MAIN_FLOOR} the others come and go in different combinations, not the whole group on every page. {CAST_COVERAGE}
 - {WHO_DOES_WHAT}
-- A character's focal page stages them alone or with one companion — two people sharing one action carry it — and stages them doing something visible. An internal decision gets a physical correlative — a held object, a step taken, a grip tightened; never a lone motionless figure.
+- A character's focal page stages them alone or with one companion — two people sharing one action carry it — and stages them doing something visible; when the character acts for or with the main character, the main character may be in frame too, and the page stays the character's own. An internal decision gets a physical correlative — a held object, a step taken, a grip tightened; never a lone motionless figure.
 - When a REAL LANDMARKS section is present, those are the landmarks the arc chose — keep them, add no others; an arc that stages none has chosen none. A landmark may be scenery — a tower on the horizon, a bridge behind the action — and never relocates the story. No page names more than one place.
 - A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.
 - A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle. The decision before and the relief after never replace it.
@@ -88,5 +88,5 @@ Only what the format below shows. No preamble, no commentary. {OUTPUT_SCOPE}
 
 {CAST_FORMAT}
 ---PAGE PLAN---
-Page <N>: {PLAN_SHOT_FORMAT} — <names, or the word nobody> — <the instant the picture shows> — <what is true after this page that was not before>
+Page <N>: {PLAN_SHOT_FORMAT} — {WHO_FORMAT} — <the instant the picture shows> — <what is true after this page that was not before>
 {CHANGES_FORMAT}

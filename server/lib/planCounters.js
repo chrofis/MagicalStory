@@ -36,7 +36,26 @@ const {
   shotFloors, MAX_MEDIUM_WIDE_SHARE, closeUpBelowWaistVerbs, PEOPLELESS_SHARED_SHOT,
 } = require('./shotVocabulary');
 const { namesMentioned, isNameMentioned } = require('./castResolver');
-const { castCoverage, groupPageBudget, underCoveredFix, noFocalFix, NO_COMMISSIONED_PAGES_MAX, PLAN_INSTANT_MAX_WORDS } = require('./castCoverage');
+const { castCoverage, groupPageBudget, underCoveredFix, noFocalFix, NO_COMMISSIONED_PAGES_MAX, PLAN_INSTANT_MAX_WORDS, peoplelessTier } = require('./castCoverage');
+
+/**
+ * IS THIS PAGE `name`'S FOCAL PAGE? In frame with at most one companion, the main character not counted against a
+ * friend (owner, 2026-11-08, test F): a friend who acts for or with the main character keeps their own page with the
+ * main character in frame. castCoverage.MAIN_IN_FRAME_CLAUSE tells the planner the same. The main character's own
+ * page is counted as before (at most two in frame). One definition for runPlanCounters.focalOf, castTablePromises,
+ * reviewPlanChanges and the typed counters.
+ * @param {string[]} present everyone in frame on the page
+ * @param {string} name      the character whose focal page it would be
+ * @param {Set<string>|string[]} mains every main character, lower-cased names (a Set) or any case (an array)
+ */
+function isFocalPage(present, name, mains) {
+  const lc = (n) => String(n || '').toLowerCase();
+  const mainSet = mains instanceof Set ? mains : new Set((mains || []).map(lc));
+  const list = Array.isArray(present) ? present : [];
+  if (!list.some(n => lc(n) === lc(name))) return false;
+  const others = mainSet.has(lc(name)) ? list : list.filter(n => !mainSet.has(lc(n)));
+  return others.length <= 2;
+}
 
 /** Words that look like names but never are, in the who-column's grammar. */
 const NAME_STOPWORDS = new Set([
@@ -811,7 +830,14 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
       `${overCeiling.length} page(s) put more than ${maxCharactersPerScene} named characters in frame — past what the image model can hold, and each needs a justification in its plan line`);
   }
 
-  // 4. Solo pages and no-people pages both have to exist.
+  // The commission's character list (see 7 below), read once: the people-free tier and the coverage rule both need it.
+  const listedLower = new Set((Array.isArray(listedNames) ? listedNames : commissionedNames)
+    .map(n => String(n || '').trim().toLowerCase()).filter(Boolean));
+  const listed = cast.commissioned.filter(n => listedLower.has(n.toLowerCase()));
+  const coverageRule = castCoverage({ pageCount, castCount: listed.length });
+  const mainsLower = new Set((mainNames || []).map(n => namesIn(n, cast.commissioned, cast.aliases)[0]).filter(Boolean).map(n => n.toLowerCase()));
+
+  // 4. Solo pages exist; a no-people page exists only where the book owes one (peoplelessTier).
   const soloPages = rows.filter(r => r.present.length === 1).map(r => r.pageNumber);
   if (soloPages.length === 0) add('NO_SOLO_PAGE', [], 'no page puts a single character alone in frame');
   // A people-free page is BY DESIGN and stays required: the drama of one page
@@ -865,7 +891,14 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   // the OBSTACLES block does. Code never synthesises a page: when no
   // nomination arrives the finding is the same sentence without the page
   // clause, and beatsPipeline logs the miss.
-  if (standingEmptyPages.length === 0) {
+  const peoplelessOwed = peoplelessTier({ pageCount, castCount: listed.length });
+  if (peoplelessOwed === 'none' && emptyPages.length) {
+    // A book too short to spare a people-free page (owner, 2026-11-08, test F): the planner was told every page has a
+    // character, so one without is noted, never required. Direction 'more' (REPLAN_FINDING_DIRECTION).
+    add('PEOPLELESS_IN_SHORT_BOOK', emptyPages,
+      `${emptyPages.length} page(s) put no one in frame in a book this short, which has no page to spare for it — a place, the weather, a vessel or an object that carries the moment is staged with the character whose moment it is`);
+  }
+  if (peoplelessOwed === 'required' && standingEmptyPages.length === 0) {
     const pick = peoplelessPick && Number.isFinite(Number(peoplelessPick.page))
       ? Number(peoplelessPick.page) : null;
     add('NO_PEOPLELESS_PAGE', pick ? [pick] : [],
@@ -1043,7 +1076,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   //    half went with the planner's shot word (2026-09-27): no shot exists
   //    when the plan is checked.
   const focalOf = (name) => rows
-    .filter(r => (r.present.length <= 2 && r.present.includes(name))
+    .filter(r => isFocalPage(r.present, name, mainsLower)
       || (legacyShots && r.shot === 'close-up' && r.present[0] === name))
     .map(r => r.pageNumber);
   //
@@ -1054,10 +1087,6 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   //    a floor the planner was not given. Both rules apply to the commission's
   //    CHARACTER LIST (`listedNames`): a pet or companion the premise or a
   //    profile supplies is commissioned, never invented, but owes no page.
-  const listedLower = new Set((Array.isArray(listedNames) ? listedNames : commissionedNames)
-    .map(n => String(n || '').trim().toLowerCase()).filter(Boolean));
-  const listed = cast.commissioned.filter(n => listedLower.has(n.toLowerCase()));
-  const coverageRule = castCoverage({ pageCount, castCount: listed.length });
   // A PAGE LEADS WITH ONE CHARACTER (castCoverage.LEAD_RULE, owner 2026-10-06).
   // When the book owes every figure a lead page, presence on a page of at most
   // two is not enough: a small page that stages ANOTHER listed character's own
@@ -1126,7 +1155,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   //     its plan lines, each character's deed page and the pages they are in
   //     frame on, and the last page's cast (castCoverage.parsePlanCastBlock).
   //     Each plan line that breaks a promise is a finding naming the page.
-  const castTableResult = castTable ? castTablePromises({ rows, castTable, actions, cast, focalEach: !!(coverageRule && coverageRule.focalEach), leadEach: !!(coverageRule && coverageRule.leadEach) }) : null;
+  const castTableResult = castTable ? castTablePromises({ rows, castTable, actions, cast, mains: mainsLower, focalEach: !!(coverageRule && coverageRule.focalEach), leadEach: !!(coverageRule && coverageRule.leadEach) }) : null;
   if (castTableResult) for (const b of castTableResult.broken) add(b.promise === 'focal' ? 'CAST_PROMISE_FOCAL_BROKEN' : 'CAST_PROMISE_BROKEN', [b.page], b.detail);
 
   // 8b. THE CENTRAL FIGURE IN EACH THIRD (owner, 2026-09-24, d4). The arc's
@@ -1209,7 +1238,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
  *
  * @returns {{broken: Array<{page:number, name:string|null, promise:string, detail:string}>, kept:number, unanswered:string[]}}
  */
-function castTablePromises({ rows, castTable, actions, cast, focalEach, leadEach = false }) {
+function castTablePromises({ rows, castTable, actions, cast, focalEach, leadEach = false, mains = [] }) {
   const byPage = new Map(rows.map(r => [Number(r.pageNumber), r]));
   const acts = Array.isArray(actions) ? actions : [];
   const broken = [];
@@ -1252,8 +1281,8 @@ function castTablePromises({ rows, castTable, actions, cast, focalEach, leadEach
       const instead = others.length ? `page ${deed}'s instant is ${others.join(' and ')}'s` : `page ${deed}'s instant is not ${name}'s own action`;
       const where = act.page == null ? 'no page stages it' : `the check finds it on page ${act.page}`;
       broken.push({ page: deed, name, promise: 'deed', detail: `the CAST block promises ${name} page ${deed} as their deed page, but ${instead} (${where})` });
-    } else if (focalEach && (!row.present.includes(name) || row.present.length > 2)) {
-      broken.push({ page: deed, name, promise: 'focal', detail: `the CAST block promises page ${deed} as ${name}'s deed page, alone or with one companion, but it holds ${row.present.join(', ') || 'nobody'}` });
+    } else if (focalEach && !isFocalPage(row.present, name, mains)) {
+      broken.push({ page: deed, name, promise: 'focal', detail: `the CAST block promises page ${deed} as ${name}'s deed page, alone or with one companion (the main character may be in frame too), but it holds ${row.present.join(', ') || 'nobody'}` });
     } else {
       kept++;
     }
@@ -1424,6 +1453,7 @@ function castLostByReplan(standing, returned, castNames = [], aliases = {}, decl
 const REPLAN_FINDING_DIRECTION = new Map([
   ['NO_COMMISSIONED_ON_PAGE', 'more'],
   ['PEOPLELESS_ON_INTERACTION_PAGE', 'more'],
+  ['PEOPLELESS_IN_SHORT_BOOK', 'more'],
   ['UNDER_COVERED_CHARACTER', 'more'],
   ['MAIN_UNDER_HALF', 'more'],
   // The invented-dominance pair asks for MORE, not fewer — measured, not
@@ -1554,7 +1584,7 @@ function replanChangeDirection(tag) {
  * @returns {{refusals: Array<{pageNumber:number, rule:string, detail:string, line:string}>,
  *            declaredOut: Map<number,string[]>, notes: string[]}}
  */
-function reviewPlanChanges({ changes = [], standing = [], returned = [], castNames = [], aliases = {}, maxCast = 3, obstacles = null, focalNames = [], protectedPages = null, actions = [], rankOf = null, castFloor = null } = {}) {
+function reviewPlanChanges({ changes = [], standing = [], returned = [], castNames = [], aliases = {}, maxCast = 3, obstacles = null, focalNames = [], protectedPages = null, actions = [], rankOf = null, castFloor = null, mainNames = [] } = {}) {
   const names = (Array.isArray(castNames) ? castNames : []).map(n => String(n || '').trim()).filter(Boolean);
   const refusals = [];
   const notes = [];
@@ -1578,9 +1608,10 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
   const afterSpan = spanIn(afterWho);
   // A focal page, read the way the NO_FOCAL_PAGE counter reads it: at most two
   // in frame (no shot exists while the plan is re-divided, 2026-09-27).
+  const mainSet = new Set((Array.isArray(mainNames) ? mainNames : []).flatMap(n => namesIn(String(n || ''), names, aliases)).map(n => n.toLowerCase()));
   const focalPagesIn = (pages, who, name) => (pages || []).filter((p) => {
     const w = who.get(Number(p.pageNumber)) || [];
-    return w.includes(name) && w.length <= 2;
+    return isFocalPage(w, name, mainSet);
   }).map(p => Number(p.pageNumber));
   const focalSet = new Set((Array.isArray(focalNames) ? focalNames : []).flatMap(n => namesIn(String(n || ''), names, aliases)));
   const actionPageOf = new Map();
@@ -1856,7 +1887,7 @@ function countPlanTargets({ rows, listedNames = [], commissionedNames = null, ar
   if (targets.appearancesMin > 0) {
     for (const name of listedNames) {
       coverage[name] = rows.filter(r => has(r, name)).map(r => r.pageNumber);
-      focal[name] = rows.filter(r => has(r, name) && r.names.length <= 2 && !isScenery(r.type)).map(r => r.pageNumber);
+      focal[name] = rows.filter(r => has(r, name) && isFocalPage(r.names, name, mainNames) && !isScenery(r.type)).map(r => r.pageNumber);
       if (coverage[name].length < targets.appearancesMin) {
         add('UNDER_COVERED_CHARACTER', coverage[name], `${name} is in frame on ${coverage[name].length} page(s), target ${targets.appearancesMin}. ${underCoveredFix(name, targets.appearancesMin)}`);
       }
@@ -2072,6 +2103,7 @@ module.exports = {
   buildReissueSection,
   reissueLostPages,
   castTablePromises,
+  isFocalPage,
   typedPlanCounters,
   countPlanTargets,
   parseTypedLine,

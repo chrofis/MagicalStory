@@ -40,6 +40,12 @@ const rosterFor = (pages: any[], things: string[] = []) => {
 };
 
 const CAST = ['Ana', 'Ben', 'Cara'];
+// A people-free page is owed only in a long book (castCoverage.peoplelessTier 'required': 18+ pages and 4 x the cast).
+// These pad a short fixture with peopled filler pages up to that length.
+const longBook = (pages: any[], n = 18) => [
+  ...pages,
+  ...Array.from({ length: Math.max(0, n - pages.length) }, (_, i) => page(200 + i, line('wide', 'Ana and Ben'))),
+];
 
 describe('planSegments / classifyShot', () => {
   it('splits on em-dash and reports incompleteness by segment count', () => {
@@ -197,9 +203,10 @@ describe('runPlanCounters', () => {
     expect(r.stats.focalPages['Ben']).toEqual([]);
   });
 
-  it('flags a commissioned character in frame on fewer than two pages', () => {
+  it('flags a commissioned character in frame on fewer pages than the floor', () => {
+    // Four pages with no people-free page owed give the floor 3 (castCoverage: every page is peopled).
     const pages = [
-      page(1, line('close-up', 'Ana')),
+      page(1, line('close-up', 'Ana and Ben')),
       page(2, line('wide', 'Ana and Ben walk')),
       page(3, line('medium', 'Ana and Ben talk')),
       page(4, line('ultra-wide', 'Cara stands alone')),
@@ -208,7 +215,7 @@ describe('runPlanCounters', () => {
     const under = r.findings.filter((f: any) => f.code === 'UNDER_COVERED_CHARACTER');
     expect(under.map((f: any) => f.detail).join(' ')).toContain('Cara');
     expect(under.map((f: any) => f.detail).join(' ')).not.toContain('Ben');
-    expect(r.stats.coveragePages.Ben).toEqual([2, 3]);
+    expect(r.stats.coveragePages.Ben).toEqual([1, 2, 3]);
   });
 
   it('never compares a pair whose plan line is incomplete or whose shot did not classify', () => {
@@ -238,7 +245,7 @@ describe('runPlanCounters', () => {
   });
 
   it('flags a book with no peopleless page and no solo page', () => {
-    const pages = [1, 2].map(n => page(n, line('wide', 'Ana and Ben')));
+    const pages = longBook([1, 2].map(n => page(n, line('wide', 'Ana and Ben'))));
     const codes = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: CAST }).findings.map((f: any) => f.code);
     expect(codes).toContain('NO_SOLO_PAGE');
     expect(codes).toContain('NO_PEOPLELESS_PAGE');
@@ -689,7 +696,7 @@ describe('PEOPLELESS_ON_INTERACTION_PAGE', () => {
   });
 
   it('still requires a people-free page somewhere in the book', () => {
-    const pages = [1, 2].map(n => page(n, line('wide', 'Ana and Ben')));
+    const pages = longBook([1, 2].map(n => page(n, line('wide', 'Ana and Ben'))));
     expect(codesFor(pages)).toContain('NO_PEOPLELESS_PAGE');
   });
 
@@ -698,10 +705,10 @@ describe('PEOPLELESS_ON_INTERACTION_PAGE', () => {
   // page the next round, which the re-plan could not touch, so it never converged.
   // Both findings now fire in the same round.
   it('does not count an interaction page as the people-free page the book owes', () => {
-    const pages = [
+    const pages = longBook([
       page(1, line('wide', 'Ana and Ben')),
       page(12, 'wide — the ship sliding away from the stone edge, no one at the gangway place'),
-    ];
+    ]);
     const codes = codesFor(pages, ['ship']);
     expect(codes).toContain('PEOPLELESS_ON_INTERACTION_PAGE');
     expect(codes).toContain('NO_PEOPLELESS_PAGE');

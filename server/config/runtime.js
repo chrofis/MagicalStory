@@ -169,6 +169,15 @@ const SETTINGS = {
   // claims kept, one re-plan round").
   planReplanRounds: 1,
 
+  // The people-free page, by book size (owner, 2026-11-08, docs/decisions.md "People-free page by book size",
+  // Lab test F). castCoverage.peoplelessTier reads these three:
+  //   'required'  pages >= peoplelessRequiredMinPages AND pages >= peoplelessRequiredPagesPerCast x listed cast
+  //   'optional'  pages >= peoplelessOptionalMinPages otherwise
+  //   'none'      shorter than that
+  peoplelessRequiredMinPages: 18,
+  peoplelessRequiredPagesPerCast: 4,
+  peoplelessOptionalMinPages: 14,
+
   // Redraws of the front cover per book-review round when the review reads its
   // title wrong (owner, 2026-11-01: "retry the title until right"). Each redraw
   // is checked against the title before it reaches the review; the first one

@@ -955,6 +955,8 @@ function createPlanCheckRunner({ inputData, approvedArc, arcHints, arcStoryLogic
     // NO FALLBACK, NO SYNTHESIS. The finding degrades to its page-less
     // sentence when Q6 nominated nothing; code never picks the page itself.
     // The miss is loud so a checker that stops answering Q6 is visible.
+    // NO_PEOPLELESS_PAGE exists only in a 'required' book (castCoverage.peoplelessTier) and Q6 asks for the nomination only
+    // there (promptBuilders.peoplelessCheckNomination), so this error cannot fire in an 'optional' or 'none' book.
     if (!peoplelessPick && counters.findings.some(f => f.code === 'NO_PEOPLELESS_PAGE')) {
       log.error(`❌ [BEATS] Plan check (${label}) fired NO_PEOPLELESS_PAGE but emitted no PEOPLELESS line — the finding names no page, and the planner picks blind`);
       gl.error(`${label}_no_peopleless_nomination`, 'The plan check found no people-free page but nominated none either (Q6 PEOPLELESS line absent); the finding degrades to naming no page', null, { model: checkModelId || planCheckModel });
@@ -1297,6 +1299,7 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
           maxCast,
           obstacles: pendingCheck.obstacles,
           focalNames: coverageRule && coverageRule.focalEach ? commission.listed : [],
+          mainNames: pickMainNames(inputData),
           protectedPages: new Map(keep.map(k => [Number(k.page), k.why])),
           actions: pendingCheck.actions,
           rankOf: replanRank,

@@ -10,8 +10,9 @@ const input = () => ({
   characters: [{ id: 'a', name: 'Levin', age: 5 }], mainCharacters: ['a'],
 });
 const planner = () => pb.buildBeatsPrompt(input(), 18, { finalArc: '1. A story.', arcHints: '' });
+// 18 beats: the plan check's people-free tier follows the plan's length (castCoverage.peoplelessTier).
 const checker = () => pb.buildPlanCheckPrompt(
-  input(), [{ pageNumber: 1, planLine: 'medium — Levin — he waits — nothing' }],
+  input(), Array.from({ length: 18 }, (_, i) => ({ pageNumber: i + 1, planLine: 'medium — Levin — he waits — nothing' })),
   '1. A story.', 'Page 1: medium — Levin — he waits — nothing');
 
 /**

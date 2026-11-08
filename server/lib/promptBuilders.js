@@ -24,7 +24,7 @@ const { SCALE_CLASS_SPEC, ANIMAL_ANATOMY_SPEC, GROWN_CREATURE_SCALE_CLASSES, bui
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, CLOSEUP_KEPT_FIXED_SHOT_RULE, FOOTING_RULE, FOOTING_FIELD, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE, GROUP_STAGING_FIXED_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { SLOP_RULES } = require('./proseSlop');
-const { castCoverage, castCoverageRule, castActionRule, FLOOR_REFUSED_ONLOOKER_RULE, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule, typedPlanTargets, typedTargetsRule, mainFloorRule, mainFloorPointer, noCommissionedRule, planInstantRule } = require('./castCoverage');
+const { castCoverage, castCoverageRule, castActionRule, FLOOR_REFUSED_ONLOOKER_RULE, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule, typedPlanTargets, typedTargetsRule, peoplelessTier, mainFloorRule, mainFloorPointer, noCommissionedRule, planInstantRule } = require('./castCoverage');
 const { PLAN_TYPE_IDS } = require('./shotVocabulary');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
 // clause and the judges' TEXT RULES block. Safe as a top-level require --
@@ -9221,7 +9221,9 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     CHANGES_FORMAT: String(replan || '').trim() && !typedPlan ? REPLAN_CHANGES_FORMAT : '',
     READER_LINE: readerLine,
     ONE_ACTION_DEF,
-    PEOPLELESS_WEIGHT_DEF,
+    // The people-free page by book size (castCoverage.peoplelessTier): the question and the who column's format.
+    PEOPLELESS_QUESTION: peoplelessPlannerQuestion(peoplelessTier({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), { afarWord: typedPlan ? ' seen from afar' : (legacyShots ? ' seen from afar' : '') }),
+    WHO_FORMAT: peoplelessWhoFormat(peoplelessTier({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length })),
     THIRD_CHARACTER_DEF,
     INTERLOCK_DEF,
     TWO_HEIGHTS_DEF,
@@ -9714,6 +9716,41 @@ const SPLIT_STATE_MARKINGS_RULE = 'Dividing, opening or breaking an object never
  * nobody in the picture counts, a thing rolling toward a drop, a nest out of reach).
  */
 const PEOPLELESS_WEIGHT_DEF = 'A page with nobody in it has story weight when its subject is something the story has been driving toward — a discovery, an arrival, a payoff — or the danger or obstacle the characters face at that point: a thing rolling toward a drop, a goal out of reach.';
+
+/**
+ * THE PEOPLE-FREE PAGE, PER TIER (owner, 2026-11-08; docs/decisions.md "People-free page by book size"). The planner's
+ * question 2 (story-beats.txt {PEOPLELESS_QUESTION}) and its who-column format ({WHO_FORMAT}), and the plan check's
+ * Q6 nomination and PEOPLELESS output block (plan-check.txt), are filled from castCoverage.peoplelessTier, the one
+ * function the counter NO_PEOPLELESS_PAGE reads too (sibling set `beats-planner-vs-plan-check`). 'required' is the
+ * question as it stood, plus one sentence: the people-free page is never the main character's moment.
+ */
+const PEOPLELESS_QUESTION_HEAD = 'Which moments earn a page with no people in frame?';
+function peoplelessPlannerQuestion(tier, { afarWord = '' } = {}) {
+  if (tier === 'none') {
+    return 'This book is too short to spare a page with no people in frame: every page has at least one character in it. A place, the weather, a vessel or an object that carries a moment is staged with the character whose moment it is.';
+  }
+  const quota = tier === 'required'
+    ? 'At least one page in the book earns this.'
+    : 'This book need not have such a page. It may have one only on a moment in which no commissioned character acts, decides or feels: a page where the main character acts, decides or feels keeps them in frame.';
+  const tail = tier === 'required' ? ' The people-free page is never a page where the main character acts, decides or feels.' : '';
+  return `${PEOPLELESS_QUESTION_HEAD} ${PEOPLELESS_WEIGHT_DEF} A place with no story weight never gets its own page. ${quota} Choose one whose drama is a place, the weather, a vessel or an object${afarWord}; never a page whose drama is between people — a parting, a confrontation, tears, a promise, a handover. Those pages get faces, and so does every picture question 5 names as most wanted.${tail}`;
+}
+/** The who column's format cell: the word `nobody` exists only where a people-free page may. */
+function peoplelessWhoFormat(tier) {
+  return tier === 'none' ? '<names>' : '<names, or the word nobody>';
+}
+/** Plan-check Q6's nomination sentence: asked only in a 'required' book, where a missing people-free page is a finding. */
+function peoplelessCheckNomination(tier) {
+  return tier === 'required'
+    ? ' When no page is people-free, nominate the one page best suited to give up its cast and give it a PEOPLELESS line: a page whose subject is already a thing or a place seen alone — a vessel, an object, the weather, a place — never a moment between people, and never one of the most wanted pictures question 4 names. A people-free page that stages a moment between people does not count as one. A book with no people-free page and no nomination is a finding.'
+    : '';
+}
+/** Plan-check's PEOPLELESS output block (the line the nomination parses), empty outside a 'required' book. */
+function peoplelessCheckFormat(tier) {
+  return tier === 'required'
+    ? 'Then, only when no page is people-free, one line naming the page best suited to give up its cast, and no line at all when some page already is:\n\nPEOPLELESS <page>: <the thing or the place that page\'s picture is already of>\n\n'
+    : '';
+}
 
 const DEED_AND_EFFECT_DEF = 'A deed, its effect, and where the effect goes are three actions. Watching, standing and being present are not actions, and an effect that is the deed itself made visible at the same instant is part of the deed.';
 
@@ -12375,6 +12412,9 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
   return fillTemplate(template, {
     DEED_AND_EFFECT_DEF,
     PEOPLELESS_WEIGHT_DEF,
+    // Q6 asks for the PEOPLELESS nomination only in a book that owes a people-free page.
+    PEOPLELESS_NOMINATION: peoplelessCheckNomination(peoplelessTier({ pageCount: beats.length, castCount: (inputData?.characters || []).filter(c => c && c.name).length })),
+    PEOPLELESS_FORMAT: peoplelessCheckFormat(peoplelessTier({ pageCount: beats.length, castCount: (inputData?.characters || []).filter(c => c && c.name).length })),
     // The fourth field's contract, shared with the planner that writes it.
     PAGE_CHANGE: PAGE_CHANGE_DEF,
     // Questions 10 (heights: TWO_HEIGHTS_DEF) and 17 (whole cast: WHOLE_CAST_DEF) are Jev's since 2026-10-09
@@ -14536,6 +14576,10 @@ module.exports = {
   // `beats-planner-vs-plan-check`).
   DEED_AND_EFFECT_DEF,
   PEOPLELESS_WEIGHT_DEF,
+  peoplelessPlannerQuestion,
+  peoplelessWhoFormat,
+  peoplelessCheckNomination,
+  peoplelessCheckFormat,
   ONE_ACTION_DEF,
   THIRD_CHARACTER_DEF,
   INTERLOCK_DEF,
