@@ -101,3 +101,16 @@ Order: #1+#3 -> #4+#5 -> #6,#7,#10 -> #2,#8,#9 (at most 2 agents at a time).
   - It is being replaced by DEED_SOURCE_RULE: a character's own page shows the deed the story gives them, on the page that tells it; joint deeds share; the hero is in frame when it is their moment.
   - A Sonnet build agent is on it, with a decisions entry that replaces the 10-06/10-07 entries. Next: staging deploy, then the planner Lab A/B on the same 12 books (about USD 1).
 - 2026-11-08: deed-source rule BUILT (not pushed; docs/decisions.md "Deed-source rule replaces the lead-page rule"). LEAD_RULE deleted; MAIN_IN_FRAME_CLAUSE, DEED_SOURCE_RULE, MAIN_MOMENT_RULE, Q12 findings, noFocalFix, main exemption in alsoOnConflicts / castTablePromises, decideGroupCuts keeps the needed main character. Free replays: main character's "also on" pages kept 3 of 12 books (rejected 12 -> 9), counters otherwise unchanged; essbvehs8 p3 cut no longer removes Emma. Next: staging deploy, then the Lab planner A/B on the same 12 books (about USD 1).
+- Owner 2026-11-08 on the final review: "An own review before pictures. But still have OPUS recheck the final logic. So that opus can decide, can I change the text or do I have to change the image, to make sense. The number one point of last review should be to catch such inconsistencies." Test with Opus agents in the console, not paid calls ("you have opus agents it should give same results").
+  - Plan, test I: (1) an agent writes the B review prompt (CONSISTENCY as the first question; the smallest fix TEXT or IMG; "absent by design" never covers the main character or a figure whose act is the page event) and builds blind book packets; (2) two blind Opus agents answer A (today's prompt) and B; (3) grading.
+  - The TEXT route already exists: storyJobPipeline.js ~5930 → runPostAuditTextRound.
+  - Owner addition: the final review also answers "would a five-year-old enjoy it" and "would a parent buy it". Today this exists only in the idea prompts (generate-story-idea*.txt, "WHAT MAKES A PARENT BUY IT"). B adds typed VERDICT[ENJOY]/VERDICT[BUY] lines from one shared constant, with page fixes for WEAK/NO.
+- 2026-11-08, test G2: deed-source rule (c3590467b) with the real planner, exp 1840, USD 1.07, scored in quality-tests-G/*-1840.*. A = exps 1838/1839.
+  - Better: hero moment without the hero 7 → 3 (all 7 carved pages fixed); hero-absent pages 24 → 14.
+  - Worse:
+    - friends without a focal page 1 → 8;
+    - must-fix 3 → 11;
+    - deeds dropped 2 → 8;
+    - a new climax page without Janna (0j933 p9).
+  - Cause: Haiku reads the main-in-frame clause as "drop the adult's own beat", and "joint deeds share" clashes with the counter's focal definition.
+  - Verdict: NO-GO. Staging currently runs it; production does not.
