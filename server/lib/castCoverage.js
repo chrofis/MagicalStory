@@ -77,8 +77,9 @@ function castCoverage({ pageCount, castCount } = {}) {
   if (!(P > 0) || !(C > 0)) return null;
   const focalPagesNeeded = Math.ceil(C / 2);
   const focalEach = C === 1 || focalPagesNeeded <= Math.floor(P / 2);
-  // A page LEADS with one character (owner 2026-10-06; docs/decisions.md "Every named figure leads a page"): when the book has
-  // a page to spare for each, no two characters share a focal page. Larger casts keep the pairing the floor above allows.
+  // Every character can have a deed page of their own: the CAST block names a different page for each unless the story gives
+  // two characters one action together (DEED_SOURCE_RULE; docs/decisions.md 2026-11-08 "Deed-source rule"). The flag keeps
+  // the name `leadEach` of the 2026-10-06 lead-page rule it was built for; renaming it would touch every stored castCoverage stat.
   const leadEach = C > 1 && C <= Math.floor(P / 2);
   // Pages with people on them: every page but the one people-free page, which only a 'required' book owes.
   const tier = peoplelessTier({ pageCount: P, castCount: C });
@@ -289,19 +290,32 @@ function castActionRule(cov, { centralFigure = null, mayAddDeeds = false } = {})
   const cast = !cov || cov.castCount === 1
     ? ''
     : cov.focalEach
-      ? `Every commissioned character gets a focal page of their own whose instant is the action the story gives them; ${MAIN_IN_FRAME_CLAUSE}.${cov.leadEach ? ` ${LEAD_RULE}` : ''}`
-      : 'This cast is too large for a focal page each: the characters share group moments, and each character\'s own action from the story is the instant of some page.';
+      ? `Every commissioned character gets a focal page of their own whose instant is the action the story gives them; ${MAIN_IN_FRAME_CLAUSE}. ${DEED_SOURCE_RULE}`
+      : `This cast is too large for a focal page each: the characters share group moments, and each character's own action from the story is the instant of some page. ${DEED_SOURCE_RULE}`;
   return [cast, cast && mayAddDeeds ? ADDED_DEED_RULE : '', centralFigureActionRule(centralFigure)].filter(Boolean).join(' ');
 }
 
 /**
- * A focal page is ONE character's (owner 2026-10-06; docs/decisions.md "Every named figure leads a page"). One sentence for
- * the planner's cast rule and CAST block, and the plan check's question 12 (castActionRule); the counter is
- * planCounters.castTablePromises (a deed page named by two characters).
+ * WHERE A FRIEND'S DEED MEETS THE MAIN CHARACTER'S MOMENT (owner, 2026-11-08, tests G and H; docs/decisions.md 2026-11-08
+ * "Deed-source rule"). One sentence for the planner's cast rule (castActionRule), its CAST block (castTableSpec), the
+ * story-beats.txt requirement ({MAIN_IN_FRAME}) and the plan check's question 12 (castActionRule). The counters:
+ * planCounters.isFocalPage (the main character is not counted against a friend's page) and castTablePromises.
  */
-/** A friend's focal page may hold the main character (owner, 2026-11-08, test F); counters: planCounters.focalCompanions. */
-const MAIN_IN_FRAME_CLAUSE = "when the character acts for or with the main character, the main character may be in frame too, and the page stays the character's own";
-const LEAD_RULE = 'A page leads with one character: two characters never share a focal page.';
+const MAIN_IN_FRAME_CLAUSE = "when the story tells this action inside the main character's own moment — the same sentence has the main character act, decide or feel, in the same place — the main character is in frame on that page and the instant is this action as it reaches them, and the page stays the character's own; an action told while the main character is somewhere else is never carved out of their moment: take another action the story gives this character";
+
+/**
+ * A CHARACTER'S DEED COMES FROM THE STORY (owner, 2026-11-08). It replaces the 2026-10-06 lead-page rule (a page leads with one character, no two characters share a focal page), which carved supporting deeds out of the main character's moment
+ * and made the planner move or invent them (tests G and H). Read by castActionRule (planner and plan-check question 12) and
+ * castTableSpec.
+ */
+const DEED_SOURCE_RULE = "A character's deed is an action the story gives them — their line under Motives in THE STORY LOGIC names them — staged on the page that tells the sentence it is in: never an action made up for them, never one moved onto a page whose sentence does not tell it. Where two characters' actions fall in one sentence, the second takes another action the story gives them; two characters the story gives one action together share that deed page.";
+
+/** What makes a page the main character's moment; one definition for the planner's rule and the checker's finding. */
+const MAIN_MOMENT_DEF = 'whose sentence has the main character act, decide or feel';
+/** The planner's rule, next to the main character's floor ({MAIN_MOMENT} in story-beats.txt). */
+const MAIN_MOMENT_RULE = `A page ${MAIN_MOMENT_DEF} keeps them in frame, whoever else's action it also stages.`;
+/** Plan-check question 12's findings ({CAST_ACTION_FINDINGS}): the checker's side of DEED_SOURCE_RULE and MAIN_MOMENT_RULE. */
+const CAST_ACTION_FINDINGS = `An action staged on a page that does not tell its sentence, or one the story never gives that character, is a finding. A page ${MAIN_MOMENT_DEF}, without the main character in its who column, is a finding.`;
 
 /**
  * A cast-out the review refused because the character sits at the page floor
@@ -359,7 +373,7 @@ function underCoveredFix(name, floor) {
 }
 
 function noFocalFix(name) {
-  return `Answer it with a page whose instant is ${name}'s own action, ${name} alone or with one companion: move that action onto a page of its own, or out of a shared moment onto a neighbouring page — never by taking another character's only focal page.`;
+  return `Answer it with a page whose instant is ${name}'s own action from the sentence that tells it, ${name} alone or with one companion (the main character in frame when it is their moment): another action the story gives ${name}, or that sentence's page — never an action made up, never one moved onto a page whose sentence does not tell it, and never by taking another character's only focal page.`;
 }
 
 /**
@@ -438,7 +452,7 @@ function castTableAlsoCount(cov) {
 /** The deed line's shape, as the planner is shown it. */
 function castTableDeedLine(cov) {
   const also = castTableAlsoCount(cov);
-  const focal = cov && cov.focalEach ? ', <alone, or with whom>' : '';
+  const focal = cov && cov.focalEach ? ', <with whom — the main character when it is their moment — or alone>' : '';
   const alsoPart = also > 0 ? ` — also on pages ${Array.from({ length: also }, () => '<N>').join(', ')}` : '';
   return `<name> — deed page <N>: <their own action from the story>${focal}${alsoPart}`;
 }
@@ -459,11 +473,12 @@ function castTableSpec(cov, pageCount, { replan = false, table = null } = {}) {
       : 'The division that stands has no CAST block; answer the findings and write none.';
   }
   const also = castTableAlsoCount(cov);
-  const where = cov.focalEach
-    ? `the page whose instant is their own action from the story, alone or with one companion (the main character may be in frame too when this character acts for or with them)${cov.leadEach ? `; ${LEAD_RULE} Every line names a different page, and a character's deed page is never another character's "also on" page` : ''}`
-    : 'the page whose instant is their own action from the story, which they may share with the group';
   const more = also > 0 ? `, and ${also} more page${also === 1 ? '' : 's'} they are in frame on` : '';
-  return `Write the CAST block before the plan lines. One line per commissioned character: ${where}${more}. Then page ${pageCount}, the last: the names of everyone the story keeps together at the end. Every plan line keeps what the block promises.`;
+  const where = cov.focalEach
+    ? `the page whose instant is their own action from the story, alone or with one companion${more}; ${MAIN_IN_FRAME_CLAUSE}.`
+    : `the page whose instant is their own action from the story, which they may share with the group${more}.`;
+  const alsoOnRule = cov.leadEach ? ` A character's deed page is never another character's "also on" page, except the main character's.` : '';
+  return `Write the CAST block before the plan lines. One line per commissioned character: ${where} ${DEED_SOURCE_RULE}${alsoOnRule} Then page ${pageCount}, the last: the names of everyone the story keeps together at the end. Every plan line keeps what the block promises.`;
 }
 
 /** The block as the OUTPUT FORMAT shows it (first division only). */
@@ -475,9 +490,13 @@ function castTableFormat(cov, pageCount, { replan = false } = {}) {
 /**
  * The "also on" pages the table gives to a character although they are ANOTHER
  * character's deed page (castTableSpec: "a character's deed page is never
- * another character's 'also on' page"). Read off the parsed table, never off
- * prose: { name, page, lead } per offence, the first claimant of a deed page
- * being its lead. Only meaningful where the lead rule holds (cov.leadEach).
+ * another character's 'also on' page, except the main character's"). Read off
+ * the parsed table, never off prose: { name, page, lead } per offence, the first
+ * claimant of a deed page being its lead. A deed page two characters share (one
+ * action the story gives them together, DEED_SOURCE_RULE) belongs to both. The
+ * main characters are exempt: they are in frame on a friend's deed page whenever
+ * it falls in their own moment (MAIN_IN_FRAME_CLAUSE). Only meaningful where the
+ * book gives every character a deed page of their own (cov.leadEach).
  *
  * REJECTED AT THE PARSE (owner, 2026-10-12: "the plan keeps its own spec").
  * Measured on 12 stored lead-rule tables: 9 broke the rule (docs/decisions.md
@@ -489,14 +508,19 @@ function castTableFormat(cov, pageCount, { replan = false } = {}) {
  * the block both later stages read, and the offence is returned in `rejected`
  * for the loud log. No extra model call.
  */
-function alsoOnConflicts(characters) {
-  const lead = new Map();
-  for (const c of characters) if (!lead.has(Number(c.deedPage))) lead.set(Number(c.deedPage), c.name);
+function alsoOnConflicts(characters, mains = []) {
+  const mainSet = new Set((mains || []).map(m => String(m).trim().toLowerCase()));
+  const owners = new Map(); // deed page -> every character whose deed page it is, first claimant first
+  for (const c of characters) {
+    const p = Number(c.deedPage);
+    owners.set(p, [...(owners.get(p) || []), c.name]);
+  }
   const out = [];
   for (const c of characters) {
+    if (mainSet.has(String(c.name).trim().toLowerCase())) continue;
     for (const p of c.alsoOn || []) {
-      const owner = lead.get(Number(p));
-      if (owner && owner !== c.name) out.push({ name: c.name, page: Number(p), lead: owner });
+      const claimants = owners.get(Number(p));
+      if (claimants && !claimants.includes(c.name)) out.push({ name: c.name, page: Number(p), lead: claimants[0] });
     }
   }
   return out;
@@ -516,7 +540,7 @@ function alsoOnConflicts(characters) {
  * @returns {{ raw: string, characters: Array<{name:string, deedPage:number, deed:string, alsoOn:number[]}>,
  *   ending: {page:number, names:string[]}, extra: string[] }}
  */
-function parsePlanCastBlock(raw, { listed = [], leadEach = false } = {}) {
+function parsePlanCastBlock(raw, { listed = [], leadEach = false, mains = [] } = {}) {
   const full = String(raw || '');
   const m = full.match(/---\s*CAST\s*---([\s\S]*?)(?=\n\s*---\s*[A-Z][A-Z ]*---|$)/i);
   if (!m) throw new Error('the planner wrote no ---CAST--- block');
@@ -556,8 +580,8 @@ function parsePlanCastBlock(raw, { listed = [], leadEach = false } = {}) {
   if (!ending) throw new Error('the CAST block has no "Ending page" line');
   const missing = listed.filter(n => !characters.some(c => c.name === n));
   if (missing.length) throw new Error(`the CAST block has no line for ${missing.join(', ')}`);
-  // The lead rule's offences leave the table (alsoOnConflicts); the block later stages read is rewritten to match.
-  const rejected = leadEach ? alsoOnConflicts(characters) : [];
+  // An "also on" page that is another character's deed page leaves the table (alsoOnConflicts, the main characters exempt); the block later stages read is rewritten to match.
+  const rejected = leadEach ? alsoOnConflicts(characters, mains) : [];
   for (const c of characters) {
     const gone = new Set(rejected.filter(r => r.name === c.name).map(r => r.page));
     if (!gone.size) continue;
@@ -583,7 +607,9 @@ module.exports = {
   MAIN_IN_FRAME_CLAUSE,
   CAST_TABLE_HEADER,
   castTableAlsoCount,
-  LEAD_RULE,
+  DEED_SOURCE_RULE,
+  MAIN_MOMENT_RULE,
+  CAST_ACTION_FINDINGS,
   castTableSpec,
   castTableFormat,
   castTableBlock,

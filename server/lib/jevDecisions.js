@@ -553,6 +553,7 @@ const NEEDED_DEF = n => `${n} is needed in the picture of the page to judge: its
  *   - the main character where the cut would leave them in frame on fewer than
  *     half the pages, and the central figure where it would leave a third of
  *     the book without it;
+ *   - the main character where Jev scored them needed in the instant (never cut from their own moment);
  *   - any name on a page that is one of that character's focal pages;
  *   - the highest-scored name when every name scored below 0.5 (a cut never
  *     empties a page).
@@ -637,6 +638,9 @@ async function decideGroupCuts(input, opts = {}) {
       const pagesIn = inFrame.get(name) || new Set();
       if (isListed(name) && floor > 0 && pagesIn.size - 1 < floor) why.push(`would fall below ${floor} page(s) in frame`);
       if (isMain(name) && (pagesIn.size - 1) * 2 < pageCount) why.push('a main character would be in frame on fewer than half the pages');
+      // The main character is never cut from a page where they are needed (owner 2026-11-08, test H: essbvehs8 p3, where the
+      // cut took the main character out of her own moment). Typed fields only: the NEEDED score, no reading of the page text.
+      if (isMain(name) && scores[name] >= JEV_DECISIONS.needed.cutBelow) why.push('the main character, needed in this instant');
       if (isCentral(name) && Array.isArray(input.centralPages)) {
         const [lo, hi] = thirdOf(n) || [n, n];
         const others = input.centralPages.map(Number).filter(p => p !== n && p >= lo && p <= hi);

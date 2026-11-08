@@ -178,9 +178,9 @@ describe('prompt placeholders per tier', () => {
     expect(p).toContain('This book need not have such a page.');
   });
   it('the focal sentence lets the main character stand in a friend\'s page, in the planner and the cast rule', () => {
-    expect(planner(20)).toContain('when the character acts for or with the main character, the main character may be in frame too, and the page stays the character\'s own');
+    expect(planner(20)).toContain(CC.MAIN_IN_FRAME_CLAUSE);
     expect(CC.castActionRule(CC.castCoverage({ pageCount: 20, castCount: 3 }))).toContain(CC.MAIN_IN_FRAME_CLAUSE);
-    expect(CC.castTableSpec(CC.castCoverage({ pageCount: 20, castCount: 3 }), 20)).toContain('the main character may be in frame too when this character acts for or with them');
+    expect(CC.castTableSpec(CC.castCoverage({ pageCount: 20, castCount: 3 }), 20)).toContain(CC.MAIN_IN_FRAME_CLAUSE);
   });
   it('plan-check Q6 asks for the PEOPLELESS nomination only in a required book', () => {
     const req = checker(20);
