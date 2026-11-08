@@ -68,3 +68,14 @@ Order: #1+#3 -> #4+#5 -> #6,#7,#10 -> #2,#8,#9 (at most 2 agents at a time).
   - Planner Lab test approved (about USD 1.20; today's total about 12.50).
   - Logic read: build a text-only Sonnet read, tune what counts as MAJOR, test free on stored books with stand-ins, then ask before one cheap real-model check.
   - The build waits for the quota agent: both may touch beatsPipeline.js, and only one code agent works per area.
+- 2026-11-08: the quota tiers + friend focal rule are built (cc47ffdd9). Full unit suite passes; free replay: must-fix 15 → 7.
+  - The staging push was blocked by the sibling gate (typedPlan.js keeps the old focal rule); an agent is syncing it.
+  - The 4 prod-only books were copied to staging for the planner Lab test (ve47ncy55, wpz3fzwyy, 6429d0n83, 79n8x82wd).
+  - The text-only logic read is being built by a Sonnet agent.
+- 2026-11-08: pushed to staging (8bf3253ba). The sibling vouch commit explains why the flagged sets need no change. Next: the Lab beats_replan planFresh on the 12 stored stories (B), compared with the stored plans (A). Approved at about USD 1.20.
+- 2026-11-08: text-only logic read built (bc38138de, not pushed).
+  - Runs after the lector; Sonnet 5.5, text only; one fix round on MAJOR through runPostAuditTextRound. Trial excluded (decisions.md).
+  - New writer rule FRIEND_REASON_RULE shared with the read.
+  - Units: 9928 pass.
+  - Stand-in A/B, 16 books: 0 false alarms, 9 of 9 MAJORs real (Lab Sonnet: 2 of 16 real faults MAJOR). Recall can't be judged (the stand-in is weaker and not blind on the positives).
+  - Pending: real-model check, about USD 1 for 16 books, owner to approve. The push waits until Lab 1839 finishes.
