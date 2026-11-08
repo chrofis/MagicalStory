@@ -23,7 +23,7 @@ const SV = require('./shotVocabulary');
 const jev = require('./jevDecisions');
 const JPC = require('./jevPlanCheck');
 const PB = require('./promptBuilders');
-const { typedPlanCounters, countPlanTargets, parseTypedLine, parseTypedWho, whoClassOf, deriveRowType, classifyShot } = require('./planCounters');
+const { isFocalPage, typedPlanCounters, countPlanTargets, parseTypedLine, parseTypedWho, whoClassOf, deriveRowType, classifyShot } = require('./planCounters');
 const { mergeReplanPages, duplicatePlanLine, pageCountHolds } = require('./planGuards');
 const { typedPlanTargets } = require('./castCoverage');
 const { castTableBlock } = require('./castCoverage');
@@ -473,7 +473,7 @@ function keepList(r, { relax = {}, stay = [], adds = [] } = {}) {
  *
  * @returns {Map<number,{reasons:string[], keep:string[], relax:Object, adds:string[], stay:string[]}>}
  */
-function replanScope({ rows, findings, jevPages, castTable = null, targets, calibration = CALIBRATION, commissionedNames = [], arcNames = [], jevMax = REPLAN_JEV_MAX }) {
+function replanScope({ rows, findings, jevPages, castTable = null, targets, calibration = CALIBRATION, commissionedNames = [], arcNames = [], mainNames = [], jevMax = REPLAN_JEV_MAX }) {
   const out = new Map();
   const P = rows.length;
   const rowOf = page => rows.find(x => x.pageNumber === page);
@@ -503,13 +503,13 @@ function replanScope({ rows, findings, jevPages, castTable = null, targets, cali
   // A page that is a commissioned character's ONLY focal page (at most two in frame) cannot take a third figure: the add
   // would take that focal page away (round 2 of a short five-character book offered the page round 1 had just made focal).
   const focalCount = new Map();
-  for (const r of rows) if (r.names.length <= 2) for (const n of r.names) if (classOf(n) === 'commissioned') focalCount.set(n.toLowerCase(), (focalCount.get(n.toLowerCase()) || 0) + 1);
+  for (const r of rows) for (const n of r.names) if (classOf(n) === 'commissioned' && isFocalPage(r.names, n, mainNames)) focalCount.set(n.toLowerCase(), (focalCount.get(n.toLowerCase()) || 0) + 1);
   const soleFocalFull = r => r.names.length >= 2 && r.names.some(n => focalCount.get(n.toLowerCase()) === 1);
   const commissionedIn = r => r.names.some(n => classOf(n) === 'commissioned');
   const nameOf = f => (f.detail.match(/^(.+?) (?:is in frame|never has)/) || [])[1];
   // EVERY main holds the floor (owner, 2026-10-30): one MAIN_UNDER_HALF finding per main, each names its own.
-  const mainNames = findings.filter(f => f.code === 'MAIN_UNDER_HALF').map(nameOf).filter(Boolean);
-  const isMainName = n => mainNames.some(m => m.toLowerCase() === String(n).toLowerCase());
+  const underHalfNames = findings.filter(f => f.code === 'MAIN_UNDER_HALF').map(nameOf).filter(Boolean);
+  const isMainName = n => underHalfNames.some(m => m.toLowerCase() === String(n).toLowerCase());
   // Scarce pages first: an invented figure leaves its page, then a focal page (it needs a page holding at most one figure, which a coverage add would take).
   const urgency = f => (f.code === 'TYPED_INVENTED_FIGURE' ? 0 : f.code === 'TYPED_NO_FACE_PAGE' ? 0.5 : f.code === 'NO_FOCAL_PAGE' ? 1 : 2);
   const facePagesTaken = new Set(); // the page a face nomination took: no figure is added to it (a face page is one figure)
@@ -555,7 +555,7 @@ function replanScope({ rows, findings, jevPages, castTable = null, targets, cali
     else if (f.code === 'UNDER_COVERED_CHARACTER' || f.code === 'NO_FOCAL_PAGE') {
       const name = nameOf(f);
       // a page takes ONE added figure (two more on a two-figure page break the medium type), and a focal page holds at most two
-      pool = wide.filter(r => name && !has(r, name) && !soleFocalFull(r) && !(out.get(r.pageNumber) || { adds: [] }).adds.length && !facePagesTaken.has(r.pageNumber) && (f.code === 'NO_FOCAL_PAGE' ? r.names.length <= 1 : true));
+      pool = wide.filter(r => name && !has(r, name) && !soleFocalFull(r) && !(out.get(r.pageNumber) || { adds: [] }).adds.length && !facePagesTaken.has(r.pageNumber) && (f.code === 'NO_FOCAL_PAGE' ? isFocalPage([...r.names, name], name, mainNames) : true));
       k = f.code === 'UNDER_COVERED_CHARACTER' ? Math.max(1, targets.appearancesMin - f.pages.length) + 1 : 2;
       what = `${name ? `put ${name} in frame here` : 'put the character in frame here'}, taking part in the page's one action`;
       if (name) add = [name];
@@ -585,7 +585,7 @@ function replanScope({ rows, findings, jevPages, castTable = null, targets, cali
     const r = rowOf(page);
     if (!r) continue;
     const stay = [...(promised.stay.get(page) || [])];
-    for (const mainName of mainNames) if (has(r, mainName) && !stay.includes(mainName)) stay.push(mainName);
+    for (const mainName of underHalfNames) if (has(r, mainName) && !stay.includes(mainName)) stay.push(mainName);
     o.stay = stay;
     o.keep = keepList(r, { relax: o.relax, stay, adds: o.adds });
   }
@@ -750,7 +750,7 @@ async function runTypedPlan({ inputData, pageCount, approvedArc, arcHints, arcSt
   let replanJevStats = null;
   for (let round = 1; round <= MAX_REPLAN_ROUNDS; round++) {
     const cNow = round === 1 ? c1 : count(standing);
-    const scope = replanScope({ rows: cNow.rows, findings: cNow.findings, jevPages, castTable, targets, calibration, commissionedNames: known, arcNames, jevMax: round === 1 ? REPLAN_JEV_MAX : 0 });
+    const scope = replanScope({ rows: cNow.rows, findings: cNow.findings, jevPages, castTable, targets, calibration, commissionedNames: known, arcNames, mainNames, jevMax: round === 1 ? REPLAN_JEV_MAX : 0 });
     if (!scope.size) break;
     const t1 = Date.now();
     const section = typedReplanSection({ pagePlanText: standing.map(p => `Page ${p.pageNumber}: ${p.planLine}`).join('\n'), scope, castTable });

@@ -683,3 +683,24 @@ describe('the face-page nomination names WHO takes the close-up (Lab 1686, 50osg
     expect(o.reasons.some((r: string) => /in frame here|focal page here/.test(r))).toBe(false);
   });
 });
+
+describe('a friend focal page may hold the main character (owner 2026-11-08; one isFocalPage, planCounters)', () => {
+  const L = ['Emma', 'Noah', 'Hans', 'Zed'];
+  const lines = [line('group', 'Emma, Noah, Hans, Zed'), ...Array.from({ length: 8 }, () => line('medium', 'Emma, Noah')), line('group', 'Emma, Noah, Hans, Zed')];
+  const run = (mainNames: string[]) => {
+    const c = PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: L, commissionedNames: L, mainNames, maxCharactersPerScene: 4 });
+    const t = CC.typedPlanTargets({ pageCount: 10, listed: L, maxCharactersPerScene: 4 });
+    return { c, scope: TP.replanScope({ rows: c.rows, findings: c.findings, jevPages: {}, castTable: null, targets: t, commissionedNames: L, arcNames: [], mainNames }) };
+  };
+  it('a friend added next to the main character and one companion has a focal page, so the nomination offers those pages', () => {
+    const { c, scope } = run(['Emma']);
+    expect(c.findings.map((f: any) => f.code)).toContain('NO_FOCAL_PAGE');
+    const asked = [...scope.entries()].filter(([, o]: any) => o.adds.includes('Hans') && /never has a focal page/.test(o.reasons.join(' ')) && /put Hans in frame here/.test(o.reasons.join(' ')));
+    expect(asked.length).toBeGreaterThan(0);
+  });
+  it('without a main character in frame the old pool (one figure before the add) is unchanged', () => {
+    const { scope } = run([]);
+    const asked = [...scope.entries()].filter(([, o]: any) => o.adds.includes('Hans') && /never has a focal page/.test(o.reasons.join(' ')) && /put Hans in frame here/.test(o.reasons.join(' ')));
+    expect(asked.length).toBe(0);
+  });
+});
