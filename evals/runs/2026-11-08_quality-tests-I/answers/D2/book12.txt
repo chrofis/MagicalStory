@@ -1,0 +1,12 @@
+FAULT[TEXT][MAJOR]: p5 — Lily wears no helmet or visor in any picture: say the grey shape drifted out "beside her head", and on p7, p9 and p12 replace "visor" with "head", with p9 saying Soot's claws only caught in Lily's curls instead of sliding on glass.
+FAULT[IMG][MAJOR][object_presence][TOUCHUP]: p8 — Remove the kit bag from Lily's back, since she threw it away down the tunnel, and show Humbug clinging at her head instead.
+FAULT[IMG][MAJOR][setting][TOUCHUP]: p8 — Replace the sunset fields and trees in the windows with dark space and stars.
+FAULT[IMG][MAJOR][object_presence][TOUCHUP]: p9 — Remove the kit bag from Lily's back.
+FAULT[IMG][MINOR][accessory][TOUCHUP]: p9 — Remove the goggles from Lily's face and let Humbug cling to her head among her curls.
+FAULT[IMG][MAJOR][setting][TOUCHUP]: p9 — Replace the sunset landscape in the window with dark space and stars.
+FAULT[IMG][MAJOR][object_presence][TOUCHUP]: p10 — Remove the kit bag hanging from Lily's shoulder.
+FAULT[IMG][MAJOR][setting][TOUCHUP]: p10 — Replace the sunset landscape in the window with dark space and stars.
+FAULT[IMG][MAJOR][image_coherence][TOUCHUP]: p11 — Make the opened nook a softly lit, empty warm cubby instead of a fiery furnace glow.
+FAULT[IMG][MAJOR][object_presence][TOUCHUP]: p13 — Remove the kit bag from Lily's back as she is hauled out of the tunnel with Bramble.
+FAULT[IMG][MAJOR][wrong_state][TOUCHUP]: p14 — Make the kit bag in James's hands the dark blue bag from the bunk, limp and empty with its zip hanging open all the way along.
+FAULTS: 11

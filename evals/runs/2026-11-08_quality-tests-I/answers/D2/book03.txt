@@ -1,0 +1,10 @@
+FAULT[TEXT][MINOR]: p1 — After «Noch drei Stunden bis zum Sonnenuntergang», add one sentence saying what happens if they are too late (after sunset the Lindenhof is dark and the chest cannot be found).
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p3 — Draw Lorena sliding the chart inside her purple coat, half hidden, as Herr Frei steps out from behind the glass case.
+FAULT[IMG][MINOR][accessory][TOUCHUP]: p3 — Remove the tricorn hat from Lorena's head.
+FAULT[IMG][MAJOR][action_interaction][NEW]: p4 — Draw Saira at the fork of the lane turning her head left and right, with Herr Frei hurrying up the cobbled lane behind her, keys swinging at his belt. | background: keep
+FAULT[IMG][MAJOR][wrong_state][NEW]: p5 — Draw Sarah crouching hidden behind stacked crates full of pumpkins at the market stall, giggling, while Herr Frei leans over the top of the crates and holds out his hand. | background: redo — add the market stall with crates full of pumpkins stacked on the quay
+FAULT[IMG][MAJOR][height_order][NEW]: p6 — Draw Fiona shorter than Lorena, the top of her head level with Lorena's eyebrows. | background: keep
+FAULT[IMG][MAJOR][object_presence][TOUCHUP]: p12 — Replace the silver pen with the red pencil and the old parchment with a cut-open brown paper bag on which the crooked copy is drawn.
+FAULT[IMG][MINOR][accessory][TOUCHUP]: p16 — Move Facundo's eye patch up onto his forehead above the eye.
+FAULT[IMG][MINOR][object_presence][TOUCHUP]: p16 — Redraw the lines on the new map Lorena holds as crooked, wobbly lines around the red cross.
+FAULTS: 9

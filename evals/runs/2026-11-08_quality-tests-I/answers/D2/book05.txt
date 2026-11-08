@@ -1,0 +1,4 @@
+FAULT[IMG][MAJOR][action_interaction][NEW]: p1 — Draw Silva startled, ears back, stepping backward up the misty path away from Janna's reaching hand. | background: keep
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p5 — Draw Silva pulling her head back against the taut rope, eyes wide with fear.
+FAULT[IMG][MAJOR][missing_character][NEW]: p6 — Draw Janna tugging hard at the knot on the oak post while Silva throws her head up and pulls back on the taut rope, with Polina and Melisa watching nearby. | background: keep
+FAULTS: 3

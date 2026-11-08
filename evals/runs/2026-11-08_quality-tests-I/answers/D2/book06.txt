@@ -1,0 +1,6 @@
+FAULT[TEXT][MINOR]: p5 — After «Das Licht wurde schon blasser», add one sentence saying that when the light is gone, Rubi can no longer get home.
+FAULT[IMG][MINOR][object_presence][TOUCHUP]: p7 — Remove the skipping rope from Polina's hands and show it lying in the leaves on the path.
+FAULT[IMG][MINOR][emotion][TOUCHUP]: p9 — Remove the tear and give Melodi a wide-eyed, amazed open-mouthed face instead of a frightened one.
+FAULT[IMG][MINOR][missing_element][TOUCHUP]: p10 — Add the bright glowing light between the two big beeches at the end of the path, where Rubi is heading.
+FAULT[IMG][MINOR][object_presence][TOUCHUP]: p10 — Remove the skipping rope slung across Polina's jacket.
+FAULTS: 5

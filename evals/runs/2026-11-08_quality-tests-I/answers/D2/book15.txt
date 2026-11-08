@@ -1,0 +1,13 @@
+FAULT[TEXT][MAJOR]: p1 — Serena walks off with the family here, yet on p7 she "non conosceva ancora" the girl and on p25 she introduces herself: say that Serena is the cook from the kiosk who was passing the family on the beach and has not yet met Ludovica.
+FAULT[IMG][MAJOR][height_order][NEW]: p1 — Draw Nonna Mirella shorter than Serena, the top of her head level with Serena's forehead, as they walk side by side. | background: keep
+FAULT[TEXT][MINOR]: p6 — Shorten Nonno Luca's story of the mountain ride to one sentence so the listener gets back to Ludovica sooner.
+FAULT[TEXT][MAJOR]: p9 — Mamma "è rimasta sui sassi" yet walks behind Papà under the sea from p10 on: say that Mamma followed them into the water right after Zio Stefano.
+FAULT[TEXT][MAJOR]: p9 — Before Papà steps into water over his head with Ludovica, add a sign that it is safe, such as Pinza breathing calmly on the sandy bottom and the bubble ring glowing, so Papà knows they can breathe there.
+FAULT[IMG][MINOR][child_torso_uncovered][TOUCHUP]: p11 — Lengthen Ludovica's purple swim shirt so it meets the tail's waistband with no bare skin showing.
+FAULT[IMG][MAJOR][image_coherence][NEW]: p13 — Draw Nerina as a tiny far-off figure deep in the blue, half hidden behind a distant rock, so that Ludovica plainly cannot see her. | background: keep
+FAULT[TEXT][MINOR]: p18 — Replace "sul natel" with "sul cellulare".
+FAULT[IMG][MAJOR][setting][NEW]: p22 — Draw Papà and Ludovica beside an underwater rock ledge crusted with short algae, with a row of dark mussels on it opening and shutting together like clapping hands. | background: redo — the ledge must be under water on the sea floor, not a dry stone edge above the surface
+FAULTS: 9
+FAULT[TEXT][MAJOR]: p25 — Mamma walks back under the sea at the end of the line, so replace "Mamma, che li aspettava sui sassi" with "Mamma, appena uscita dall'acqua dietro di loro".
+FAULT[IMG][MAJOR][height_order][NEW]: p25 — Draw Nonna Mirella shorter than Serena, the top of her head level with Serena's forehead, as they walk side by side. | background: keep
+FAULTS: 2

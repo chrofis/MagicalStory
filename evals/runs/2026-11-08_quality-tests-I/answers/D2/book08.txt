@@ -1,0 +1,4 @@
+FAULT[IMG][MINOR][wrong_state][TOUCHUP]: p8 — Move the trembling shadow down off the wall so that it sits upright on the pillow.
+FAULT[TEXT][MAJOR]: p10 — Before «Bonne nuit, Léa», add that Henri, who had stayed downstairs after bringing Léa home, came up to the bedroom door with the others.
+FAULT[IMG][MAJOR][height_order][NEW]: p10 — Draw Élodie taller, the top of her head level with Henri's eyebrows, instead of more than a head shorter than him. | background: keep
+FAULTS: 3

@@ -1,0 +1,6 @@
+FAULT[TEXT][MAJOR]: p4 — Silbermond rhymes every word, yet no rhyme follows Janna's call "Polina!": add that Silbermond only rhymes words said straight to him, so he stays silent when she calls ahead into the crowd.
+FAULT[TEXT][MINOR]: p5 — After "Nur eine kleine Lücke war noch offen", add a sentence saying that once the ring closes, Janna will be left outside it without her lantern and her place beside Polina.
+FAULT[IMG][MINOR][clothing][CHAR:Polina]: p8 — Give Polina warm white tights and black rubber rain boots under her purple skirt.
+FAULT[IMG][MAJOR][missing_element][NEW]: p9 — Draw the ring of children with lanterns and the one gap beside Polina, Melodi at the gap holding her hand up to stop the line, Melisa lifting the painted lantern and Janna running toward the gap with Silbermond. | background: keep
+FAULT[TEXT][MAJOR]: p9 — Polina, Melodi and Melisa are children and can see the unicorn walking beside Janna: add one line where Polina stares at Silbermond and asks who he is, or say the friends gasp at him.
+FAULTS: 5

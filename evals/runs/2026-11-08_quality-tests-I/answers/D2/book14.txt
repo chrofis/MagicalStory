@@ -1,0 +1,5 @@
+FAULT[IMG][MINOR][creature_scale][NEW]: p4 — Draw Silbermond as the same small pony as on the pages before, his back no higher than Janna's waist, pressed against her coat. | background: keep
+FAULT[IMG][MAJOR][wrong_state][TOUCHUP]: p7 — Make Silbermond's horn blaze with a bright silver light that floods the whole street around Janna.
+FAULT[IMG][MAJOR][height_order][NEW]: p9 — Draw Melisa about the same height as Janna, not a whole head taller, as she hands Janna the star lantern. | background: keep
+FAULT[IMG][MAJOR][creature_scale][NEW]: p10 — Draw Silbermond as the same small pony as on the earlier pages, stepping into the leaf heap and looking back at the waving girls. | background: keep
+FAULTS: 4

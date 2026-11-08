@@ -1,0 +1,6 @@
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p1 — Draw Henri's hand and Léa's hand both pressed flat side by side on the front pocket of his orange coat, not on his chest.
+FAULT[IMG][MAJOR][wrong_state][NEW]: p6 — Draw Gaspard swollen inside the coral arch with his wide open mouth filling the opening from side to side, Jules pushed back from it with scraped hands and Léa pressing both hands to her belly. | background: keep
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p7 — Turn Henri's head and gaze toward Maëlle as she swims away along the reef.
+FAULT[IMG][MAJOR][missing_character][NEW]: p10 — Draw Gaspard sliding backward into his sandy hollow under the arch, and Léa at child scale floating at the arch's edge watching him, with open blue water visible through the arch. | background: keep
+FAULT[IMG][MINOR][clothing_detail][CHAR:Léa]: p13 — Give Léa her red swim shirt with long sleeves.
+FAULTS: 5

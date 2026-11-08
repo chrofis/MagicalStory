@@ -177,3 +177,10 @@ Order: #1+#3 -> #4+#5 -> #6,#7,#10 -> #2,#8,#9 (at most 2 agents at a time).
   - Grader's edit: put a whole-book gap on the page where the danger or the character first appears.
   - Next: a real-Opus check, edited D vs A on book13/05/06/04/07, about USD 1.5, owner's yes needed.
   - The friend-made ending is an arc-stage fault (suggestion #6), not a review fix.
+- 2026-11-09, arm D2 (whole-book gaps go on the page where the danger or character first appears), stand-ins, USD 0:
+  - Totals: 111 lines (D 93); text fixes 19 (D 8); 0 CRITICAL.
+  - Price-of-failing lines now in 5 books: 01, 03, 06, 09, 13.
+  - Book13: price at p5, friends react to the unicorn at p9, and the empty-square p9 picture is caught. Each is missed by A/B/C/D.
+  - Book15: a water-safety line.
+  - Still missed: friends end the problem in book13 (arc stage).
+  - Not yet graded line by line for false alarms.

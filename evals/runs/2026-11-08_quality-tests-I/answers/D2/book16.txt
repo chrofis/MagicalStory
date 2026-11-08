@@ -1,0 +1,4 @@
+FAULT[IMG][MAJOR][setting][NEW]: p2 — Draw the little garden bridge as the covered bridge with wooden side walls and two round windows, Picot dragging Bouton across its planks in the lamp's beam on a dark rainy evening. | background: redo — night-time rain instead of grey daylight, and the walled roofed bridge with its two round windows instead of an open railed bridge
+FAULT[IMG][MAJOR][object_count][TOUCHUP]: p8 — Remove the second red boot from the planks and put Léa's left boot back on her left foot, so only her right boot lies on its side being filled with dry leaves.
+FAULT[IMG][MAJOR][clothing][CHAR:Léa]: p10 — Draw Léa in bed without red rain boots, her right foot wrapped in Henri's spare sock and her left foot bare.
+FAULTS: 3

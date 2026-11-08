@@ -1,0 +1,7 @@
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p2 — Draw Lia bending low with her head lowered, peering into the dark gap under the bed.
+FAULT[IMG][MAJOR][missing_element][TOUCHUP]: p13 — Add Brumm's huge dark shadow cast by the lantern light, looming large on the den wall behind him.
+FAULT[IMG][MAJOR][missing_element][TOUCHUP]: p14 — Add Brumm's huge shadow on the den wall, visibly trembling, with his paws shaking around the star.
+FAULT[IMG][MINOR][wrong_state][TOUCHUP]: p16 — Remove the painted gold stars from the lantern glass so that the stars appear only on the cave ceiling.
+FAULT[IMG][MINOR][wrong_state][TOUCHUP]: p16 — Draw the star still held in Brumm's paws against his chest, not floating free above them.
+FAULT[TEXT][MINOR]: p19 — Add one sentence saying the Laternenumzug is starting at the fountain and Lia walks in it holding her gold spark instead of the lantern she gave Brumm.
+FAULTS: 6

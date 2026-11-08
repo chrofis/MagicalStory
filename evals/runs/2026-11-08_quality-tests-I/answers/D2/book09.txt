@@ -1,0 +1,10 @@
+FAULT[IMG][MAJOR][creature_scale][NEW]: p2 — Draw Funkel as a tiny glowing creature, no bigger than a walnut, drifting over the sill toward the floor. | background: keep
+FAULT[IMG][MAJOR][creature_scale][NEW]: p3 — Draw Funkel tiny enough to sit inside Emma's cupped hands, her hands closed around his glow in the shoebox. | background: keep
+FAULT[TEXT][MAJOR]: p3 — After Noah's call to fly him there, add one sentence saying what happens if they are too late: Funkel's glow will fade if he is left behind by the row of lights.
+FAULT[IMG][MAJOR][missing_character][NEW]: p5 — Draw Krax's peeping chicks in the nest below the rocket, turning one by one to look up into Funkel's glow. | background: keep
+FAULT[IMG][MINOR][image_coherence][TOUCHUP]: p5 — Make the rocket's window the same small round porthole as on the earlier pages, with Funkel glowing behind it.
+FAULT[IMG][MAJOR][image_coherence][TOUCHUP]: p7 — Remove the cardboard rocket seen through the cabin window and show the dark nest and dust cloud outside instead.
+FAULT[IMG][MINOR][accessory][TOUCHUP]: p9 — Make Noah's gloves white with ribbed cuffs.
+FAULT[TEXT][MINOR]: p9 — Replace "die letzten Lichter des Umzugs" with "die letzten der kleinen Lichter", since no parade was ever mentioned.
+FAULT[IMG][MAJOR][action_interaction][TOUCHUP]: p10 — Light Noah's large turnip lantern with a warm glow and put Emma's hand on its handle beside Noah's.
+FAULTS: 9

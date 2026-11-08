@@ -1,0 +1,8 @@
+FAULT[IMG][MINOR][extra_character][TOUCHUP]: p1 — Remove the small figure in the yellow raincoat outside the bridge window.
+FAULT[TEXT][MINOR]: p1 — After "j'ai promis d'être au lit avant que Papa ouvre le livre", add one sentence saying what happens if she is late (Papa reads the story without her and Pompon falls asleep alone).
+FAULT[IMG][MAJOR][image_coherence][NEW]: p4 — Draw Jules and Léa sitting in the bubble bath with only heads and shoulders above thick foam, with no clothes, cardigan or rain boots in the water. | background: keep
+FAULT[IMG][MAJOR][wrong_state][TOUCHUP]: p6 — Draw the teal book closed in Marc's hand, his eyes on its cover, not reading it.
+FAULT[IMG][MINOR][object_presence][TOUCHUP]: p7 — Hide Pompon under the duvet so that only one long ear sticks out above it.
+FAULT[IMG][MINOR][setting][TOUCHUP]: p8 — Move the stamping shadow from the corridor floor into the bedroom beyond the open door.
+FAULT[IMG][MAJOR][action_interaction][NEW]: p9 — Draw Léa on her bedroom threshold, facing the shadow on the bedroom floor, slowly lifting one foot while the shadow lifts its foot too, her mouth opening into a small laugh. | background: redo — the open bedroom doorway with the bed and the shadow inside the room, not the corridor
+FAULTS: 7

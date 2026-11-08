@@ -1,0 +1,6 @@
+FAULT[IMG][MAJOR][action_interaction][NEW]: p3 — Draw Ombri standing upright right in front of Léa's bed, between Léa and the bed, so he blocks her way to it while Élodie watches from the doorway. | background: keep
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p4 — Open Jules's eyes and draw him yawning as he watches Léa from under his blanket.
+FAULT[TEXT][MINOR]: p6 — Replace "l'ombre de sa petite oreille" with "l'ombre de l'oreille du lapin", so the listener knows whose ear casts the shadow.
+FAULT[IMG][MAJOR][wrong_state][TOUCHUP]: p7 — Make the night light's beam shine up onto the wall above the beds in a bright patch, and turn Ombri's head up toward it.
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p10 — Draw Ombri's shadow lying stretched out on the glowing wall beside the rabbit's shadow instead of standing.
+FAULTS: 5

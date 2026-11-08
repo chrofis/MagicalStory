@@ -1,0 +1,16 @@
+FAULT[IMG][MAJOR][wrong_action][NEW]: p1 — Draw Eliah and Yara leaping mid-air into a high heap of autumn leaves under the big tree, with the pirate ship's mast and skull sail rising between the heaps. | background: redo — show high leaf heaps on the ruin platform around the ship instead of a bare path
+FAULT[TEXT][MAJOR]: p2 — Before Eliah promises to take the gull to Schloss Unterseen, add a sentence saying he knows that many gulls always sit on the square in front of Schloss Unterseen.
+FAULT[IMG][MAJOR][wrong_state][TOUCHUP]: p2 — Make one of Spaghetti's wings hang down and drag behind her on the plank.
+FAULT[IMG][MAJOR][setting][NEW]: p3 — Draw Eliah kneeling on the pirate ship's own deck planks in his black breeches and boots, close to Spaghetti whose one wing hangs down, with no other ship or crowd behind them. | background: redo — the deck of the children's pirate ship under the big tree, not a boardwalk beside a large galleon
+FAULT[IMG][MAJOR][wrong_state][TOUCHUP]: p4 — Make one of Spaghetti's wings hang limply down at her side.
+FAULT[IMG][MINOR][extra_character][TOUCHUP]: p4 — Remove the hooded figure walking in the background on the left.
+FAULT[IMG][MAJOR][wrong_action][NEW]: p5 — Draw Spaghetti hopping backwards over the ship's rail with one wing hanging, not flying with both wings spread, while Eliah holds his hat on the deck. | background: redo — the ship's deck rail with dense fog behind it instead of the platform's metal fence and stone wall
+FAULT[IMG][MAJOR][image_coherence][TOUCHUP]: p7 — Remove the second large sailing ship looming in the fog behind Eliah.
+FAULT[IMG][MINOR][clothing][CHAR:Eliah]: p7 — Give Eliah his long-sleeved red and white striped shirt.
+FAULT[IMG][MAJOR][image_coherence][TOUCHUP]: p9 — Remove the large red galleon beside Eliah so he stands at the rail of the children's own ship looking into the fog.
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p10 — Draw Kapitän Brummbart with his mouth wide open, roaring out over the water.
+FAULT[IMG][MAJOR][emotion][TOUCHUP]: p16 — Give Eliah a brave, determined face calling out clearly instead of a crying, frightened one.
+FAULT[IMG][MAJOR][image_coherence][TOUCHUP]: p16 — Remove the second sailing ship in the fog behind Eliah.
+FAULT[IMG][MAJOR][image_coherence][NEW]: p17 — Draw Spaghetti hopping off the end of the long board that reaches from the ship's rail out to the reeds, the lantern glowing on it, onto the deck. | background: redo — the board must run out over the water to the reeds, not down from the ship to a pier
+FAULT[IMG][MINOR][extra_character][TOUCHUP]: p19 — Remove the four robed adults standing on the square.
+FAULTS: 15
