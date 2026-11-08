@@ -356,6 +356,8 @@ async function loadPromptTemplates() {
     // The LECTOR: objective language faults in the FINAL text. It returns the
     // corrected pages itself — there is no separate application pass.
     ['storyTextProofread', 'story-text-proofread.txt'],
+    // The LOGIC READ (2026-11-08): one text-only call after the lector, typed JSON findings; MAJOR ones get one fix round.
+    ['storyTextLogicRead', 'story-text-logic-read.txt'],
     // The DIFF pass (2026-09-06): the same quoted-span finding contract as the
     // lector, but it sees each repaired page as BEFORE/AFTER and judges only
     // what the rewrite damaged. Cold-read and diff are different tasks — see

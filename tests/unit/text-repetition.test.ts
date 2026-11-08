@@ -105,7 +105,8 @@ describe('refineStoryText — one corrective repetition pass', () => {
         text = correctiveFixes
           ? ['---ANALYSIS---', 'moved from p12 to p13', '---STORY TEXT---', '## Page 12', PAGES[0].text].join('\n')
           : ['---ANALYSIS---', 'nothing', '---STORY TEXT---', 'NONE'].join('\n');
-      } else text = '---STORY TEXT---\nNONE';
+      } else if (label === 'text_logic_read') text = '{"findings": []}';
+      else text = '---STORY TEXT---\nNONE';
       return { text, modelId: `stub-${model}`, usage: { input_tokens: 10, output_tokens: 20, direct_cost: 0.01 } };
     };
   });
@@ -122,7 +123,7 @@ describe('refineStoryText — one corrective repetition pass', () => {
     expect(fixes[0].prompt).toContain('Plan p13: close — two figures at the sailcloth');
     // length_fix sits between the repetition fix and the diff (2026-09-11): the
     // word budget is re-measured on the text the whole-page passes produced.
-    expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'repetition_fix', 'length_fix', 'diff', 'lector']);
+    expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'repetition_fix', 'length_fix', 'diff', 'lector', 'logic_read']);
     expect(res.repetition.pairs).toHaveLength(1);
     expect(res.repetition.pairs[0].pages).toEqual([12, 13]);
     expect(res.repetition.correctivePassRan).toBe(true);

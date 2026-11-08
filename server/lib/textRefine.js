@@ -1293,7 +1293,8 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
   // REWRITE, not the reading.
   // Numbered: the refine's ledger cites these ids, and a finding it declines
   // (`STANDS:`) is recorded open (parseDeclinedFindings).
-  const findingsText = `${POST_AUDIT_SCOPE_NOTE}\n\n${numberedFindingsText(findings)}`;
+  // opts.scopeNote: the logic read's fix round states its own source (textLogicRead.LOGIC_FIX_SCOPE_NOTE).
+  const findingsText = `${opts.scopeNote || POST_AUDIT_SCOPE_NOTE}\n\n${numberedFindingsText(findings)}`;
   const prompt = buildTextRefinePrompt(storyData, pages, findingsText, String(opts.arc || '').trim(), { arcHints: opts.arcHints, storyLogic: opts.storyLogic });
   if (!prompt) {
     log.error('❌ [TEXT-POST-AUDIT] text-refine template unavailable — the TEXT route goes unanswered');
@@ -1486,6 +1487,8 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // Finding-shaped lines the parser could not read — counted, never skipped in
   // silence (parseLectorLines).
   let lectorUnparsed = [];
+  // The logic read of the finished text (textLogicRead.js); null until it has run.
+  let logicRead = null;
   let diffReview = '';
   let diffFindings = [];
   let diffApplied = [];
@@ -1525,6 +1528,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     lectorFindings: lectorFindings.slice(),
     lectorApplied: lectorApplied.slice(),
     lectorDropped: lectorDropped.slice(),
+    logicRead,
     diffReview,
     diffFindings: diffFindings.slice(),
     diffApplied: diffApplied.slice(),
@@ -2296,6 +2300,22 @@ ${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
     publish();   // clears the in-flight flag the join's grace period reads
   }
 
+  // THE LOGIC READ — after the lector, the last text pass (2026-11-08, docs/decisions.md "Logic read of the
+  // finished text"). One text-only call reads the finished text for story logic; typed MAJOR findings get ONE fix
+  // round through runPostAuditTextRound. No diff or lector re-run follows: the existing post-audit round has none
+  // either, and the fix is a scoped, edit-capped rewrite of the pages a finding names. `opts.logicRead === false`
+  // switches it off (a Lab replay that must not pay for it). Never throws.
+  if (opts.logicRead !== false) {
+    beginStep();
+    const lr = await require('./textLogicRead').runLogicReadStep(storyData, current, {
+      arc, arcHints, storyLogic, firstRound: rounds.length + 1,
+    });
+    rounds.push(...lr.rounds);
+    logicRead = lr.logicRead;
+    current = lr.pages;
+    publish();
+  }
+
   // THE COUNTER, ON THE TEXT THAT SHIPS (2026-09-23). The re-measure above runs
   // before the diff and the lector, and both edit pages: on
   // job_1790100385959_1nitlympp the diff put back p4's cut sentences (69 → 92
@@ -2347,6 +2367,7 @@ ${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
     pages: current, original, rounds, changed, planTextDrift,
     audits, mergedFindings, mergeStats, findingLedger,
     proofread, lectorFindings, lectorApplied, lectorDropped,
+    logicRead,
     diffReview, diffFindings, diffApplied, diffDropped,
     repetition, wordBudget, oneSentenceParagraphs,
     partial: false,
@@ -2649,6 +2670,9 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
     lectorFindings: (usable.lectorFindings || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
     lectorApplied: (usable.lectorApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
     lectorDropped: (usable.lectorDropped || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, reason: f.reason })),
+    // THE LOGIC READ (textLogicRead.js): every typed finding with its severity, what was dropped and why, the fix
+    // round's per-finding outcomes. null = the read did not run (trial, TEXT_REFINE off, opts.logicRead false).
+    logicRead: usable.logicRead || null,
     // THE DIFF'S FOUR, stored the way the lector's four always were. They were
     // returned by the chain and projected by nobody, so the pass that catches
     // rewrite damage was the one pass whose output could not be read back.

@@ -305,6 +305,7 @@ describe('refineStoryText — chain order', () => {
       if (label === 'text_audit') text = 'FAULT[TRANSITION]: p2 — no page shows how he reached the water.\nFAULTS: 1';
       else if (label === 'text_audit_blind') text = 'FAULT[TRANSITION]: p2 — he is suddenly in the water, nothing says how.\nFAULTS: 1';
       else if (label === 'text_refine') text = '---ANALYSIS---\nthe crossing is stated on p2\n---STORY TEXT---\nNONE';
+      else if (label === 'text_logic_read') text = '{"findings": []}';
       else if (label === 'text_lector') {
         text = [
           "PAGE 2: 'schwamm die Leine zurück' → 'schwamm mit der Leine zurück'",
@@ -326,7 +327,7 @@ describe('refineStoryText — chain order', () => {
     const labels = calls.map(c => c.label);
     expect(labels.filter(l => l === 'text_audit' || l === 'text_audit_blind')).toHaveLength(2);
     expect(labels.slice(0, 2).sort()).toEqual(['text_audit', 'text_audit_blind']);
-    expect(labels.slice(2)).toEqual(['text_refine', 'text_refine_length_fix', 'text_lector']);
+    expect(labels.slice(2)).toEqual(['text_refine', 'text_refine_length_fix', 'text_lector', 'text_logic_read']);
     // Both audits were open at the same time — the parallelism, not two
     // sequential calls that happen to come first.
     expect(maxConcurrent).toBe(2);
@@ -339,7 +340,7 @@ describe('refineStoryText — chain order', () => {
     // word-budget re-measure's corrective pass (2026-09-11), which fires here
     // because both stub pages sit under the floor and the repair stub does not
     // lengthen them.
-    expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'length_fix', 'lector']);
+    expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'length_fix', 'lector', 'logic_read']);
 
     // The audits merged to ONE finding, credited to both — and the word-budget
     // counter (third source, 2026-09-05) adds one FAULT[LENGTH] per page
@@ -412,6 +413,7 @@ describe('refineStoryText - a stalled audit is abandoned, the chain continues', 
       if (label === 'text_audit') text = ['FAULT[CAUSE]: p1 — nothing says how the map tore.', 'FAULTS: 1'].join('\n');
       else if (label === 'text_refine') text = ['---ANALYSIS---', 'fixed', '---STORY TEXT---', '## Page 1', 'Die Karte ist alt, und der Rand riss beim Auspacken ein.'].join('\n');
       else if (label === 'text_lector') text = ['---STORY TEXT---', 'NONE'].join('\n');
+      else if (label === 'text_logic_read') text = '{"findings": []}';
       return { text, modelId: `stub-${model}`, usage: { input_tokens: 10, output_tokens: 20, direct_cost: 0 } };
     };
   });
@@ -429,7 +431,7 @@ describe('refineStoryText - a stalled audit is abandoned, the chain continues', 
     expect(res.mergedFindings).toHaveLength(2);
     expect(res.mergedFindings.map((f: any) => f.sources)).toEqual([['arc-informed'], ['counter']]);
     // The repair rewrote a page, so the diff pass reviews that pair (2026-09-06).
-    expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'length_fix', 'diff', 'lector']);
+    expect(res.rounds.map((r: any) => r.kind)).toEqual(['repair', 'length_fix', 'diff', 'lector', 'logic_read']);
     expect(res.changed).toEqual([1]);
     expect(labels).toContain('text_lector');
   });

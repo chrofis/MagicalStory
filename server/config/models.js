@@ -601,6 +601,13 @@ const MODEL_DEFAULTS = {
   // Haiku 5.5 xhigh was tried as lector 2026-10-08 and NOT adopted: 8-9/11 real pages vs gemini 10/11 (decisions.md
   // 2026-10-08 "Haiku 5.5 round 2").
   textProofreadModel: process.env.TEXT_PROOFREAD_MODEL || 'gemini-3.1-pro',
+  // The LOGIC READ of the finished text, after the lector (2026-11-08, docs/decisions.md "Logic read of the finished
+  // text"): ONE text-only call, typed JSON findings, MAJOR ones get one fix round. Sonnet 5.5 chosen from the paid
+  // Lab test E (3 of 6 known faults, 9 of 10 real faults on clean books, 6% false alarms, ~$0.12 per book WITH page
+  // images, so far less text-only); Opus matched its recall at $0.21. The effort is NOT measured (the Lab ran the
+  // book_audit stage's own): `medium` keeps the call near the text-only estimate, to be checked on the real model.
+  textLogicReadModel: process.env.TEXT_LOGIC_READ_MODEL || 'claude-sonnet-5-5',
+  textLogicReadEffort: 'medium',
   // The DIFF pass that runs between the repair and the lector: it reads only
   // the repaired pages as BEFORE/AFTER and reports what the rewrite damaged.
   // luna-pro is a MEASURED choice for THIS task and the ranking is INVERTED

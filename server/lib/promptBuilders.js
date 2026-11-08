@@ -10679,6 +10679,7 @@ const VERSE_TOPIC = { category: 'educational', topic: 'rhyming' };
 const VERSE_FORM_RULE = 'VERSE FORM. This whole book is told in rhyming verse: rhyming couplets (AABB), each verse line on its own line of the page, a blank line between stanzas of two or four lines. This form replaces the paragraph shape and the sentence-per-paragraph rules for this book: a stanza is the paragraph, and a stanza of one sentence is fine. The lines have a steady beat a child can clap: every line has about four stressed beats (roughly 8 to 11 syllables), and the two lines of a couplet have the same beat and about the same length. A line is never a whole prose sentence with a rhyme word stuck on its end: when a thought is too long for one line, it is split over two lines or said more simply, and a long name or place is used where it fits the beat or left out of that line. When a page holds more than fits in a few stanzas, it says less in fewer words, never longer lines. Rhyme is only the FORM of the telling: the plot is an ordinary plot, and no character, game, rule or spell is built on rhyming. If the story idea gives a character a rhyming habit (it answers in rhyme words, it speaks only in rhymes), that habit is dropped: the character speaks ordinary words, and the story keeps its plot. Every couplet rhymes when read aloud in this language. The words stay plain words a child at the reading level already uses; word order stays the natural order of a spoken sentence, and no line is padded with a word, or made to say something odd, only to rhyme. Spoken lines stay in the cast\'s ordinary speech.';
 const VERSE_ROLE_TAILS = {
   write: 'Write every page in this form, with the line breaks in the page text.',
+  logic: 'You judge the story, not the verse: use this form only for the VERSE question.',
   rewrite: 'Every rewritten page stays in this form: keep the couplets, the rhymes and the line breaks. A sentence is recast by changing words inside its lines, keeping the end-rhyme of each couplet, never by turning verse into prose or by moving a word into an unnatural position to keep a rhyme. A finding that asks for a rhyme the page lacks is closed by restoring the couplet.',
   audit: 'Also file as a fault, under the question whose name fits best: a couplet whose two lines do not rhyme when read aloud; a line that says something senseless, or that has no work to do in the story, only to supply a rhyme word; and a line whose word order a first reader cannot follow because it was inverted to rhyme; a line with no steady beat, or far longer than its partner line (a prose sentence with a rhyme word on its end); a character who answers or speaks in rhyme words as a habit. A verse line break is the form, never a fault.',
   lector: 'The pages are verse. Quote and correct ONE verse line at a time, exactly as it stands on a single line; where a fault spans two lines, write the line break as " / " in both the quote and the correction. A correction never changes the word that ends a line if that word rhymes with its partner line, and never turns a line into prose order.',
@@ -10989,6 +10990,12 @@ function styleRulebook(language) {
 const PICTURE_COUNT_RULE = 'When a page\'s picture leaves out someone the story has with the others at that moment — whoever that page\'s plan line or scene does not put in frame — the page\'s text gives that group no number and never says all, both or every one of them, in whatever language it is written: it names who acts, or speaks of the rest without a count';
 
 const MOTIVE_AT_THE_ACT_RULE = 'Where a character refuses, demands, flees, hides or lies for a reason the story reveals only later, the reader gets a glimpse of that reason at or before the act (a look, a half-said word, an act) without giving the later reveal away. The reason is the story\'s own, so this invents nothing';
+
+// A friend's or relative's unkindness toward the main character needs a reason on the pages (2026-11-08,
+// docs/decisions.md "Logic read of the finished text"). ONE constant: the beats writer and the trial writer are
+// given it as {FRIEND_REASON}, and the logic read's FRIEND question judges against the same sentence
+// (generator-vs-critic: a rule the reader can deduct for is a rule the writer was given).
+const FRIEND_REASON_RULE = 'A friend or family member is never unkind, dismissive or careless toward the main character without a reason the pages give (a want of their own, a fear, a misunderstanding), and an unkindness is answered by a later page (an apology, a repair, or the answer the main character gives it).';
 
 /**
  * A payoff survives every fix (owner, 2026-09-24). ONE string for every pass
@@ -12691,6 +12698,52 @@ function buildTextProofreadPrompt(inputData, pages = []) {
 }
 
 /**
+ * The names of the story's declared main characters, in the order the story lists them, ALL of them (no cap).
+ * Mains arrive as an id array, an `isMainCharacter` stamp or an `isMain` flag (the same three pickMainCharacters
+ * reads). [] when nobody is marked. Shared by buildTitleRule and the logic read.
+ */
+function declaredMainNames(inputData) {
+  const mainIds = inputData?.mainCharacters || [];
+  const chars = inputData?.characters || [];
+  const declared = mainIds.length
+    ? chars.filter(c => mainIds.includes(c.id))
+    : chars.filter(c => c.isMain || c.isMainCharacter);
+  return declared.map(c => c.name).filter(Boolean);
+}
+
+/**
+ * THE LOGIC READ of the finished text (2026-11-08): one TEXT-ONLY call that reads the text the lector left and
+ * answers the story-logic questions a listening child trips over (obstacle, stakes, who knows what, who is where,
+ * contradictions, unkind friends, empty pages, cause, verse beat). Typed JSON out (parseLogicRead,
+ * textLogicRead.js); only the typed severity decides what is fixed. Prompt: prompts/story-text-logic-read.txt.
+ */
+function buildTextLogicReadPrompt(inputData, pages = []) {
+  const template = PROMPT_TEMPLATES.storyTextLogicRead;
+  if (!template) {
+    log.error('[PROMPT] storyTextLogicRead template not loaded — logic read unavailable');
+    return null;
+  }
+  const names = declaredMainNames(inputData);
+  const chars = (inputData?.characters || []).map(c => c.name).filter(Boolean);
+  // Nobody marked (older jobs): the first character is the focus, the long-standing fallback (pickMainCharacters).
+  const mains = names.length ? names : chars.slice(0, 1);
+  const mainText = mains.length > 1
+    ? `${mains.join(', ')} (together: the deciding act may be any one of them)`
+    : (mains[0] || 'the character the story follows');
+  const verse = isVerseStory(inputData);
+  return fillTemplate(template, {
+    LANGUAGE: inputData?.language ? getLanguageNameEnglish(inputData.language) : 'the language of the pages',
+    MAIN_CHARACTERS: mainText,
+    PAGES: pages.map(p => `--- Page ${p.pageNumber} ---\n${String(p.text || '').trim()}`).join('\n\n'),
+    FRIEND_REASON: FRIEND_REASON_RULE,
+    VERSE_FORM: verseFormFor(inputData, 'logic'),
+    VERSE_QUESTION: verse
+      ? 'VERSE. Lines where the beat stumbles so a first reader would trip, and lines that carry no story and exist only for the rhyme.\n'
+      : '',
+  });
+}
+
+/**
  * A page as numbered sentences (`A1: …`), a blank line between paragraphs —
  * the grammar check edits by number (pageSentences is the one splitter).
  */
@@ -13294,6 +13347,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     WHO_DOES_WHAT: WHO_DOES_WHAT_RULE,
     STYLE_RULEBOOK: styleRulebook(inputData?.language),
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
+    FRIEND_REASON: FRIEND_REASON_RULE,
     // A plot-relevant body condition carries a visible marker the text names (2026-10-15).
     BODY_CONDITION_MARKER: BODY_CONDITION_MARKER_RULE,
     PICTURE_COUNT: PICTURE_COUNT_RULE,
@@ -13336,12 +13390,8 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
  * @returns {string} one prompt line
  */
 function buildTitleRule(inputData) {
-  const mainIds = inputData?.mainCharacters || [];
   const chars = inputData?.characters || [];
-  const declared = mainIds.length
-    ? chars.filter(c => mainIds.includes(c.id))
-    : chars.filter(c => c.isMain || c.isMainCharacter);
-  const mainNames = declared.map(c => c.name).filter(Boolean);
+  const mainNames = declaredMainNames(inputData);
   // Nothing marked at all (older jobs, trials mid-migration): fall back to the
   // whole cast, which is what the count is standing in for.
   const names = mainNames.length ? mainNames : chars.map(c => c.name).filter(Boolean);
@@ -13660,6 +13710,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       WHO_DOES_WHAT: WHO_DOES_WHAT_RULE,
       STYLE_RULEBOOK: styleRulebook(language),
       MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
+      FRIEND_REASON: FRIEND_REASON_RULE,
       // A plot-relevant body condition carries a visible marker the text names (2026-10-15).
       BODY_CONDITION_MARKER: BODY_CONDITION_MARKER_RULE,
       // The trial writer's Visual Bible entries state a one-sided feature relationally (sibling of visual-bible.txt).
@@ -14714,6 +14765,9 @@ module.exports = {
   buildTextAuditPrompt,
   buildTextAuditBlindPrompt,
   buildTextProofreadPrompt,
+  buildTextLogicReadPrompt,
+  declaredMainNames,
+  FRIEND_REASON_RULE,
   buildTextDiffPrompt,
   countFaults,
   faultsByCategory,
