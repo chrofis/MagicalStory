@@ -4669,7 +4669,7 @@
       "source": "Reproduced on staging job_1794128424739_0j933o99i5u p5: v4 was a Lab test row (is_test, experiment 1816); PUT /pages/5/active-image {versionIndex:4} succeeded (image_version_meta['5'].activeVersion=4); POST /edit/image/5 then edited version 0 and saved it as a new active version. server/routes/regeneration.js rehydrateActivePageImage (~243), cover twin rehydrateActiveCoverImage, pages-load handler ~543.",
       "rootCause": "Active-row lookup was `rows.find(active) || rows.find(version 0)` over rows that exclude is_test; plus PUT active-image let an is_test index through its blob-length last-resort check.",
       "status": "fixed",
-      "fixedIn": "the commit that adds this entry (git log -S page-edit-silently-edits-version-0 tasks/bugs.json)"
+      "fixedIn": "fddb71c0c"
     }
   ]
 }
