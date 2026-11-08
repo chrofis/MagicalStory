@@ -79,3 +79,13 @@ Order: #1+#3 -> #4+#5 -> #6,#7,#10 -> #2,#8,#9 (at most 2 agents at a time).
   - Units: 9928 pass.
   - Stand-in A/B, 16 books: 0 false alarms, 9 of 9 MAJORs real (Lab Sonnet: 2 of 16 real faults MAJOR). Recall can't be judged (the stand-in is weaker and not blind on the positives).
   - Pending: real-model check, about USD 1 for 16 books, owner to approve. The push waits until Lab 1839 finishes.
+- 2026-11-08, test G: real planner (Haiku 5.5 + luna check) in the Lab, exps 1838/1839, USD 0.98; scored in evals/runs/2026-11-08_quality-tests-G/.
+  - A shipped vs B new quota:
+    - hero-moment pages without the hero 14 → 7 (key pages 7 → 3);
+    - people-free pages 9 → 1 (short books 8 → 0);
+    - friends without a focal page 2 → 1;
+    - must-fix 7 → 3 (same counter).
+  - Regressions in 3 books: a friend's or adult's deed left unstaged (1tmyzh1do Polina, 79n8x82wd Henri), and an invented deed (k3c6 Marc).
+  - Remaining pattern: an adult's or friend's "alone" deed page is cut out of the hero's own moment (7 pages).
+  - Verdict: GO, with that gap as the next fix.
+- [ ] Next fix: an adult's or friend's deed page must not take the main character's own moment (7 of 12 books affected after test G) → this file, test G
