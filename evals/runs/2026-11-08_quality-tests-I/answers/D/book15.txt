@@ -1,0 +1,11 @@
+FAULT[IMG][MAJOR][height_order][NEW]: p1 — Draw Nonna Mirella shorter than Serena, the top of her head level with Serena's forehead. | background: keep
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p3 — Move the towel so Mamma holds it spread directly under Ludovica's tail over the stone.
+FAULT[TEXT][MAJOR]: p7 — Cut the words "e che non conosceva ancora", since Serena stood with the family beside Ludovica on page 1.
+FAULT[TEXT][MINOR]: p8 — Say that Mamma picks up the towel, now damp from the wet stone, instead of "ancora asciutto".
+FAULT[TEXT][MAJOR]: p10 — Say that Mamma, after watching from the stones, stepped into the water after them too, before she follows Papà along the sea floor.
+FAULT[IMG][MINOR][child_torso_uncovered][CHAR:Ludovica]: p11 — Draw Ludovica's purple swim shirt reaching down to the tail's waistband with no bare skin between them.
+FAULT[IMG][MAJOR][scale][TOUCHUP]: p13 — Move Nerina far off into the distant blue behind the coral, small and half hidden, so Ludovica cannot see her.
+FAULT[IMG][MINOR][setting][TOUCHUP]: p22 — Put the rock ledge with the mussels under the water instead of above the surface.
+FAULTS: 8
+FAULT[TEXT][MAJOR]: p25 — Say that Mamma climbs out of the grotto water just before them, instead of "che li aspettava sui sassi", since she walked at the back of the line under the sea.
+FAULTS: 1

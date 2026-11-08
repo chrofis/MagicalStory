@@ -1,0 +1,7 @@
+FAULT[IMG][MAJOR][object_presence][NEW]: p8 — Draw Lily with no kit bag on her back and Humbug clinging to the front of her head at her visor, as she unwinds Bramble from the red scarf. | background: keep
+FAULT[IMG][MAJOR][object_presence][TOUCHUP]: p9 — Remove the kit bag from Lily's back.
+FAULT[IMG][MAJOR][object_presence][TOUCHUP]: p10 — Remove the kit bag and its shoulder strap from Lily.
+FAULT[IMG][MAJOR][missing_character][NEW]: p11 — Draw Lily beside the pump cabinet with Humbug's shining ears turned toward the warm door, pointing it out to Margaret as she opens it. | background: keep
+FAULT[IMG][MINOR][duplicate_object][TOUCHUP]: p12 — Remove the glasses from Margaret's face so only the pair on her necklace remains.
+FAULT[IMG][MAJOR][object_presence][TOUCHUP]: p13 — Remove the kit bag from Lily's back.
+FAULTS: 6

@@ -1,0 +1,5 @@
+FAULT[IMG][MINOR][object_presence][TOUCHUP]: p7 — Remove the skipping rope from Polina's hand and leave it lying in the leaves on the path.
+FAULT[IMG][MINOR][emotion][TOUCHUP]: p9 — Give Melodi a wide-eyed, amazed and delighted face with no tear, instead of a frightened, crying one.
+FAULT[IMG][MAJOR][missing_element][NEW]: p10 — Draw Rubi at the bright glowing light between the two big beeches, turning his head back with his horn shining, as the four girls walk quietly up behind him. | background: redo — show the two big beeches with a bright glowing gap of light between them at dusk
+FAULT[TEXT][MINOR]: p10 — Say that the four girls walked back through the wood to the farm before the sentence "Auf dem Hof schaute das Pony über die Stalltür".
+FAULTS: 4

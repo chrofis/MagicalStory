@@ -1,0 +1,6 @@
+FAULT[IMG][MAJOR][setting][NEW]: p2 — Draw Jules leaning out of the open window into the dark rainy night with the lamp's beam on the bridge, and a small hedgehog dragging Bouton across the bridge's planks. | background: redo — the garden at night, dark and wet, lit only by the lamp beam
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p5 — Draw Léa's arm plunged into the leaf heap up to the elbow and Picot pulling back deeper into it instead of peering out.
+FAULT[IMG][MAJOR][object_presence][TOUCHUP]: p8 — Put the left red boot back on Léa's foot so only her right boot is off and being filled.
+FAULT[IMG][MAJOR][object_presence][TOUCHUP]: p9 — Draw Léa's left foot still in its red rain boot.
+FAULT[IMG][MAJOR][object_presence][NEW]: p10 — Draw Léa lying under the blue quilt with Bouton against her cheek and no rain boots on her feet. | background: keep
+FAULTS: 5

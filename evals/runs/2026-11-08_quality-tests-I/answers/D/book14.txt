@@ -1,0 +1,4 @@
+FAULT[IMG][MINOR][creature_scale][TOUCHUP]: p4 — Draw Silbermond as the small foal-sized unicorn of the other pages, its back no higher than Janna's waist.
+FAULT[IMG][MAJOR][image_coherence][NEW]: p5 — Draw a dense row of grown-ups standing at the kerb between Janna and the passing children, with Janna squeezed behind them calling past their shoulders. | background: keep
+FAULT[IMG][MINOR][creature_scale][TOUCHUP]: p10 — Draw Silbermond as the small foal-sized unicorn of the other pages, its back no higher than the girls' waists.
+FAULTS: 3

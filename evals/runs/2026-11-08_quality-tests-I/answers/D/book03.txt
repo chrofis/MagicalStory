@@ -1,0 +1,5 @@
+FAULT[IMG][MAJOR][action_interaction][NEW]: p4 — Draw Saira at the lane fork turning her head left and right, with Herr Frei hurrying up the cobbled lane behind her, coming after her rather than standing beside her pointing the way. | background: keep
+FAULT[IMG][MAJOR][action_interaction][NEW]: p5 — Draw Sarah crouched hidden behind stacked crates full of pumpkins at the market stall, with Herr Frei's face appearing over the top of the crates and his hand held out. | background: redo — add the market stall with crates of pumpkins stacked behind it on the quay
+FAULT[IMG][MINOR][object_presence][TOUCHUP]: p12 — Put a red pencil in Fiona's hand and make the sheet she draws on a cut-open brown paper sack instead of old parchment.
+FAULT[IMG][MINOR][object_presence][TOUCHUP]: p16 — Redraw the lines on the map Lorena holds up as crooked, wavering lines instead of straight crossing strokes.
+FAULTS: 4

@@ -1,0 +1,4 @@
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p4 — Draw Jules with his eyes open and mouth yawning as he watches Léa from under his blanket, instead of asleep.
+FAULT[IMG][MINOR][wrong_state][TOUCHUP]: p7 — Draw the turned night light throwing a bright round pool of light onto the wall above the beds.
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p10 — Draw Ombri lying stretched out on the glowing wall beside the rabbit's shadow instead of standing upright.
+FAULTS: 3

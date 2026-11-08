@@ -1,0 +1,37 @@
+{
+  "note": "Known faults still present in the 16 test-I books (as packeted 2026-11-08). Rebuilt 2026-11-09 by the arm-D grader to match the arm-C grader's counts (5 picture, 17 text); the C grader did not store its list, so membership is this grader's reconstruction, checked against the packet text and pictures. Sources: tasks/janna-books-issues-2026-11-07.md (A1-A4, B8, F), evals/runs/2026-11-08_quality-tests-C/grades.json (positives + real negatives), evals/runs/2026-11-08_quality-tests-E/t1-grades.jsonl and t2-grades.jsonl (g=R), tasks/quality-suggestions-2026-11-08.md (test I results). Faults fixed since (Einhorn stakes/knowledge/p9, Rubi trap and cord, the hand-fixed verse V1-V7) are excluded. Book numbers are test-I numbers (key.json).",
+  "picture": [
+    {"id": "K1", "book": "book05", "page": 6, "story": "Einhorn", "fault": "Janna missing from her own knot-pulling moment (stable shows no girl)", "source": "test E t1 K1; janna-issues F open finding"},
+    {"id": "K2", "book": "book13", "page": 9, "story": "Laternen original", "fault": "The ring with its gap is not drawn (empty square); Polina, who speaks, is absent; the girl at the gap is Melodi, not Polina", "source": "janna-issues B8; test E t1"},
+    {"id": "K3", "book": "book06", "page": 10, "story": "Rubi rewritten", "fault": "The passage through the glowing light between the two beeches is not shown", "source": "test I A/B/C grading (all arms flagged)"},
+    {"id": "K4", "book": "book14", "page": 9, "story": "Laternen verse", "fault": "Height order: Melisa drawn clearly taller than Janna (HEIGHT ORDER says about the same); Melisa stands on the kerb, so the prompt's different-surface clause makes this arguable", "source": "janna-issues B1 (height order); test I A/B/C grading"},
+    {"id": "K5", "book": "book14", "page": 1, "story": "Laternen verse", "fault": "Page 1 shows only Melodi; the main character is absent from the opening page", "source": "test E t1 (verse p1); janna-issues F open finding (p1 shows only Melodi)"}
+  ],
+  "text": [
+    {"id": "T1", "book": "book13", "page": 9, "fault": "The friends end the problem: Melodi's «Halt!» stops the ring, Melisa's raised lantern guides Janna in", "source": "janna-issues A1/E; test C L1"},
+    {"id": "T2", "book": "book13", "page": "9-10", "fault": "The friends never react to the unicorn although only children can see it and it walks beside them", "source": "janna-issues A3; test C L2; test E t2 L2"},
+    {"id": "T3", "book": "book13", "page": "1-5", "fault": "The price of failing (why the ring matters, what happens if it closes without Janna) is never said", "source": "janna-issues A4; test C L3"},
+    {"id": "T4", "book": "book13", "page": 3, "fault": "The unicorn's motive (why it comes and stays at her coat) is never said", "source": "janna-issues A4; test C L4; test E t2 L4"},
+    {"id": "T5", "book": "book05", "page": 8, "fault": "A friend removes the obstacle: Melisa lifts the loop off (Janna instructs)", "source": "janna-issues A1 (Einhorn not rewritten for A1); test C E1"},
+    {"id": "T6", "book": "book06", "page": 5, "fault": "The price of failing is only hinted (the light grows paler), never said", "source": "test C R4; test I C verdict"},
+    {"id": "T7", "book": "book13", "page": 5, "fault": "'obwohl die Reime laut klangen' contradicts the only-children-can-hear rule", "source": "test E t2 (Sonnet, g=R)"},
+    {"id": "T8", "book": "book06", "page": 9, "fault": "Melodi shouts right after the hush-to-be-silent rule", "source": "test E t2 (Opus, g=R)"},
+    {"id": "T9", "book": "book05", "page": 2, "fault": "The friends find Silva and lead it off; Janna's whereabouts are not mentioned", "source": "test C B finding p1-2 (real MAJOR); test E t2 (g=R)"},
+    {"id": "T10", "book": "book02", "page": 14, "fault": "Henri never thanked Maëlle in 60 years, then simply wades in and thanks her", "source": "test C negatives (79n8x82wd real)"},
+    {"id": "T11", "book": "book11", "page": 6, "fault": "Ombri, who only repeats, speaks a sentence of his own with no comment", "source": "test C negatives (9nhq3ju59 real)"},
+    {"id": "T12", "book": "book04", "page": 16, "fault": "The lantern parade is set as the deadline, the lantern is given away, and the parade never returns", "source": "test C negatives (0ir5y6hlh real); test E t2"},
+    {"id": "T13", "book": "book07", "page": 4, "fault": "Alba's reason to block the planting is never given", "source": "test C negatives (ve47ncy55 real MAJOR)"},
+    {"id": "T14", "book": "book15", "page": "9-10, 25", "fault": "Mamma stays on the stones, then walks behind them under the sea, then waits on the stones", "source": "test C negatives (kkg5gxkbj); test E t2"},
+    {"id": "T15", "book": "book15", "page": "5-7", "fault": "Three side-scene pages (camper, heater, kiosk) away from the quest", "source": "test C negatives (kkg5gxkbj); test E t2"},
+    {"id": "T16", "book": "book15", "page": 7, "fault": "Serena is with the family on p1 yet does not know Ludovica on p7 and introduces herself on p25", "source": "test C negatives (kkg5gxkbj); test E t2"},
+    {"id": "T17", "book": "book08", "page": "1-3", "fault": "Henri sees a talking shadow ride in his car and never reacts", "source": "test C negatives (txr1gqd28); test E t2"}
+  ],
+  "missedByAllArmsNotOnLists": [
+    {"book": "book04", "page": 11, "fault": "Lia, who decides «Dann gehe ich selbst» and takes the lantern, is not drawn (Opa alone)"},
+    {"book": "book07", "page": 13, "fault": "Lou, who jumps stone to stone and finds the gap, is not drawn (people-free page)"}
+  ],
+  "readAloudOnly": [
+    {"book": "book14", "page": 4, "fault": "forced stress; 'sie' ambiguous (Polina and Melodi)", "source": "test E t2 Opus Q9 g=R"},
+    {"book": "book14", "page": 9, "fault": "'den' grammatically refers to 'Zug'", "source": "test E t2 Opus Q9 g=R"}
+  ]
+}

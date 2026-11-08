@@ -1,0 +1,3 @@
+FAULT[IMG][MAJOR][wrong_state][TOUCHUP]: p8 — Move the trembling shadow off the wall and onto the lit pillow, sitting up on it, so it has not yet slid onto the wall.
+FAULT[TEXT][MAJOR]: p10 — Say on p3 that Henri comes into the house behind Léa and the shadow, so that he can be at the bedroom door with Jules and Élodie on p10.
+FAULTS: 2

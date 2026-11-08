@@ -1,0 +1,7 @@
+FAULT[IMG][MAJOR][clothing][NEW]: p4 — Draw Léa and Jules sitting in the bubble bath undressed, shoulders above the foam, with no cardigan, sweatshirt, trousers or rain boots in the water. | background: keep
+FAULT[IMG][MAJOR][clothing][CHAR:Léa]: p5 — Draw Léa in the bath water with bare shoulders above the foam instead of wearing her cardigan and t-shirt in the tub.
+FAULT[IMG][MAJOR][wrong_state][TOUCHUP]: p6 — Close the teal book in Marc's hand, held shut at his side, since he opens it only when he reaches zero.
+FAULT[IMG][MINOR][object_presence][TOUCHUP]: p7 — Tuck Pompon under the duvet so that only one long ear shows above the duvet near the pillow.
+FAULT[IMG][MAJOR][wrong_action][NEW]: p8 — Draw Léa stamping one boot flat on the corridor floor with her hands at her sides, and draw the dark shape inside the bedroom, on the floor beyond the open door, stamping in the same pose. | background: keep
+FAULT[IMG][MAJOR][action_interaction][NEW]: p9 — Draw Léa on the bedroom threshold facing into the room, looking straight at the dark shape cast on the bedroom floor in front of her, the shape her own size and shape, not a tall figure standing in the corridor. | background: redo — show the open bedroom doorway with the room and bed beyond it
+FAULTS: 6

@@ -1,0 +1,3 @@
+FAULT[IMG][MAJOR][missing_character][NEW]: p6 — Draw Janna tugging hard at the knot of the skipping rope on the oak post while Silva throws her head up and pulls back so the rope stands taut, with Melisa watching nearby. | background: keep
+FAULT[IMG][MINOR][action_interaction][NEW]: p10 — Draw Silva walking away from the girls into a bank of mist lying on the stream, her back to them, while Janna stands on the bank with her hand held open. | background: keep
+FAULTS: 2

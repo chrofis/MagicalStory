@@ -1,0 +1,7 @@
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p1 — Move Henri's hand and Léa's hand down onto the large front pocket of Henri's coat, side by side and flat on it, instead of on his chest.
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p3 — Raise Marc's second hand too, so both palms are held up toward Jules.
+FAULT[IMG][MAJOR][setting][NEW]: p4 — Draw Maëlle ringing her bell on a rock out in the water beyond the coral wall, with the reef wall clearly between her and the children on the sand. | background: redo — put Maëlle's rock out in the sea on the far side of the coral wall, not on the beach
+FAULT[IMG][MAJOR][wrong_state][NEW]: p6 — Draw Gaspard swollen and filling the coral arch opening from one side to the other with his wide-open mouth, so no gap remains for Jules to pass. | background: keep
+FAULT[IMG][MAJOR][missing_character][NEW]: p10 — Draw Gaspard sliding backward into his hollow beneath the arch, his tail end still visible as he goes, while Léa floats at the arch's edge beside the opening looking through to the blue water beyond. | background: keep
+FAULT[IMG][MINOR][clothing][CHAR:Léa]: p13 — Give Léa her red long-sleeve swim shirt instead of a short-sleeve one.
+FAULTS: 6

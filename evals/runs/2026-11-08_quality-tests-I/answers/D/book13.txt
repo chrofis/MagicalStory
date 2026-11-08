@@ -1,0 +1,3 @@
+FAULT[IMG][MINOR][clothing_detail][CHAR:Polina]: p8 — Give Polina her warm white tights and black rubber rain boots instead of bare legs and brown shoes.
+FAULT[IMG][MINOR][object_count][TOUCHUP]: p8 — Remove one of the two lanterns so Polina holds a single lantern.
+FAULTS: 2

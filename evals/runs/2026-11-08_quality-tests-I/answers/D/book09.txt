@@ -1,0 +1,7 @@
+FAULT[IMG][MAJOR][creature_scale][TOUCHUP]: p2 — Draw Funkel as a tiny glowing creature no bigger than a child's cupped hands drifting over the sill, instead of the knee-high figure now drawn.
+FAULT[IMG][MAJOR][image_coherence][NEW]: p5 — Draw the rocket closed and whole in Krax's talons, with Funkel glowing small through its round window, instead of a rocket cut open on one side and filled entirely by Funkel. | background: keep
+FAULT[IMG][MINOR][image_coherence][TOUCHUP]: p7 — Remove the second cardboard rocket seen through the porthole.
+FAULT[IMG][MINOR][clothing_detail][CHAR:Noah]: p9 — Give Noah white astronaut gloves with ribbed cuffs instead of black gloves.
+FAULT[IMG][MAJOR][action_interaction][TOUCHUP]: p10 — Draw Emma's hand holding the lantern handle together with Noah and make the turnip lantern glow warmly.
+FAULT[IMG][MAJOR][height_order][NEW]: p10 — Draw Emma with the top of her head level with Noah's chin, not at his shoulder. | background: keep
+FAULTS: 6

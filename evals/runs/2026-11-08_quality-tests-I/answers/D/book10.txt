@@ -1,0 +1,16 @@
+FAULT[IMG][MAJOR][wrong_action][NEW]: p1 — Draw Eliah and Yara leaping into the middle of the big leaf heap under the tree, Yara pointing with her whole arm at the pirate ship's mast and skull sail, with Yara's head top level with Eliah's chin. | background: keep
+FAULT[TEXT][MINOR]: p2 — Say that Eliah hears gulls calling from the direction of Schloss Unterseen before he tells the gull her flock sits there.
+FAULT[IMG][MAJOR][wrong_state][TOUCHUP]: p2 — Draw the gull's left wing hanging down and dragging limply on the plank behind her.
+FAULT[IMG][MAJOR][setting][NEW]: p3 — Draw Eliah kneeling on the deck planks of the small pirate ship close to the gull, in his black breeches, with no second ship and no crowd behind him. | background: redo — the deck of the small skull-sail ship by the ruin platform, autumn midday
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p4 — Draw Yara holding her unicorn stretched far out in front of her toward the gull instead of hugging it to her chest.
+FAULT[IMG][MAJOR][wrong_action][TOUCHUP]: p5 — Draw the gull hopping backwards over the rail with one wing trailing limply instead of flying with both wings spread.
+FAULT[IMG][MINOR][clothing_detail][CHAR:Eliah]: p7 — Give Eliah his long-sleeved red and white striped shirt instead of a short-sleeved one.
+FAULT[IMG][MINOR][image_coherence][TOUCHUP]: p7 — Remove the large second galleon from the fog behind Eliah.
+FAULT[IMG][MAJOR][action_interaction][NEW]: p9 — Draw Eliah bending over the rail with both hands on his cap, whispering into thick fog over the water, with no second ship beside him. | background: redo — thick fog over open water and reeds seen from the rail, no other ship
+FAULT[TEXT][MINOR]: p11 — Say that the crew pulls the skull sail tight and full instead of that it climbs slowly up the mast, since it already hangs on the mast from page 1.
+FAULT[IMG][MINOR][object_presence][TOUCHUP]: p15 — Extend the plank so its lantern end reaches the first reed stalks.
+FAULT[IMG][MAJOR][emotion][TOUCHUP]: p16 — Draw Eliah calling with a clear, confident face instead of crying in fear, and remove the second galleon from the fog.
+FAULT[IMG][MAJOR][image_coherence][NEW]: p17 — Draw the long plank running from the reeds over the water up to the ship's rail with the lantern at its end, and the gull hopping off it down onto the deck. | background: redo — the ship's deck at the rail facing the reeds at sunset, no taller ship behind
+FAULT[IMG][MINOR][object_presence][TOUCHUP]: p18 — Draw Yara stroking a feather that is still part of the gull's right wing instead of holding a loose feather.
+FAULT[IMG][MAJOR][height_order][NEW]: p20 — Draw Yara shorter than Eliah, the top of her head level with his chin. | background: keep
+FAULTS: 15

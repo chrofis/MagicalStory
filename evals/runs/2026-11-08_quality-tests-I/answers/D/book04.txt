@@ -1,0 +1,11 @@
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p2 — Turn Lia's head and eyes down toward the dark gap under the bed instead of looking off to the side.
+FAULT[IMG][MINOR][clothing][CHAR:Lia]: p5 — Give Lia her grey fleece-lined leggings instead of blue trousers.
+FAULT[IMG][MAJOR][structure_scale][NEW]: p9 — Draw the cave entrance as a low, narrow hole at the foot of the rocky hill, too small for a grown man to fit through, with the golden glow coming out of it. | background: redo — replace the tall stone archway with a low, narrow hole in the rock
+FAULT[IMG][MAJOR][structure_scale][NEW]: p10 — Draw Opa Dirk on his knees with his head and shoulders jammed in a low, narrow hole, his shoulders stuck at its edges, while Lia watches. | background: redo — make the entrance a low, narrow hole instead of a wide stone arch
+FAULT[IMG][MAJOR][structure_scale][NEW]: p11 — Draw Opa Dirk kneeling beside a low, narrow hole at the foot of the rock, lighting the lantern candle with a match, with no stars on the tunnel walls yet. | background: redo — make the entrance a low, narrow hole instead of a wide lit tunnel
+FAULT[IMG][MINOR][wrong_action][NEW]: p12 — Draw Lia on hands and knees crawling through a low, tight tunnel, the lantern carried in one hand and the other hand on the wall. | background: redo — make the tunnel low and tight, barely higher than a crawling child
+FAULT[IMG][MINOR][missing_element][TOUCHUP]: p13 — Add Brumm's huge shadow thrown on the den wall behind him by the light of Lia's lantern.
+FAULT[IMG][MINOR][wrong_state][TOUCHUP]: p16 — Put the star clutched against Brumm's chest in his paws instead of floating free above his open paws.
+FAULT[IMG][MAJOR][clothing][CHAR:Oma Nicole]: p19 — Draw Oma Nicole without her red scarf, her neck showing the white turtleneck, since she wrapped the scarf around Fridolin's tail.
+FAULT[IMG][MAJOR][wrong_action][NEW]: p20 — Draw Opa Dirk lifting Lia up to the top of the Christmas tree while she sets the gold spark on its empty tip, and Oma Nicole without her red scarf looking on. | background: keep
+FAULTS: 10

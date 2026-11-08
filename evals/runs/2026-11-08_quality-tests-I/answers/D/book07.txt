@@ -1,0 +1,11 @@
+FAULT[IMG][MAJOR][object_presence][TOUCHUP]: p6 — Put Lou's cream plush rabbit under her arm and the softly glowing sprout in its clump of earth in her red mitten.
+FAULT[IMG][MAJOR][character_identity][NEW]: p7 — Draw Mirli with a bare forehead and no horn, pressing his flank against Lou's side, while Lou stands still clutching her plush rabbit with the glowing sprout in her mitten. | background: keep
+FAULT[IMG][MINOR][wrong_state][TOUCHUP]: p10 — Remove the full moon from the sky above the brook.
+FAULT[IMG][MINOR][accessory_missing][CHAR:Lou]: p11 — Give Lou her red knitted mittens on both hands as she squeezes the rabbit.
+FAULT[IMG][MINOR][wrong_state][TOUCHUP]: p12 — Lower the moon so only its upper edge is rising above the far side of the pond.
+FAULT[IMG][MAJOR][missing_element][NEW]: p13 — Draw the line of flat stepping stones running across the pond toward the spring in the middle, with one stone clearly missing so a wide dark gap of deep water breaks the line, thin ice creeping toward it. | background: redo — show the spring in the middle of the pond with the stepping-stone line broken by one missing stone
+FAULT[IMG][MAJOR][character_identity][TOUCHUP]: p15 — Remove the horn from Mirli's forehead so it is bare.
+FAULT[IMG][MINOR][clothing][CHAR:Lou]: p16 — Give Lou her green rubber boots and white tights instead of brown shoes and socks.
+FAULT[IMG][MAJOR][wrong_state][NEW]: p17 — Draw Lou kneeling on the stone beside the warm spring in the middle of the pond, the star-flower blooming in the spring's cleft, while Mirli stands knee-deep in the water of the gap smiling up at it. | background: redo — show the spring in the middle of the pond beyond the stepping stones, not at the shore
+FAULT[IMG][MAJOR][wrong_action][NEW]: p19 — Draw Alba lowering her golden horn in a deep bow toward Mirli, and Mirli with a bare forehead and no horn drinking at the pond's edge. | background: keep
+FAULTS: 10

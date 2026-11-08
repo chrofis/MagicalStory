@@ -168,3 +168,12 @@ Order: #1+#3 -> #4+#5 -> #6,#7,#10 -> #2,#8,#9 (at most 2 agents at a time).
   - Adds the questions CHILD ("what would you want different"), PARENT and SHOW-STOPPER (CRITICAL). Each answer is a fault line.
   - IMG faults get one line per picture.
   - Two blind Opus stand-ins are running, USD 0.
+- 2026-11-09, test I arm D graded (stand-in, USD 0):
+  - 93 lines: 82 real, 10 arguable, 1 false.
+  - Consistency: 26 real, 0 false.
+  - Picture recall against B: lost ~20 (C lost ~28).
+  - Listener questions 8–10: only 2 lines, 0 show-stoppers. The book13 price, the friend-made ending, p9, book04 p11 and book07 p13 are still missed by every arm.
+  - Likely cause: "Where no change to one page would fix it, leave it out" lets whole-book gaps drop.
+  - Grader's edit: put a whole-book gap on the page where the danger or the character first appears.
+  - Next: a real-Opus check, edited D vs A on book13/05/06/04/07, about USD 1.5, owner's yes needed.
+  - The friend-made ending is an arc-stage fault (suggestion #6), not a review fix.
