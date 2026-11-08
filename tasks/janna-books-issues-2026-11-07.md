@@ -74,3 +74,18 @@ ending is still made by friends: Melodi calls «Halt!» (p8) and Melisa lifts th
 act (shouting «Laterne!») is a bit stronger. The rhyme gimmick is unchanged, as expected: verse mode is
 not built yet. Logs show 9 MAJOR panel findings went to the re-telling, but the text-only rerun stores no
 arc report, so why the obstacle rule did not hold cannot be read (BACKLOG line).
+
+## F. Laternen full verse run (2026-11-08, staging job_1794128424739_0j933o99i5u, USD 4.10 + about USD 0.30 Lab)
+Full rerun from the identical input with verse mode and the tightened verse rule (e8cb78719). Verse 7/10, plot 7/10:
+the stakes and the unicorn's reason are said, and Janna's own act (comforting the unicorn, so its horn lights the street) is what makes Polina see her.
+The rhyme-word unicorn is gone.
+Hand fixes after the logic check (owner: "check logic and consistency first, rewrite texts, then fix images, spend 2.-"):
+- p1: Janna can no longer be painting her star while Melisa already carries it.
+- p5: clearer why she cannot get through.
+- p8: Polina stops at the corner and turns round, because the front had already turned the corner on p6.
+- p9: a line with no beat rewritten.
+Pictures: the stored scene plans for p6 and p9 had no Janna at all (p6: zero characters on her low point). Redrawn in the Lab:
+- p6 v1 (Lab 1812): good on the first try.
+- p9 v2 (Lab 1814): the first try, 1813, gave Janna a second star lantern.
+Both are active.
+Open finding: the scene plan left the main character out of her own key moments (p6, p9) and p1 shows only Melodi.
