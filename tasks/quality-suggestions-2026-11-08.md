@@ -114,3 +114,19 @@ Order: #1+#3 -> #4+#5 -> #6,#7,#10 -> #2,#8,#9 (at most 2 agents at a time).
     - a new climax page without Janna (0j933 p9).
   - Cause: Haiku reads the main-in-frame clause as "drop the adult's own beat", and "joint deeds share" clashes with the counter's focal definition.
   - Verdict: NO-GO. Staging currently runs it; production does not.
+- Owner 2026-11-08: narrow the deed rule. Keep: the hero is never cut; moved or invented deeds are flagged. Make sure a friend's own deed is never removed.
+  - Sequence: free stand-in test J → build → one more real planner run (about USD 1).
+  - Burn-loop: this is the 2nd paid attempt at the deed fix; if it fails, stop and fall back to the run-1 page rules.
+- 2026-11-08, test J: narrowed deed rule (stand-in, partly blind, USD 0; evals/runs/2026-11-08_quality-tests-J/).
+  - Causes of the 8 drops: three sentences of c3590467b (the "never carved out ... take another action" tail, "the second takes another action", and "joint deeds share" used as an escape), plus a counter (isFocalPage) that never counts the last page as focal.
+  - Results:
+
+    | | A | 1840 | J |
+    |---|---|---|---|
+    | hero moment without the hero | 7 | 3 | 0 |
+    | deeds dropped | 2 | 8 | 2 |
+    | friends without a focal page | 1 | 8 | 0 |
+    | must-fix | 3 | 7 | 4 (patched counter) |
+
+  - Expected real: hero 1-3, drops 2-5.
+  - GO. A Sonnet build agent is on it.
