@@ -89,3 +89,10 @@ Pictures: the stored scene plans for p6 and p9 had no Janna at all (p6: zero cha
 - p9 v2 (Lab 1814): the first try, 1813, gave Janna a second star lantern.
 Both are active.
 Open finding: the scene plan left the main character out of her own key moments (p6, p9) and p1 shows only Melodi.
+Final pass 2026-11-08:
+- p5 text: the friend no longer seems to ignore Janna (owner choice). Picture: Lab try 2 edited (caption removed, varied lanterns, more people).
+- p9: crowd edit; the crowd steps back and watches.
+- p7: the horn now shines "so hell und so weit", because it already glowed on p3.
+- Total about USD 4.90.
+Copied to her account as job_1794136064260_8qgo59eyb.
+Bug found and fixed on the way: a page edit silently edited v0 when the active version was an unpromoted Lab row (fddb71c0c).
