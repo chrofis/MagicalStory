@@ -3992,6 +3992,19 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
       return res.status(404).json({ error: 'Story not found' });
     }
 
+    // An unpromoted Lab test row (is_test) is not a customer version: every
+    // user-facing read filters it out, so pinning it makes the page serve and edit
+    // a different picture (bug page-edit-silently-edits-version-0). Refuse; the
+    // Lab promote route flips the flag first (decisions.md 2026-11-08).
+    const testRow = await pool.query(
+      `SELECT 1 FROM story_images
+       WHERE story_id = $1 AND image_type = 'scene' AND page_number = $2 AND version_index = $3 AND is_test`,
+      [id, pageNum, dbVersionIndex]
+    );
+    if (testRow.rows.length > 0) {
+      return res.status(409).json({ error: 'This version is an unpromoted Test Lab version; promote it first.' });
+    }
+
     // Validate version exists in story_images table (try direct DB index first)
     let versionCheck = await pool.query(
       `SELECT 1 FROM story_images

@@ -109,7 +109,29 @@ function needsOriginalSeed(record) {
   return !Array.isArray(record?.imageVersions) || record.imageVersions.length === 0;
 }
 
+/**
+ * Pick the story_images row of the ACTIVE version. No fallback: if the pinned
+ * active version has no loadable row (e.g. an unpromoted Lab test row, which every
+ * user-facing read filters out - decisions.md "Test Lab: is_test sandbox versions"),
+ * throw, because silently substituting version 0 makes an edit/repair act on a
+ * different picture than the one the customer sees (bug page-edit-silently-edits-version-0).
+ * @param {Array} rows rows with version_index
+ * @param {number} activeDbIndex image_version_meta activeVersion
+ * @param {string} label for the error message
+ */
+function requireActiveRow(rows, activeDbIndex, label) {
+  const row = rows.find(r => r.version_index === activeDbIndex);
+  if (!row) {
+    const err = new Error(`Active version ${activeDbIndex} of ${label} has no loadable image row (versions present: ${rows.map(r => r.version_index).join(', ') || 'none'}). Refusing to use another version.`);
+    err.code = 'ACTIVE_VERSION_NOT_LOADABLE';
+    err.status = 409;
+    throw err;
+  }
+  return row;
+}
+
 module.exports = {
+  requireActiveRow,
   needsOriginalSeed,
   arrayToDbIndex,
   dbToArrayIndex,

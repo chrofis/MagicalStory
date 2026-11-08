@@ -165,7 +165,7 @@ const {
 } = require('../lib/visualBible');
 const { applyStyledAvatars } = require('../lib/styledAvatars');
 const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing, collectEntityAppearances, buildClothingDescription } = require('../lib/entityConsistency');
-const { needsOriginalSeed, getActiveIndexAfterPush, arrayToDbIndex, dbIndexFor, arrayIndexForDb } = require('../lib/versionManager');
+const { needsOriginalSeed, getActiveIndexAfterPush, arrayToDbIndex, dbIndexFor, arrayIndexForDb, requireActiveRow } = require('../lib/versionManager');
 const { hasPhotos: hasCharacterPhotos, getStandardAvatar } = require('../lib/characterPhotos');
 const { isGrokConfigured } = require('../lib/grok');
 const { coverKeyToType, coverTypeToKey, coverLabel, COVER_PAGE_NUMBERS } = require('../lib/coverKeys');
@@ -237,8 +237,8 @@ async function fetchStoryRowForUser(id, req, columns = '*') {
 // rehydrate's activeOnly path exactly: (1) copy the active version's
 // bboxDetection up to the scene root, (2) populate scene.imageData with the
 // active version's bytes (R2-safe via database.imgBytesAsync). Active-version selection
-// mirrors getActiveStoryImages — image_version_meta.activeVersion, falling back
-// to version_index 0 when unset or when that version row is missing. Only used
+// mirrors getActiveStoryImages — image_version_meta.activeVersion, (version_index 0 only when
+// unset); a pinned version whose row is missing THROWS (requireActiveRow). Only used
 // for scene pages (pageNumber >= 0); cover branches keep the full rehydrate.
 async function rehydrateActivePageImage(storyId, storyData, pageNumber) {
   const sceneEntry = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber);
@@ -269,8 +269,8 @@ async function rehydrateActivePageImage(storyId, storyData, pageNumber) {
 
   // Always load the ACTIVE version's bytes (overwriting any stale inline blob,
   // which may hold a different version than the pinned active one).
-  const activeRow = rows.find(r => r.version_index === activeDbIndex)
-    || rows.find(r => r.version_index === 0);
+  // No v0 fallback: an unloadable active version fails loudly (bug page-edit-silently-edits-version-0).
+  const activeRow = requireActiveRow(rows, activeDbIndex, `page ${pageNumber}`);
   sceneEntry.imageData = await imgBytesAsync(activeRow);
   return storyData;
 }
@@ -281,8 +281,8 @@ async function rehydrateActivePageImage(storyId, storyData, pageNumber) {
 // stories JSONB (R2 / story_images), and the page-path cover render
 // (coverRender.iterateFullStoryCover) throws "no cover image to iterate" without
 // them. A full rehydrate would load every page too (the SPD-2 OOM). Active
-// version = image_version_meta[coverKey].activeVersion, falling back to version 0
-// — the same rule as getActiveStoryImages.
+// version = image_version_meta[coverKey].activeVersion, (0 only when unset);
+// a pinned version with no row throws.
 async function rehydrateActiveCoverImage(storyId, storyData, coverKey) {
   const cover = storyData.coverImages?.[coverKey];
   // absent, a legacy bare-string cover, or bytes already inline: nothing to load
@@ -295,8 +295,9 @@ async function rehydrateActiveCoverImage(storyId, storyData, coverKey) {
      ORDER BY version_index`,
     [storyId, coverKey]
   );
-  const activeRow = rows.find(r => r.version_index === activeDbIndex) || rows.find(r => r.version_index === 0);
-  if (activeRow) cover.imageData = await imgBytesAsync(activeRow);
+  if (rows.length === 0) return storyData;
+  const activeRow = requireActiveRow(rows, activeDbIndex, `cover ${coverKey}`);
+  cover.imageData = await imgBytesAsync(activeRow);
   return storyData;
 }
 
@@ -540,8 +541,8 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       const metaResult = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [id]);
       const versionMeta = metaResult[0]?.image_version_meta || {};
       const activeVersion = versionMeta[String(pageNumber)]?.activeVersion || 0;
-      const activeImg = pageImages.find(i => i.version_index === activeVersion) || pageImages.find(i => i.version_index === 0);
-      if (activeImg) sceneEntry.imageData = activeImg.image_data;
+      const activeImg = requireActiveRow(pageImages, activeVersion, `page ${pageNumber}`);
+      sceneEntry.imageData = activeImg.image_data;
 
       // Populate imageVersions with their image data from DB
       if (sceneEntry.imageVersions) {

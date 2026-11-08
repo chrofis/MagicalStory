@@ -3466,7 +3466,7 @@ async function getActiveStoryImages(storyId) {
       )
     )
     SELECT si.image_type, si.page_number, si.version_index, si.image_data, si.image_url, si.quality_score, si.generated_at,
-           COALESCE(vc.version_count, 1) as version_count
+           COALESCE(vc.version_count, 1) as version_count, tv.requested_version
     FROM story_images si
     JOIN target_versions tv ON (
       tv.story_id = si.story_id
@@ -3483,6 +3483,15 @@ async function getActiveStoryImages(storyId) {
     ORDER BY si.image_type, si.page_number`,
     [storyId]
   );
+
+  // The display load must not fail a whole story over one page, so it serves
+  // version 0 for a pinned version with no loadable row - but never silently:
+  // single-page edit/repair handlers throw instead (requireActiveRow).
+  for (const r of results) {
+    if (r.requested_version !== r.version_index) {
+      console.error(`[ACTIVE-IMAGE] story ${storyId} ${r.image_type}${r.page_number != null ? ' p' + r.page_number : ''}: pinned active version ${r.requested_version} has no loadable row, serving version ${r.version_index}`);
+    }
+  }
 
   return results;
 }
