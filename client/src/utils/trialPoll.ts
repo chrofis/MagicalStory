@@ -39,6 +39,9 @@ export function mergeAvatarSlides(prev: string[], incoming: unknown): string[] {
  * email verified (claim-session succeeded) or Google linked. An anonymous trial visitor, or one who has
  * only typed an address, stays on the page and reads the book there.
  */
+/** The screen every trial sign-up path ends on (pages/FreeBook.tsx). */
+export const FREE_BOOK_PATH = '/free-book';
+
 export function shouldRedirectToStories(pageState: string, isVerified: boolean, googleLinked: boolean): boolean {
   return pageState === 'completed' && (isVerified || googleLinked);
 }

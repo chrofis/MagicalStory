@@ -35,6 +35,7 @@ if (typeof window !== 'undefined') {
 // Lazy load pages for code splitting
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const WelcomePage = lazy(() => import('./pages/WelcomePage'));
+const FreeBook = lazy(() => import('./pages/FreeBook'));
 const StoryWizard = lazy(() => import('./pages/StoryWizard'));
 const MyStories = lazy(() => import('./pages/MyStories'));
 const MyOrders = lazy(() => import('./pages/MyOrders'));
@@ -97,6 +98,7 @@ function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/welcome" element={<WelcomePage />} />
+          <Route path="/free-book" element={<FreeBook />} />
           <Route path="/create/*" element={<StoryWizard />} />
           <Route path="/stories" element={<MyStories />} />
           <Route path="/orders" element={<MyOrders />} />

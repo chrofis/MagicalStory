@@ -44,6 +44,7 @@ export const footer: Record<Lang, { tagline: string; country: string }> = {
 export const storyComplete: Record<Lang, {
   subject: string; preview: string; headline: string; greeting: string;
   body: string; cta: string; perksIntro: string; perks: string[]; signoff: string;
+  freeBook: string; freeBookCta: string;
 }> = {
   en: {
     subject: 'Your magical story "{title}" is ready!',
@@ -61,6 +62,9 @@ export const storyComplete: Record<Lang, {
       'Download as PDF',
     ],
     signoff: 'Thank you for using Magical Story!',
+    // DRAFT copy, owner review pending (docs/decisions.md 2026-11-08)
+    freeBook: 'Your first real book is free, up to {freeBookPages} pages. Your character is already in your account.',
+    freeBookCta: 'Create your free book',
   },
   de: {
     subject: 'Deine magische Geschichte «{title}» ist fertig!',
@@ -78,6 +82,9 @@ export const storyComplete: Record<Lang, {
       'Als PDF herunterladen',
     ],
     signoff: 'Vielen Dank, dass du Magical Story nutzt!',
+    // DRAFT copy, owner review pending (docs/decisions.md 2026-11-08)
+    freeBook: 'Dein erstes richtiges Buch ist gratis, bis zu {freeBookPages} Seiten. Deine Figur ist schon in deinem Konto.',
+    freeBookCta: 'Gratis-Buch erstellen',
   },
   fr: {
     subject: 'Votre histoire magique « {title} » est prête !',
@@ -95,6 +102,9 @@ export const storyComplete: Record<Lang, {
       'Télécharger en PDF',
     ],
     signoff: "Merci d'utiliser Magical Story !",
+    // DRAFT copy, owner review pending (docs/decisions.md 2026-11-08)
+    freeBook: "Votre premier vrai livre est offert, jusqu'à {freeBookPages} pages. Votre personnage est déjà dans votre compte.",
+    freeBookCta: 'Créer votre livre gratuit',
   },
   it: {
     subject: 'La tua storia magica «{title}» è pronta!',
@@ -112,6 +122,9 @@ export const storyComplete: Record<Lang, {
       'Scaricarla in PDF',
     ],
     signoff: 'Grazie per aver usato Magical Story!',
+    // DRAFT copy, owner review pending (docs/decisions.md 2026-11-08)
+    freeBook: 'Il tuo primo vero libro è gratis, fino a {freeBookPages} pagine. Il tuo personaggio è già nel tuo account.',
+    freeBookCta: 'Crea il tuo libro gratuito',
   },
 };
 

@@ -15,6 +15,11 @@ interface Props {
  * Story-complete email for full-account users — sends them straight back to
  * the reader. Optional hero cover image at the top (rendered when the caller
  * passes `coverUrl`).
+ *
+ * Free-book block (`{?freeBookUrl}`): a plain account note for a person who just
+ * signed up from the trial and has not made a real book yet. Transactional mail
+ * with one factual line, deliberately NO unsubscribe wording (docs/decisions.md
+ * 2026-11-08). Stripped when email.js passes no `freeBookUrl`.
  */
 export default function StoryComplete({ lang }: Props) {
   const t = storyComplete[lang];
@@ -35,6 +40,12 @@ export default function StoryComplete({ lang }: Props) {
         <div style={{ textAlign: 'center', margin: '8px 0 24px' }}>
           <Button href="{storyUrl}">{t.cta}</Button>
         </div>
+        <Cond when="freeBookUrl">
+          <Paragraph>{t.freeBook}</Paragraph>
+          <div style={{ textAlign: 'center', margin: '8px 0 24px' }}>
+            <Button href="{freeBookUrl}">{t.freeBookCta}</Button>
+          </div>
+        </Cond>
         <PerksList intro={t.perksIntro} perks={t.perks} />
         <Paragraph muted>{t.signoff}</Paragraph>
       </CardBody>

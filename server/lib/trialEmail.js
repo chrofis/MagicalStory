@@ -17,6 +17,14 @@ const { getPool, isDatabaseMode, rehydrateStoryImages } = require('../services/d
 const { generateViewPdf } = require('./pdf');
 const email = require('../../email');
 
+const FRONTEND_URL = process.env.FRONTEND_URL || process.env.BASE_URL || 'https://magicalstory.ch';
+
+// True when the recipient has signed up and has made no story besides the one
+// being mailed.
+function shouldOfferFreeBook(user, otherStoryCount) {
+  return user.is_trial !== true && Number(otherStoryCount) === 0;
+}
+
 const ANON_EMAIL_RE = /^anon_.+@anonymous$/i;
 
 async function sendTrialCompletionEmailIfDeferred(userId) {
@@ -103,7 +111,22 @@ async function sendTrialCompletionEmailIfDeferred(userId) {
           [claimToken, expires, userId]
         );
       }
-      emailOptions.claimUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://magicalstory.ch'}/claim/${claimToken}`;
+      emailOptions.claimUrl = `${FRONTEND_URL}/claim/${claimToken}`;
+    }
+
+    // Free-book note (docs/decisions.md 2026-11-08): a signed-up person (the
+    // claim link above is for the unclaimed ones) whose only story is the trial
+    // story has not used the free credits yet. No credit arithmetic: "no other
+    // story" is the condition. Plain account note in a transactional mail, no
+    // unsubscribe wording by owner decision.
+    if (user.is_trial !== true) {
+      const others = await pool.query(
+        'SELECT COUNT(*)::int AS n FROM stories WHERE user_id = $1 AND id <> $2',
+        [userId, storyId]
+      );
+      if (shouldOfferFreeBook(user, others.rows[0]?.n)) {
+        emailOptions.freeBookUrl = `${FRONTEND_URL}/create?new=true`;
+      }
     }
 
     const firstName = email.resolveGreetingName(user);
@@ -131,4 +154,4 @@ async function sendTrialCompletionEmailIfDeferred(userId) {
   }
 }
 
-module.exports = { sendTrialCompletionEmailIfDeferred };
+module.exports = { sendTrialCompletionEmailIfDeferred, shouldOfferFreeBook };

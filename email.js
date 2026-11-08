@@ -253,6 +253,11 @@ async function getCoverPublicUrl(storyId) {
  * @param {string} storyId - ID of the story for direct link
  * @param {string} language - Language for email content (English, German, French)
  */
+// Pages the initial grant buys (200 credits / 10 per page = 20).
+function freeBookPages() {
+  return Math.floor(CREDIT_CONFIG.LIMITS.INITIAL_USER / CREDIT_CONFIG.COSTS.PER_PAGE);
+}
+
 async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId, language = 'English', options = {}) {
   if (!resend) {
     console.log('📧 Email not configured - skipping story complete notification');
@@ -305,7 +310,11 @@ async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId,
     storyUrl: storyUrl,
     claimUrl: options.claimUrl || '',
     coverUrl: coverUrl || '',
-    credits: String(CREDIT_CONFIG.LIMITS.INITIAL_USER)
+    credits: String(CREDIT_CONFIG.LIMITS.INITIAL_USER),
+    // Free-book note (story-complete only; empty strips the block). The page
+    // count comes from the credit config, never typed into copy.
+    freeBookUrl: options.freeBookUrl || '',
+    freeBookPages: String(freeBookPages()),
   };
 
   try {

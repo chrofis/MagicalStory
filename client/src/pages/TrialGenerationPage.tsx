@@ -10,7 +10,7 @@ import { trackEmailLead, trackTrialStoryCompleted } from '@/utils/gtagConversion
 import { trackEvent } from '@/utils/analytics';
 import { trackTrialStep } from '@/utils/trialFunnel';
 import { FUNNY_MESSAGES, NAMELESS_FUNNY_MESSAGES, funnyDeck, funnyLine } from '@/utils/funnyMessages';
-import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs, mergeAvatarSlides, shouldRedirectToStories, avatarPoolSources, nextAvatarSource, HERO_FIGURE } from '@/utils/trialPoll';
+import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs, mergeAvatarSlides, shouldRedirectToStories, avatarPoolSources, nextAvatarSource, HERO_FIGURE, FREE_BOOK_PATH } from '@/utils/trialPoll';
 import { Navigation } from '@/components/common';
 import RenderErrorBoundary from '@/components/common/RenderErrorBoundary';
 import TrialBook, { TrialGateProvider } from '@/components/book/TrialBook';
@@ -595,7 +595,10 @@ export default function TrialGenerationPage() {
         storage.removeItem('trial_gen_character_id');
         storage.removeItem('trial_gen_character_name');
         storage.removeItem('trial_gen_job_id');
-        window.location.href = '/stories';
+        // Google sign-up has a usable account right now: land on the free-book screen. An email
+        // sign-up still has to set its password first (/stories shows the banner; setting it
+        // then goes to the same screen).
+        window.location.href = googleLinked ? FREE_BOOK_PATH : '/stories';
       }, 1500);
       return () => clearTimeout(timer);
     }

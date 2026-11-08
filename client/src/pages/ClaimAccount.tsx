@@ -1,4 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
+import { FREE_BOOK_PATH } from '@/utils/trialPoll';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import storage from '@/services/storage';
@@ -192,7 +193,7 @@ export default function ClaimAccount() {
       }
 
       setPageState('success');
-      setTimeout(() => { window.location.href = '/stories'; }, 1500);
+      setTimeout(() => { window.location.href = FREE_BOOK_PATH; }, 1500);
     } catch {
       setError(t.error);
     } finally {
@@ -241,7 +242,7 @@ export default function ClaimAccount() {
       }
 
       setPageState('success');
-      setTimeout(() => { window.location.href = '/stories'; }, 1500);
+      setTimeout(() => { window.location.href = FREE_BOOK_PATH; }, 1500);
     } catch (err) {
       // 'Redirecting…' = redirect fallback; 'GOOGLE_POPUP_CLOSED' = user closed
       // the popup on purpose. Neither is an error — just let the finally clear

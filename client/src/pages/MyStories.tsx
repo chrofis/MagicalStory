@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Book, Trash2, Eye, Pencil, AlertTriangle, BookOpen, Tag, Loader2, Lock, CheckCircle, X, Plus } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
+import { FREE_BOOK_PATH } from '@/utils/trialPoll';
 import { useToast } from '@/context/ToastContext';
 import { useGenerationOptional } from '@/context/GenerationContext';
 import { storyService } from '@/services';
@@ -342,6 +343,8 @@ export default function MyStories() {
         ? (language === 'de' ? `Passwort gesetzt! ${resData.credits} Credits erhalten.` : language === 'fr' ? `Mot de passe défini ! ${resData.credits} crédits reçus.` : language === 'it' ? `Password impostata! ${resData.credits} crediti ricevuti.` : `Password set! ${resData.credits} credits received.`)
         : (language === 'de' ? 'Passwort gesetzt!' : language === 'fr' ? 'Mot de passe défini !' : language === 'it' ? 'Password impostata!' : 'Password set!');
       showSuccess(creditsMsg);
+      // Next step for a new sign-up: the free-book screen (one shared screen, docs/decisions.md 2026-11-08).
+      navigate(FREE_BOOK_PATH);
     } catch {
       setPasswordError('Failed to set password');
     } finally {
