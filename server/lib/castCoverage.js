@@ -301,19 +301,19 @@ function castActionRule(cov, { centralFigure = null, mayAddDeeds = false } = {})
  * story-beats.txt requirement ({MAIN_IN_FRAME}) and the plan check's question 12 (castActionRule). The counters:
  * planCounters.isFocalPage (the main character is not counted against a friend's page) and castTablePromises.
  */
-const MAIN_IN_FRAME_CLAUSE = "when the story tells this action inside the main character's own moment — the same sentence has the main character act, decide or feel, in the same place — the main character is in frame on that page and the instant is this action as it reaches them, and the page stays the character's own; an action told while the main character is somewhere else is never carved out of their moment: take another action the story gives this character";
+const MAIN_IN_FRAME_CLAUSE = "when the sentence that tells this action has the main character act, decide or feel in the same place, the main character is in frame on that page too — added, never in this character's place — and the page stays the character's own";
 
 /**
  * A CHARACTER'S DEED COMES FROM THE STORY (owner, 2026-11-08). It replaces the 2026-10-06 lead-page rule (a page leads with one character, no two characters share a focal page), which carved supporting deeds out of the main character's moment
  * and made the planner move or invent them (tests G and H). Read by castActionRule (planner and plan-check question 12) and
  * castTableSpec.
  */
-const DEED_SOURCE_RULE = "A character's deed is an action the story gives them — their line under Motives in THE STORY LOGIC names them — staged on the page that tells the sentence it is in: never an action made up for them, never one moved onto a page whose sentence does not tell it. Where two characters' actions fall in one sentence, the second takes another action the story gives them; two characters the story gives one action together share that deed page.";
+const DEED_SOURCE_RULE = "A character's deed is an action their line under Motives in THE STORY LOGIC names, staged on the page that tells the sentence it is in: never an action made up for them, never one moved onto a page whose sentence does not tell it. Every commissioned character keeps a deed page of their own, and no change takes a deed off a page that stages it — not the main character's moment, not another character's action. Where one sentence tells the deeds of two characters, one whose Motives line names another action takes that one instead; where neither has another, or the story gives them one action together, the two share that page. Two characters who share a deed page are each other's one companion there: nobody else is in frame but the main character, except on the last page, which holds everyone the story keeps together at the end.";
 
 /** What makes a page the main character's moment; one definition for the planner's rule and the checker's finding. */
 const MAIN_MOMENT_DEF = 'whose sentence has the main character act, decide or feel';
 /** The planner's rule, next to the main character's floor ({MAIN_MOMENT} in story-beats.txt). */
-const MAIN_MOMENT_RULE = `A page ${MAIN_MOMENT_DEF} keeps them in frame, whoever else's action it also stages.`;
+const MAIN_MOMENT_RULE = `A page ${MAIN_MOMENT_DEF} keeps them in frame, whoever else's action it also stages: the main character is added to that page, never put in place of another character's deed.`;
 /** Plan-check question 12's findings ({CAST_ACTION_FINDINGS}): the checker's side of DEED_SOURCE_RULE and MAIN_MOMENT_RULE. */
 const CAST_ACTION_FINDINGS = `An action staged on a page that does not tell its sentence, or one the story never gives that character, is a finding. A page ${MAIN_MOMENT_DEF}, without the main character in its who column, is a finding.`;
 
@@ -373,7 +373,7 @@ function underCoveredFix(name, floor) {
 }
 
 function noFocalFix(name) {
-  return `Answer it with a page whose instant is ${name}'s own action from the sentence that tells it, ${name} alone or with one companion (the main character in frame when it is their moment): another action the story gives ${name}, or that sentence's page — never an action made up, never one moved onto a page whose sentence does not tell it, and never by taking another character's only focal page.`;
+  return `Answer it with a page whose instant is ${name}'s deed — an action ${name}'s line under Motives names, on the page that tells its sentence — ${name} alone or with one companion (the main character added when it is their moment in the same place): never an action made up, never one moved onto a page whose sentence does not tell it, and never by taking another character's deed off a page.`;
 }
 
 /**

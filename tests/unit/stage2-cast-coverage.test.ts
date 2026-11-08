@@ -101,7 +101,7 @@ describe('a cast finding says how it is answered', () => {
 
   it('the fix sentences forbid taking from another commissioned character', () => {
     expect(CC.underCoveredFix('Kiaan', 3)).toMatch(/never by casting out another commissioned character who would fall below 3 pages/);
-    expect(CC.noFocalFix('Kiaan')).toMatch(/never by taking another character's only focal page/);
+    expect(CC.noFocalFix('Kiaan')).toMatch(/never by taking another character's deed off a page/);
   });
 });
 

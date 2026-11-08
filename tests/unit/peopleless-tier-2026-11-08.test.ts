@@ -128,7 +128,8 @@ describe('a friend focal page may hold the main character', () => {
     expect(r.stats.focalPages.Ben).toContain(2);
   });
   it('the CAST block promise "alone or with one companion" holds with the hero in frame', () => {
-    const rows = [{ pageNumber: 2, present: ['Ana', 'Ben', 'Cara'] }];
+    // a page after it: the last page is the exception (test J), so the deed page is not the last
+    const rows = [{ pageNumber: 2, present: ['Ana', 'Ben', 'Cara'] }, { pageNumber: 3, present: ['Ana'] }];
     const table = { characters: [{ name: 'Ben', deedPage: 2, deed: '', alsoOn: [] }], ending: null };
     const args = { rows, castTable: table, actions: [{ key: 'Ben', page: 2 }], cast: { all: CAST, aliases: {} }, focalEach: true, leadEach: false };
     expect(PC.castTablePromises({ ...args, mains: ['Ana'] }).broken).toEqual([]);

@@ -36,8 +36,10 @@ describe('the rule texts, rendered', () => {
     }
   });
   it('MAIN_IN_FRAME_CLAUSE: one constant, read by the planner (cast rule and requirement), the CAST block and plan-check Q12', () => {
-    expect(CC.MAIN_IN_FRAME_CLAUSE).toContain("when the story tells this action inside the main character's own moment");
-    expect(CC.MAIN_IN_FRAME_CLAUSE).toContain('an action told while the main character is somewhere else is never carved out of their moment: take another action the story gives this character');
+    // narrowed 2026-11-08 (test J): the friend's own deed is never traded away
+    expect(CC.MAIN_IN_FRAME_CLAUSE).toContain('when the sentence that tells this action has the main character act, decide or feel in the same place');
+    expect(CC.MAIN_IN_FRAME_CLAUSE).toContain("added, never in this character's place");
+    expect(CC.MAIN_IN_FRAME_CLAUSE).not.toContain('take another action the story gives this character');
     const p = planner(20);
     // three times: castActionRule ({CAST_COVERAGE}), castTableSpec ({CAST_TABLE}) and the focal-page requirement ({MAIN_IN_FRAME})
     expect(p.split(CC.MAIN_IN_FRAME_CLAUSE).length - 1).toBe(3);
@@ -50,15 +52,17 @@ describe('the rule texts, rendered', () => {
     expect(fs.readFileSync(path.join(__dirname, '../../prompts/story-beats.txt'), 'utf8')).not.toContain('the main character may be in frame too');
   });
   it('DEED_SOURCE_RULE reaches planner, CAST block and checker, in a small cast too', () => {
-    expect(CC.DEED_SOURCE_RULE).toContain("their line under Motives in THE STORY LOGIC names them");
-    expect(CC.DEED_SOURCE_RULE).toContain('two characters the story gives one action together share that deed page');
+    expect(CC.DEED_SOURCE_RULE).toContain("their line under Motives in THE STORY LOGIC names");
+    expect(CC.DEED_SOURCE_RULE).toContain("no change takes a deed off a page that stages it — not the main character's moment, not another character's action");
+    expect(CC.DEED_SOURCE_RULE).toContain('one whose Motives line names another action takes that one instead; where neither has another, or the story gives them one action together, the two share that page');
+    expect(CC.DEED_SOURCE_RULE).toContain('except on the last page, which holds everyone the story keeps together at the end');
     expect(planner(20)).toContain(CC.DEED_SOURCE_RULE);
     expect(checker(20)).toContain(CC.DEED_SOURCE_RULE);
     expect(CC.castTableSpec(CC.castCoverage({ pageCount: 10, castCount: 5 }), 10)).toContain(CC.DEED_SOURCE_RULE);
     expect(CC.castActionRule(CC.castCoverage({ pageCount: 10, castCount: 7 }))).toContain(CC.DEED_SOURCE_RULE);
   });
   it('the main-moment rule stands next to the main floor line, and Q12 files its finding', () => {
-    expect(CC.MAIN_MOMENT_RULE).toBe("A page whose sentence has the main character act, decide or feel keeps them in frame, whoever else's action it also stages.");
+    expect(CC.MAIN_MOMENT_RULE).toBe("A page whose sentence has the main character act, decide or feel keeps them in frame, whoever else's action it also stages: the main character is added to that page, never put in place of another character's deed.");
     const p = planner(20);
     expect(p.indexOf(CC.MAIN_MOMENT_RULE)).toBeGreaterThan(p.indexOf('is in frame on at least'));
     expect(p.indexOf(CC.MAIN_MOMENT_RULE) - p.indexOf('is in frame on at least')).toBeLessThan(400);
@@ -72,16 +76,15 @@ describe('the rule texts, rendered', () => {
   it('castTableSpec: the garbled splice is gone, the shape names the main character, "Every line names a different page" is gone', () => {
     const cov = CC.castCoverage({ pageCount: 18, castCount: 4 });
     const spec = CC.castTableSpec(cov, 18);
-    expect(spec).toMatch(/alone or with one companion, and 2 more pages they are in frame on; when the story tells this action/);
+    expect(spec).toMatch(/alone or with one companion, and 2 more pages they are in frame on; when the sentence that tells this action/);
     expect(spec).toContain('never another character\'s "also on" page, except the main character\'s');
     expect(spec).not.toContain('Every line names a different page');
     expect(CC.castTableFormat(cov, 18)).toContain('<with whom — the main character when it is their moment — or alone>');
   });
   it('noFocalFix: the deed comes from the sentence that tells it, never made up or moved', () => {
     const t = CC.noFocalFix('Ben');
-    expect(t).toContain("Ben's own action from the sentence that tells it, Ben alone or with one companion (the main character in frame when it is their moment)");
-    expect(t).toContain('another action the story gives Ben, or that sentence\'s page');
-    expect(t).toContain("never an action made up, never one moved onto a page whose sentence does not tell it, and never by taking another character's only focal page");
+    expect(t).toContain("Ben's deed — an action Ben's line under Motives names, on the page that tells its sentence — Ben alone or with one companion (the main character added when it is their moment in the same place)");
+    expect(t).toContain("never an action made up, never one moved onto a page whose sentence does not tell it, and never by taking another character's deed off a page");
     expect(t).not.toContain('move that action onto a page of its own');
   });
   it('noFocalFix reaches both NO_FOCAL_PAGE sites, the typed counters included', () => {
@@ -90,7 +93,7 @@ describe('the rule texts, rendered', () => {
     const r = PC.typedPlanCounters({ pages, listedNames: NAMES, commissionedNames: NAMES, mainNames: ['Ana'], maxCharactersPerScene: 6 });
     const nf = r.findings.filter((f: any) => f.code === 'NO_FOCAL_PAGE');
     expect(nf.length).toBeGreaterThan(0);
-    for (const f of nf) expect(f.detail).toContain('from the sentence that tells it');
+    for (const f of nf) expect(f.detail).toContain('on the page that tells its sentence');
   });
 });
 
@@ -148,7 +151,7 @@ describe('castTablePromises: the main character\'s "also on" a friend\'s deed pa
     expect(r.leadWins.map((w: any) => w.name)).toEqual(['Cara']);
   });
   it('the focal detail names the moment, not "may be in frame too"', () => {
-    const r = PC.castTablePromises({ rows: [{ pageNumber: 2, present: ['Ben', 'Cara', 'Dee'] }], castTable: { characters: [{ name: 'Ben', deedPage: 2, deed: '', alsoOn: [] }], ending: null }, actions: [{ key: 'Ben', page: 2 }], cast: { all: ['Ben', 'Cara', 'Dee', 'Ana'], aliases: {} }, focalEach: true, mains: ['ana'] });
+    const r = PC.castTablePromises({ rows: [{ pageNumber: 2, present: ['Ben', 'Cara', 'Dee'] }, { pageNumber: 3, present: ['Ana'] }], castTable: { characters: [{ name: 'Ben', deedPage: 2, deed: '', alsoOn: [] }], ending: null }, actions: [{ key: 'Ben', page: 2 }], cast: { all: ['Ben', 'Cara', 'Dee', 'Ana'], aliases: {} }, focalEach: true, mains: ['ana'] });
     expect(r.broken[0].detail).toContain('(the main character in frame when it is their moment)');
     expect(r.broken[0].detail).not.toContain('may be in frame too');
   });
@@ -191,5 +194,54 @@ describe('decideGroupCuts: the main character, needed in the instant, is never c
     const d = await decide([]);
     const p3 = d.decisions.find((x: any) => x.pageNumber === 3);
     expect(p3.required.Emma).toBeUndefined();
+  });
+});
+
+describe('the last page is the focal page of a character whose own action the ACTION line puts on it (test J, 2026-11-08)', () => {
+  it('isLastPageDeed: only the last page, only with the ACTION line on it', () => {
+    expect(PC.isLastPageDeed(10, 10, 10)).toBe(true);
+    expect(PC.isLastPageDeed(10, 10, 9)).toBe(false);
+    expect(PC.isLastPageDeed(10, 10, null)).toBe(false);
+    expect(PC.isLastPageDeed(9, 10, 9)).toBe(false);
+    expect(PC.isLastPageDeed(1, 0, 1)).toBe(false);
+  });
+  it('isFocalPage: a crowded page stays unfocal unless the fourth argument says it is the last-page deed', () => {
+    const crowd = ['Ana', 'Ben', 'Cara', 'Dee'];
+    expect(PC.isFocalPage(crowd, 'Ben', ['ana'])).toBe(false);
+    expect(PC.isFocalPage(crowd, 'Ben', ['ana'], true)).toBe(true);
+  });
+  it('castTablePromises: a last-page deed with the whole group in frame keeps its focal promise; on a middle page it breaks', () => {
+    const cast = { all: ['Ana', 'Ben', 'Cara', 'Dee'], aliases: {} };
+    const crowd = ['Ana', 'Ben', 'Cara', 'Dee'];
+    const run = (rows: any[], deed: number) => PC.castTablePromises({ rows, castTable: { characters: [{ name: 'Ben', deedPage: deed, deed: '', alsoOn: [] }], ending: null }, actions: [{ key: 'Ben', page: deed }], cast, focalEach: true, mains: ['ana'] });
+    expect(run([{ pageNumber: 1, present: ['Ana'] }, { pageNumber: 2, present: crowd }], 2).broken).toEqual([]);
+    const mid = run([{ pageNumber: 1, present: crowd }, { pageNumber: 2, present: ['Ana'] }], 1);
+    expect(mid.broken.map((b: any) => b.promise)).toEqual(['focal']);
+  });
+  it('the three sites share the one helper; the typed counters stay strict (docs/decisions.md 2026-11-08 "Narrowed deed rule")', () => {
+    const src = fs.readFileSync(path.join(__dirname, '../../server/lib/planCounters.js'), 'utf8');
+    expect(src.match(/isLastPageDeed\(/g)!.length).toBe(4); // definition + runPlanCounters, castTablePromises, reviewPlanChanges
+    expect(src).toMatch(/focal\[name\] = rows\.filter\(r => has\(r, name\) && isFocalPage\(r\.names, name, mainNames\) &&/);
+  });
+  it('runPlanCounters: no NO_FOCAL_PAGE for a character whose action the ACTION line puts on the crowded last page', () => {
+    const P = SV.PLAN_SHOT_PLACEHOLDER;
+    const NAMES4 = ['Ana', 'Ben', 'Cara', 'Dee'];
+    // 10 pages: a focal page for each is owed (castCoverage.focalEach); Dee is only ever on the crowded last page
+    const pages = Array.from({ length: 10 }, (_, i) => ({ pageNumber: i + 1, planLine: `${P} — ${i === 9 ? 'Ana, Ben, Cara, Dee' : `Ana, ${['Ben', 'Cara'][i % 2]}`} — they do thing ${i} — x` }));
+    const roster = new Map(pages.map((p: any) => [p.pageNumber, { people: PC.namesIn(PC.whoColumn(p.planLine), NAMES4), things: [], covers: [], unlisted: [] }]));
+    const base = { pages, roster, commissionedNames: NAMES4, mainNames: ['Ana'], maxCharactersPerScene: 6 };
+    const nf = (r: any) => r.findings.filter((f: any) => f.code === 'NO_FOCAL_PAGE').map((f: any) => f.detail.split(' ')[0]);
+    const without = nf(PC.runPlanCounters(base));
+    const withAct = nf(PC.runPlanCounters({ ...base, actions: [{ key: 'Dee', page: 10 }] }));
+    expect(without).toContain('Dee');
+    expect(withAct).not.toContain('Dee');
+    expect(withAct).toEqual(without.filter((n: string) => n !== 'Dee'));
+  });
+});
+
+describe('no change takes a deed off a page (code-checkable parts)', () => {
+  it('every rule text that edits a plan forbids taking a deed off a page', () => {
+    for (const t of [CC.DEED_SOURCE_RULE, CC.noFocalFix('Ben')]) expect(t).toMatch(/deed off a page/);
+    expect(CC.MAIN_MOMENT_RULE).toContain("never put in place of another character's deed");
   });
 });
