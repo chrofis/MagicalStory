@@ -89,3 +89,14 @@ Order: #1+#3 -> #4+#5 -> #6,#7,#10 -> #2,#8,#9 (at most 2 agents at a time).
   - Remaining pattern: an adult's or friend's "alone" deed page is cut out of the hero's own moment (7 pages).
   - Verdict: GO, with that gap as the next fix.
 - [ ] Next fix: an adult's or friend's deed page must not take the main character's own moment (7 of 12 books affected after test G) → this file, test G
+- Owner 2026-11-08: fix the adult/friend deed-page pattern first. Plan: free stand-in A/B on the same 12 books (test H) → build → one real planner Lab run (about USD 1) → production push asked separately.
+- 2026-11-08, test H (stand-in, not blind, USD 0; evals/runs/2026-11-08_quality-tests-H/):
+  - Root cause: the lead-page rule + one sentence per page. A supporting deed inside the hero's or another's sentence gets carved out, moved or invented; the noFocalFix text pushes re-plans the same way; Jev's decideGroupCuts dropped the main character on essb p3.
+  - A (real test G) vs B (stand-in): hero-moment pages without the hero 7 → 0; deeds dropped/moved/invented 5 → 0. Real-model expectation about 7 → 3-4.
+  - The 7-part change text is in the agent report.
+  - Part 2 (two characters given one deed together may share a focal page) changes the owner's 2026-10-06 lead-page rule and needs the owner's yes.
+  - Open, unlisted: k3c6, characters off-stage until the last sentence cannot reach the 3-page floor (arc vs page floor).
+- Owner 2026-11-08 on the 2026-10-06 lead-page rule ("two characters never share a focal page"): "of course. Review this rule it sounds stupid."
+  - Reviewed: its Revisit-if is met (the planner loses the hero's moments and invents deeds).
+  - It is being replaced by DEED_SOURCE_RULE: a character's own page shows the deed the story gives them, on the page that tells it; joint deeds share; the hero is in frame when it is their moment.
+  - A Sonnet build agent is on it, with a decisions entry that replaces the 10-06/10-07 entries. Next: staging deploy, then the planner Lab A/B on the same 12 books (about USD 1).
