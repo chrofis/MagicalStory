@@ -1,0 +1,934 @@
+{
+  "cost": 0.004586652000000001,
+  "calls": 46,
+  "rows": [
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 1,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.01,
+        0.01,
+        0.01
+      ],
+      "oldMaxP": 0.01,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.01,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 2,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.02,
+        0.02,
+        0.01
+      ],
+      "oldMaxP": 0.02,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 3,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.01,
+        0.01,
+        0.01
+      ],
+      "oldMaxP": 0.01,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 4,
+      "truth": true,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.23,
+        0.19,
+        0.17
+      ],
+      "oldMaxP": 0.23,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.71,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": true
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 5,
+      "truth": true,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.28,
+        0.26,
+        0.24
+      ],
+      "oldMaxP": 0.28,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.78,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": true
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 6,
+      "truth": true,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.3,
+        0.24,
+        0.2
+      ],
+      "oldMaxP": 0.3,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.86,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": true
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 7,
+      "truth": true,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.29,
+        0.19,
+        0.16
+      ],
+      "oldMaxP": 0.29,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.81,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": true
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 8,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.02,
+        0.02,
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.03,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 9,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.02,
+        0.02,
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 10,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.02,
+        0.02,
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.03,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 11,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.02,
+        0.01,
+        0.01
+      ],
+      "oldMaxP": 0.02,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.03,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 12,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.02,
+        0.02,
+        0.01
+      ],
+      "oldMaxP": 0.02,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.03,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 13,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.02,
+        0.02,
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 14,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.03,
+        0.02,
+        0.01
+      ],
+      "oldMaxP": 0.03,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.03,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 15,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.02,
+        0.02,
+        0.01
+      ],
+      "oldMaxP": 0.02,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.03,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 16,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.02,
+        0.02,
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 17,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.02,
+        0.01,
+        0.01
+      ],
+      "oldMaxP": 0.02,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 18,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.02,
+        0.02,
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.03,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 19,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.02,
+        0.01,
+        0.01
+      ],
+      "oldMaxP": 0.02,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1794231161354_l3n2o3afm",
+      "page": 20,
+      "truth": false,
+      "oldNames": [
+        "Grumbo",
+        "Plodd",
+        "Squelch"
+      ],
+      "oldP": [
+        0.01,
+        0.01,
+        0.01
+      ],
+      "oldMaxP": 0.01,
+      "newName": "bog monster",
+      "newQuestion": "the bog monster (3 of them, all alike) (a fully grown adult bog monster twice the height of an adult, dark moss-green all over, the whole body hung with shaggy wet moss and trailin) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.01,
+      "bar": 0.7,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1791145238223_50osg2osm",
+      "page": 1,
+      "truth": false,
+      "oldNames": [
+        "soldier one",
+        "soldier two"
+      ],
+      "oldP": [
+        0.06,
+        0.06
+      ],
+      "oldMaxP": 0.06,
+      "newName": "soldier",
+      "newQuestion": "the soldier (2 of them, all alike) (30. adult man, stocky and muscular. hair: blonde, short cropped. blue eyes, clean-shaven. Signature: a rounded iron half-helm. Clothing: A d) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.04,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1791145238223_50osg2osm",
+      "page": 2,
+      "truth": false,
+      "oldNames": [
+        "soldier one",
+        "soldier two"
+      ],
+      "oldP": [
+        0.18,
+        0.15
+      ],
+      "oldMaxP": 0.18,
+      "newName": "soldier",
+      "newQuestion": "the soldier (2 of them, all alike) (30. adult man, stocky and muscular. hair: blonde, short cropped. blue eyes, clean-shaven. Signature: a rounded iron half-helm. Clothing: A d) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.07,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1791145238223_50osg2osm",
+      "page": 3,
+      "truth": false,
+      "oldNames": [
+        "soldier one",
+        "soldier two"
+      ],
+      "oldP": [
+        0.05,
+        0.04
+      ],
+      "oldMaxP": 0.05,
+      "newName": "soldier",
+      "newQuestion": "the soldier (2 of them, all alike) (30. adult man, stocky and muscular. hair: blonde, short cropped. blue eyes, clean-shaven. Signature: a rounded iron half-helm. Clothing: A d) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.04,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1791145238223_50osg2osm",
+      "page": 4,
+      "truth": false,
+      "oldNames": [
+        "soldier one",
+        "soldier two"
+      ],
+      "oldP": [
+        0.05,
+        0.04
+      ],
+      "oldMaxP": 0.05,
+      "newName": "soldier",
+      "newQuestion": "the soldier (2 of them, all alike) (30. adult man, stocky and muscular. hair: blonde, short cropped. blue eyes, clean-shaven. Signature: a rounded iron half-helm. Clothing: A d) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.03,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1791145238223_50osg2osm",
+      "page": 5,
+      "truth": true,
+      "oldNames": [
+        "soldier one",
+        "soldier two"
+      ],
+      "oldP": [
+        0.68,
+        0.62
+      ],
+      "oldMaxP": 0.68,
+      "newName": "soldier",
+      "newQuestion": "the soldier (2 of them, all alike) (30. adult man, stocky and muscular. hair: blonde, short cropped. blue eyes, clean-shaven. Signature: a rounded iron half-helm. Clothing: A d) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.91,
+      "bar": 0.5,
+      "oldCited": true,
+      "newCited": true
+    },
+    {
+      "story": "job_1791145238223_50osg2osm",
+      "page": 6,
+      "truth": false,
+      "oldNames": [
+        "soldier one",
+        "soldier two"
+      ],
+      "oldP": [
+        0.12,
+        0.1
+      ],
+      "oldMaxP": 0.12,
+      "newName": "soldier",
+      "newQuestion": "the soldier (2 of them, all alike) (30. adult man, stocky and muscular. hair: blonde, short cropped. blue eyes, clean-shaven. Signature: a rounded iron half-helm. Clothing: A d) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.14,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1791145238223_50osg2osm",
+      "page": 7,
+      "truth": false,
+      "oldNames": [
+        "soldier one",
+        "soldier two"
+      ],
+      "oldP": [
+        0.13,
+        0.15
+      ],
+      "oldMaxP": 0.15,
+      "newName": "soldier",
+      "newQuestion": "the soldier (2 of them, all alike) (30. adult man, stocky and muscular. hair: blonde, short cropped. blue eyes, clean-shaven. Signature: a rounded iron half-helm. Clothing: A d) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.24,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1791145238223_50osg2osm",
+      "page": 8,
+      "truth": false,
+      "oldNames": [
+        "soldier one",
+        "soldier two"
+      ],
+      "oldP": [
+        0.07,
+        0.1
+      ],
+      "oldMaxP": 0.1,
+      "newName": "soldier",
+      "newQuestion": "the soldier (2 of them, all alike) (30. adult man, stocky and muscular. hair: blonde, short cropped. blue eyes, clean-shaven. Signature: a rounded iron half-helm. Clothing: A d) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.1,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1791145238223_50osg2osm",
+      "page": 9,
+      "truth": false,
+      "oldNames": [
+        "soldier one",
+        "soldier two"
+      ],
+      "oldP": [
+        0.13,
+        0.13
+      ],
+      "oldMaxP": 0.13,
+      "newName": "soldier",
+      "newQuestion": "the soldier (2 of them, all alike) (30. adult man, stocky and muscular. hair: blonde, short cropped. blue eyes, clean-shaven. Signature: a rounded iron half-helm. Clothing: A d) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.08,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1791145238223_50osg2osm",
+      "page": 10,
+      "truth": false,
+      "oldNames": [
+        "soldier one",
+        "soldier two"
+      ],
+      "oldP": [
+        0.04,
+        0.04
+      ],
+      "oldMaxP": 0.04,
+      "newName": "soldier",
+      "newQuestion": "the soldier (2 of them, all alike) (30. adult man, stocky and muscular. hair: blonde, short cropped. blue eyes, clean-shaven. Signature: a rounded iron half-helm. Clothing: A d) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.06,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 1,
+      "truth": false,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 2,
+      "truth": false,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 3,
+      "truth": false,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.03
+      ],
+      "oldMaxP": 0.03,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.03,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 4,
+      "truth": true,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.83
+      ],
+      "oldMaxP": 0.83,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.73,
+      "bar": 0.5,
+      "oldCited": true,
+      "newCited": true
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 5,
+      "truth": true,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.6
+      ],
+      "oldMaxP": 0.6,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.55,
+      "bar": 0.5,
+      "oldCited": true,
+      "newCited": true
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 6,
+      "truth": false,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.04
+      ],
+      "oldMaxP": 0.04,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.04,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 7,
+      "truth": false,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 8,
+      "truth": false,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.03
+      ],
+      "oldMaxP": 0.03,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.03,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 9,
+      "truth": false,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 10,
+      "truth": false,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 11,
+      "truth": false,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 12,
+      "truth": false,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 13,
+      "truth": false,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 14,
+      "truth": false,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.03,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 15,
+      "truth": false,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    },
+    {
+      "story": "job_1788471969309_9cg9dqyirre",
+      "page": 16,
+      "truth": false,
+      "oldNames": [
+        "net menders"
+      ],
+      "oldP": [
+        0.02
+      ],
+      "oldMaxP": 0.02,
+      "newName": "net mender",
+      "newQuestion": "the net mender (2 of them, all alike) (two men in their fifties and sixties. one stocky and broad-chested, one lean and slightly stooped. hair: one with short grey hair, one with ) is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.",
+      "newP": 0.02,
+      "bar": 0.5,
+      "oldCited": false,
+      "newCited": false
+    }
+  ]
+}

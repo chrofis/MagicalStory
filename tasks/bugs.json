@@ -4714,7 +4714,8 @@
       "reportedAt": "2026-11-09",
       "source": "Prod job_1794231161354_l3n2o3afm: three monsters became Grumbo/Plodd/Squelch (green/brown/purple); Jev vb scores 0.22-0.47 on pages 4-7 (bar 0.7), no reference cell; redraws drew the bible colours (Lab 1849/1850).",
       "rootCause": "visual-bible.txt schema \"name\": \"[Name]\" for CHR/ANI, no group shape; matching sites need exact names. Plan: tasks/vb-name-or-role-groups-2026-11-09.md (owner design 2026-11-09).",
-      "status": "open"
+      "status": "fixed",
+      "fixedIn": "74eb9a1fa"
     },
     {
       "id": "season-ignores-story-date-christmas-drawn-autumn",

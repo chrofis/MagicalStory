@@ -1,0 +1,41 @@
+{
+  "pages": 46,
+  "positives": 7,
+  "negatives": 39,
+  "calls": 46,
+  "cost_usd": 0.0046,
+  "oldPositiveCitedRate": 0.429,
+  "newPositiveCitedRate": 1,
+  "oldNegativeCitedRate": 0,
+  "newNegativeCitedRate": 0,
+  "oldPositiveMeanMaxP": 0.459,
+  "newPositiveMeanP": 0.764,
+  "oldNegativeMeanMaxP": 0.038,
+  "newNegativeMeanP": 0.038,
+  "perStory": {
+    "job_1794231161354_l3n2o3afm": {
+      "pages": 20,
+      "pos": 4,
+      "oldPosRate": 0,
+      "newPosRate": 1,
+      "oldNegRate": 0,
+      "newNegRate": 0
+    },
+    "job_1791145238223_50osg2osm": {
+      "pages": 10,
+      "pos": 1,
+      "oldPosRate": 1,
+      "newPosRate": 1,
+      "oldNegRate": 0,
+      "newNegRate": 0
+    },
+    "job_1788471969309_9cg9dqyirre": {
+      "pages": 16,
+      "pos": 2,
+      "oldPosRate": 1,
+      "newPosRate": 1,
+      "oldNegRate": 0,
+      "newNegRate": 0
+    }
+  }
+}
