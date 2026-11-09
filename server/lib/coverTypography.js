@@ -544,6 +544,34 @@ function dedicationLines(dedication) {
   return out;
 }
 
+/** The band a band is never shorter than (fraction of the page height): below it the text gets too small to read. */
+const DEDICATION_MIN_BAND = 0.22;
+/**
+ * The lower band a long or multi-line dedication is fitted into: taller when it has more rows,
+ * and never above the lowest face (owner, 2026-11-09: a ten-line dedication started at the
+ * child's chin and covered both figures, prod job_1794231161354_l3n2o3afm). fitRender scales
+ * the text to the band, so a band that starts lower prints smaller text. When the faces sit
+ * so low that less than DEDICATION_MIN_BAND is left, the band keeps that minimum and the
+ * overlap is logged.
+ * @param {number} textRows - display rows (a paragraph break counts half)
+ * @param {Array<{faceBox?: number[]}>} figures - boxes as [ymin, xmin, ymax, xmax], 0..1
+ * @returns {{x0:number, x1:number, y0:number, y1:number}}
+ */
+function dedicationBand(textRows, figures) {
+  const y1 = 0.96;
+  let y0 = Math.max(0.5, Math.min(0.62, y1 - textRows * 0.045));
+  const faceBottoms = (figures || []).map(f => f && Array.isArray(f.faceBox) ? Number(f.faceBox[2]) : NaN).filter(Number.isFinite);
+  if (faceBottoms.length) {
+    const belowFaces = Math.max(...faceBottoms) + 0.03;
+    if (belowFaces > y0) y0 = belowFaces;
+  }
+  if (y1 - y0 < DEDICATION_MIN_BAND) {
+    require('../utils/logger').log.warn(`⚠️ [COVER TYPO] dedication: the faces reach ${y0.toFixed(2)} of the page height; the text band keeps its minimum height and overlaps the lowest face`);
+    y0 = y1 - DEDICATION_MIN_BAND;
+  }
+  return { x0: 0.08, x1: 0.92, y0, y1 };
+}
+
 async function composeDedication(artBuffer, dedication, figures, seed, style) {
   if (!dedication || !String(dedication).trim()) return { buffer: artBuffer, spec: { kind: 'initial', skipped: 'no-dedication' } };
   const meta = await sharp(artBuffer).metadata(); const W = meta.width, H = meta.height;
@@ -568,8 +596,7 @@ async function composeDedication(artBuffer, dedication, figures, seed, style) {
     const br = bottomRect(occ.grid, occ.gw, occ.gh, W, H, text.length, 0.5, 1, 0.12);
     place = { x0: br.x0, x1: br.x1, y0: br.y0, y1: br.y1 };
   } else {
-    // long or multi-line dedication → generous lower band, taller when it has more rows
-    place = { x0: 0.08, x1: 0.92, y0: Math.max(0.5, Math.min(0.62, 0.96 - textRows * 0.045)), y1: 0.96 };
+    place = dedicationBand(textRows, figures);
   }
   const bg = await boxDominant(artBuffer, place.x0, place.y0, place.x1, Math.min(0.97, place.y1));
   if (styleOv?.color) {
@@ -582,7 +609,7 @@ async function composeDedication(artBuffer, dedication, figures, seed, style) {
   const overlay = await fitRender(group, W, H, place, 'bottom');
   if (!overlay) return { buffer: artBuffer, spec: { kind: 'initial', skipped: 'no-ink' } };
   const buffer = await sharp(artBuffer).composite([{ input: overlay }]).jpeg({ quality: 92 }).toBuffer();
-  return { buffer, spec: { kind: 'initial', font: wf.family, face: colors.face, lines, ...(styleOv ? { style: styleOv } : {}) } };
+  return { buffer, spec: { kind: 'initial', font: wf.family, face: colors.face, lines, place, ...(styleOv ? { style: styleOv } : {}) } };
 }
 
 // seed note: first bake passes jobId as seed while restamps pass the title, so
@@ -1138,7 +1165,7 @@ async function stampRepaintedCover(storyData, coverKey, imageResult, { force = f
 
 module.exports = {
   stampRepaintedCover,
-  composeCover, composeFrontTitle, composeDedication, dedicationLines, composeBrand, applyCoverTypography, bakeCoverTypographyPostPersist,
+  composeCover, composeFrontTitle, composeDedication, dedicationLines, dedicationBand, composeBrand, applyCoverTypography, bakeCoverTypographyPostPersist,
   resolveCoverTitleMode,
   resolveCoverTextContract,
   restampCover, restampServedCover, paintServedCoverTitle, sanitizeTitleStyle, sanitizeDedicationStyle,
