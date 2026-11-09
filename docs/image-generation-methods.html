@@ -636,6 +636,32 @@ superseded by the general floor on 2026-09-06.</li>
 <code>🎨 [GROK Pn] VB column: …px cells (floor 200) - dropped …</code>), so which path a
 page took is auditable from the run log.</p>
 
+<h3>Reference pages &mdash; an extra, opt-in slot for a redraw (owner, 2026-11-09)</h3>
+
+<p><code>iteratePageCore(&hellip;, { referencePages: [{ pageNumber, imageData }] })</code> sends
+earlier pages of the same book along with a redraw, so an instruction such as &ldquo;draw the monsters
+as on pages 4, 5 and 7&rdquo; has something to look at. <code>server/lib/referencePages.js</code>
+composes the pages into <strong>one</strong> sheet at the page aspect (grid chosen like
+<code>composeVbSlot</code>), each cell under a printed <code>page N</code> caption (the one place a
+caption is deliberate: the model must tell the pages apart; the prompt block says the captions are
+never to be painted). The sheet is passed to <code>generateImageOnly</code> as
+<code>referencePagesSheet</code> and rides:</p>
+<ul>
+<li><strong>Grok</strong> (primary and model-routed branch): <code>packReferences</code> appends it as the
+<em>last</em> slot, <em>outside</em> the 3-slot packing budget, so the plate, characters and VB cells are packed
+exactly as without it and nothing is dropped. Only xAI's hard cap (<code>GROK_EDIT_MAX_REFS</code> = 5)
+bounds it; if it would be exceeded the call throws <code>ReferencePagesError</code> naming the unsent slot
+(<code>localFault</code>: <code>rethrowLocalFault</code> never routes it to another provider).
+<code>editWithGrok</code> is given <code>maxRefs</code> = the packed count.</li>
+<li><strong>Gemini</strong>: an extra labelled inline part after the VB grid.</li>
+<li><strong>Runware</strong> and <code>iterativePlacement</code>: throw (no slot for it).</li>
+</ul>
+<p>The prompt side is <code>withReferencePages</code> inside the one page-prompt closure
+(<code>pageRenderCall.makePageImagePrompt</code>, option <code>referencePageNumbers</code>), appended at the
+tail so the over-cap shrink keeps it. Test Lab: <code>iterate</code> stage <code>params.referencePages: [4,5,7]</code>
+(the pages' ACTIVE pictures from the same story). Built for a Lab test; not yet wired from the book review
+(decisions.md 2026-11-09).</p>
+
 <h2 id="promptcap">5c. Prompt length: the Grok cap and the cut order</h2>
 
 <p>Every page and cover prompt is fitted to the image model's character cap by <code>shrinkPromptForModel</code> (<code>server/lib/images.js</code>). The order below is rendered from <code>PROMPT_CUT_ORDER</code> / <code>PROMPT_NEVER_CUT</code> in that file; edit the code, then run <code>node scripts/admin/sync-prompt-cut-order-docs.js</code>.</p>

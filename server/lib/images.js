@@ -1309,9 +1309,11 @@ function fitPlatePrompt(prompt, maxLen, logLabel, modelName = null) {
  * back to Gemini would hide our bug behind another provider's picture.
  */
 function rethrowLocalFault(err, { logLabel, pageLabel = '', provider }) {
-  if (!(err instanceof PromptFitError)) return;
+  // `localFault`: a failure of our own contract (referencePages.ReferencePagesError - slot cap,
+  // unsupported backend), never a provider outage, so no other provider may answer for it.
+  if (!(err instanceof PromptFitError) && err?.localFault !== true) return;
   const page = pageLabel ? ` page ${pageLabel}` : '';
-  log.error(`❌ [${logLabel}]${page} prompt does not fit ${provider}'s cap — failing, no provider fallback: ${err.message}`);
+  log.error(`❌ [${logLabel}]${page} local fault before ${provider} - failing, no provider fallback: ${err.message}`);
   getCurrentLogger()?.error('prompt_fit_failed', `${logLabel}${page}: ${err.message}`, null,
     { label: logLabel, page: pageLabel || null, provider, message: err.message });
   throw err;
@@ -1456,6 +1458,9 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     // Callers stamp it onto the page record so the batch eval judges the render
     // against the description that was actually sent.
     promptMeta = null,
+    // ONE data-URL sheet of earlier pages (referencePages.js), an extra reference on top of the
+    // normal packing. Grok and Gemini carry it; Runware cannot, and throws.
+    referencePagesSheet = null,
   } = opts;
 
   // PLATE OR FAIL: a landmark photo with no plate and no declared role never
@@ -1512,6 +1517,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
   // ── Primary Runware (cheap FLUX Schnell) ──────────────────────────────────
   if (imageBackend === 'runware' && isRunwareConfigured()) {
+    if (referencePagesSheet) throw new (require('./referencePages').ReferencePagesError)(`[${logLabel}] referencePages is not supported on the Runware backend (its references are character photos only)`);
     log.info(`🎨 [${logLabel}] Using Runware FLUX Schnell backend${verbose ? ' (cheap testing mode)' : ''}`);
     try {
       const referenceImages = extractDataImageUrls(characterPhotos);
@@ -1558,13 +1564,13 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
     try {
       const refImages = await packReferences(
-        { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, textAreaMask, landmarkScene },
+        { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, textAreaMask, landmarkScene, referencePagesSheet },
         { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate, ...(maxRefSlots ? { maxSlots: maxRefSlots } : {}), ...(vbColumnFraction ? { vbColumnFraction } : {}) }
       );
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(grokPrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate, ...(maxRefSlots ? { maxRefs: maxRefSlots } : {}) });
+        result = await editWithGrok(grokPrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate, ...(maxRefSlots ? { maxRefs: maxRefSlots } : {}), ...(referencePagesSheet ? { maxRefs: refImages.length } : {}) });
       } else {
         result = await generateWithGrok(grokPrompt, { model: grokModel, aspectRatio: grokAspect });
       }
@@ -1741,6 +1747,14 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
       : `🔲 [${logLabel}] Added Visual Bible reference grid`);
   }
 
+  // Reference pages sheet (earlier pages, each captioned "page N").
+  if (referencePagesSheet) {
+    parts.push({ text: `[Reference pages (earlier pages of this book, each captioned with its page number)]:` });
+    parts.push({ inline_data: { mime_type: 'image/jpeg', data: r2Lib.stripDataUriPrefix(referencePagesSheet) } });
+    currentImageIndex++;
+    log.info(`🖼️ [${logLabel}] Added reference pages sheet`);
+  }
+
   if (verbose) {
     log.debug(`🔍 [${logLabel}] Parts array structure: ${parts.map((p, i) =>
       p.text ? `[${i}] text(${p.text.length}ch)` :
@@ -1764,6 +1778,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
   // ── Model-routed Runware (model config says backend='runware') ────────────
   if (modelConfig?.backend === 'runware' && isRunwareConfigured() && primaryProviderFailed !== 'runware') {
+    if (referencePagesSheet) throw new (require('./referencePages').ReferencePagesError)(`[${logLabel}] referencePages is not supported on the Runware backend (its references are character photos only)`);
     log.info(verbose
       ? `🎨 [${logLabel}] Model ${modelId} uses Runware backend - routing to Runware`
       : `🎨 [${logLabel}] Model ${modelId} uses Runware backend`);
@@ -1806,14 +1821,14 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
         log.info(`🎨 [GROK] Avatar mode: ${refImages.length} reference images as separate slots`);
       } else {
         refImages = await packReferences(
-          { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, landmarkScene },
+          { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, landmarkScene, referencePagesSheet },
           { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate }
         );
       }
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(effectivePrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate });
+        result = await editWithGrok(effectivePrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate, ...(referencePagesSheet ? { maxRefs: refImages.length } : {}) });
       } else {
         result = await generateWithGrok(effectivePrompt, { model: grokModel, aspectRatio: grokAspect });
       }
@@ -2324,6 +2339,9 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     // | null) — server/lib/landmarkScene.js. Checked BEFORE the cache, so a
     // cached render can never stand in for a refused one.
     landmarkScene = null,
+    // Earlier pages as ONE captioned sheet (data URL, referencePages.composeReferencePagesSheet),
+    // an extra reference slot above the normal packing. Iterate redraws only.
+    referencePagesSheet = null,
   } = options;
   assertLandmarkScene({ landmarkPhotos, sceneBackground, landmarkScene, label: `IMAGE GEN-ONLY P${pageNumber ?? '?'}` });
 
@@ -2333,7 +2351,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
   // Check cache first (include previousImage presence and page number in cache key)
   const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber, sceneBackground ? 'bg' : null,
-    ...imageRouteCacheMarkers({ model: imageModelOverride, backend: imageBackendOverride, aspect: aspectRatio, maxRefSlots, vbColumnFraction }));
+    ...imageRouteCacheMarkers({ model: imageModelOverride, backend: imageBackendOverride, aspect: aspectRatio, maxRefSlots, vbColumnFraction }),
+    referencePagesSheet ? `refpages:${hashImageData(referencePagesSheet)}` : null);
 
   // For generateImageOnly, we use a separate cache namespace to avoid conflicts with evaluated images
   const genOnlyCacheKey = `genonly_${cacheKey}`;
@@ -2386,6 +2405,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     includeSceneBackgroundPart: true,
     maxRefSlots,
     vbColumnFraction,
+    referencePagesSheet,
   });
 
   // Strip a stray uniform frame the model painted despite the D-01 prompt ban
@@ -4541,6 +4561,10 @@ Your previous answer was incomplete: it must be the full prose brief followed by
  * @param {Array}    options.fixTargets            - Fix target bboxes (required when blackoutIssues=true)
  * @param {boolean}  options.previewOnly           - Return prompt + mismatches without generating
  * @param {string}   options.customImagePrompt     - Override the built image prompt
+ * @param {Array}    options.referencePages        - [{ pageNumber, imageData }] earlier pages of the book. Composed into ONE
+ *   captioned sheet sent as an extra reference (outside the normal slot packing) with a REFERENCE PAGES prompt block,
+ *   so a redraw instruction like "as on pages 4 and 5" has something to look at. Grok and Gemini only; throws when
+ *   the provider's hard slot cap would be exceeded. See referencePages.js, docs/decisions.md 2026-11-09.
  * @param {Object}   options.emptySceneCallbacks   - { load, save } for DB-backed empty scene handling
  *   load(pageNumber): Promise<string|null>  — load existing empty scene from DB
  *   save(pageNumber, imageData): Promise<void> — save generated empty scene to DB
@@ -4563,6 +4587,8 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // The book review's background decision for this redraw ({keep:true} | {keep:false, change}):
     // code pins keep/redo from it and the rewriter's reuseEmptyScene is not read (resolveIteratePlate).
     backgroundPin = null,
+    // Earlier pages sent along as one captioned reference sheet (see the doc above).
+    referencePages: referencePagesIn = null,
     // Per-scene aspect override — caller (regeneration route or repair pipeline)
     // passes the scene's saved imageAspect so the regenerated image matches the
     // shape the layout expects. null/undefined falls back to the global default.
@@ -4589,6 +4615,14 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     skipEval = false,
   } = options;
   const effectiveReferenceMode = referenceMode || CONFIG_DEFAULTS.referenceMode || 'strict';
+  const referencePages = require('./referencePages').normaliseReferencePages(referencePagesIn);
+  const referencePageNumbers = referencePages.map(p => p.pageNumber);
+  if (referencePages.length > 0 && iterativePlacement) {
+    throw new Error('[ITERATE] referencePages is not supported with iterativePlacement (the two-pass path has no reference-sheet slot)');
+  }
+  if (referencePages.length > 0 && referencePageNumbers.includes(pageNumber)) {
+    throw new Error(`[ITERATE] referencePages lists the page being redrawn (${pageNumber}); it is the thing being replaced`);
+  }
   // Explicit boolean from caller wins over the run-level default.
   const effectiveSinglePass = typeof singlePassScene === 'boolean'
     ? singlePassScene
@@ -5541,6 +5575,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     sceneDescription: newSceneDescription, inputData: storyData, sceneCharacters, visualBible, pageNumber,
     characterPhotos: referencePhotos, pageImageModel: imageModelOverride, coverOpts,
     extraOptions: { imageBackend: iterateImageBackend, textPositionOverride: lockedTextPosition },
+    referencePageNumbers,
   })((visualBibleGrid?.rawElements || []).map(e => e.id).filter(Boolean));
 
   // Eval feedback was already routed to Claude via previewFeedback.fixIssues
@@ -5570,7 +5605,15 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   if (customImagePrompt) {
     log.info(`🔄 [ITERATE] Page ${pageNumber}: Using custom image prompt (${customImagePrompt.length} chars, was ${imagePrompt.length})`);
     imagePrompt = customImagePrompt;
+    if (referencePages.length > 0 && !customImagePrompt.includes('**REFERENCE PAGES:**')) {
+      throw new Error('[ITERATE] customImagePrompt replaces the whole prompt but carries no **REFERENCE PAGES:** block while referencePages are sent');
+    }
   }
+
+  // The captioned sheet of earlier pages: one extra reference, composed at the page aspect.
+  const referencePagesSheet = referencePages.length > 0
+    ? `data:image/jpeg;base64,${(await require('./referencePages').composeReferencePagesSheet(referencePages, sceneAspect)).toString('base64')}`
+    : null;
 
   // Clear cache to force new generation
   const cacheKey = generateImageCacheKey(imagePrompt, referencePhotos.map(p => p.photoUrl), null);
@@ -5638,6 +5681,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       skipCache: true,
       aspectRatio: sceneAspect,
       captureLabel: coverOpts ? coverOpts.captureLabel : 'image_scene',
+      referencePagesSheet,
     });
     if (usageTracker && genResult?.usage) {
       const m = genResult.modelId || '';
@@ -5812,6 +5856,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     bboxDetection: imageResult.bboxDetection || null,
     // The blackout image (when blackout mode was used and fixTargets were found)
     blackoutImage: (blackoutIssues && previousImage && previousImage !== imageData) ? previousImage : null,
+    referencePageNumbers,
     method: 'iterate'
   };
 }

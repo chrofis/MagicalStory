@@ -5572,8 +5572,16 @@ async function runIterateStage(ctx, { experimentId, params = {} }) {
   const { storyData } = await loadStoryDataFull(ctx.storyId);
 
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  // params.referencePages: [4,5,7] - page numbers of the SAME story whose ACTIVE picture rides along
+  // as a captioned reference sheet (iteratePageCore option referencePages).
+  const referencePages = [];
+  for (const n of (Array.isArray(params.referencePages) ? params.referencePages : [])) {
+    const pageNumber = Number(n);
+    referencePages.push({ pageNumber, imageData: await loadActivePageImage(ctx.storyId, pageNumber) });
+  }
   const t0 = Date.now();
   const result = await iteratePageCore(imageData, ctx.pageNumber, storyData, {
+    ...(referencePages.length ? { referencePages } : {}),
     evaluationFeedback: params.feedback || null,
     useOriginalAsReference: params.useOriginalAsReference === true,
     freeIterate: params.freeIterate === true,
@@ -5595,6 +5603,7 @@ async function runIterateStage(ctx, { experimentId, params = {} }) {
     imagePrompt: result.imagePrompt || null,
     baselinePrompt: ctx.scene.prompt || null,
     newSceneDescription: result.newScene || null,
+    referencePages: result.referencePageNumbers || [],
   };
 }
 

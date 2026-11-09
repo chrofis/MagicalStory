@@ -138,13 +138,16 @@ function pageRenderModel({ sceneMetadata, modelOverrides = {}, coverOpts = null,
  * Lab's explicit A/B surface (pageScaleScope) and the iterate repair's locked
  * text position and render backend (images.js iteratePageCore, 2026-09-28 —
  * the repair builds its prompt here too); the first render passes none.
+ * `referencePageNumbers` (iterate redraw only): the earlier pages sent as a captioned
+ * reference sheet; the REFERENCE PAGES block rides at the tail, before a baked title.
  */
-function makePageImagePrompt({ sceneDescription, inputData, sceneCharacters, visualBible, pageNumber, characterPhotos, pageImageModel, coverOpts = null, extraOptions = null }) {
+function makePageImagePrompt({ sceneDescription, inputData, sceneCharacters, visualBible, pageNumber, characterPhotos, pageImageModel, coverOpts = null, extraOptions = null, referencePageNumbers = null }) {
   const { IMAGE_MODELS } = require('../config/models');
   const { buildImagePrompt, withBakedTitle } = require('./promptBuilders');
+  const { withReferencePages } = require('./referencePages');
   // Grok's prompt cap: the VB prose is skipped and the grid carries the refs.
   const isGrokImage = IMAGE_MODELS[pageImageModel]?.backend === 'grok';
-  return (vbRefElementIds) => withBakedTitle(buildImagePrompt(
+  return (vbRefElementIds) => withBakedTitle(withReferencePages(buildImagePrompt(
     sceneDescription, inputData, sceneCharacters, visualBible, pageNumber, characterPhotos, {
       skipVisualBible: isGrokImage,
       vbRefElementIds,
@@ -152,7 +155,7 @@ function makePageImagePrompt({ sceneDescription, inputData, sceneCharacters, vis
       ...(coverOpts ? { textPositionOverride: coverOpts.textPosition } : {}),
       ...(extraOptions || {}),
     }
-  ), coverOpts?.bakeTitle || '');
+  ), referencePageNumbers), coverOpts?.bakeTitle || '');
 }
 
 /**

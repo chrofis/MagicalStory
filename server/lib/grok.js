@@ -18,6 +18,10 @@ const { withGrok } = require('./aiConcurrency');
 const { frameColorForName } = require('./characterFrames');
 const { guardPromptString } = require('../services/prompts');
 const { PromptFitError, promptBytes } = require('./promptFitError');
+const { ReferencePagesError } = require('./referencePages');
+
+// xAI's documented edit cap (re-verified 2026-09-02). One source for the cap the reference-pages slot is checked against.
+const GROK_EDIT_MAX_REFS = 5;
 
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const XAI_API_URL = 'https://api.x.ai/v1';
@@ -1241,6 +1245,11 @@ async function packReferences(refs = {}, options = {}) {
     // (this call renders the plate) or 'castless' (cast-0 page). See
     // server/lib/landmarkScene.js. Without one, a photo with no plate throws.
     landmarkScene = null,
+    // ONE data-URL sheet of earlier pages (referencePages.composeReferencePagesSheet).
+    // An EXTRA slot on top of the normal packing: it never competes with the plate,
+    // characters or VB for `maxSlots`, and nothing is dropped to make room. Only
+    // xAI's hard edit cap bounds it, and exceeding that throws.
+    referencePagesSheet = null,
   } = refs;
   const {
     aspectRatio = '1:1', pageLabel = '', padInputWithExtension = false,
@@ -1567,6 +1576,16 @@ async function packReferences(refs = {}, options = {}) {
     }
   }
 
+  // Reference pages sheet: the extra slot (see refs.referencePagesSheet). Fail loudly
+  // when xAI's hard cap would be exceeded - never drop another slot to fit it.
+  if (referencePagesSheet) {
+    if (slots.length + 1 > GROK_EDIT_MAX_REFS) {
+      throw new ReferencePagesError(`${tag} no reference slot left for the reference pages sheet: ${slots.length} slot(s) already packed and xAI's edit cap is ${GROK_EDIT_MAX_REFS}. Not sent: the reference pages sheet.`);
+    }
+    slots.push(referencePagesSheet);
+    log.info(`🎨 ${tag} Slot ${slots.length}: reference pages sheet (extra slot, outside the ${maxSlots}-slot packing budget)`);
+  }
+
   // Grok edit output matches the input image aspect ratio (it mostly ignores the
   // aspect_ratio API param for edits). Pad every slot to the requested aspect so
   // the output matches. Never leave a non-matching slot in place — doing so would
@@ -1726,6 +1745,9 @@ async function packReferences(refs = {}, options = {}) {
     }
   }
 
+  if (referencePagesSheet && paddedSlots.length !== slots.length) {
+    throw new ReferencePagesError(`${tag} a reference slot was dropped while padding (${paddedSlots.length}/${slots.length}) - refusing to send the reference pages call without every slot`);
+  }
   log.info(`🎨 [GROK] Packed ${paddedSlots.length}/${maxSlots} reference slots at ${aspectRatio} (prev: ${previousImage ? 'yes' : 'no'}, ${charCount} chars, ${landmarkBuffers.length} landmarks, VB: ${visualBibleGrid ? 'yes' : 'no'})`);
   return paddedSlots;
 }
@@ -2136,6 +2158,7 @@ module.exports = {
   editWithGrok,
   isGrokConfigured,
   packReferences,
+  GROK_EDIT_MAX_REFS,
   capVbElements,
   sortVbElements,
   VB_SLOT_MAX_ELEMENTS,
