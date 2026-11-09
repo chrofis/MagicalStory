@@ -3,8 +3,8 @@
  * 2026-10-18, docs/decisions.md). Before: the wardrobe writer was only told to
  * costume "whenever the theme implies special clothing", and ~1 pirate-theme
  * story in 16 got everyday clothes. These pin behaviour: the structured field
- * is read (never prose), no field means nothing injected, and the adult
- * role-clothing rule stays.
+ * is read (never prose), no field means nothing injected, and the role-clothing
+ * sentence stays. Adults are costumed too since 2026-11-09 (owner reversal).
  */
 import { describe, it, beforeAll, expect } from 'vitest';
 
@@ -42,11 +42,11 @@ describe('guideCostume', () => {
 });
 
 describe('wardrobe writer prompt', () => {
-  it('a costume theme states the costume as a rule, with the role-clothing exemption', () => {
+  it('a costume theme states the costume as a rule', () => {
     const p = wardrobe({ storyCategory: 'adventure', storyTheme: 'pirate' });
     expect(p).toContain("The theme's costume is `pirate`");
-    expect(p).toContain('`costumed.costume: pirate`');
-    expect(p).toMatch(/An adult the story already dresses for their role stays `standard`/);
+    expect(p).toContain('`costumed.costume` is `pirate`');
+    // The adult exemption is gone (owner, 2026-11-09): adults-wear-theme-costume-2026-11-09.test.ts.
     expect(p).not.toContain('THEME_COSTUME_RULE');
   });
   it('the role-clothing sentence for characters is still there', () => {

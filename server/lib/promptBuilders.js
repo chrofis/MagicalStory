@@ -7735,7 +7735,8 @@ function guideCostume(guideText) {
 function themeCostumeRule(guideText) {
   const costume = guideCostume(guideText);
   if (!costume) return '';
-  return `The theme's costume is \`${costume}\`. The child characters the theme is about use the \`costumed\` variant with \`costumed.costume: ${costume}\`, even when the story opens in the present day or finds the themed world from there. An adult the story already dresses for their role stays \`standard\`.`;
+  // Adults included (owner, 2026-11-09, docs/decisions.md): role first, else the theme's costume.
+  return `The theme's costume is \`${costume}\`. Every character who takes part in the theme's adventure uses the \`costumed\` variant, children and adults alike, even when the story opens in the present day or finds the themed world from there. Their \`costumed.costume\` is \`${costume}\`, except for a character the story request asks to be dressed for a role of their own (a knight with a sword, a fairy, a superhero): that character's \`costumed.costume\` names that role's outfit.`;
 }
 
 /** The guide without its PROMISE line — the promise is never "material". */
@@ -13130,7 +13131,7 @@ const wardrobeSharedFills = () => ({ ...WARDROBE_RULES, GARMENT_LIST: GARMENT_LI
 /** The wardrobe reviewer's half of the theme costume rule: the same string the writer holds, as a coverage check. */
 function themeCostumeReviewText(inputData) {
   const rule = themeCostumeRule(getTeachingGuide(inputData.storyCategory, topicGuideKey(inputData)));
-  return rule ? ` ${rule} A child the theme is about who has no \`costumed\` outfit under that costume is a missing entry: add it.` : '';
+  return rule ? ` ${rule} A character in the theme's adventure who has no \`costumed\` outfit is a missing entry: add it.` : '';
 }
 
 /**
