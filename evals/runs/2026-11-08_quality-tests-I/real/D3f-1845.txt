@@ -1,0 +1,8 @@
+FAULT[IMG][MAJOR][missing_character][NEW]: p9 — Draw Janna standing in front of Rubi with her open hand out and the red leaf just landing in her palm, the fallen leaves sliding off his head to show the glowing horn, and Melodi crying out from the edge of the path by the brambles. | background: keep
+FAULT[IMG][MINOR][emotion][TOUCHUP]: p9 — Remove the tear from Melodi's cheek and give her a wide-eyed, amazed face instead of a frightened, crying one.
+FAULT[IMG][MAJOR][missing_element][NEW]: p10 — Draw the four girls from behind walking with Rubi to the bright glowing gap between two big grey beeches, with Rubi turned back toward them and his horn shining. | background: redo — use the same green-and-grey beech wood with the brambles and stream at dusk under a deep blue sky, as on pages 5, 7 and 8, with warm light pouring through the gap, instead of a bare, overcast daytime wood.
+FAULT[IMG][MAJOR][height_order][NEW]: p7 — Draw Polina as the shortest girl, with the top of her head at Melodi's forehead, as they stand side by side at the brambles. | background: keep
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p6 — Draw Melisa with her finger on her lips, as the text says.
+FAULT[TEXT][MINOR]: p5 — After «Das Licht wurde schon blasser», add a sentence saying that if the light goes out, Rubi cannot get home.
+FAULT[TEXT][MINOR]: p10 — Before «Auf dem Hof schaute das Pony über die Stalltür», add a sentence saying that the four girls walked back home to the farm.
+FAULTS: 7

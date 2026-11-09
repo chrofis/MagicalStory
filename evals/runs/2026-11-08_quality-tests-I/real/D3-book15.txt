@@ -1,0 +1,45 @@
+📝 Prompt templates loaded: 102/102 ok
+🅰️ [COVER EVAL LAYER] job_1793561351885_kkg5gxkbj frontCover: judging v2 unstamped render
+🅰️ [COVER EVAL LAYER] job_1793561351885_kkg5gxkbj initialPage: judging v0 textless art layer
+🅰️ [COVER EVAL LAYER] job_1793561351885_kkg5gxkbj backCover: judging v0 textless art layer
+[CAST-RESOLVE] PAGE 1 13 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 2 7 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 3 7 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 4 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 5 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 6 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 7 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 8 8 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 9 11 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 10 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 11 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 12 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 13 9 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 14 7 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 15 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 16 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 17 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 18 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 19 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 20 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 22 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 23 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 24 6 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 25 14 refs, 0 unresolved (), 0 ambiguous ()
+📐 [BOOK-AUDIT] SCALE: "yellow leaf" — drawn larger than its commissioned size on p8. LOW CONFIDENCE: measured against the size the bible commissions, not against the other pages. On the one story this wording was validated against it named the worst size outlier in the book and repeated that answer exactly across two runs; it also named a page that merely sits near the commissioned size and misse
+📖 [BOOK-AUDIT] 25 page(s) in 2 call(s): 5 fault(s) — 5 IMG, 0 TEXT
+📝 Prompt templates loaded: 102/102 ok
+🅰️ [COVER EVAL LAYER] job_1792482580699_3iiy0v4dj frontCover: judging v0 unstamped render
+🅰️ [COVER EVAL LAYER] job_1792482580699_3iiy0v4dj initialPage: judging v0 textless art layer
+🅰️ [COVER EVAL LAYER] job_1792482580699_3iiy0v4dj backCover: judging v0 textless art layer
+[CAST-RESOLVE] PAGE 1 8 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 2 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 3 7 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 5 6 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 6 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 7 4 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 8 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 9 7 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 10 8 refs, 0 unresolved (), 0 ambiguous ()
+📐 [BOOK-AUDIT] SCALE: "yellow leaf" — drawn larger than its commissioned size on p8, p13. LOW CONFIDENCE: measured against the size the bible commissions, not against the other pages. On the one story this wording was validated against it named the worst size outlier in the book and repeated that answer exactly across two runs; it also named a page that merely sits near the commissioned size and 
+📖 [BOOK-AUDIT] 25 page(s) in 2 call(s): 7 fault(s) — 6 IMG, 1 TEXT

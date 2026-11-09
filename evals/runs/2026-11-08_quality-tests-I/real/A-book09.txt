@@ -1,0 +1,31 @@
+📝 Prompt templates loaded: 102/102 ok
+🅰️ [COVER EVAL LAYER] job_1792482580699_3iiy0v4dj frontCover: judging v0 unstamped render
+🅰️ [COVER EVAL LAYER] job_1792482580699_3iiy0v4dj initialPage: judging v0 textless art layer
+🅰️ [COVER EVAL LAYER] job_1792482580699_3iiy0v4dj backCover: judging v0 textless art layer
+[CAST-RESOLVE] PAGE 1 8 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 2 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 3 7 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 5 6 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 6 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 7 4 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 8 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 9 7 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 10 8 refs, 0 unresolved (), 0 ambiguous ()
+📐 [BOOK-AUDIT] SCALE: "yellow leaf" — drawn larger than its commissioned size on p8, p13. LOW CONFIDENCE: measured against the size the bible commissions, not against the other pages. On the one story this wording was validated against it named the worst size outlier in the book and repeated that answer exactly across two runs; it also named a page that merely sits near the commissioned size and 
+📖 [BOOK-AUDIT] 25 page(s) in 2 call(s): 7 fault(s) — 6 IMG, 1 TEXT
+📝 Prompt templates loaded: 102/102 ok
+🅰️ [COVER EVAL LAYER] job_1792482580699_3iiy0v4dj frontCover: judging v0 unstamped render
+🅰️ [COVER EVAL LAYER] job_1792482580699_3iiy0v4dj initialPage: judging v0 textless art layer
+🅰️ [COVER EVAL LAYER] job_1792482580699_3iiy0v4dj backCover: judging v0 textless art layer
+[CAST-RESOLVE] PAGE 1 8 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 2 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 3 7 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 5 6 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 6 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 7 4 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 8 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 9 7 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 10 8 refs, 0 unresolved (), 0 ambiguous ()
+📐 [BOOK-AUDIT] SCALE: "cardboard rocket" — drawn larger than its commissioned size on p6, p7, p8, p9; drawn smaller than its commissioned size on p1, p5. LOW CONFIDENCE: measured against the size the bible commissions, not against the other pages. On the one story this wording was validated against it named the worst size outlier in the book and repeated that answer exactly across two runs; it al
+📐 [BOOK-AUDIT] SCALE: "shoebox airlock" — drawn larger than its commissioned size on p1, p3, p6, p8. LOW CONFIDENCE: measured against the size the bible commissions, not against the other pages. On the one story this wording was validated against it named the worst size outlier in the book and repeated that answer exactly across two runs; it also named a page that merely sits near the commissione
+📖 [BOOK-AUDIT] 10 page(s) in 1 call(s): 5 fault(s) — 5 IMG, 0 TEXT

@@ -1,0 +1,28 @@
+📝 Prompt templates loaded: 102/102 ok
+🅰️ [COVER EVAL LAYER] job_1793964466256_1tmyzh1do frontCover: judging v0 unstamped render
+🅰️ [COVER EVAL LAYER] job_1793964466256_1tmyzh1do initialPage: judging v1 textless art layer
+🅰️ [COVER EVAL LAYER] job_1793964466256_1tmyzh1do backCover: judging v1 textless art layer
+[CAST-RESOLVE] PAGE 1 6 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 2 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 3 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 4 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 6 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 7 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 8 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 9 8 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 10 11 refs, 0 unresolved (), 0 ambiguous ()
+[TESTLAB] Experiment 1843 started: stage=book_audit, targets=5, override=yes
+📝 Prompt templates loaded: 102/102 ok
+🅰️ [COVER EVAL LAYER] job_1793964466256_1tmyzh1do frontCover: judging v0 unstamped render
+🅰️ [COVER EVAL LAYER] job_1793964466256_1tmyzh1do initialPage: judging v1 textless art layer
+🅰️ [COVER EVAL LAYER] job_1793964466256_1tmyzh1do backCover: judging v1 textless art layer
+[CAST-RESOLVE] PAGE 1 6 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 2 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 3 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 4 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 6 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 7 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 8 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 9 8 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 10 11 refs, 0 unresolved (), 0 ambiguous ()
+📖 [BOOK-AUDIT] 10 page(s) in 1 call(s): 5 fault(s) — 5 IMG, 0 TEXT

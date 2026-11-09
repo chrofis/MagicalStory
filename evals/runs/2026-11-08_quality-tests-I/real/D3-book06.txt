@@ -1,0 +1,38 @@
+📝 Prompt templates loaded: 102/102 ok
+🅰️ [COVER EVAL LAYER] job_1793959308869_fre2mb4d0 frontCover: judging v1 unstamped render
+🅰️ [COVER EVAL LAYER] job_1793959308869_fre2mb4d0 initialPage: judging v0 textless art layer
+🅰️ [COVER EVAL LAYER] job_1793959308869_fre2mb4d0 backCover: judging v3 textless art layer
+[CAST-RESOLVE] PAGE 1 4 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 3 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 4 11 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 5 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 6 4 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 7 10 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 8 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 9 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 10 8 refs, 0 unresolved (), 0 ambiguous ()
+📖 [BOOK-AUDIT] 10 page(s) in 1 call(s): 8 fault(s) — 8 IMG, 0 TEXT
+📝 Prompt templates loaded: 102/102 ok
+🅰️ [COVER EVAL LAYER] job_1793736454070_0ir5y6hlh frontCover: judging v0 unstamped render
+🅰️ [COVER EVAL LAYER] job_1793736454070_0ir5y6hlh initialPage: judging v0 textless art layer
+🅰️ [COVER EVAL LAYER] job_1793736454070_0ir5y6hlh backCover: judging v0 textless art layer
+[CAST-RESOLVE] PAGE 1 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 2 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 3 6 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 4 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 5 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 6 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 7 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 8 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 10 4 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 11 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 12 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 13 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 14 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 15 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 16 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 17 5 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 18 2 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 19 6 refs, 0 unresolved (), 0 ambiguous ()
+[CAST-RESOLVE] PAGE 20 6 refs, 0 unresolved (), 0 ambiguous ()
+📖 [BOOK-AUDIT] 10 page(s) in 1 call(s): 7 fault(s) — 7 IMG, 0 TEXT

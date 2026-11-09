@@ -1,0 +1,9 @@
+FAULT[TEXT][MINOR]: p2 — Say that the toggles on Janna's coat would not fasten ("Drinnen wollten die Knebel an Jannas Mantel nicht zugehen"), not that its zip was stuck.
+FAULT[IMG][MINOR][setting][NEW]: p2 — Draw the leaf heap in front of the small yellow station door with the round window and the lamp seen on pages 1, 3 and 10, with Janna kicking it and the silver leaf rising. | background: redo — show the small yellow station building and its door, not a long platform wall
+FAULT[IMG][MINOR][clothing][CHAR:Polina]: p8 — Dress Polina's legs in warm white tights and black rubber rain boots.
+FAULT[IMG][MINOR][object_count][TOUCHUP]: p8 — Remove one of the two lanterns so Polina holds a single lantern.
+FAULT[TEXT][MAJOR]: p9 — Add a sentence where Polina, Melodi and Melisa first see Silbermond and gasp at the unicorn beside Janna, for example "Polina machte grosse Augen: «Ein Einhorn!»", before Polina says "Da bist du ja!".
+FAULT[IMG][MAJOR][action_interaction][NEW]: p9 — Draw Silbermond trotting right beside Janna as she runs toward the raised lantern, and draw Melodi holding her hand up at the edge of the waiting lantern ring instead of standing beside the unicorn. | background: keep
+FAULT[IMG][MINOR][emotion][TOUCHUP]: p9 — Give Melodi a nervous, tense face as she calls "Halt!" with her shaky voice.
+FAULT[IMG][MAJOR][height_order][NEW]: p10 — Redraw the four girls standing on the path with Polina clearly the shortest, her head top level with Melodi's forehead, Melodi's head top level with Janna's forehead, and Janna's head top level with Melisa's forehead. | background: keep
+FAULTS: 8

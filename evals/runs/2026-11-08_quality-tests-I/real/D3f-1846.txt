@@ -1,0 +1,11 @@
+FAULT[TEXT][MAJOR]: p7 — Delete "e che non conosceva ancora", because on page 1 Serena stood with the family and spoke to them before going back to the kiosk.
+FAULT[TEXT][MAJOR]: p9 — After "Zio Stefano lo ha seguito quasi subito", add that Mamma also stepped into the water with the towel on her arm, so that she is with them on the sea floor from page 10 onward.
+FAULT[IMG][MINOR][wrong_state][TOUCHUP]: p2 — Draw the starfish slowly raising one arm up out of the water.
+FAULT[IMG][MINOR][wrong_state][TOUCHUP]: p8 — Remove the yellow leaf from the pool while Zio Stefano is still pulling up the seaweed.
+FAULT[IMG][MINOR][child_torso_uncovered][CHAR:Ludovica]: p11 — Draw Ludovica's purple swim shirt reaching all the way down to the tail's waistband, with no skin showing at her waist.
+FAULT[IMG][MAJOR][scale][TOUCHUP]: p13 — Draw Nerina much smaller, far off in the deep blue, disappearing behind a distant rock, well away from the coral in front of Ludovica's eyes.
+FAULT[IMG][MINOR][action_interaction][TOUCHUP]: p20 — Turn Ludovica's gaze down to the flatfish on the sand instead of out toward the viewer.
+FAULT[TEXT][MINOR]: p24 — The sentence "Intorno a loro Papà, Mamma e Zio Stefano erano fermi a guardarle, senza dire una parola." places the three right in this instant while the picture shows only the two girls; say instead that they watched from a little way back.
+FAULTS: 8
+FAULT[TEXT][MAJOR]: p25 — Mamma walks at the back of the line on the sea floor with Zio Stefano, then is suddenly "che li aspettava sui sassi"; change "Mamma, che li aspettava sui sassi, ha aperto il telo" to "Mamma, uscita dall'acqua subito dietro di loro, ha aperto il telo" so she arrives on the pebbles with them instead of already waiting there.
+FAULTS: 1

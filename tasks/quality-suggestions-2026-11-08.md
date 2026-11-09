@@ -189,3 +189,15 @@ Order: #1+#3 -> #4+#5 -> #6,#7,#10 -> #2,#8,#9 (at most 2 agents at a time).
   - Arm A is valid: its template has none of those placeholders. Its warnings come from D3's concurrent run; the Lab log capture is time-windowed, a small Lab issue.
   - A gave 0 TEXT lines on all 5 books, the same as the stand-in arm A.
   - Rerun of D3 only, with per-book pre-filled overrides (5 experiments): about USD 1.30. Waiting for the owner.
+- 2026-11-09, real-Opus D3 rerun, filled per book: exps 1844 (book13), 1845 (book06), 1846 (book15). Cost USD 0.80, cap 1.50.
+  - The real-Opus check cost USD 3.28 in total, including the invalid 1843.
+
+  | | A, text | D3, text | D3 text catches | lost against A |
+  |---|---|---|---|---|
+  | book13 | 0 | 2 | friends react to the unicorn (T2) | p9 empty-square ring |
+  | book06 | 0 | 2 | price of failing (T6), walk back to the farm | none |
+  | book15 | 0 | 4 | Serena, Mamma p9 and p25, p24 who-is-present | p9 grotto coherence, p1 heights |
+
+  - Not caught by real D3: the book13 price of failing (the stand-ins did catch it).
+  - No noise lines: no natel, no "shorten", no invented lore.
+  - The Lab genericity warning ("The main character is: Janna") comes from the per-book pre-fill. In production the name comes from the placeholder.
