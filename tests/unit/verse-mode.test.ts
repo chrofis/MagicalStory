@@ -13,10 +13,10 @@ const { loadPromptTemplates } = require('../../server/services/prompts');
 
 const verseInput = (band: string) => ({
   pages: 6, language: 'de-CH', languageLevel: band, storyCategory: 'educational', storyTopic: 'rhyming',
-  storyDetails: 'Ein Kind sucht seine Muetze.',
+  storyDetails: 'Ein Kind sucht seine Muetze.', textForm: 'verse',   // stamped by the page writer (markVerseWriter)
   characters: [{ id: 'a', name: 'Levin', age: 5 }], mainCharacters: ['a'],
 });
-const plainInput = (band: string) => ({ ...verseInput(band), storyTopic: 'seasons' });
+const plainInput = (band: string) => ({ ...verseInput(band), storyTopic: 'seasons', textForm: undefined });
 const PAGES = [{ pageNumber: 1, text: 'Der Mond steht hoch,\nder Wald ist still.\n\nDa kommt ein Fuchs,\ner will, was er will.' }];
 const BANDS = ['1st-grade', 'advanced'];
 const MARK = 'VERSE FORM.';

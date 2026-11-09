@@ -149,6 +149,7 @@ const {
   buildVisualBibleCallPrompt,
   buildSceneBriefsAllPrompt,
   buildStoryTextFromBeatsPrompt,
+  markVerseWriter,
   buildStoryBibleFromBeatsPrompt,
   parseRefinedText,
   BRIEF_TRAILING_MARKERS,
@@ -3493,6 +3494,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       log.warn('⚠️ [BEATS] Step 6 has NO scene briefs — text is being written blind to the illustrations');
       gl.warn('beats_text_without_briefs', 'Page text written without scene briefs — text and art may disagree');
     }
+    markVerseWriter(inputData);   // typed record that this text is written in verse; every later pass reads it, not the topic
     const textPrompt = buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions, approvedArc, { arcHints, storyLogic: arcStoryLogic, visualBible, clothingRequirements });
     if (!textPrompt) throw new Error('story-text-from-beats template unavailable — beats pipeline cannot run');
     const beatPages = beats.map(b => b.pageNumber);

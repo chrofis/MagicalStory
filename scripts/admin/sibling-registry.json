@@ -1449,6 +1449,28 @@
           }
         ]
       }
+    },
+    {
+      "id": "text-fix-adds-nothing",
+      "axis": "generator-vs-critic",
+      "reason": "A text fix never brings in a new character, creature, group, place, object, event, ability or rule the story does not carry (owner 2026-11-09, docs/decisions.md 'A text fix never adds'). NO_NEW_ELEMENT_RULE (promptBuilders) is ONE sentence filled as {NO_NEW_ELEMENT} into the refiner that carries a fix out (text-refine.txt) and into the two readers that ORDER a fix (the book review book-audit.txt, three places; the logic read's fix line in story-text-logic-read.txt); the retest's ADDED question in the logic read (additionsFill) quotes the same constant to check the result. A reader that orders an addition the refiner was told never to make, or a refiner that adds what the checker is told to flag, is the drift this set stops.",
+      "generators": [
+        "prompts/text-refine.txt"
+      ],
+      "critics": [
+        "prompts/book-audit.txt",
+        "prompts/story-text-logic-read.txt"
+      ],
+      "severity": "block",
+      "parity": {
+        "ruleAnchors": [
+          {
+            "critic": "{NO_NEW_ELEMENT}",
+            "generator": "{NO_NEW_ELEMENT}",
+            "note": "One constant, NO_NEW_ELEMENT_RULE; pinned in tests/unit/text-fix-adds-nothing.test.ts."
+          }
+        ]
+      }
     }
   ],
   "withinFile": [

@@ -426,6 +426,7 @@ function bookAuditStoryFill(storyData) {
   return {
     MAIN_CHARACTERS: mainCharactersText(storyData),
     ...logicReadQuestions(),
+    NO_NEW_ELEMENT: require('./promptBuilders').NO_NEW_ELEMENT_RULE,
     BUY_CRITERION: buildIdeaContract(chars).BUY_CRITERION,
   };
 }

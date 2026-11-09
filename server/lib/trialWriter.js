@@ -13,7 +13,7 @@
  * Shared by the trial pipeline (storyJobPipeline.js) and the Test Lab trial stage (testlab.js), so the
  * two cannot drift. docs/decisions.md 2026-10-10 "Trial writer: Flash arc+bible v4".
  */
-const { buildTrialArcPrompt, buildTrialPagesPrompt } = require('./promptBuilders');
+const { buildTrialArcPrompt, buildTrialPagesPrompt, markVerseWriter } = require('./promptBuilders');
 const { callTextModelStreaming, describeTruncation } = require('./textModels');
 const { UnifiedStoryParser } = require('./outlineParser');
 const { log } = require('../utils/logger');
@@ -87,6 +87,7 @@ async function runTrialWriter({ inputData, sceneCount, pagesModel, arcSuffix = '
   // Ends on the marker B's output starts with, so the progressive parser closes the cover scene now.
   if (onArcText) onArcText(arcText, `${arcText}\n\n${PAGES_MARKER}\n`);
 
+  markVerseWriter(inputData);   // typed record that this text is written in verse (promptBuilders.isVerseStory reads it)
   const pagesPrompt = buildTrialPagesPrompt(inputData, sceneCount, arcText);
   const pagesResult = await callText(pagesPrompt, null, (chunk, fullText) => {
     if (onPagesChunk) onPagesChunk(chunk, `${arcText}\n\n${fullText}`);

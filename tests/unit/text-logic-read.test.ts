@@ -144,7 +144,7 @@ describe('buildTextLogicReadPrompt', () => {
 
   it('asks the verse question only for a verse book', () => {
     expect(buildTextLogicReadPrompt(storyData, pages())).not.toMatch(/^VERSE\./m);
-    const verse = { ...storyData, storyCategory: 'educational', storyTopic: 'rhyming' };
+    const verse = { ...storyData, storyCategory: 'educational', storyTopic: 'rhyming', textForm: 'verse' };
     const v = buildTextLogicReadPrompt(verse, pages());
     expect(v).toMatch(/^VERSE\./m);
   });

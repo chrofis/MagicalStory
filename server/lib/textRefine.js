@@ -1318,8 +1318,16 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
     let finalPages = next;
     if (majorChange.length && !opts.noRetest) {
       log.info(`🔁 [TEXT-POST-AUDIT] page(s) ${majorChange.map(o => `p${o.pageNumber} ${Math.round(o.ratio * 100)}%`).join(', ')} changed past the ${Math.round(MODEL_DEFAULTS.textRefineMajorChangeRatio * 100)}% major-change threshold — one logic re-read of the whole book`);
+      // The additions check rides in this same read (owner 2026-11-09, "Retest also checks additions"): the BEFORE
+      // and AFTER of each over-threshold page, with the findings that page was asked to answer.
+      const additions = majorChange.map(o => ({
+        pageNumber: o.pageNumber,
+        before: pages.find(p => p.pageNumber === o.pageNumber)?.text || '',
+        after: next.find(p => p.pageNumber === o.pageNumber)?.text || '',
+        findings: findings.filter(f => f.pageNumber === o.pageNumber).map(f => f.text),
+      }));
       const lr = await require('./textLogicRead').runLogicReadStep(storyData, next, {
-        arc: opts.arc, arcHints: opts.arcHints, storyLogic: opts.storyLogic,
+        arc: opts.arc, arcHints: opts.arcHints, storyLogic: opts.storyLogic, additions,
       });
       finalPages = lr.pages;
       retest = {

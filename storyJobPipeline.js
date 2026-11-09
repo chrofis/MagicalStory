@@ -6557,6 +6557,8 @@ ${trialWriter.pagesPrompt}`;
       storyTypeName: inputData.storyTypeName || '', // Display name for story type
       storyCategory: inputData.storyCategory || '', // adventure, life-challenge, educational
       storyTopic: inputData.storyTopic || '', // Specific topic within category
+      // 'verse' when the page writer wrote the text in rhyming verse (promptBuilders.markVerseWriter); absent otherwise.
+      ...(inputData.textForm ? { textForm: inputData.textForm } : {}),
       storyTheme: inputData.storyTheme || '', // Theme/setting for the story
       storyDetails: inputData.storyDetails || '', // User's custom story idea
       // What the idea generator offered, so the save path can work out whether

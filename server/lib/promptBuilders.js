@@ -6549,6 +6549,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     READING_LEVEL: getReadingLevel(inputData.languageLevel),
     PARAGRAPH_SHAPE: paragraphShapeRule(),
     VERSE_FORM: verseFormFor(inputData, 'rewrite'),
+    NO_NEW_ELEMENT: NO_NEW_ELEMENT_RULE,
     PAGE_COUNT: pages.length,
     CHARACTER_NAMES: cast.names.join(', '),
     CHARACTER_DETAILS: cast.details,
@@ -10663,6 +10664,14 @@ const PERIL_CEILING_RULE = "Nothing in the story or its pictures is dangerous en
  */
 const NO_DASH_RULE = 'Never use an em-dash or an en-dash, except where the LANGUAGE block above names one use for it. Use a comma, a full stop, a colon or parentheses.';
 const PAGE_CONTINUITY_RULE = 'A character knows only what an earlier page or picture gave them; a feeling a page says someone had is one an earlier page showed; no page states as true what an earlier page told otherwise. A character who refuses, gives up or discards a thing stays done with it, and a later page that has them want it back or take it up again says what changed. Every reveal a page promises is answered on a later page, and every price paid leaves a mark a later page shows.';
+/**
+ * A FIX NEVER ADDS (owner, 2026-11-09: "Make sure opus knows that is not supposed to add new characters etc").
+ * ONE sentence read by everything that orders a text fix (the book review's FAULT[TEXT] lines and listener
+ * questions, the logic read's fix lines) and by the refiner that carries the fix out, plus the retest's ADDED
+ * question that checks the result against it. Generator-vs-critic: sibling set `text-fix-adds-nothing`.
+ * docs/decisions.md 2026-11-09 "A text fix never adds".
+ */
+const NO_NEW_ELEMENT_RULE = 'A fix never brings in a new character, creature, group, place, object, event, ability or rule that the story does not already carry; it says again, or says more plainly, what the story already holds.';
 const NEIGHBOUR_PHRASE_RULE = 'No phrase is repeated from a neighbouring sentence.';
 const NO_ABBREVIATION_RULE = 'No abbreviation or acronym reaches the page; write the thing the way a child says it.';
 
@@ -10685,18 +10694,44 @@ const VERSE_ROLE_TAILS = {
   lector: 'The pages are verse. Quote and correct ONE verse line at a time, exactly as it stands on a single line; where a fault spans two lines, write the line break as " / " in both the quote and the correction. A correction never changes the word that ends a line if that word rhymes with its partner line, and never turns a line into prose order.',
   diff: 'The pages are verse. Sentences are shown with " / " between their verse lines. A FIX keeps every " / " where it stands, and never changes a word that ends a line and rhymes with its partner line. A RESTORE puts back the sentence with its " / " marks.',
 };
-/** True when the story is told in verse (the learning topic `rhyming`). */
-function isVerseStory(inputData) {
+/** True when the story's TOPIC asks for verse: the request the writer reads. Writers only; see isVerseStory. */
+function topicAsksForVerse(inputData) {
   const d = inputData || {};
   return d.storyCategory === VERSE_TOPIC.category
     && String(d.storyTopic || '').toLowerCase().replace(/\s+/g, '-') === VERSE_TOPIC.topic;
 }
 /**
+ * Called by each page writer right before it builds its prompt: records on the story, as a typed field, that its
+ * text is written in verse. Everything after the writer reads that field and never the topic (owner, 2026-11-09:
+ * "a book counts as rhyming only if it is actually written in verse"; a rhyming-topic book written in prose
+ * before the verse writer shipped must not be rewritten into verse). Mutates inputData; returns it.
+ */
+function markVerseWriter(inputData) {
+  if (topicAsksForVerse(inputData)) inputData.textForm = 'verse';
+  return inputData;
+}
+/**
+ * True when the story's text is written in verse: the typed `textForm` field the writer stamped.
+ * A story with the rhyming topic and NO field is a record from before the field existed, and whether its text is
+ * verse or prose cannot be told from here: this THROWS instead of guessing (a guess flattens a verse book to prose
+ * or turns a prose book into verse). The one-off backfill sets the field (docs/decisions.md 2026-11-09).
+ */
+function isVerseStory(inputData) {
+  const d = inputData || {};
+  if (d.textForm != null) return d.textForm === 'verse';
+  if (topicAsksForVerse(d)) {
+    throw new Error('isVerseStory: the story has the rhyming topic but no textForm field, so it is unknown whether its text is verse or prose; backfill textForm (docs/decisions.md 2026-11-09)');
+  }
+  return false;
+}
+/**
  * The {VERSE_FORM} value for one role ('write' | 'rewrite' | 'audit' | 'lector' | 'diff').
- * '' for a story that is not told in verse.
+ * '' for a story that is not told in verse. The writer role reads the topic (it is the one that decides the form);
+ * every later role reads the stamped field.
  */
 function verseFormFor(inputData, role) {
-  if (!isVerseStory(inputData)) return '';
+  const verse = role === 'write' ? topicAsksForVerse(inputData) : isVerseStory(inputData);
+  if (!verse) return '';
   const tail = VERSE_ROLE_TAILS[role];
   if (!tail) throw new Error(`verseFormFor: unknown role "${role}"`);
   return `${VERSE_FORM_RULE} ${tail}`;
@@ -12749,7 +12784,7 @@ function logicReadQuestions() {
  * contradictions, unkind friends, empty pages, cause, verse beat). Typed JSON out (parseLogicRead,
  * textLogicRead.js); only the typed severity decides what is fixed. Prompt: prompts/story-text-logic-read.txt.
  */
-function buildTextLogicReadPrompt(inputData, pages = []) {
+function buildTextLogicReadPrompt(inputData, pages = [], { additions = [] } = {}) {
   const template = PROMPT_TEMPLATES.storyTextLogicRead;
   if (!template) {
     log.error('[PROMPT] storyTextLogicRead template not loaded — logic read unavailable');
@@ -12761,11 +12796,31 @@ function buildTextLogicReadPrompt(inputData, pages = []) {
     MAIN_CHARACTERS: mainCharactersText(inputData),
     PAGES: pages.map(p => `--- Page ${p.pageNumber} ---\n${String(p.text || '').trim()}`).join('\n\n'),
     FRIEND_REASON: FRIEND_REASON_RULE,
+    NO_NEW_ELEMENT: NO_NEW_ELEMENT_RULE,
     VERSE_FORM: verseFormFor(inputData, 'logic'),
     VERSE_QUESTION: verse
       ? 'VERSE. Lines where the beat stumbles so a first reader would trip, and lines that carry no story and exist only for the rhyme.\n'
       : '',
+    ...additionsFill(additions),
   });
+}
+
+/**
+ * The retest's ADDITIONS check (owner, 2026-11-09: "Retest also checks additions"), inside the logic read that
+ * the retest already runs. `additions` is one entry per rewritten page over the major-change threshold:
+ * {pageNumber, before, after, findings: string[]} (the findings that page was asked to answer). Empty list =
+ * both placeholders empty, so the logic read after the lector is unchanged.
+ */
+function additionsFill(additions = []) {
+  if (!additions.length) return { ADDITIONS: '', ADDED_ID: '' };
+  const body = additions.map(a => {
+    const asked = (a.findings || []).map(f => `- ${String(f).trim()}`).join('\n') || '- (none recorded)';
+    return `--- Page ${a.pageNumber} ---\nTHE FINDING THIS REWRITE ANSWERED:\n${asked}\n\nBEFORE:\n${String(a.before || '').trim()}\n\nAFTER:\n${String(a.after || '').trim()}`;
+  }).join('\n\n');
+  return {
+    ADDITIONS: `\n# REWRITTEN PAGES\n\nThe pages below were just rewritten to answer the finding shown under each. BEFORE is the text that stood, AFTER is the text now printed in PAGES above.\n\n${body}\n\nADDED. The rule for any fix: ${NO_NEW_ELEMENT_RULE} For each rewritten page above: does AFTER bring in anything that rule forbids and that the finding did not ask for? Saying again, or more plainly, what BEFORE already carried is not an addition. An addition is always MAJOR, and its fix says what to remove from AFTER. Quote the added words from AFTER.\n`,
+    ADDED_ID: '|ADDED',
+  };
 }
 
 /**
@@ -14621,6 +14676,9 @@ module.exports = {
   VERSE_FORM_RULE,
   VERSE_ROLE_TAILS,
   isVerseStory,
+  markVerseWriter,
+  topicAsksForVerse,
+  NO_NEW_ELEMENT_RULE,
   verseFormFor,
   verseLinesInline,
   TEXT_VS_PICTURE_RULE,

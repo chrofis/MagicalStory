@@ -24,6 +24,7 @@ const { log } = require('../utils/logger');
 /** The closed question vocabulary. Upper-case letters only: the ids double as FAULT-line categories. */
 const LOGIC_QUESTIONS = Object.freeze([
   'OBSTACLE', 'STAKES', 'KNOWLEDGE', 'PLACE', 'CONTRADICTION', 'FRIEND', 'NOPROGRESS', 'CAUSE', 'VERSE',
+  'ADDED',   // retest only: the rewrite brought in what the finding did not ask for (prompts/story-text-logic-read.txt)
 ]);
 const LOGIC_SEVERITIES = Object.freeze(['MAJOR', 'MINOR']);
 
@@ -104,7 +105,8 @@ function toFaultLines(findings = []) {
  *
  * @param {Object} storyData story record fields
  * @param {Array<{pageNumber:number,text:string}>} pages the text as the lector left it
- * @param {Object} [opts] arc, arcHints, storyLogic (passed to the fix round), model, effort, firstRound (round number to use)
+ * @param {Object} [opts] arc, arcHints, storyLogic (passed to the fix round), model, effort, firstRound (round number to use),
+ *   additions (the retest only: [{pageNumber, before, after, findings}] of the over-threshold pages, asks the ADDED question)
  * @returns {Promise<{pages:Array, rounds:Array, logicRead:object}>}
  *   logicRead is the stored record: model, ok, findings (all, typed), dropped, majorCount, fixed, error, cost.
  */
@@ -124,7 +126,7 @@ async function runLogicReadStep(storyData, pages, opts = {}) {
   };
   const out = () => ({ pages, rounds, logicRead: record });
 
-  const prompt = buildTextLogicReadPrompt(storyData, pages);
+  const prompt = buildTextLogicReadPrompt(storyData, pages, { additions: opts.additions || [] });
   if (!prompt || !TEXT_MODELS[modelKey]) {
     record.error = prompt ? `unknown model "${modelKey}"` : 'template unavailable';
     log.error(`❌ [LOGIC-READ] not run: ${record.error} — the finished text is unread for story logic`);

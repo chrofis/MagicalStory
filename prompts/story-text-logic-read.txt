@@ -20,7 +20,7 @@ CONTRADICTION. A later page contradicts an earlier one: a thing, ability or feat
 FRIEND. {FRIEND_REASON} A conflict with a reason on the page is not a fault.
 NOPROGRESS. A page where nothing changes: no new problem, try, discovery, feeling or decision, only walking, arriving or describing.
 CAUSE. An event with no cause the reader can follow, or an obvious simpler solution the characters ignore with no reason ("why don't they just ...?").
-{VERSE_QUESTION}
+{VERSE_QUESTION}{ADDITIONS}
 # SEVERITY
 
 Every finding is MAJOR or MINOR.
@@ -42,7 +42,7 @@ Everything else is MINOR: an arguable reading, a small gap the reader fills with
 - Do not report style, word choice, spelling or grammar. Do not ask for what a picture book leaves to its pictures (clothes, colours, the look of a place), and do not treat the page text as a checklist of facts that must all be said.
 - Make-believe is allowed: a magic rule is fine as long as the book keeps to it.
 - The quote is copied word for word from one page named in "pages". For a fault that is something never said (STAKES), the quote is an empty string.
-- The fix is the smallest change to the words that solves the fault, written as an instruction to an editor. It changes words only: no page is added, no event is moved to another page, no plot is changed.
+- The fix is the smallest change to the words that solves the fault, written as an instruction to an editor. It changes words only: no page is added, no event is moved to another page, no plot is changed. {NO_NEW_ELEMENT}
 
 # OUTPUT
 
@@ -50,7 +50,7 @@ Reply with one JSON object and nothing else:
 
 {"resolution": {"page": <number or null>, "actor": "<who performs the act that removes the central problem>", "byMainCharacter": <true or false>},
  "findings": [
-  {"pages": [<page numbers the fault touches, the first is where it shows>], "question": "<OBSTACLE|STAKES|KNOWLEDGE|PLACE|CONTRADICTION|FRIEND|NOPROGRESS|CAUSE|VERSE>", "severity": "<MAJOR|MINOR>", "quote": "<words copied from the page, or an empty string>", "fix": "<the smallest change>"}
+  {"pages": [<page numbers the fault touches, the first is where it shows>], "question": "<OBSTACLE|STAKES|KNOWLEDGE|PLACE|CONTRADICTION|FRIEND|NOPROGRESS|CAUSE|VERSE{ADDED_ID}>", "severity": "<MAJOR|MINOR>", "quote": "<words copied from the page, or an empty string>", "fix": "<the smallest change>"}
  ]}
 
 A book with no fault has "findings": [].

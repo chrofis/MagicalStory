@@ -1,0 +1,25 @@
+{
+ "source": "evals/runs/2026-11-09_post-audit-text-replay/v2-job_1793959308869_fre2mb4d0.json (staging job_1793959308869_fre2mb4d0, pages 5 and 10; the refiner added a herd and a thank-you line the story never has)",
+ "faults": [
+  "FAULT[TEXT][MINOR]: p5 — After «Das Licht wurde schon blasser», add a sentence saying that if the light goes out, Rubi cannot get home.",
+  "FAULT[TEXT][MINOR]: p10 — Before «Auf dem Hof schaute das Pony über die Stalltür», add a sentence saying that the four girls walked back home to the farm."
+ ],
+ "before": {
+  "5": "Rubi erschrak. Er stampfte und warf das Laub hoch. Auf der einen Seite waren Brombeeren, auf der anderen der Bach. Er kam nicht an den Mädchen vorbei.\n\nDas Licht wurde schon blasser. «Er will dort hindurch», dachte Janna. «Aber er hat Angst vor uns.»",
+  "10": "Ganz leise gingen die vier mit Rubi bis zum Licht. Dort drehte er sich noch einmal um, und sein Horn leuchtete. Dann trabte er hindurch.\n\nAuf dem Hof schaute das Pony über die Stalltür. «Da bist du ja!», lachte Melodi. Janna hielt ihr rotes Blatt fest und lächelte."
+ },
+ "after": {
+  "5": "Rubi erschrak. Er stampfte und warf das Laub hoch. Auf der einen Seite waren Brombeeren, auf der anderen der Bach. Er kam nicht an den Mädchen vorbei.\n\nDas Licht wurde schon blasser. «Wenn es ausgeht, geht seine Herde ohne ihn, und er bleibt allein im dunklen Wald», dachte Janna. «Er will dort hindurch. Aber er hat Angst vor uns.»",
+  "10": "Ganz leise gingen die vier mit Rubi bis zum Licht. Am Licht drehte er sich noch einmal um, und sein Horn leuchtete ihnen den Weg. «Danke, Rubi», flüsterte Janna. Die vier traten zwischen den zwei grossen Buchen hinaus, und Rubi trabte seiner Herde nach.\n\nDann liefen die vier zurück zum Hof. Dort schaute das Pony über die Stalltür. «Da bist du ja!», lachte Melodi. Janna hielt ihr rotes Blatt fest und lächelte."
+ },
+ "majorChangePages": [
+  {
+   "pageNumber": 5,
+   "ratio": 0.305
+  },
+  {
+   "pageNumber": 10,
+   "ratio": 0.417
+  }
+ ]
+}

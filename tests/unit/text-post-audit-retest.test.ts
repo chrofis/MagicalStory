@@ -15,7 +15,7 @@ const { runPostAuditTextRound } = nodeRequire('../../server/lib/textRefine.js');
 const fx = nodeRequire('./fixtures/verse-edit-cap-p2-p9.json');
 
 const realCall = textModels.callTextModelStreaming;
-const STORY: any = { language: 'de-ch', languageLevel: 'standard', storyCategory: fx.storyCategory, storyTopic: fx.storyTopic, characters: [], mainCharacters: [] };
+const STORY: any = { language: 'de-ch', languageLevel: 'standard', storyCategory: fx.storyCategory, storyTopic: fx.storyTopic, textForm: 'verse', characters: [], mainCharacters: [] };
 const pagesOf = () => Object.entries(fx.pages).map(([n, p]: any) => ({ pageNumber: Number(n), text: p.before, sceneIntent: 'x', sceneBrief: 'x', planLine: '' }));
 const rewrite = (map: Record<string, string>) => '---ANALYSIS---\nfixed\n---STORY TEXT---\n' + Object.entries(map).map(([n, t]) => `## Page ${n}\n${t}`).join('\n\n');
 const fault = (n: number) => ({ page: n, severity: 'MINOR', line: `FAULT[TEXT][MINOR]: p${n} — fix it` });
@@ -45,7 +45,7 @@ describe('runPostAuditTextRound: no rewrite is rejected for size', () => {
     expect(res.entry.editRatios.map((o: any) => Math.round(o.ratio * 100))).toEqual([64, 65]);
   });
   it('keeps them for a prose book too', async () => {
-    const res = await runPostAuditTextRound({ ...STORY, storyCategory: 'adventure', storyTopic: '' }, pagesOf(), [fault(2), fault(9)]);
+    const res = await runPostAuditTextRound({ ...STORY, storyCategory: 'adventure', storyTopic: '', textForm: undefined }, pagesOf(), [fault(2), fault(9)]);
     expect(res.pages.map((p: any) => p.text)).toEqual([fx.pages[2].after, fx.pages[9].after]);
   });
 });
