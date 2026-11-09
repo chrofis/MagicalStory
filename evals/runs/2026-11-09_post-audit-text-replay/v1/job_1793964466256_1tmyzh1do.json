@@ -1,0 +1,43 @@
+{
+ "id": "job_1793964466256_1tmyzh1do",
+ "faults": [
+  "FAULT[TEXT][MINOR]: p2 — Say that the toggles on Janna's coat would not fasten (\"Drinnen wollten die Knebel an Jannas Mantel nicht zugehen\"), not that its zip was stuck.",
+  "FAULT[TEXT][MAJOR]: p9 — Add a sentence where Polina, Melodi and Melisa first see Silbermond and gasp at the unicorn beside Janna, for example \"Polina machte grosse Augen: «Ein Einhorn!»\", before Polina says \"Da bist du ja!\"."
+ ],
+ "ok": true,
+ "changedPages": [],
+ "outcomes": [
+  {
+   "category": "TEXT",
+   "pageNumber": 2,
+   "text": "Say that the toggles on Janna's coat would not fasten (\"Drinnen wollten die Knebel an Jannas Mantel nicht zugehen\"), not that its zip was stuck.",
+   "line": "FAULT[TEXT][MINOR]: p2 — Say that the toggles on Janna's coat would not fasten (\"Drinnen wollten die Knebel an Jannas Mantel nicht zugehen\"), not that its zip was stuck.",
+   "sources": [
+    "book-audit"
+   ],
+   "id": "T1",
+   "outcome": "page-returned-identical",
+   "reason": "the pass returned page 2 as a rewrite and its text is identical to the one it was given"
+  },
+  {
+   "category": "TEXT",
+   "pageNumber": 9,
+   "text": "Add a sentence where Polina, Melodi and Melisa first see Silbermond and gasp at the unicorn beside Janna, for example \"Polina machte grosse Augen: «Ein Einhorn!»\", before Polina says \"Da bist du ja!\".",
+   "line": "FAULT[TEXT][MAJOR]: p9 — Add a sentence where Polina, Melodi and Melisa first see Silbermond and gasp at the unicorn beside Janna, for example \"Polina machte grosse Augen: «Ein Einhorn!»\", before Polina says \"Da bist du ja!\".",
+   "sources": [
+    "book-audit"
+   ],
+   "id": "T2",
+   "outcome": "page-returned-identical",
+   "reason": "the pass returned page 9 as a rewrite and its text is identical to the one it was given"
+  }
+ ],
+ "before": {},
+ "after": {},
+ "analysis": "---ANALYSIS---\nRewritable pages: p2 and p9, because the findings name them. The other pages were scanned for the four extra cases, and none applies. No page has a text that states the opposite of its outline, a MISMATCH move, an abbreviation or acronym, or a banned dash.\n\nPage 2: \"Drinnen klemmte der Reissverschluss an Jannas Mantel.\" The coat has toggles, not a zip. The sentence now says the toggles would not fasten. Janna's murmured line is recast, because the page is now verse and needs the rhyme with \"zugehen\": «Ich kann nicht länger stehen!» It still shows her impatience. The kick, the silver leaf and her staring stay.\n\nPage 9: Polina and the others do not react when Silbermond appears beside Janna. One line is added in which Polina gasps «Ein Einhorn ist da!» before «Da bist du ja!». Children can see Silbermond, so the reaction fits. Melodi's reaction to the shout stays as Polinas Ruf, as the hint (s9) requires. The deadline (the ring not yet closed) stays shown through the gap and Melodi's «Halt!». The rewrite is in verse, as the book form requires. Polina is not in the p9 picture, so the added line gives no group a number.\n\nLedger:\n- T1: fixed on p2 (toggles that would not fasten).\n- T2: fixed on p9 (Polina's gasp, \"Ein Einhorn ist da!\", before \"Da bist du ja!\").\n- p2 sentences removed: \"Das dauert viel zu lange!\" was recast as the new spoken line. \"Dann rannte sie zur Tür hinaus\" and \"Janna blieb stehen und starrte es an\" were folded into couplets. No story fact was dropped.\n- p9 sentences removed: \"bevor sich der Ring schloss\" is now carried by Melodi's «Halt!» and the gap, and the raised hand is left to the picture. Nothing else was dropped.\n\n---STORY TEXT---\n## Page 2\nDie Knebel am Mantel wollten nicht zugehen.\nJanna murmelte: «Ich kann nicht länger stehen!»\n\nJanna rannte zur Tür hinaus.\nEin Haufen Herbstlaub lag vor dem Haus.\n\nSie trat mit dem Stiefel kräftig hinein.\nDie Blätter flogen auf, und ein Blatt glänzte fein.\n\nEin silbernes Blatt hob sich aus dem Haufen.\nJanna starrte es an, statt weiterzulaufen.\n\n## Page 9\nMelodi hörte Polinas Ruf. Sie konnte die Lücke sehen.\n«Halt!», rief sie zittrig, und die Reihe blieb stehen.\n\nMelisa hob Jannas Laterne hoch: «Janna, hier!»\nJanna sah das Licht und rannte zu ihr.\n\nJanna trat in die Lücke mit einem Schritt,\nund Silbermond ging neben ihr mit.\n\nPolina machte grosse Augen: «Ein Einhorn ist da!»\nDann sagte sie zu Janna: «Da bist du ja!»",
+ "cost": 0.147754,
+ "usage": {
+  "input_tokens": 17287,
+  "output_tokens": 11318
+ }
+}

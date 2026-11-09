@@ -1,0 +1,52 @@
+{
+ "id": "job_1793959308869_fre2mb4d0",
+ "faults": [
+  "FAULT[TEXT][MINOR]: p5 — After «Das Licht wurde schon blasser», add a sentence saying that if the light goes out, Rubi cannot get home.",
+  "FAULT[TEXT][MINOR]: p10 — Before «Auf dem Hof schaute das Pony über die Stalltür», add a sentence saying that the four girls walked back home to the farm."
+ ],
+ "ok": true,
+ "changedPages": [
+  5,
+  10
+ ],
+ "outcomes": [
+  {
+   "category": "TEXT",
+   "pageNumber": 5,
+   "text": "After «Das Licht wurde schon blasser», add a sentence saying that if the light goes out, Rubi cannot get home.",
+   "line": "FAULT[TEXT][MINOR]: p5 — After «Das Licht wurde schon blasser», add a sentence saying that if the light goes out, Rubi cannot get home.",
+   "sources": [
+    "book-audit"
+   ],
+   "id": "T1",
+   "outcome": "page-rewritten",
+   "reason": null
+  },
+  {
+   "category": "TEXT",
+   "pageNumber": 10,
+   "text": "Before «Auf dem Hof schaute das Pony über die Stalltür», add a sentence saying that the four girls walked back home to the farm.",
+   "line": "FAULT[TEXT][MINOR]: p10 — Before «Auf dem Hof schaute das Pony über die Stalltür», add a sentence saying that the four girls walked back home to the farm.",
+   "sources": [
+    "book-audit"
+   ],
+   "id": "T2",
+   "outcome": "page-rewritten",
+   "reason": null
+  }
+ ],
+ "before": {
+  "5": "Rubi erschrak. Er stampfte und warf das Laub hoch. Auf der einen Seite waren Brombeeren, auf der anderen der Bach. Er kam nicht an den Mädchen vorbei.\n\nDas Licht wurde schon blasser. «Er will dort hindurch», dachte Janna. «Aber er hat Angst vor uns.»",
+  "10": "Ganz leise gingen die vier mit Rubi bis zum Licht. Dort drehte er sich noch einmal um, und sein Horn leuchtete. Dann trabte er hindurch.\n\nAuf dem Hof schaute das Pony über die Stalltür. «Da bist du ja!», lachte Melodi. Janna hielt ihr rotes Blatt fest und lächelte."
+ },
+ "after": {
+  "5": "Rubi erschrak. Er stampfte und warf das Laub hoch. Auf der einen Seite waren Brombeeren, auf der anderen der Bach. Er kam nicht an den Mädchen vorbei.\n\nDas Licht wurde schon blasser. «Wenn es erlischt, kommt er nicht mehr heim», dachte Janna. «Er will dort hindurch», dachte Janna. «Aber er hat Angst vor uns.»",
+  "10": "Ganz leise gingen die vier mit Rubi bis zum Licht. Dort drehte er sich noch einmal um, und sein Horn leuchtete. Dann trabte er hindurch.\n\nDann liefen die vier zum Hof zurück. Auf dem Hof schaute das Pony über die Stalltür. «Da bist du ja!», lachte Melodi. Janna hielt ihr rotes Blatt fest und lächelte."
+ },
+ "analysis": "---ANALYSIS---\nT1 (p5): The finding is accepted. The page shows the light dimming but never says what that costs Rubi. The stakes are owed by the MUST SAY line. I added one thought for Janna after «Das Licht wurde schon blasser.»: «Wenn es erlischt, kommt er nicht mehr heim.» It is a character's thought, with no narrator reason and no new fact.\n\nT2 (p10): The finding is accepted. The text jumps from the light to the farm with no walk back. I added one plain sentence of ordinary business before «Auf dem Hof schaute das Pony über die Stalltür»: «Dann liefen die vier zum Hof zurück.»\n\nFour-case scan of the other pages:\n- Page whose text states the opposite of its scene outline: none found.\n- MISMATCH move: none needed.\n- Abbreviation or acronym: none found.\n- Banned dash (em-dash or en-dash): none found.\n\nLedger:\nT1: fixed on p5 with one added thought for Janna.\nT2: fixed on p10 with one added sentence.\np5: no sentence removed.\np10: no sentence removed.\n\n---STORY TEXT---\n## Page 5\nRubi erschrak. Er stampfte und warf das Laub hoch. Auf der einen Seite waren Brombeeren, auf der anderen der Bach. Er kam nicht an den Mädchen vorbei.\n\nDas Licht wurde schon blasser. «Wenn es erlischt, kommt er nicht mehr heim», dachte Janna. «Er will dort hindurch», dachte Janna. «Aber er hat Angst vor uns.»\n\n## Page 10\nGanz leise gingen die vier mit Rubi bis zum Licht. Dort drehte er sich noch einmal um, und sein Horn leuchtete. Dann trabte er hindurch.\n\nDann liefen die vier zum Hof zurück. Auf dem Hof schaute das Pony über die Stalltür. «Da bist du ja!», lachte Melodi. Janna hielt ihr rotes Blatt fest und lächelte.",
+ "cost": 0.05692,
+ "usage": {
+  "input_tokens": 16140,
+  "output_tokens": 2464
+ }
+}

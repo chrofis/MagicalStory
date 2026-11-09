@@ -24,8 +24,8 @@ const CASES = { job_1793959308869_fre2mb4d0: 1845, job_1793964466256_1tmyzh1do: 
     const out = { id, faults: faults.map(f => f.line), ok: en.ok, error: en.error, changedPages: en.changedPages, outcomes: en.findingOutcomes,
       before: Object.fromEntries(pages.filter(p => (en.changedPages || []).includes(p.pageNumber)).map(p => [p.pageNumber, p.text])),
       after: Object.fromEntries((r?.pages || []).filter(p => (en.changedPages || []).includes(p.pageNumber)).map(p => [p.pageNumber, p.text])),
-      analysis: en.rawResponse ? String(en.rawResponse).slice(0, 4000) : null, cost: en.cost, usage: en.usage };
-    fs.writeFileSync(path.join(__dirname, id + '.json'), JSON.stringify(out, null, 1));
+      retest: en.retest, majorChangePages: en.majorChangePages, analysis: en.rawResponse ? String(en.rawResponse).slice(0, 4000) : null, cost: en.cost, usage: en.usage };
+    fs.writeFileSync(path.join(__dirname, 'v2-' + id + '.json'), JSON.stringify(out, null, 1));
     console.log(id, 'ok', en.ok, 'changed', en.changedPages, 'cost', en.cost, 'keys', Object.keys(en).join(','));
   }
   console.log('total cost', total); await pool.end(); process.exit(0);

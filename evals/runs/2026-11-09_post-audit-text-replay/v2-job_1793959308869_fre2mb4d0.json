@@ -1,0 +1,120 @@
+{
+ "id": "job_1793959308869_fre2mb4d0",
+ "faults": [
+  "FAULT[TEXT][MINOR]: p5 — After «Das Licht wurde schon blasser», add a sentence saying that if the light goes out, Rubi cannot get home.",
+  "FAULT[TEXT][MINOR]: p10 — Before «Auf dem Hof schaute das Pony über die Stalltür», add a sentence saying that the four girls walked back home to the farm."
+ ],
+ "ok": true,
+ "changedPages": [
+  5,
+  10
+ ],
+ "outcomes": [
+  {
+   "category": "TEXT",
+   "pageNumber": 5,
+   "text": "After «Das Licht wurde schon blasser», add a sentence saying that if the light goes out, Rubi cannot get home.",
+   "line": "FAULT[TEXT][MINOR]: p5 — After «Das Licht wurde schon blasser», add a sentence saying that if the light goes out, Rubi cannot get home.",
+   "sources": [
+    "book-audit"
+   ],
+   "id": "T1",
+   "outcome": "page-rewritten",
+   "reason": null
+  },
+  {
+   "category": "TEXT",
+   "pageNumber": 10,
+   "text": "Before «Auf dem Hof schaute das Pony über die Stalltür», add a sentence saying that the four girls walked back home to the farm.",
+   "line": "FAULT[TEXT][MINOR]: p10 — Before «Auf dem Hof schaute das Pony über die Stalltür», add a sentence saying that the four girls walked back home to the farm.",
+   "sources": [
+    "book-audit"
+   ],
+   "id": "T2",
+   "outcome": "page-rewritten",
+   "reason": null
+  }
+ ],
+ "before": {
+  "5": "Rubi erschrak. Er stampfte und warf das Laub hoch. Auf der einen Seite waren Brombeeren, auf der anderen der Bach. Er kam nicht an den Mädchen vorbei.\n\nDas Licht wurde schon blasser. «Er will dort hindurch», dachte Janna. «Aber er hat Angst vor uns.»",
+  "10": "Ganz leise gingen die vier mit Rubi bis zum Licht. Dort drehte er sich noch einmal um, und sein Horn leuchtete. Dann trabte er hindurch.\n\nAuf dem Hof schaute das Pony über die Stalltür. «Da bist du ja!», lachte Melodi. Janna hielt ihr rotes Blatt fest und lächelte."
+ },
+ "after": {
+  "5": "Rubi erschrak. Er stampfte und warf das Laub hoch. Auf der einen Seite waren Brombeeren, auf der anderen der Bach. Er kam nicht an den Mädchen vorbei.\n\nDas Licht wurde schon blasser. «Wenn es ausgeht, geht seine Herde ohne ihn, und er bleibt allein im dunklen Wald», dachte Janna. «Er will dort hindurch. Aber er hat Angst vor uns.»",
+  "10": "Ganz leise gingen die vier mit Rubi bis zum Licht. Am Licht drehte er sich noch einmal um, und sein Horn leuchtete ihnen den Weg. «Danke, Rubi», flüsterte Janna. Die vier traten zwischen den zwei grossen Buchen hinaus, und Rubi trabte seiner Herde nach.\n\nDann liefen die vier zurück zum Hof. Dort schaute das Pony über die Stalltür. «Da bist du ja!», lachte Melodi. Janna hielt ihr rotes Blatt fest und lächelte."
+ },
+ "retest": {
+  "ran": true,
+  "ok": true,
+  "error": null,
+  "findings": [
+   {
+    "pages": [
+     3,
+     9
+    ],
+    "question": "CONTRADICTION",
+    "severity": "MINOR",
+    "quote": "Darunter leuchtete ein Horn!",
+    "fix": "Change page 9 so the horn is not shown as a surprise, or let page 3 hide the horn by saying only that the leaves lay like a crown."
+   },
+   {
+    "pages": [
+     4,
+     9
+    ],
+    "question": "KNOWLEDGE",
+    "severity": "MINOR",
+    "quote": "«Das Pony vom Hof!», rief Melodi laut.",
+    "fix": "Let Melodi say 'Ein Pony!' on page 4, or have her only suspect it is the farm pony."
+   },
+   {
+    "pages": [
+     6
+    ],
+    "question": "CAUSE",
+    "severity": "MINOR",
+    "quote": "«Psst!», sagte Janna. «Wir machen ihm Angst. Wir müssen ganz still sein.»",
+    "fix": "Change to: «Psst! Wir machen ihm Angst. Wir müssen ganz still sein und uns an den Rand stellen.»"
+   }
+  ],
+  "majorCount": 0,
+  "fixedPages": [],
+  "cost": 0.010783999999999998,
+  "rounds": [
+   {
+    "round": 1,
+    "kind": "logic_read",
+    "ok": true,
+    "modelKey": "claude-sonnet-5-5",
+    "modelId": "claude-sonnet-5-5",
+    "elapsedMs": 3217,
+    "usage": {
+     "input_tokens": 3322,
+     "output_tokens": 414
+    },
+    "cost": 0.010783999999999998,
+    "prompt": "You are the final story-logic reader of a finished Swiss Standard German (ss, never ß — never dialect) children's picture book. You get the text of every page in reading order, as it will be printed. The text has already been proofread for spelling and grammar. Your only job is the story logic a careful parent, or the child listening, would trip over when the words are read aloud. Judge the text only.\n\nThe main character is: Janna. Every question that says \"the main character\" is judged against exactly that character, never against whoever the title names first.\n\n# PAGES\n\n--- Page 1 ---\nAuf dem Bauernhof an der Oberen Reppischstrasse in Dietikon war die Koppel leer. «Das Pony ist weg!», rief Melodi. «Wir suchen es im Honeret.»\n\nPolina nahm ihr Springseil mit. «Damit fange ich es!», sagte sie. Janna wollte rote Buchenblätter sammeln, und Melisa kam auch mit. Zusammen liefen die vier los.\n\n--- Page 2 ---\nIm Honeret blies der Wind Janna das schönste rote Blatt aus der Hand. Es flog hoch über die Wiese und zwischen zwei grossen Buchen hindurch.\n\n«Mein Blatt!», rief Janna und rannte hinterher. Hinter den Buchen glitzerte das Laub. Die anderen liefen ihr nach.\n\n--- Page 3 ---\nHinter einer Buche trat ein weisses Tier hervor, so klein wie ein Pony. Auf seiner Stirn lagen viele Blätter, dicht wie eine Krone. Mittendrin steckte Jannas rotes Blatt.\n\n«Hallo, Rubi», flüsterte Janna, denn das Blatt war rot wie ein Rubin. Rubi kam einen Schritt näher.\n\n--- Page 4 ---\nDa kamen die anderen angerannt. «Das Pony vom Hof!», rief Melodi laut. Polina schwang ihr Springseil. «Ich fange es!»\n\nHinter den Mädchen, zwischen zwei Buchen, leuchtete ein helles Licht. Rubi schaute dorthin. Aber auf dem schmalen Weg standen jetzt die Mädchen.\n\n--- Page 5 ---\nRubi erschrak. Er stampfte und warf das Laub hoch. Auf der einen Seite waren Brombeeren, auf der anderen der Bach. Er kam nicht an den Mädchen vorbei.\n\nDas Licht wurde schon blasser. «Wenn es ausgeht, geht seine Herde ohne ihn, und er bleibt allein im dunklen Wald», dachte Janna. «Er will dort hindurch. Aber er hat Angst vor uns.»\n\n--- Page 6 ---\n«Psst!», sagte Janna. «Wir machen ihm Angst. Wir müssen ganz still sein.»\n\nPolina liess ihr Seil ins Laub fallen. Melodi hielt sich die Hand vor den Mund. Melisa legte den Finger auf die Lippen.\n\n--- Page 7 ---\n«Geht an den Rand», flüsterte Janna. Leise stellten sich die drei neben die Brombeeren. Jetzt war der Weg zum Licht frei.\n\nAber Rubi traute sich noch nicht. Janna ging langsam zu ihm hin. Nach jedem Schritt blieb sie stehen.\n\n--- Page 8 ---\nVor Rubi blieb Janna stehen und hielt ihm die Hand hin. «Komm», flüsterte sie. «Ich bringe dich hin.»\n\nRubi senkte die Stirn in ihre Hand.\n\n--- Page 9 ---\nDa rutschten die Blätter von seiner Stirn, und das rote Blatt fiel in Jannas Hand. Darunter leuchtete ein Horn!\n\n«Ein Einhorn!», rief Melodi. «Das ist gar nicht unser Pony!»\n\n--- Page 10 ---\nGanz leise gingen die vier mit Rubi bis zum Licht. Am Licht drehte er sich noch einmal um, und sein Horn leuchtete ihnen den Weg. «Danke, Rubi», flüsterte Janna. Die vier traten zwischen den zwei grossen Buchen hinaus, und Rubi trabte seiner Herde nach.\n\nDann liefen die vier zurück zum Hof. Dort schaute das Pony über die Stalltür. «Da bist du ja!», lachte Melodi. Janna hielt ihr rotes Blatt fest und lächelte.\n\n# QUESTIONS\n\nRead the whole book once. Then answer these for the book as a whole. Each question has an id; use exactly that id in your answer.\n\nOBSTACLE. Name the act on the page that removes the central problem and who performs it. It is a fault when a friend, an adult, luck or the problem itself removes it and the main character's own act (an idea, a choice, a brave or kind deed) is not what makes the difference. Helpers may help; the deciding act is the main character's.\nSTAKES. Is it said on the pages what the main character wants and what failing would cost? When a creature, an animal or another non-family figure drives the plot, is its reason (why it came, why it wants or refuses something) said? A fault is a reason the reader needs for the plot and is never given.\nKNOWLEDGE. Who knows what, and when. A fault is a character who acts on something no earlier page gave them, who fails to react to something remarkable they have plainly seen, heard or been told (walking beside it without a word), or who \"discovers\" what the reader already saw them learn.\nPLACE. Track every named character's place and the time of day page by page. A fault is a character in two places at once, a character who appears without arriving, who is forgotten mid-scene with no exit, or who leaves and is never mentioned again, or a time or weather jump the text does not explain.\nCONTRADICTION. A later page contradicts an earlier one: a thing, ability or feature presented as new or surprising that already appeared; an object held by someone who no longer has it, or by two people; a number that changes; a rule of the story world broken without comment; a page that states as true what an earlier page told otherwise.\nFRIEND. A friend or family member is never unkind, dismissive or careless toward the main character without a reason the pages give (a want of their own, a fear, a misunderstanding), and an unkindness is answered by a later page (an apology, a repair, or the answer the main character gives it). A conflict with a reason on the page is not a fault.\nNOPROGRESS. A page where nothing changes: no new problem, try, discovery, feeling or decision, only walking, arriving or describing.\nCAUSE. An event with no cause the reader can follow, or an obvious simpler solution the characters ignore with no reason (\"why don't they just ...?\").\n\n# SEVERITY\n\nEvery finding is MAJOR or MINOR.\n\nMAJOR means a child or parent would stop the reading and ask \"but why?\" or \"how?\", or the ending would feel unearned. A finding is MAJOR when it is one of these:\n- OBSTACLE: someone other than the main character makes the deciding move that removes the central problem.\n- STAKES: what the main character wants or what failing costs is never said, or the driving creature's reason is never said and the plot turns on it.\n- KNOWLEDGE: a character acts on knowledge no page gave them, or does not react to the very thing the plot turns on, or to something so remarkable that any child would ask why nobody says anything.\n- PLACE: a character in two places at once, appearing without arriving, or vanishing from a scene that goes on.\n- CONTRADICTION: a later page contradicts an earlier page on something a child who heard both would notice (a feature shown as new that was already there, an object that is in two hands, a count that changes).\n- FRIEND: a friend or family member acts against the main character with no reason on the pages and no repair.\n- CAUSE: the whole problem exists only because an obvious simple solution is ignored without a reason.\n\nEverything else is MINOR: an arguable reading, a small gap the reader fills without noticing, a detail only a careful adult would catch, a style preference. NOPROGRESS and VERSE are always MINOR. When you doubt whether a finding is real, leave it out; when it is real and you doubt only the weight, weigh it by whether a listening child would ask.\n\n# RULES\n\n- Report only what a reader of THIS text would actually notice. Never invent a fault to fill a question.\n- Do not report style, word choice, spelling or grammar. Do not ask for what a picture book leaves to its pictures (clothes, colours, the look of a place), and do not treat the page text as a checklist of facts that must all be said.\n- Make-believe is allowed: a magic rule is fine as long as the book keeps to it.\n- The quote is copied word for word from one page named in \"pages\". For a fault that is something never said (STAKES), the quote is an empty string.\n- The fix is the smallest change to the words that solves the fault, written as an instruction to an editor. It changes words only: no page is added, no event is moved to another page, no plot is changed.\n\n# OUTPUT\n\nReply with one JSON object and nothing else:\n\n{\"resolution\": {\"page\": <number or null>, \"actor\": \"<who performs the act that removes the central problem>\", \"byMainCharacter\": <true or false>},\n \"findings\": [\n  {\"pages\": [<page numbers the fault touches, the first is where it shows>], \"question\": \"<OBSTACLE|STAKES|KNOWLEDGE|PLACE|CONTRADICTION|FRIEND|NOPROGRESS|CAUSE|VERSE>\", \"severity\": \"<MAJOR|MINOR>\", \"quote\": \"<words copied from the page, or an empty string>\", \"fix\": \"<the smallest change>\"}\n ]}\n\nA book with no fault has \"findings\": [].\n",
+    "rawResponse": "{\"resolution\": {\"page\": 7, \"actor\": \"Janna, who tells the others to be quiet, has them step aside, and leads Rubi to the light\", \"byMainCharacter\": true}, \"findings\": [{\"pages\": [3, 9], \"question\": \"CONTRADICTION\", \"severity\": \"MINOR\", \"quote\": \"Darunter leuchtete ein Horn!\", \"fix\": \"Change page 9 so the horn is not shown as a surprise, or let page 3 hide the horn by saying only that the leaves lay like a crown.\"}, {\"pages\": [4, 9], \"question\": \"KNOWLEDGE\", \"severity\": \"MINOR\", \"quote\": \"«Das Pony vom Hof!», rief Melodi laut.\", \"fix\": \"Let Melodi say 'Ein Pony!' on page 4, or have her only suspect it is the farm pony.\"}, {\"pages\": [6], \"question\": \"CAUSE\", \"severity\": \"MINOR\", \"quote\": \"«Psst!», sagte Janna. «Wir machen ihm Angst. Wir müssen ganz still sein.»\", \"fix\": \"Change to: «Psst! Wir machen ihm Angst. Wir müssen ganz still sein und uns an den Rand stellen.»\"}]}",
+    "changedPages": [],
+    "error": null
+   }
+  ]
+ },
+ "majorChangePages": [
+  {
+   "pageNumber": 5,
+   "ratio": 0.305
+  },
+  {
+   "pageNumber": 10,
+   "ratio": 0.417
+  }
+ ],
+ "analysis": "---ANALYSIS---\nT1: Accepted, but the sentence is worded as the story has it. The finding asks for \"Rubi cannot get home\". The book has never shown a home, and the story's stake is that the herd leaves without him and he spends the night alone in the dark wood. I add that as Janna's thought right after «Das Licht wurde schon blasser.», and I move «dachte Janna» so the thoughts read as one block. This also carries the MUST SAY stakes line, which no page said yet. Fixed on p5.\n\nT2: Accepted. The jump from the wood to «Auf dem Hof schaute das Pony…» needs the walk back, so I add «Dann liefen die vier zurück zum Hof.» p10 is rewritable because of this finding. The page also left out the owed return fact, that the children step out between the same two big beeches by Rubi's light. So I recast the Rubi sentences to say it: his horn lights the way and the four step out between the two big beeches. The picture shows this, so there is no contradiction. I also add Janna's thanks, which the story has, as a spoken line that names no feeling. Fixed on p10.\n\nScan of the other pages for the four cases (MISMATCH move, text against outline, abbreviation, banned dash): none found, so pages 1 to 4 and 6 to 9 stay as they are.\n\nLedger:\n- T1: fixed on p5.\n- T2: fixed on p10.\n- Owed return fact (stepping out between the two beeches, lit by the horn): fixed on p10.\n- Sentences removed: p5 none; the text of «dachte Janna» was moved, not cut. p10: «Dann trabte er hindurch.» was recast into «…und Rubi trabte seiner Herde nach.»\n\n---STORY TEXT---\n## Page 5\nRubi erschrak. Er stampfte und warf das Laub hoch. Auf der einen Seite waren Brombeeren, auf der anderen der Bach. Er kam nicht an den Mädchen vorbei.\n\nDas Licht wurde schon blasser. «Wenn es ausgeht, geht seine Herde ohne ihn, und er bleibt allein im dunklen Wald», dachte Janna. «Er will dort hindurch. Aber er hat Angst vor uns.»\n\n## Page 10\nGanz leise gingen die vier mit Rubi bis zum Licht. Am Licht drehte er sich noch einmal um, und sein Horn leuchtete ihnen den Weg. «Danke, Rubi», flüsterte Janna. Die vier traten zwischen den zwei grossen Buchen hinaus, und Rubi trabte seiner Herde nach.\n\nDann liefen die vier zurück zum Hof. Dort schaute das Pony über die Stalltür. «Da bist du ja!», lachte Melodi. Janna hielt ihr rotes Blatt fest und lächelte.",
+ "cost": 0.073738,
+ "usage": {
+  "input_tokens": 16252,
+  "output_tokens": 3045
+ }
+}
