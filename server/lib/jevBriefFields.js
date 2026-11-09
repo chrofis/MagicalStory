@@ -190,6 +190,11 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
   }
   const locOf = new Map([...located.byPage].map(([n, r]) => [n, r.base]));
   const pop = await jevDecisions.decidePopulation({ arc: approvedArc, pages: storyBeats, visualBible: vb, locOf });
+  // The place's answer, lowered per page by the page's moment and decided hour (decisions.md 2026-11-09).
+  const popMoment = await jevDecisions.decidePopulationMoment({
+    arc: approvedArc, pages: storyBeats, byLocation: pop.byLocation, locOf,
+    lightOf: new Map(storyBeats.filter(b => b.fixed).map(b => [Number(b.pageNumber), { timeOfDay: b.fixed.timeOfDay, indoor: b.fixed.indoor }])),
+  });
   // Labels for the FIXED block: an element's name, and the look for a dotted id.
   const gIndex = jevDecisions.gazeIndex(vb);
   const lookOf = new Map(els.flatMap(e => jevDecisions.stateOptions(e.entry).map(o => [o.id, o.label])));
@@ -228,7 +233,7 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
       cites, decidedIds,
       noDaylight: dayless.has(n) && !(b.fixed && isSkylessLight(b.fixed.timeOfDay)),
       ...(loc ? { location: loc.cite } : {}),
-      ...(loc && pop.byLocation[loc.base] ? { population: pop.byLocation[loc.base].population } : {}),
+      ...(loc && popMoment.byPage.get(n) ? { population: popMoment.byPage.get(n).population } : {}),
       aboard: r ? r.aboard : null, aboardIds: vehicleIds,
       ...(r && loc && aboardOnGroundVantage(vb, loc.cite, r.aboard, vehicleIds) ? { aboardFromGround: true } : {}),
       readsText: !!(r && r.readsText),
@@ -287,8 +292,8 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
       else bibleSections = synced;
     }
   }
-  const report = { vb: decidedVb, population: pop, gaze, emotions, lightSources: Object.fromEntries([...lit.byPage]), locations: Object.fromEntries([...located.byPage].map(([n, r]) => [n, r.cite])), unlocated: located.unplaced, elapsedMs: Date.now() - t0 };
-  gl.info('beats_jev_brief_fields', `Jev decided the cited elements, looks, location, aboard, population, gaze and emotions of ${storyBeats.length} page(s) before the briefs (${decidedVb.stats.calls + pop.stats.calls + gaze.stats.calls + emotions.stats.calls} Jev calls, ${(report.elapsedMs / 1000).toFixed(1)}s)`, null, {
+  const report = { vb: decidedVb, population: { ...pop, moment: { stats: popMoment.stats, byPage: Object.fromEntries(popMoment.byPage) } }, gaze, emotions, lightSources: Object.fromEntries([...lit.byPage]), locations: Object.fromEntries([...located.byPage].map(([n, r]) => [n, r.cite])), unlocated: located.unplaced, elapsedMs: Date.now() - t0 };
+  gl.info('beats_jev_brief_fields', `Jev decided the cited elements, looks, location, aboard, population, gaze and emotions of ${storyBeats.length} page(s) before the briefs (${decidedVb.stats.calls + pop.stats.calls + popMoment.stats.calls + gaze.stats.calls + emotions.stats.calls} Jev calls, ${(report.elapsedMs / 1000).toFixed(1)}s)`, null, {
     stats: { vb: decidedVb.stats, population: pop.stats, gaze: gaze.stats, emotions: emotions.stats, lightSources: lit.stats },
   });
   return { bibleSections, report };

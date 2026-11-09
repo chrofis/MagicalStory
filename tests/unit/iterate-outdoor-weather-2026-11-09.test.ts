@@ -13,12 +13,14 @@ import { createRequire } from 'module';
 
 const req = createRequire(import.meta.url);
 const { weatherNoneOutdoorsFinding } = req('../../server/lib/briefChecks');
-const { fixedLine } = req('../../server/lib/jevDecisions');
+const { fixedBlock, isOutdoorSky } = req('../../server/lib/jevDecisions');
 const { buildSceneDescriptionPrompt } = req('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = req('../../server/services/prompts');
 
 const brief = (meta: any) => `Prose.\n\n---METADATA---\n${JSON.stringify({ characters: [], objects: [], ...meta })}`;
 const outdoorNight = { timeOfDay: 'night', indoor: false };
+// The rewrite's FIXED block (since 2026-11-09 the whole block, not the light line alone).
+const rewriteCtx = (planLine: string, jf: any) => ({ planLine, fixedBlock: fixedBlock({ jevFixed: jf }, { rewrite: true }), fixedOutdoors: isOutdoorSky(jf) });
 
 beforeAll(async () => { await loadPromptTemplates(); });
 
@@ -41,16 +43,16 @@ describe('the iterate rewrite', () => {
     expect(src).toContain("require('./briefChecks').weatherNoneOutdoorsFinding(pageNumber, text, savedScene?.jevFixed)");
   });
   it('is given the page\'s decided light', () => {
-    expect(src).toContain("fixedLight: require('./jevDecisions').fixedLine(savedScene?.jevFixed)");
+    expect(src).toContain("fixedOutdoors: require('./jevDecisions').isOutdoorSky(savedScene?.jevFixed)");
     const p = buildSceneDescriptionPrompt(8, 'They stop at the edge of the dark forest.', [], 'a forest edge', 'en', null, [], null, '', [],
-      { planLine: 'wide — Amaya, Fabiola — they stop at the fork', fixedLight: fixedLine(outdoorNight) }, null, {});
-    expect(p).toContain('FIXED: timeOfDay night; outdoors');
+      rewriteCtx('wide — Amaya, Fabiola — they stop at the fork', outdoorNight), null, {});
+    expect(p).toContain('- timeOfDay: night; outdoors');
     expect(p).toContain('outdoors, `weather` is an outdoor value, never `none`');
   });
   it('an indoor page is not told the outdoor clause', () => {
     const p = buildSceneDescriptionPrompt(1, 'Bedtime.', [], 'a bedroom', 'en', null, [], null, '', [],
-      { planLine: 'medium — Amaya — bedtime', fixedLight: fixedLine({ timeOfDay: 'night', indoor: true }) }, null, {});
-    expect(p).toContain('FIXED: timeOfDay night; indoors (weather none)');
+      rewriteCtx('medium — Amaya — bedtime', { timeOfDay: 'night', indoor: true }), null, {});
+    expect(p).toContain('- timeOfDay: night; indoors (weather none)');
     expect(p).not.toContain('never `none`');
   });
 });

@@ -78,7 +78,7 @@ const JEV_DECISIONS = {
   vb: { reps: 1, creature: 0.7, vehicle: 0.5, secondary: 0.5, object: 0.7, objectBand: 0.5 },
   aboard: { reps: 1, at: 0.5 },     // 9/10 on the one ship book
   reads: { at: 0.5 },               // rides the vb call; 7/7 true on 674 stored plan lines (2026-09-28)
-  population: { reps: 1, publicAt: 0.5, crowdAt: 0.5, creatureCrowdAt: 0.5, wildlifeAt: 0.4, sparseAt: 0.5 }, // wildlifeAt 0.4: a reef's fish read 0.44-0.56 on the two sea books (replay 2026-10-06), a land place 0.26-0.31; 13/13 for crowd/ambient/cast_only; the creature and sparse questions only ever read a place that was cast_only
+  population: { reps: 1, momentAt: 0.5, publicAt: 0.5, crowdAt: 0.5, creatureCrowdAt: 0.5, wildlifeAt: 0.4, sparseAt: 0.5 }, // wildlifeAt 0.4: a reef's fish read 0.44-0.56 on the two sea books (replay 2026-10-06), a land place 0.26-0.31; 13/13 for crowd/ambient/cast_only; the creature and sparse questions only ever read a place that was cast_only
   gaze: { reps: 3 },                // G2 128/139 averaged (owner: 3 calls for this field)
   state: { reps: 3 },               // a choice, averaged as gaze is (owner, 2026-09-28)
   outfit: { reps: 1, statedAt: 0.3 }, // outfit stated in the prose: P(s0) below 0.3 = not stated. 90/90 missing caught, 9/48 stated flagged on 138 read pages (decisions.md 2026-10-09 "clothing check to Jev")
@@ -1103,6 +1103,49 @@ async function decidePopulation({ arc, pages, visualBible, locOf }, opts = {}) {
   return { byLocation: byLoc, stats: summarise(stats) };
 }
 
+const POP_MOMENT_Q = 'Ordinary unnamed people of this place are out and about in it at the instant the page to judge shows, as they usually are in such a place at that hour. A plan line that never mentions bystanders says nothing against them: answer no only when the page itself or its hour keeps them away (deep night, a danger, a chase, a closed or emptied place, a hiding place).';
+
+/**
+ * THE PAGE'S MOMENT LOWERS THE PLACE'S POPULATION (owner bug, 2026-11-09). `decidePopulation` answers for the
+ * PLACE, from all its pages, and every page there used to copy the answer: a bridge the public may walk onto read
+ * `ambient` on four night pages with monsters attacking, and the pictures drew strolling villagers. Kept
+ * (the place answer feeds the covers and the plan's setting), plus one question per page whose place read `ambient`
+ * or `crowd`, asked beside that page's plan line and its decided hour: are ordinary people out in this place at this
+ * moment? Below `momentAt` the page is `cast_only`. It only ever LOWERS: a page never gains people its place lacks.
+ *
+ * @param {{arc:string, pages:Array, byLocation:Object, locOf:Map<number,string>, lightOf:Map<number,{timeOfDay:string,indoor:boolean}>}} input
+ * @returns {Promise<{byPage:Map<number,{population:string, placePopulation:string, momentP:number|null}>, stats:Object}>}
+ */
+async function decidePopulationMoment({ arc, pages, byLocation, locOf, lightOf }, opts = {}) {
+  const stats = newStats();
+  const byNum = new Map(pages.map(p => [Number(p.pageNumber), p]));
+  const asked = [];
+  const byPage = new Map();
+  for (const [n, id] of locOf) {
+    if (!byNum.has(Number(n))) continue;
+    const place = byLocation && byLocation[id] && byLocation[id].population;
+    if (!place) continue;
+    byPage.set(Number(n), { population: place, placePopulation: place, momentP: null });
+    if (place === 'ambient' || place === 'crowd') asked.push(Number(n));
+  }
+  const hourLine = (n) => {
+    const l = lightOf && lightOf.get(n);
+    return l && l.timeOfDay ? `
+THE HOUR OF THIS PAGE (decided): ${l.timeOfDay}${l.indoor ? ', indoors' : ''}` : '';
+  };
+  const reqs = asked.flatMap(n => repeat({ key: `popm:p${n}`, state: pageState(arc, pages, byNum.get(n)) + hourLine(n), questions: { MOMENT: { type: 'noul', instructions: POP_MOMENT_Q } } }, JEV_DECISIONS.population.reps));
+  const ans = reqs.length ? await runJevRequests(reqs, { ...opts, usageLabel: 'jev_decisions_population_moment', stats }) : new Map();
+  for (const n of asked) {
+    const mp = meanNoul(ans.get(`popm:p${n}`), 'MOMENT');
+    const row = byPage.get(n);
+    row.momentP = +mp.toFixed(3);
+    if (mp < JEV_DECISIONS.population.momentAt) row.population = 'cast_only';
+  }
+  const lowered = [...byPage].filter(([, r]) => r.population !== r.placePopulation).map(([n, r]) => `p${n}:${r.placePopulation}->${r.population}`);
+  log.info(`🌙 [JEV/populationMoment] ${asked.length} page(s) asked, lowered: ${lowered.join(' ') || 'none'} (${stats.calls} calls)`);
+  return { byPage, stats: summarise(stats) };
+}
+
 // ───────────────────────── GAZE (looksAt) ─────────────────────────
 // Wording and candidate builder verbatim from scripts/analysis/eval-jev-extra-fields.js
 // (G2, "Gaze, depth, story relevance asked as fit", e3c329da1).
@@ -1381,6 +1424,11 @@ function fixedLightPlace(f, outdoors = 'outdoors') {
   return f.indoor ? 'indoors (weather none)' : outdoors;
 }
 
+/** True when the decided light has a sky outdoors (not indoors, not a skyless light): `weather` is then an outdoor value. */
+function isOutdoorSky(f) {
+  return !!(f && f.timeOfDay && !isSkylessLight(f.timeOfDay) && !f.indoor);
+}
+
 /** The FIXED line under a page's PLAN line in the Art Director's plan block. */
 function fixedLine(fixed) {
   if (!fixed || !fixed.timeOfDay) return '';
@@ -1395,10 +1443,15 @@ function fixedLine(fixed) {
  * Visual Bible call before any element decision) carries only its light line,
  * if any. `labels`: id → display label (name, and the look for a dotted id).
  */
-function fixedBlock(page) {
+function fixedBlock(page, { rewrite = false } = {}) {
   const f = page && page.jevFixed;
   if (!f) return fixedLine(page && page.fixed);
   const label = id => (f.labels && f.labels[id] ? `${id} (${f.labels[id]})` : id);
+  // An iterate REWRITE writes a whole brief, METADATA included (its template asks for those fields), and code pins
+  // these over it afterwards (pinBrief): the same block, a header that does not tell it to leave the fields out.
+  const header = rewrite
+    ? 'FIXED — code pins each over the METADATA you write; the prose must show each, and stage nothing against it:'
+    : 'FIXED — code writes each into METADATA (write none of them); the prose shows each:';
   // A COVER'S FIXED BLOCK never lists `objects` (2026-10-04): that line reads as
   // the page's whole element list, and the cover would lose its central figure
   // and the elements its beat asks for. Since 2026-10-05 it also holds the
@@ -1407,7 +1460,7 @@ function fixedBlock(page) {
   if (f.coverPlace) {
     // The Jev-outage backup states no FIXED block anywhere (its templates carry no FIXED rule); the pin still runs.
     if (f.quiet) return '';
-    const lines = ['FIXED — code writes each into METADATA (write none of them); the prose shows each:'];
+    const lines = [header];
     if (f.shot) lines.push(`- shot: ${f.shot}`);
     if (f.timeOfDay) lines.push(`- timeOfDay: ${f.timeOfDay}; ${fixedLightPlace(f, `outdoors, weather ${f.weather || 'yours to write'}`)}`);
     if (f.location) lines.push(`- location: ${label(f.location)} — code puts it first in objects[]; write the cover's other ids after it, following its beat`);
@@ -1418,7 +1471,7 @@ function fixedBlock(page) {
     if (dressed.length) lines.push(`- clothing: ${dressed.map(([n, c]) => `${n} → ${c}`).join('; ')} (each outfit is in the plan line: the prose dresses that figure in exactly that, top, bottom and footwear)`);
     return lines.length > 1 ? lines.join('\n') : '';
   }
-  const lines = ['FIXED — code writes each into METADATA (write none of them); the prose shows each:'];
+  const lines = [header];
   if (f.shot) lines.push(`- shot: ${f.shot}`);
   if (f.timeOfDay) lines.push(`- timeOfDay: ${f.timeOfDay}; ${fixedLightPlace(f)}`);
   if (f.lightSources && f.lightSources.length) lines.push(`- lightSources: ${f.lightSources.join('; ')} (lit and glowing: the light the page is lit by)`);
@@ -1614,6 +1667,7 @@ module.exports = {
   fixedFieldsRule,
   fixedLine,
   fixedBlock,
+  isOutdoorSky,
   vantageShotRule,
   pinBrief,
   applyVbPages,
@@ -1669,4 +1723,6 @@ module.exports = {
   decideStates,
   decideVbAndAboard,
   decidePopulation,
+  decidePopulationMoment,
+  POP_MOMENT_Q,
 };

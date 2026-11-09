@@ -258,7 +258,7 @@ describe('Jev first: the decided fields exist before the page briefs', () => {
   it('decideBriefFields sets every page\'s fixed fields from the bible and the head count, and the bible pages follow', async () => {
     const J = req('../../server/lib/jevAudit');
     const saved = J.callJev;
-    const stub = makeJevStub({ noul: (q, st) => (/Drako/.test(q) ? 0.9 : /lamp/.test(q) ? (/PAGE TO JUDGE: Page 1 /.test(st) ? 0.8 : 0.1) : /public can walk/.test(q) ? 0.7 : 0.1) });
+    const stub = makeJevStub({ noul: (q, st) => (/Drako/.test(q) ? 0.9 : /lamp/.test(q) ? (/PAGE TO JUDGE: Page 1 /.test(st) ? 0.8 : 0.1) : /public can walk/.test(q) ? 0.7 : /out and about/.test(q) ? 0.9 : 0.1) });
     J.callJev = stub.impl;
     try {
       const { decideBriefFields } = req('../../server/lib/jevBriefFields');

@@ -509,7 +509,7 @@ function populatedProse(brief, metadata) {
   return [body, full.sceneIntent || '', full.imageSummary || ''].join('\n');
 }
 
-function checkPopulationContradiction(page, metadata, castNames = []) {
+function checkPopulationContradiction(page, metadata, castNames = [], { pinned = false } = {}) {
   const { normalisePopulation } = require('./sceneMetadata');
   const full = (metadata && metadata.fullData) || {};
   const declared = normalisePopulation(
@@ -542,7 +542,10 @@ function checkPopulationContradiction(page, metadata, castNames = []) {
     detail: `\`population\` is \`${declared}\` — no unnamed people belong on this page — while the prose puts unnamed figures in the frame: `
       + hits.map(h => `"${h}"`).join('; ')
       + `. The evaluator and the figure count both read that field, so the people the prose orders are drawn and then billed as surplus cast. `
-      + `Set \`population\` to \`ambient\` if the setting is a public place that simply has people in it, or to \`crowd\` if the page is written around them — or take the unnamed figures out of the prose and keep \`cast_only\`.`,
+      + (pinned
+        // An iterate rewrite: code pins the field over whatever the rewrite writes, so only the prose can move.
+        ? `The field is fixed by the page's FIXED block: take the unnamed figures out of the prose.`
+        : `Set \`population\` to \`ambient\` if the setting is a public place that simply has people in it, or to \`crowd\` if the page is written around them — or take the unnamed figures out of the prose and keep \`cast_only\`.`),
   };
 }
 

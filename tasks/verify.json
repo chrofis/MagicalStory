@@ -11417,6 +11417,22 @@
         "kind": "human",
         "what": "Read the iterate rewrite (eval_calls iterate_rebrief) and the stored image prompt of each redrawn outdoor page: weather not none, outdoor light line, timeOfDay = jevFixed.timeOfDay."
       }
+    },
+    {
+      "id": "population-moment-and-iterate-fixed-2026-11-09",
+      "title": "Population follows the page's moment; the iterate rewrite is told the page's whole FIXED block",
+      "commits": [],
+      "addedAt": "2026-11-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On the next staging story (or Lab run of the population stage), pages of a public place that are at night or under attack carry population cast_only while daytime pages at the same place stay ambient or crowd; and an iterate redraw of a cast_only page stages no unnamed onlookers and its rewrite prompt carries the FIXED block (population, objects, looksAt, emotion, light; no shot for a free iterate).",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read jevDecisions.population.moment.byPage in the stored story (momentP per page), the stored jevFixed.population of each page, and for a redraw the eval_calls iterate_rebrief prompt (FIXED block present) and the rewrite prose (no unnamed people on a cast_only page)."
+      }
     }
   ],
   "runs": [

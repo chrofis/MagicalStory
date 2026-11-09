@@ -4951,11 +4951,18 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // null, buildSceneDescriptionPrompt fills the authoritative SCENE_SUMMARY
     // slot from the previous brief's own imageSummary, and the rewrite has no
     // narrative anchor outside the artefact it is rewriting.
-    // `fixedLight`: the page's decided light, the FIXED line the Art Director sees under the same
-    // plan line (jevDecisions.fixedLine). Without it the rewrite invented its own hour and sky:
-    // prod job_1794231161354_l3n2o3afm p6/p8 rewrites wrote "autumn afternoon" and `weather: none`
-    // on outdoor night pages.
-    { planLine, fixedLight: require('./jevDecisions').fixedLine(savedScene?.jevFixed) },
+    // `fixedBlock`: the page's whole FIXED block, the one the Art Director sees under the same plan line
+    // (jevDecisions.fixedBlock, rewrite header). Light alone (52cc5cd2c) left the rewrite writing prose
+    // against fields code pins afterwards: staging Lab 1851 (job_1794231161354_l3n2o3afm p6, population
+    // cast_only) kept "two distant village onlookers" from the parent brief and the image drew them.
+    // A free iterate reframes, so it is not told the shot (pinBrief skips it for free mode too).
+    {
+      planLine,
+      fixedBlock: require('./jevDecisions').fixedBlock(
+        { jevFixed: savedScene?.jevFixed && (freeIterate ? { ...savedScene.jevFixed, shot: undefined } : savedScene.jevFixed) },
+        { rewrite: true }),
+      fixedOutdoors: require('./jevDecisions').isOutdoorSky(savedScene?.jevFixed),
+    },
     previewFeedback,  // The actual image analysis feedback!
     // clothingRequirements so the EXPECTED_CLOTHING block can state each
     // character's actual outfit TEXT. Without it the Art Director only sees the
@@ -5041,9 +5048,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // one-action and hand-off counts off. Both checks are free — pure code, no
   // model call — and both feed the ONE corrective re-ask below, never a second.
   const runBriefChecks = (text) => [
+    // `population_contradicted` is read below against the PINNED field, inherited or not; the generic
+    // introduced-only copy of it reads the rewrite's own (absent) field and would report the page twice.
     ...checkRewrittenBrief({
       pageNumber, brief: text, parentBrief: sceneDescText, planLine, castNames: castNamesForCheck, visualBible, castIndex: iterateIdx,
-    }),
+    }).filter(f => !(savedScene?.jevFixed?.population && f.type === 'population_contradicted')),
     ...checkCarriedFields({
       // The parent BRIEF's own metadata: it is the contract this rewrite
       // replaces, and it always parses to the full row shape. (savedScene's
@@ -5064,6 +5073,16 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // re-ask as on an authored brief (briefChecks.weatherNoneOutdoorsFinding). Unchecked, the
     // pin below reported it and dropped it, and the page got the indoor light line.
     ...[require('./briefChecks').weatherNoneOutdoorsFinding(pageNumber, text, savedScene?.jevFixed)].filter(Boolean),
+    // The page's pinned `population` holds on the rewrite as on an authored brief: a page decided `cast_only`
+    // (or a wildlife level) stages no unnamed people. The same check the authored path runs
+    // (sceneBriefCheck.checkPopulationContradiction), on the pinned value the rewrite will be given.
+    ...(() => {
+      const pinnedPopulation = savedScene?.jevFixed?.population;
+      if (!pinnedPopulation) return [];
+      const meta = extractSceneMetadata(String(text || '')) || {};
+      const f = require('./sceneBriefCheck').checkPopulationContradiction({ pageNumber, brief: text }, { ...meta, population: pinnedPopulation }, castNamesForCheck, { pinned: true });
+      return f ? [f] : [];
+    })(),
   ];
   // ── ONE CORRECTIVE RE-ASK, FOR BOTH CHECK FAMILIES (2026-09-17) ───────────
   // Owner: "All 3 same as pipeline. These should be siblings or even identical

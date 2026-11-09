@@ -1,0 +1,1867 @@
+{
+ "variant": "wording 1 (rejected)",
+ "stories": 24,
+ "pagesAsked": 152,
+ "lowered": 118,
+ "spentUsd": 0.01215,
+ "loweredPages": [
+  {
+   "story": "job_1794231161354_l3n2o3afm",
+   "page": 2,
+   "timeOfDay": "night",
+   "momentP": 0.19,
+   "old": "ambient",
+   "plan": "ultra-wide — nobody — Glowing kisses stream up from the kingdom's rooftops toward a tower on the hill as the lights go out — The kingdom is dark and cold, and the kisses are held in Griselda's tower."
+  },
+  {
+   "story": "job_1794231161354_l3n2o3afm",
+   "page": 4,
+   "timeOfDay": "night",
+   "momentP": 0.14,
+   "old": "ambient",
+   "plan": "wide — Fabiola, Amaya, monsters — Three monsters lumber onto the stone bridge, arms cocked to hurl goo at Fabiola and Amaya — The only bridge is blocked and the monsters are ready to throw."
+  },
+  {
+   "story": "job_1794231161354_l3n2o3afm",
+   "page": 5,
+   "timeOfDay": "night",
+   "momentP": 0.11,
+   "old": "ambient",
+   "plan": "medium — Fabiola, monsters — Fabiola's sword meets a goo bolt and the goo splashes away from the monsters into the river — Fabiola can turn the bolts aside but the monsters keep throwing and she cannot advance."
+  },
+  {
+   "story": "job_1794231161354_l3n2o3afm",
+   "page": 7,
+   "timeOfDay": "night",
+   "momentP": 0.13,
+   "old": "ambient",
+   "plan": "wide — Fabiola, Amaya, monsters — The monsters' feet slip out from under them on the muddy bank as they roar — The monsters are down in the river mud, and Fabiola and Amaya's clothes are covered in goo."
+  },
+  {
+   "story": "job_1794128424739_0j933o99i5u",
+   "page": 2,
+   "timeOfDay": "dusk",
+   "momentP": 0.45,
+   "old": "crowd",
+   "plan": "high-angle — Janna, Silbermond — Janna scuffs through the leaf pile by the station wall; silver leaves whirl up and a unicorn steps out — Silbermond is out of the leaves and beside Janna."
+  },
+  {
+   "story": "job_1794128424739_0j933o99i5u",
+   "page": 3,
+   "timeOfDay": "dusk",
+   "momentP": 0.41,
+   "old": "crowd",
+   "plan": "close-up — Janna, Silbermond — Silbermond holds the hem of Janna's coat in its teeth, ears drooping, as she turns away from it — Silbermond will not let go, and Janna is held back on the leaf path."
+  },
+  {
+   "story": "job_1794128424739_0j933o99i5u",
+   "page": 7,
+   "timeOfDay": "dusk",
+   "momentP": 0.41,
+   "old": "crowd",
+   "plan": "wide — Janna, Silbermond — Janna steps off the kerb into the dark road, Silbermond pressed to her coat, its horn lighting the street — Janna stands in the open road in the horn's silver light."
+  },
+  {
+   "story": "job_1793964466256_1tmyzh1do",
+   "page": 10,
+   "timeOfDay": "dusk",
+   "momentP": 0.49,
+   "old": "crowd",
+   "plan": "wide — Silbermond, Janna, Polina, Melisa, Melodi — Silbermond steps into the leaf pile by the station door as a silver leaf drifts down, the four girls watching from behind — Silbermond is gone, and Janna is with her friends and no longer alone."
+  },
+  {
+   "story": "job_1793959308869_fre2mb4d0",
+   "page": 1,
+   "timeOfDay": "afternoon",
+   "momentP": 0.24,
+   "old": "ambient",
+   "plan": "medium — Melodi, Polina — Melodi cups her hands and calls over the empty paddock gate, Polina beside her. — Melodi has decided the farm pony is loose, and the four set off for the Honeret."
+  },
+  {
+   "story": "job_1793893086454_ao77wh9j5",
+   "page": 1,
+   "timeOfDay": "morning",
+   "momentP": 0.27,
+   "old": "ambient",
+   "plan": "over-the-shoulder — Janna, Silva — Silva steps back up the path, out of reach of Janna's hurrying arm at the mist's edge — Silva has backed beyond Janna's reach, and Janna's first chance is lost."
+  },
+  {
+   "story": "job_1793893086454_ao77wh9j5",
+   "page": 2,
+   "timeOfDay": "morning",
+   "momentP": 0.32,
+   "old": "ambient",
+   "plan": "medium — Polina, Silva — Polina ties her skipping rope into a loop around Silva's neck on the path, Silva standing still — Silva is roped; the friends take her for the farm pony."
+  },
+  {
+   "story": "job_1793893086454_ao77wh9j5",
+   "page": 3,
+   "timeOfDay": "morning",
+   "momentP": 0.3,
+   "old": "ambient",
+   "plan": "over-the-shoulder — Melisa and Melodi — Melisa holds the rope fast as Silva walks up the path behind Melodi, hoofprints glittering — glittering prints lie in the leaves; the pony is led toward the farm."
+  },
+  {
+   "story": "job_1793893086454_ao77wh9j5",
+   "page": 4,
+   "timeOfDay": "morning",
+   "momentP": 0.31,
+   "old": "ambient",
+   "plan": "medium — Janna — Janna jumps over a root on the Bachweg without stopping, following the glittering prints through the fog — Janna is on the trail and nearing the farm on the Obere Reppischstrasse."
+  },
+  {
+   "story": "job_1793893086454_ao77wh9j5",
+   "page": 10,
+   "timeOfDay": "morning",
+   "momentP": 0.27,
+   "old": "ambient",
+   "plan": "wide — Janna, Silva, Polina, Melisa, Melodi — The four friends watch from behind as Silva walks into the mist over the Tobelbach — Silva has gone back into the mist, and the friends stand together at the bank."
+  },
+  {
+   "story": "job_1793736454070_0ir5y6hlh",
+   "page": 3,
+   "timeOfDay": "morning",
+   "momentP": 0.35,
+   "old": "ambient",
+   "plan": "wide — Lia, Oma Nicole, Opa Dirk — The three walk toward the Albrechtsbrunnen through the snow, Oma carrying the thermos and lantern — The three have reached the fountain, with Oma's thermos and painted lantern in hand."
+  },
+  {
+   "story": "job_1793736454070_0ir5y6hlh",
+   "page": 4,
+   "timeOfDay": "morning",
+   "momentP": 0.31,
+   "old": "ambient",
+   "plan": "close-up — Opa Dirk — Opa brushes fresh snow off a big round paw print by the fountain's rim — The prints lead away from the fountain, and the way into the snow is clear."
+  },
+  {
+   "story": "job_1793736454070_0ir5y6hlh",
+   "page": 5,
+   "timeOfDay": "morning",
+   "momentP": 0.28,
+   "old": "ambient",
+   "plan": "close-up — Lia, Weihnachtsstern — Lia's finger touches the first paw print, and a small gold spark from the Weihnachtsstern drops into it — The lane has turned into a snowy path between firs, and the way into the Zauberwald is open."
+  },
+  {
+   "story": "job_1793736454070_0ir5y6hlh",
+   "page": 19,
+   "timeOfDay": "dusk",
+   "momentP": 0.47,
+   "old": "ambient",
+   "plan": "ultra-wide — Oma Nicole, Opa Dirk, Lia — The three step out of the golden path beside the Albrechtsbrunnen as St. Martin's bells ring — They are back in Rheinfelden beside the Albrechtsbrunnen, with the star above St. Martin."
+  },
+  {
+   "story": "job_1793557464719_txr1gqd28",
+   "page": 1,
+   "timeOfDay": "evening",
+   "momentP": 0.44,
+   "old": "ambient",
+   "plan": "wide — Léa, Henri, L'ombre — Léa stamps in the leaves on the pavement before St. Sebastian in Wettingen, her shadow lifting off her feet. — The shadow is loose and talking; Léa has refused Henri's bedtime."
+  },
+  {
+   "story": "job_1793557464719_txr1gqd28",
+   "page": 2,
+   "timeOfDay": "evening",
+   "momentP": 0.38,
+   "old": "ambient",
+   "plan": "ultra-wide — nobody — Henri's car winds down the valley road toward Fislisbach's lit windows. — The car has reached Fislisbach, and the children's home is in sight."
+  },
+  {
+   "story": "job_1792859316244_6429d0n83",
+   "page": 1,
+   "timeOfDay": "dusk",
+   "momentP": 0.49,
+   "old": "ambient",
+   "plan": "medium — Léa, Henri — Léa tugs Henri's coat sleeve, looking up at him on the wet boards. — Henri knows Léa has a promise to keep and needs his help."
+  },
+  {
+   "story": "job_1792859316244_6429d0n83",
+   "page": 2,
+   "timeOfDay": "dusk",
+   "momentP": 0.42,
+   "old": "ambient",
+   "plan": "ultra-wide — Léa and Henri — Henri carries Léa off the wet bridge boards toward his car by the Landvogteischloss, the shape stretched on the pavement below. — Léa is carried away from the bridge and the shape is left behind on the street."
+  },
+  {
+   "story": "job_1792226018737_lb65hzkqs",
+   "page": 1,
+   "timeOfDay": "afternoon",
+   "momentP": 0.36,
+   "old": "ambient",
+   "plan": "wide — Eliah — Eliah, arm raised, shouts \"Ahoi!\" at a pirate ship lying in leaf piles by the ruin. — The pirate crew is awake and the leaves under the ship have turned to water."
+  },
+  {
+   "story": "job_1792226018737_lb65hzkqs",
+   "page": 2,
+   "timeOfDay": "afternoon",
+   "momentP": 0.32,
+   "old": "ambient",
+   "plan": "medium — Lotti, Eliah — A gull with a red bandage on her dragging wing hops over the ship's plank; Eliah kneels, watching her. — Lotti is on the plank, close to Eliah, and cannot fly."
+  },
+  {
+   "story": "job_1792226018737_lb65hzkqs",
+   "page": 3,
+   "timeOfDay": "afternoon",
+   "momentP": 0.43,
+   "old": "ambient",
+   "plan": "close-up — Eliah, Lotti — Eliah kneels with both palms open as the gull hops toward his hands. — The gull is following Eliah, and he has taken her in hand to bring her home to her flock."
+  },
+  {
+   "story": "job_1792226018737_lb65hzkqs",
+   "page": 4,
+   "timeOfDay": "afternoon",
+   "momentP": 0.35,
+   "old": "ambient",
+   "plan": "over-the-shoulder — Yara, Lotti — Yara runs after the gull, unicorn under one arm, mouth open in a gull's squeal. — Yara is at the gull's side, reaching toward her feathers."
+  },
+  {
+   "story": "job_1792226018737_lb65hzkqs",
+   "page": 17,
+   "timeOfDay": "dusk",
+   "momentP": 0.24,
+   "old": "ambient",
+   "plan": "wide — nobody — The ship's hull bumps the quay wall under Schloss Unterseen's white tower. — The ship is tied at the quay before the flock lifts for the night."
+  },
+  {
+   "story": "job_1792226018737_lb65hzkqs",
+   "page": 18,
+   "timeOfDay": "dusk",
+   "momentP": 0.28,
+   "old": "ambient",
+   "plan": "close-up — Yara, Eliah, Lotti — Eliah and Yara each touch Lotti's feathers with one finger while Lotti stands still. — Yara has touched the feathers and whispered \"Weich.\""
+  },
+  {
+   "story": "job_1792226018737_lb65hzkqs",
+   "page": 19,
+   "timeOfDay": "dusk",
+   "momentP": 0.24,
+   "old": "ambient",
+   "plan": "medium — Lotti, Eliah — Lotti hops over the plank toward the quay wall as Eliah stands at the rail. — Lotti has left the ship and is on the quay with her flock."
+  },
+  {
+   "story": "job_1792226018737_lb65hzkqs",
+   "page": 20,
+   "timeOfDay": "dusk",
+   "momentP": 0.27,
+   "old": "ambient",
+   "plan": "wide — Eliah, Yara, Lotti — seen from behind, the three look out over the dusky water as the ship turns to leaves. — The children are safe on the quay, Lotti is home with her flock, and the ship is gone."
+  },
+  {
+   "story": "job_1792078014622_uh8tj6ht1",
+   "page": 1,
+   "timeOfDay": "midday",
+   "momentP": 0.34,
+   "old": "ambient",
+   "plan": "wide — Eliah, Yara — both children leap into the leaf heaps under the big tree; a mast and skull sail rise between the heaps. — They have found the pirate ship lying among the leaves."
+  },
+  {
+   "story": "job_1792078014622_uh8tj6ht1",
+   "page": 2,
+   "timeOfDay": "midday",
+   "momentP": 0.31,
+   "old": "ambient",
+   "plan": "over-the-shoulder — Spaghetti, Eliah — the startled gull, one wing dragging, hops up the plank onto the deck while Eliah watches from the deck. — The gull is aboard and Eliah has decided to take her to her flock at Unterseen."
+  },
+  {
+   "story": "job_1792078014622_uh8tj6ht1",
+   "page": 3,
+   "timeOfDay": "midday",
+   "momentP": 0.39,
+   "old": "ambient",
+   "plan": "close-up — Spaghetti, Eliah — Eliah kneels beside the gull, who tilts her head toward him and answers \"kree\". — The gull has her name, Spaghetti, and answers to it."
+  },
+  {
+   "story": "job_1792078014622_uh8tj6ht1",
+   "page": 4,
+   "timeOfDay": "midday",
+   "momentP": 0.28,
+   "old": "ambient",
+   "plan": "medium — Yara — Yara runs up the plank with her unicorn held out toward the gull on deck. — Yara has come aboard, rushing to touch the feathers."
+  },
+  {
+   "story": "job_1792078014622_uh8tj6ht1",
+   "page": 5,
+   "timeOfDay": "afternoon",
+   "momentP": 0.18,
+   "old": "ambient",
+   "plan": "over-the-shoulder — Spaghetti, Eliah — Spaghetti hops over the rail into the fog-filled reeds while Eliah stands frozen, both hands on his cap. — The gull is gone into the fog and Eliah can see nothing."
+  },
+  {
+   "story": "job_1792078014622_uh8tj6ht1",
+   "page": 19,
+   "timeOfDay": "dusk",
+   "momentP": 0.45,
+   "old": "ambient",
+   "plan": "over-the-shoulder — Eliah, Spaghetti — Eliah waves Tschüss from the end of the plank as Spaghetti stands on the stones before Schloss Unterseen. — Spaghetti has reached the landing at Unterseen, her flock close by."
+  },
+  {
+   "story": "job_1792078014622_uh8tj6ht1",
+   "page": 20,
+   "timeOfDay": "night",
+   "momentP": 0.21,
+   "old": "ambient",
+   "plan": "wide — Eliah, Yara, Brummbart — Eliah, Yara and Brummbart lean over the rail together, calling into the fog among the leaf heaps. — A far kree answers from the fog."
+  },
+  {
+   "story": "job_1791551239260_a0dpn715x",
+   "page": 1,
+   "timeOfDay": "evening",
+   "momentP": 0.47,
+   "old": "ambient",
+   "plan": "wide — Max, Kiaan, the egg — Max and Kiaan chase the red ball toward the big Linde, where the egg knocks in the leaves. — The children have left the still corner, and the warm egg is knocking under the Linde."
+  },
+  {
+   "story": "job_1791551239260_a0dpn715x",
+   "page": 2,
+   "timeOfDay": "evening",
+   "momentP": 0.44,
+   "old": "ambient",
+   "plan": "high-angle — Levin, Julian — Levin lifts the knocking egg from the leaves under the Linde, Julian crouched beside him. — The egg is out of the leaves and held in Levin's hands."
+  },
+  {
+   "story": "job_1791551239260_a0dpn715x",
+   "page": 3,
+   "timeOfDay": "dusk",
+   "momentP": 0.36,
+   "old": "ambient",
+   "plan": "close-up — Funka, Julian — Funka holds out her claw for the egg while Julian hugs it tight against his chest and keeps it from her. — Funka's flame is dead, the egg is cooling, and the children are no longer able to warm it on the open square."
+  },
+  {
+   "story": "job_1791551239260_a0dpn715x",
+   "page": 4,
+   "timeOfDay": "dusk",
+   "momentP": 0.35,
+   "old": "ambient",
+   "plan": "wide — Levin, Julian, Max, Kiaan, Funka, Lindi (the egg) — Levin, Julian, Max and Kiaan kneel around the egg cracking open, Funka watching behind them. — The little dragon Lindi is out of the shell in the still corner, with the friends and Funka together."
+  },
+  {
+   "story": "job_1791531449494_o0kaatvmq",
+   "page": 1,
+   "timeOfDay": "midday",
+   "momentP": 0.44,
+   "old": "ambient",
+   "plan": "close-up — Levin, Kiaan, the egg — Levin and Kiaan hold the knocking egg together between them under the roots — The children have the warm egg in their hands, and it knocks."
+  },
+  {
+   "story": "job_1791531449494_o0kaatvmq",
+   "page": 2,
+   "timeOfDay": "midday",
+   "momentP": 0.4,
+   "old": "ambient",
+   "plan": "medium — Max — Max sprints across the grass and stops the rolling egg just before the steps — the egg is caught in Max's hands and kept from the steps."
+  },
+  {
+   "story": "job_1791531449494_o0kaatvmq",
+   "page": 3,
+   "timeOfDay": "dusk",
+   "momentP": 0.29,
+   "old": "ambient",
+   "plan": "close-up — Julian, Funka — Julian kneels in the wind with both arms around the dark egg, Funka's head bowed above him — Funka's flame is out, the knocking has faded, and Julian will not step back."
+  },
+  {
+   "story": "job_1791531449494_o0kaatvmq",
+   "page": 4,
+   "timeOfDay": "dusk",
+   "momentP": 0.28,
+   "old": "ambient",
+   "plan": "wide — Levin, Julian, Max, Kiaan, Funka, Lindi — All six kneel together around Kiaan's blanket behind the trunk, seen from behind, as the shell cracks — Lindi has hatched behind the trunk, Funka's flame burns there, and all are safe together."
+  },
+  {
+   "story": "job_1791497309909_6quecrr9t",
+   "page": 1,
+   "timeOfDay": "evening",
+   "momentP": 0.41,
+   "old": "ambient",
+   "plan": "wide — Levin, Funka — Levin kneels in the linden roots lifting the egg while Funka's shadow crosses it from above the lindens — Levin holds the egg and sees Funka is its mother."
+  },
+  {
+   "story": "job_1791497309909_6quecrr9t",
+   "page": 2,
+   "timeOfDay": "evening",
+   "momentP": 0.35,
+   "old": "ambient",
+   "plan": "close-up — Levin, Kiaan, the raven — Kiaan pulls his jacket tight as the raven sits on the egg and snaps at Levin's reaching hand — the egg cannot be lifted and the knocks are slowing."
+  },
+  {
+   "story": "job_1791497309909_6quecrr9t",
+   "page": 3,
+   "timeOfDay": "evening",
+   "momentP": 0.4,
+   "old": "ambient",
+   "plan": "over-the-shoulder — Julian, the raven, Funka — Julian sets his bag of hot Marroni down on the roots in front of the raven, which turns toward it, while Funka circles above the lindens — the raven is ready to leave the egg."
+  },
+  {
+   "story": "job_1791497309909_6quecrr9t",
+   "page": 4,
+   "timeOfDay": "evening",
+   "momentP": 0.35,
+   "old": "ambient",
+   "plan": "wide — Levin, Max, Funka — Funka lands beside Levin's raised egg in the open square and breathes on the shell while Max waves at her — the egg is warm and the little dragon hatches."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 1,
+   "timeOfDay": "afternoon",
+   "momentP": 0.49,
+   "old": "ambient",
+   "plan": "wide — Levin, Julian, Max, Kiaan — all four toss red and yellow leaves on the Lindenhof; a red shape glides over the Grossmünster towers — the red shape is now in the autumn sky above the friends."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 2,
+   "timeOfDay": "afternoon",
+   "momentP": 0.45,
+   "old": "ambient",
+   "plan": "close-up — Levin — Levin kneels between the roots of the big linden and lifts the egg, its shell glowing orange — Levin holds a warm egg that glows from inside."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 4,
+   "timeOfDay": "afternoon",
+   "momentP": 0.49,
+   "old": "ambient",
+   "plan": "high-angle — Levin, Julian, Max, Kiaan — the four kneel round the egg and wind Julian's red scarf around it — the egg is wrapped in the scarf in the children's hands."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 5,
+   "timeOfDay": "afternoon",
+   "momentP": 0.36,
+   "old": "ambient",
+   "plan": "over-the-shoulder — Max, Glutta — the old dragon lands on the hill and lowers her huge head to Max, who stands his ground — Max has asked her name and she has answered Glutta."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 6,
+   "timeOfDay": "afternoon",
+   "momentP": 0.41,
+   "old": "ambient",
+   "plan": "close-up — Julian, Glutta — Julian tumbles against Glutta's side, his palm flat on her warm scales — Julian has felt that her side is warm."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 7,
+   "timeOfDay": "afternoon",
+   "momentP": 0.41,
+   "old": "ambient",
+   "plan": "medium — Levin, Glutta — Glutta holds the egg in one claw while Levin's hands are empty and raised — Glutta has taken the egg and says it is hers."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 8,
+   "timeOfDay": "afternoon",
+   "momentP": 0.39,
+   "old": "ambient",
+   "plan": "medium — Levin, Max, Glutta — Glutta breathes grey smoke over the egg in her claw while Levin and Max watch — only smoke comes, and Glutta refuses the small ones' help."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 9,
+   "timeOfDay": "afternoon",
+   "momentP": 0.3,
+   "old": "ambient",
+   "plan": "wide — Julian, Glutta — Glutta spreads her stiff wings on the path, pushed back by the cold lake wind — the egg is loose and slipping from her claw."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 10,
+   "timeOfDay": "afternoon",
+   "momentP": 0.31,
+   "old": "ambient",
+   "plan": "ultra-wide — nobody — The egg rolls down the sloping path toward the roots of the big linden — the egg is rolling away from everyone toward the roots."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 11,
+   "timeOfDay": "afternoon",
+   "momentP": 0.36,
+   "old": "ambient",
+   "plan": "close-up — Max — Max's two hands close around the rolling egg between the roots, the egg glowing brighter in them — the egg is caught and safe in Max's arms."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 12,
+   "timeOfDay": "dusk",
+   "momentP": 0.3,
+   "old": "ambient",
+   "plan": "medium — Max, Glutta — Glutta sits down heavily on the grass beside Max, who holds the grey egg — Glutta has said her fire is gone and dragons warm eggs only with fire."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 13,
+   "timeOfDay": "dusk",
+   "momentP": 0.36,
+   "old": "ambient",
+   "plan": "over-the-shoulder — Levin, Glutta — Levin holds up the open dinosaur book to a mother dinosaur lying over her eggs, facing Glutta — Glutta has refused: she is a dragon and no hen."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 14,
+   "timeOfDay": "dusk",
+   "momentP": 0.35,
+   "old": "ambient",
+   "plan": "medium — Kiaan, Levin — Kiaan kneels at the still leaves between the roots while Levin heaps leaves into a nest beside him — the still place has a leaf nest ready for the egg."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 15,
+   "timeOfDay": "dusk",
+   "momentP": 0.28,
+   "old": "ambient",
+   "plan": "close-up — Julian, Glutta — Julian holds the scarf-wrapped egg, lifted from the nest, and presses it against Glutta's side — the egg has been carried to the warm dragon and is still grey."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 16,
+   "timeOfDay": "dusk",
+   "momentP": 0.39,
+   "old": "ambient",
+   "plan": "high-angle — Glutta — Glutta curls her body round the leaf nest between the roots, one wing laid over the top — the egg glows orange again as the Grossmünster bell rings the evening."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 17,
+   "timeOfDay": "dusk",
+   "momentP": 0.35,
+   "old": "ambient",
+   "plan": "close-up — Julian, Funki — a small dragon climbs out of the cracked orange shell in the nest while Julian kneels close beside it — Funki is out and Julian has named it."
+  },
+  {
+   "story": "job_1791489793707_2ir6nl5kw",
+   "page": 18,
+   "timeOfDay": "dusk",
+   "momentP": 0.36,
+   "old": "ambient",
+   "plan": "wide — Levin, Julian, Max, Kiaan, Glutta, Funki — seen from behind, all six lean over the leaf nest together, looking in at Funki — Funki is warm and wrapped in the scarf, and the friends are together."
+  },
+  {
+   "story": "job_1791450210539_nwi88y9lr",
+   "page": 3,
+   "timeOfDay": "afternoon",
+   "momentP": 0.49,
+   "old": "ambient",
+   "plan": "over-the-shoulder — Lorena, Herr Frei — Lorena slips the chart inside her coat while Herr Frei strides out from behind a glass case with his keys jingling — Herr Frei has seen the chart and the chase begins"
+  },
+  {
+   "story": "job_1791450210539_nwi88y9lr",
+   "page": 7,
+   "timeOfDay": "afternoon",
+   "momentP": 0.48,
+   "old": "ambient",
+   "plan": "medium — Saira, Herr Frei — Saira throws off the bow rope as Herr Frei's fingers reach for it and miss on the quay — the Silbermöwe leaves the quay with Herr Frei left behind"
+  },
+  {
+   "story": "job_1791450210539_nwi88y9lr",
+   "page": 13,
+   "timeOfDay": "evening",
+   "momentP": 0.48,
+   "old": "ambient",
+   "plan": "ultra-wide — Facundo, Sarah — Facundo hurls the chestnut-wrapped copy across the Limmat while Sarah shrieks with her hands raised — the copy lands on the far steps and Herr Frei runs for the bridge"
+  },
+  {
+   "story": "job_1791450210539_nwi88y9lr",
+   "page": 14,
+   "timeOfDay": "dusk",
+   "momentP": 0.42,
+   "old": "ambient",
+   "plan": "wide — Lorena, Facundo — Lorena holds the chart against the linden beside the chess field while Facundo digs under the knotted branch's tip, last light on the towers — the chest comes up from the earth"
+  },
+  {
+   "story": "job_1791450210539_nwi88y9lr",
+   "page": 15,
+   "timeOfDay": "dusk",
+   "momentP": 0.45,
+   "old": "ambient",
+   "plan": "close-up — Fiona, Facundo, Herr Frei — Fiona and Facundo lift the lid of the chest under the linden as Herr Frei arrives holding the galley sack — the chest stands open on a brass compass, old coins and a letter"
+  },
+  {
+   "story": "job_1791145238223_50osg2osm",
+   "page": 1,
+   "timeOfDay": "dusk",
+   "momentP": 0.48,
+   "old": "crowd",
+   "plan": "medium — Emma, Sarah, Hans — Emma grips Sarah's hand and pulls toward the Dorfplatz while Sarah holds firm and Hans watches the stage ahead, the lanterns already lit around them — the play has begun, Emma is afraid and being held back"
+  },
+  {
+   "story": "job_1791145238223_50osg2osm",
+   "page": 2,
+   "timeOfDay": "dusk",
+   "momentP": 0.16,
+   "old": "crowd",
+   "plan": "over-the-shoulder — Daniel, Noah — Noah stands alone under the lime tree with an apple on his head while Daniel faces him with the loaded crossbow, a second bolt at his belt — the shot is ordered and Noah is alone in the open place"
+  },
+  {
+   "story": "job_1791145238223_50osg2osm",
+   "page": 3,
+   "timeOfDay": "dusk",
+   "momentP": 0.23,
+   "old": "crowd",
+   "plan": "medium — Sarah, Emma, Hans — Sarah speaks to Emma with one hand raised toward the lane while Hans holds Emma's mitten, the open lane visible beside them — Emma knows she cannot enter the lane or shout, and nobody may follow her there"
+  },
+  {
+   "story": "job_1791145238223_50osg2osm",
+   "page": 4,
+   "timeOfDay": "dusk",
+   "momentP": 0.15,
+   "old": "crowd",
+   "plan": "close-up — Emma — Emma frozen among the dark wall of coat-hems, cheeks puffed in the lion breath alone, one hand pressed to a stranger's coat, the grown-ups' legs rising around her on all sides — Emma has used the lion breath to go on and is now moving alone through the packed crowd"
+  },
+  {
+   "story": "job_1791145238223_50osg2osm",
+   "page": 5,
+   "timeOfDay": "dusk",
+   "momentP": 0.15,
+   "old": "crowd",
+   "plan": "ultra-wide — Emma, Daniel — Emma arrives in the front row at Daniel's side, two soldiers' crossed wooden spears blocking the lane ahead of her, the lit lantern beside Daniel throwing light on her face — Emma is stopped at the lane's edge and can neither cross to Noah nor call to him"
+  },
+  {
+   "story": "job_1791145238223_50osg2osm",
+   "page": 6,
+   "timeOfDay": "dusk",
+   "momentP": 0.13,
+   "old": "crowd",
+   "plan": "medium — Daniel, Gessler — Daniel holds the crossbow lowered, his eyes on Noah, while Gessler stands at the frame's edge with his counting hand raised, marking six, seven — the shot is not taken and the count is running out"
+  },
+  {
+   "story": "job_1791145238223_50osg2osm",
+   "page": 7,
+   "timeOfDay": "dusk",
+   "momentP": 0.17,
+   "old": "crowd",
+   "plan": "over-the-shoulder — Emma, Noah — Emma raises both hands like paws in the lantern light and breathes the lion breath big and slow; across the lane Noah's eyes find her and his hands stay at his sides — Noah has joined the breath and is steady"
+  },
+  {
+   "story": "job_1791145238223_50osg2osm",
+   "page": 8,
+   "timeOfDay": "dusk",
+   "momentP": 0.13,
+   "old": "crowd",
+   "plan": "close-up — Noah — the blunt bolt strikes the apple from Noah's head at the count of nine, the apple spinning in the air above him, Noah's hands still at his sides — the apple is off and the shot is made before Gessler's ten"
+  },
+  {
+   "story": "job_1791145238223_50osg2osm",
+   "page": 9,
+   "timeOfDay": "dusk",
+   "momentP": 0.17,
+   "old": "crowd",
+   "plan": "medium — Daniel, Gessler — Daniel faces Gessler in the open place and holds up the second bolt while Gessler steps back from the open place before the crowd — Gessler can take no action and steps back"
+  },
+  {
+   "story": "job_1791145238223_50osg2osm",
+   "page": 10,
+   "timeOfDay": "dusk",
+   "momentP": 0.23,
+   "old": "crowd",
+   "plan": "wide — Emma, Daniel, Noah, Sarah, Hans — Daniel holds Emma up and grins at her while Noah reaches up to give her the bigger half of the broken apple; Sarah and Hans stand beside them and Hans holds up the empty mitten — the family is together and Emma is proud"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 1,
+   "timeOfDay": "afternoon",
+   "momentP": 0.45,
+   "old": "ambient",
+   "plan": "wide — Levin, Julian, Max, Kiaan — the four kick and chase a ball across the Lindenhof under the linden trees, the Grossmünster towers catching afternoon sun in the distance — the four friends and the autumn square are established as the story's world"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 2,
+   "timeOfDay": "afternoon",
+   "momentP": 0.35,
+   "old": "ambient",
+   "plan": "over-the-shoulder — Levin, Herr Keller — the man in the orange vest lifts his leaf blower and starts it near the chess field while Levin watches — the roaring leaf blower is now running on the square"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 3,
+   "timeOfDay": "afternoon",
+   "momentP": 0.45,
+   "old": "ambient",
+   "plan": "medium — Julian — he kneels in the big leaf heap between the linden roots, both hands pulling a large warm egg up out of the leaves — the warm, softly knocking egg is found"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 4,
+   "timeOfDay": "afternoon",
+   "momentP": 0.43,
+   "old": "ambient",
+   "plan": "low-angle — Levin, Julian — Julian holds the egg while Levin looks up into the linden's crown where one golden eye blinks down from the branches — Rubina in her nest is discovered"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 5,
+   "timeOfDay": "afternoon",
+   "momentP": 0.42,
+   "old": "ambient",
+   "plan": "wide — Rubina, Levin, Julian, Max, Kiaan — the four children stand below the linden with their backs to the viewer, looking up at Rubina in her nest who calls down to them asking for help — the four are asked for help and the stake is spoken aloud"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 6,
+   "timeOfDay": "afternoon",
+   "momentP": 0.31,
+   "old": "ambient",
+   "plan": "over-the-shoulder — Julian, Rubina — Julian looks up at Rubina in the linden crown, where she presses her wings hard over her ears against the blower's roar — the children know Rubina cannot fly down to help them"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 7,
+   "timeOfDay": "afternoon",
+   "momentP": 0.39,
+   "old": "ambient",
+   "plan": "medium — Levin, Herr Keller — Levin stands beside Herr Keller whose blower is roaring, Levin's mouth open in a whisper that the machine swallows — the blower roars on and Levin's first chance was wasted"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 8,
+   "timeOfDay": "afternoon",
+   "momentP": 0.38,
+   "old": "ambient",
+   "plan": "close-up — Max, Herr Keller — Max cups his hands and shouts into Herr Keller's ear; Herr Keller throws his head back laughing — Herr Keller has been told about the egg and dismissed it; the blower goes back on"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 9,
+   "timeOfDay": "afternoon",
+   "momentP": 0.34,
+   "old": "ambient",
+   "plan": "ultra-wide — the egg — the egg wobbles out from the linden roots and rolls down the slope toward the top of the steep stairs, the leaf blanket scattered behind it — the egg is rolling toward the stairs unguarded"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 10,
+   "timeOfDay": "afternoon",
+   "momentP": 0.38,
+   "old": "ambient",
+   "plan": "medium — Max — he sprints and plants his foot against the egg, stopping it at the very top step — the egg is stopped at the stairhead; the danger is past"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 11,
+   "timeOfDay": "afternoon",
+   "momentP": 0.39,
+   "old": "ambient",
+   "plan": "close-up — Kiaan — he wraps the egg tightly in his autumn jacket, then nearly sets the bundle down before catching himself and clutching it hard against his chest — the egg is wrapped and held; Kiaan's forgetfulness is shown and overcome"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 12,
+   "timeOfDay": "dusk",
+   "momentP": 0.21,
+   "old": "ambient",
+   "plan": "medium — Kiaan, Julian — Julian covers his ears and presses behind Levin as Herr Keller blows right up to the linden, while Kiaan clutches the jacketed egg and watches the knocking almost stop — the knocking has nearly stopped; the sun lights only the tips of the Grossmünster towers; this is the low point"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 13,
+   "timeOfDay": "dusk",
+   "momentP": 0.35,
+   "old": "ambient",
+   "plan": "close-up — Julian — Julian stands with his mouth open and one finger raised as he speaks — Julian has spoken the key observation aloud"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 14,
+   "timeOfDay": "dusk",
+   "momentP": 0.35,
+   "old": "ambient",
+   "plan": "close-up — Levin, Herr Keller — with shaking knees Levin reaches out and tugs Herr Keller's sleeve — the blower is off and Herr Keller's attention is on Levin"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 15,
+   "timeOfDay": "dusk",
+   "momentP": 0.29,
+   "old": "ambient",
+   "plan": "medium — Levin, Herr Keller — Levin points at the leaf cart by the chess field, asking question after question while Herr Keller stands with his back to the linden — the quiet holds; Herr Keller's back stays turned"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 16,
+   "timeOfDay": "dusk",
+   "momentP": 0.25,
+   "old": "ambient",
+   "plan": "medium — Kiaan, Rubina, Max — Kiaan stretches up, holding the jacketed egg toward Rubina's open branch-claws at the foot of the linden trunk, Max beside him — Rubina has the egg"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 17,
+   "timeOfDay": "dusk",
+   "momentP": 0.22,
+   "old": "ambient",
+   "plan": "low-angle — Levin, Rubina — Levin looks up as Rubina rises above the linden's crown carrying the egg toward her nest, her wingbeats shaking a cascade of red and yellow leaves down — the egg is safely in the nest and every last leaf has fallen"
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "page": 18,
+   "timeOfDay": "dusk",
+   "momentP": 0.26,
+   "old": "ambient",
+   "plan": "wide — Levin, Julian, Max, Kiaan, Rubina, the little dragon — the four children look up from below as the little dragon peeks out of the cracked egg in Rubina's nest — the little dragon has hatched and the egg's journey is complete"
+  },
+  {
+   "story": "job_1790618717512_n9wrh5u0j",
+   "page": 2,
+   "timeOfDay": "afternoon",
+   "momentP": 0.44,
+   "old": "ambient",
+   "plan": "medium — Sarah, Emma, Noah — Sarah crouches to press her lit lantern into Emma's hands at the Limmatquai as Noah waits at the oars of the little wooden boat in the autumn fog — the lantern is now with Emma, and the children are about to row out alone"
+  },
+  {
+   "story": "job_1794136064260_8qgo59eyb",
+   "page": 2,
+   "timeOfDay": "dusk",
+   "momentP": 0.45,
+   "old": "crowd",
+   "plan": "high-angle — Janna, Silbermond — Janna scuffs through the leaf pile by the station wall; silver leaves whirl up and a unicorn steps out — Silbermond is out of the leaves and beside Janna."
+  },
+  {
+   "story": "job_1794136064260_8qgo59eyb",
+   "page": 3,
+   "timeOfDay": "dusk",
+   "momentP": 0.42,
+   "old": "crowd",
+   "plan": "close-up — Janna, Silbermond — Silbermond holds the hem of Janna's coat in its teeth, ears drooping, as she turns away from it — Silbermond will not let go, and Janna is held back on the leaf path."
+  },
+  {
+   "story": "job_1794136064260_8qgo59eyb",
+   "page": 7,
+   "timeOfDay": "dusk",
+   "momentP": 0.43,
+   "old": "crowd",
+   "plan": "wide — Janna, Silbermond — Janna steps off the kerb into the dark road, Silbermond pressed to her coat, its horn lighting the street — Janna stands in the open road in the horn's silver light."
+  },
+  {
+   "story": "job_1794060490533_1ksytdn47",
+   "page": 1,
+   "timeOfDay": "afternoon",
+   "momentP": 0.25,
+   "old": "ambient",
+   "plan": "medium — Melodi, Polina — Melodi cups her hands and calls over the empty paddock gate, Polina beside her. — Melodi has decided the farm pony is loose, and the four set off for the Honeret."
+  },
+  {
+   "story": "job_1794060455874_w2sbl0o0s",
+   "page": 1,
+   "timeOfDay": "morning",
+   "momentP": 0.28,
+   "old": "ambient",
+   "plan": "over-the-shoulder — Janna, Silva — Silva steps back up the path, out of reach of Janna's hurrying arm at the mist's edge — Silva has backed beyond Janna's reach, and Janna's first chance is lost."
+  },
+  {
+   "story": "job_1794060455874_w2sbl0o0s",
+   "page": 2,
+   "timeOfDay": "morning",
+   "momentP": 0.34,
+   "old": "ambient",
+   "plan": "medium — Polina, Silva — Polina ties her skipping rope into a loop around Silva's neck on the path, Silva standing still — Silva is roped; the friends take her for the farm pony."
+  },
+  {
+   "story": "job_1794060455874_w2sbl0o0s",
+   "page": 3,
+   "timeOfDay": "morning",
+   "momentP": 0.34,
+   "old": "ambient",
+   "plan": "over-the-shoulder — Melisa and Melodi — Melisa holds the rope fast as Silva walks up the path behind Melodi, hoofprints glittering — glittering prints lie in the leaves; the pony is led toward the farm."
+  },
+  {
+   "story": "job_1794060455874_w2sbl0o0s",
+   "page": 4,
+   "timeOfDay": "morning",
+   "momentP": 0.31,
+   "old": "ambient",
+   "plan": "medium — Janna — Janna jumps over a root on the Bachweg without stopping, following the glittering prints through the fog — Janna is on the trail and nearing the farm on the Obere Reppischstrasse."
+  },
+  {
+   "story": "job_1794060455874_w2sbl0o0s",
+   "page": 10,
+   "timeOfDay": "morning",
+   "momentP": 0.29,
+   "old": "ambient",
+   "plan": "wide — Janna, Silva, Polina, Melisa, Melodi — The four friends watch from behind as Silva walks into the mist over the Tobelbach — Silva has gone back into the mist, and the friends stand together at the bank."
+  },
+  {
+   "story": "job_1792935369477_o6kzclnxl",
+   "page": 14,
+   "timeOfDay": "dusk",
+   "momentP": 0.48,
+   "old": "ambient",
+   "plan": "ultra-wide — nobody — The skull-sailed ship's bow bumps the quay as the first lantern flares above the harbour — The lanterns of the port are lit and the ship is moored."
+  },
+  {
+   "story": "job_1792251663990_rxjob5qlb",
+   "page": 1,
+   "timeOfDay": "afternoon",
+   "momentP": 0.35,
+   "old": "ambient",
+   "plan": "wide — Eliah — Eliah, arm raised, shouts \"Ahoi!\" at a pirate ship lying in leaf piles by the ruin. — The pirate crew is awake and the leaves under the ship have turned to water."
+  },
+  {
+   "story": "job_1792251663990_rxjob5qlb",
+   "page": 2,
+   "timeOfDay": "afternoon",
+   "momentP": 0.31,
+   "old": "ambient",
+   "plan": "medium — Lotti, Eliah — A gull with a red bandage on her dragging wing hops over the ship's plank; Eliah kneels, watching her. — Lotti is on the plank, close to Eliah, and cannot fly."
+  },
+  {
+   "story": "job_1792251663990_rxjob5qlb",
+   "page": 3,
+   "timeOfDay": "afternoon",
+   "momentP": 0.43,
+   "old": "ambient",
+   "plan": "close-up — Eliah, Lotti — Eliah kneels with both palms open as the gull hops toward his hands. — The gull is following Eliah, and he has taken her in hand to bring her home to her flock."
+  },
+  {
+   "story": "job_1792251663990_rxjob5qlb",
+   "page": 4,
+   "timeOfDay": "afternoon",
+   "momentP": 0.38,
+   "old": "ambient",
+   "plan": "over-the-shoulder — Yara, Lotti — Yara runs after the gull, unicorn under one arm, mouth open in a gull's squeal. — Yara is at the gull's side, reaching toward her feathers."
+  },
+  {
+   "story": "job_1792251663990_rxjob5qlb",
+   "page": 17,
+   "timeOfDay": "dusk",
+   "momentP": 0.23,
+   "old": "ambient",
+   "plan": "wide — nobody — The ship's hull bumps the quay wall under Schloss Unterseen's white tower. — The ship is tied at the quay before the flock lifts for the night."
+  },
+  {
+   "story": "job_1792251663990_rxjob5qlb",
+   "page": 18,
+   "timeOfDay": "dusk",
+   "momentP": 0.28,
+   "old": "ambient",
+   "plan": "close-up — Yara, Eliah, Lotti — Eliah and Yara each touch Lotti's feathers with one finger while Lotti stands still. — Yara has touched the feathers and whispered \"Weich.\""
+  },
+  {
+   "story": "job_1792251663990_rxjob5qlb",
+   "page": 19,
+   "timeOfDay": "dusk",
+   "momentP": 0.23,
+   "old": "ambient",
+   "plan": "medium — Lotti, Eliah — Lotti hops over the plank toward the quay wall as Eliah stands at the rail. — Lotti has left the ship and is on the quay with her flock."
+  },
+  {
+   "story": "job_1792251663990_rxjob5qlb",
+   "page": 20,
+   "timeOfDay": "dusk",
+   "momentP": 0.25,
+   "old": "ambient",
+   "plan": "wide — Eliah, Yara, Lotti — seen from behind, the three look out over the dusky water as the ship turns to leaves. — The children are safe on the quay, Lotti is home with her flock, and the ship is gone."
+  }
+ ],
+ "allMomentP": [
+  [
+   "l3n2o3afm",
+   2,
+   "night",
+   0.19
+  ],
+  [
+   "l3n2o3afm",
+   4,
+   "night",
+   0.14
+  ],
+  [
+   "l3n2o3afm",
+   5,
+   "night",
+   0.11
+  ],
+  [
+   "l3n2o3afm",
+   7,
+   "night",
+   0.13
+  ],
+  [
+   "933o99i5u",
+   1,
+   "dusk",
+   0.53
+  ],
+  [
+   "933o99i5u",
+   2,
+   "dusk",
+   0.45
+  ],
+  [
+   "933o99i5u",
+   3,
+   "dusk",
+   0.41
+  ],
+  [
+   "933o99i5u",
+   4,
+   "dusk",
+   0.65
+  ],
+  [
+   "933o99i5u",
+   5,
+   "dusk",
+   0.66
+  ],
+  [
+   "933o99i5u",
+   6,
+   "dusk",
+   0.61
+  ],
+  [
+   "933o99i5u",
+   7,
+   "dusk",
+   0.41
+  ],
+  [
+   "933o99i5u",
+   8,
+   "dusk",
+   0.61
+  ],
+  [
+   "933o99i5u",
+   9,
+   "dusk",
+   0.53
+  ],
+  [
+   "933o99i5u",
+   10,
+   "dusk",
+   0.56
+  ],
+  [
+   "1tmyzh1do",
+   1,
+   "dusk",
+   0.6
+  ],
+  [
+   "1tmyzh1do",
+   2,
+   "dusk",
+   0.54
+  ],
+  [
+   "1tmyzh1do",
+   3,
+   "dusk",
+   0.56
+  ],
+  [
+   "1tmyzh1do",
+   4,
+   "dusk",
+   0.89
+  ],
+  [
+   "1tmyzh1do",
+   6,
+   "dusk",
+   0.75
+  ],
+  [
+   "1tmyzh1do",
+   7,
+   "dusk",
+   0.76
+  ],
+  [
+   "1tmyzh1do",
+   8,
+   "dusk",
+   0.81
+  ],
+  [
+   "1tmyzh1do",
+   9,
+   "dusk",
+   0.74
+  ],
+  [
+   "1tmyzh1do",
+   10,
+   "dusk",
+   0.49
+  ],
+  [
+   "fre2mb4d0",
+   1,
+   "afternoon",
+   0.24
+  ],
+  [
+   "ao77wh9j5",
+   1,
+   "morning",
+   0.27
+  ],
+  [
+   "ao77wh9j5",
+   2,
+   "morning",
+   0.32
+  ],
+  [
+   "ao77wh9j5",
+   3,
+   "morning",
+   0.3
+  ],
+  [
+   "ao77wh9j5",
+   4,
+   "morning",
+   0.31
+  ],
+  [
+   "ao77wh9j5",
+   10,
+   "morning",
+   0.27
+  ],
+  [
+   "0ir5y6hlh",
+   3,
+   "morning",
+   0.35
+  ],
+  [
+   "0ir5y6hlh",
+   4,
+   "morning",
+   0.31
+  ],
+  [
+   "0ir5y6hlh",
+   5,
+   "morning",
+   0.28
+  ],
+  [
+   "0ir5y6hlh",
+   19,
+   "dusk",
+   0.47
+  ],
+  [
+   "kkg5gxkbj",
+   7,
+   "afternoon",
+   0.56
+  ],
+  [
+   "txr1gqd28",
+   1,
+   "evening",
+   0.44
+  ],
+  [
+   "txr1gqd28",
+   2,
+   "evening",
+   0.38
+  ],
+  [
+   "6429d0n83",
+   1,
+   "dusk",
+   0.49
+  ],
+  [
+   "6429d0n83",
+   2,
+   "dusk",
+   0.42
+  ],
+  [
+   "lb65hzkqs",
+   1,
+   "afternoon",
+   0.36
+  ],
+  [
+   "lb65hzkqs",
+   2,
+   "afternoon",
+   0.32
+  ],
+  [
+   "lb65hzkqs",
+   3,
+   "afternoon",
+   0.43
+  ],
+  [
+   "lb65hzkqs",
+   4,
+   "afternoon",
+   0.35
+  ],
+  [
+   "lb65hzkqs",
+   17,
+   "dusk",
+   0.24
+  ],
+  [
+   "lb65hzkqs",
+   18,
+   "dusk",
+   0.28
+  ],
+  [
+   "lb65hzkqs",
+   19,
+   "dusk",
+   0.24
+  ],
+  [
+   "lb65hzkqs",
+   20,
+   "dusk",
+   0.27
+  ],
+  [
+   "uh8tj6ht1",
+   1,
+   "midday",
+   0.34
+  ],
+  [
+   "uh8tj6ht1",
+   2,
+   "midday",
+   0.31
+  ],
+  [
+   "uh8tj6ht1",
+   3,
+   "midday",
+   0.39
+  ],
+  [
+   "uh8tj6ht1",
+   4,
+   "midday",
+   0.28
+  ],
+  [
+   "uh8tj6ht1",
+   5,
+   "afternoon",
+   0.18
+  ],
+  [
+   "uh8tj6ht1",
+   19,
+   "dusk",
+   0.45
+  ],
+  [
+   "uh8tj6ht1",
+   20,
+   "night",
+   0.21
+  ],
+  [
+   "a0dpn715x",
+   1,
+   "evening",
+   0.47
+  ],
+  [
+   "a0dpn715x",
+   2,
+   "evening",
+   0.44
+  ],
+  [
+   "a0dpn715x",
+   3,
+   "dusk",
+   0.36
+  ],
+  [
+   "a0dpn715x",
+   4,
+   "dusk",
+   0.35
+  ],
+  [
+   "o0kaatvmq",
+   1,
+   "midday",
+   0.44
+  ],
+  [
+   "o0kaatvmq",
+   2,
+   "midday",
+   0.4
+  ],
+  [
+   "o0kaatvmq",
+   3,
+   "dusk",
+   0.29
+  ],
+  [
+   "o0kaatvmq",
+   4,
+   "dusk",
+   0.28
+  ],
+  [
+   "6quecrr9t",
+   1,
+   "evening",
+   0.41
+  ],
+  [
+   "6quecrr9t",
+   2,
+   "evening",
+   0.35
+  ],
+  [
+   "6quecrr9t",
+   3,
+   "evening",
+   0.4
+  ],
+  [
+   "6quecrr9t",
+   4,
+   "evening",
+   0.35
+  ],
+  [
+   "2ir6nl5kw",
+   1,
+   "afternoon",
+   0.49
+  ],
+  [
+   "2ir6nl5kw",
+   2,
+   "afternoon",
+   0.45
+  ],
+  [
+   "2ir6nl5kw",
+   3,
+   "afternoon",
+   0.56
+  ],
+  [
+   "2ir6nl5kw",
+   4,
+   "afternoon",
+   0.49
+  ],
+  [
+   "2ir6nl5kw",
+   5,
+   "afternoon",
+   0.36
+  ],
+  [
+   "2ir6nl5kw",
+   6,
+   "afternoon",
+   0.41
+  ],
+  [
+   "2ir6nl5kw",
+   7,
+   "afternoon",
+   0.41
+  ],
+  [
+   "2ir6nl5kw",
+   8,
+   "afternoon",
+   0.39
+  ],
+  [
+   "2ir6nl5kw",
+   9,
+   "afternoon",
+   0.3
+  ],
+  [
+   "2ir6nl5kw",
+   10,
+   "afternoon",
+   0.31
+  ],
+  [
+   "2ir6nl5kw",
+   11,
+   "afternoon",
+   0.36
+  ],
+  [
+   "2ir6nl5kw",
+   12,
+   "dusk",
+   0.3
+  ],
+  [
+   "2ir6nl5kw",
+   13,
+   "dusk",
+   0.36
+  ],
+  [
+   "2ir6nl5kw",
+   14,
+   "dusk",
+   0.35
+  ],
+  [
+   "2ir6nl5kw",
+   15,
+   "dusk",
+   0.28
+  ],
+  [
+   "2ir6nl5kw",
+   16,
+   "dusk",
+   0.39
+  ],
+  [
+   "2ir6nl5kw",
+   17,
+   "dusk",
+   0.35
+  ],
+  [
+   "2ir6nl5kw",
+   18,
+   "dusk",
+   0.36
+  ],
+  [
+   "nwi88y9lr",
+   1,
+   "afternoon",
+   0.73
+  ],
+  [
+   "nwi88y9lr",
+   2,
+   "afternoon",
+   0.53
+  ],
+  [
+   "nwi88y9lr",
+   3,
+   "afternoon",
+   0.49
+  ],
+  [
+   "nwi88y9lr",
+   4,
+   "afternoon",
+   0.65
+  ],
+  [
+   "nwi88y9lr",
+   5,
+   "afternoon",
+   0.69
+  ],
+  [
+   "nwi88y9lr",
+   6,
+   "afternoon",
+   0.65
+  ],
+  [
+   "nwi88y9lr",
+   7,
+   "afternoon",
+   0.48
+  ],
+  [
+   "nwi88y9lr",
+   9,
+   "afternoon",
+   0.63
+  ],
+  [
+   "nwi88y9lr",
+   13,
+   "evening",
+   0.48
+  ],
+  [
+   "nwi88y9lr",
+   14,
+   "dusk",
+   0.42
+  ],
+  [
+   "nwi88y9lr",
+   15,
+   "dusk",
+   0.45
+  ],
+  [
+   "nwi88y9lr",
+   16,
+   "dusk",
+   0.57
+  ],
+  [
+   "50osg2osm",
+   1,
+   "dusk",
+   0.48
+  ],
+  [
+   "50osg2osm",
+   2,
+   "dusk",
+   0.16
+  ],
+  [
+   "50osg2osm",
+   3,
+   "dusk",
+   0.23
+  ],
+  [
+   "50osg2osm",
+   4,
+   "dusk",
+   0.15
+  ],
+  [
+   "50osg2osm",
+   5,
+   "dusk",
+   0.15
+  ],
+  [
+   "50osg2osm",
+   6,
+   "dusk",
+   0.13
+  ],
+  [
+   "50osg2osm",
+   7,
+   "dusk",
+   0.17
+  ],
+  [
+   "50osg2osm",
+   8,
+   "dusk",
+   0.13
+  ],
+  [
+   "50osg2osm",
+   9,
+   "dusk",
+   0.17
+  ],
+  [
+   "50osg2osm",
+   10,
+   "dusk",
+   0.23
+  ],
+  [
+   "atbttop6w",
+   1,
+   "afternoon",
+   0.45
+  ],
+  [
+   "atbttop6w",
+   2,
+   "afternoon",
+   0.35
+  ],
+  [
+   "atbttop6w",
+   3,
+   "afternoon",
+   0.45
+  ],
+  [
+   "atbttop6w",
+   4,
+   "afternoon",
+   0.43
+  ],
+  [
+   "atbttop6w",
+   5,
+   "afternoon",
+   0.42
+  ],
+  [
+   "atbttop6w",
+   6,
+   "afternoon",
+   0.31
+  ],
+  [
+   "atbttop6w",
+   7,
+   "afternoon",
+   0.39
+  ],
+  [
+   "atbttop6w",
+   8,
+   "afternoon",
+   0.38
+  ],
+  [
+   "atbttop6w",
+   9,
+   "afternoon",
+   0.34
+  ],
+  [
+   "atbttop6w",
+   10,
+   "afternoon",
+   0.38
+  ],
+  [
+   "atbttop6w",
+   11,
+   "afternoon",
+   0.39
+  ],
+  [
+   "atbttop6w",
+   12,
+   "dusk",
+   0.21
+  ],
+  [
+   "atbttop6w",
+   13,
+   "dusk",
+   0.35
+  ],
+  [
+   "atbttop6w",
+   14,
+   "dusk",
+   0.35
+  ],
+  [
+   "atbttop6w",
+   15,
+   "dusk",
+   0.29
+  ],
+  [
+   "atbttop6w",
+   16,
+   "dusk",
+   0.25
+  ],
+  [
+   "atbttop6w",
+   17,
+   "dusk",
+   0.22
+  ],
+  [
+   "atbttop6w",
+   18,
+   "dusk",
+   0.26
+  ],
+  [
+   "n9wrh5u0j",
+   1,
+   "afternoon",
+   0.53
+  ],
+  [
+   "n9wrh5u0j",
+   2,
+   "afternoon",
+   0.44
+  ],
+  [
+   "n9wrh5u0j",
+   4,
+   "afternoon",
+   0.52
+  ],
+  [
+   "8qgo59eyb",
+   1,
+   "dusk",
+   0.55
+  ],
+  [
+   "8qgo59eyb",
+   2,
+   "dusk",
+   0.45
+  ],
+  [
+   "8qgo59eyb",
+   3,
+   "dusk",
+   0.42
+  ],
+  [
+   "8qgo59eyb",
+   4,
+   "dusk",
+   0.71
+  ],
+  [
+   "8qgo59eyb",
+   5,
+   "dusk",
+   0.61
+  ],
+  [
+   "8qgo59eyb",
+   6,
+   "dusk",
+   0.64
+  ],
+  [
+   "8qgo59eyb",
+   7,
+   "dusk",
+   0.43
+  ],
+  [
+   "8qgo59eyb",
+   8,
+   "dusk",
+   0.57
+  ],
+  [
+   "8qgo59eyb",
+   9,
+   "dusk",
+   0.53
+  ],
+  [
+   "8qgo59eyb",
+   10,
+   "dusk",
+   0.54
+  ],
+  [
+   "1ksytdn47",
+   1,
+   "afternoon",
+   0.25
+  ],
+  [
+   "w2sbl0o0s",
+   1,
+   "morning",
+   0.28
+  ],
+  [
+   "w2sbl0o0s",
+   2,
+   "morning",
+   0.34
+  ],
+  [
+   "w2sbl0o0s",
+   3,
+   "morning",
+   0.34
+  ],
+  [
+   "w2sbl0o0s",
+   4,
+   "morning",
+   0.31
+  ],
+  [
+   "w2sbl0o0s",
+   10,
+   "morning",
+   0.29
+  ],
+  [
+   "o6kzclnxl",
+   14,
+   "dusk",
+   0.48
+  ],
+  [
+   "o6kzclnxl",
+   15,
+   "dusk",
+   0.51
+  ],
+  [
+   "rxjob5qlb",
+   1,
+   "afternoon",
+   0.35
+  ],
+  [
+   "rxjob5qlb",
+   2,
+   "afternoon",
+   0.31
+  ],
+  [
+   "rxjob5qlb",
+   3,
+   "afternoon",
+   0.43
+  ],
+  [
+   "rxjob5qlb",
+   4,
+   "afternoon",
+   0.38
+  ],
+  [
+   "rxjob5qlb",
+   17,
+   "dusk",
+   0.23
+  ],
+  [
+   "rxjob5qlb",
+   18,
+   "dusk",
+   0.28
+  ],
+  [
+   "rxjob5qlb",
+   19,
+   "dusk",
+   0.23
+  ],
+  [
+   "rxjob5qlb",
+   20,
+   "dusk",
+   0.25
+  ]
+ ]
+}
