@@ -1,0 +1,54 @@
+{
+ "id": "job_1793964466256_1tmyzh1do",
+ "faults": [
+  "FAULT[TEXT][MINOR]: p2 — Say that the toggles on Janna's coat would not fasten (\"Drinnen wollten die Knebel an Jannas Mantel nicht zugehen\"), not that its zip was stuck.",
+  "FAULT[TEXT][MAJOR]: p9 — Add a sentence where Polina, Melodi and Melisa first see Silbermond and gasp at the unicorn beside Janna, for example \"Polina machte grosse Augen: «Ein Einhorn!»\", before Polina says \"Da bist du ja!\"."
+ ],
+ "ok": true,
+ "changedPages": [
+  2,
+  9
+ ],
+ "outcomes": [
+  {
+   "category": "TEXT",
+   "pageNumber": 2,
+   "text": "Say that the toggles on Janna's coat would not fasten (\"Drinnen wollten die Knebel an Jannas Mantel nicht zugehen\"), not that its zip was stuck.",
+   "line": "FAULT[TEXT][MINOR]: p2 — Say that the toggles on Janna's coat would not fasten (\"Drinnen wollten die Knebel an Jannas Mantel nicht zugehen\"), not that its zip was stuck.",
+   "sources": [
+    "book-audit"
+   ],
+   "id": "T1",
+   "outcome": "page-rewritten",
+   "reason": null
+  },
+  {
+   "category": "TEXT",
+   "pageNumber": 9,
+   "text": "Add a sentence where Polina, Melodi and Melisa first see Silbermond and gasp at the unicorn beside Janna, for example \"Polina machte grosse Augen: «Ein Einhorn!»\", before Polina says \"Da bist du ja!\".",
+   "line": "FAULT[TEXT][MAJOR]: p9 — Add a sentence where Polina, Melodi and Melisa first see Silbermond and gasp at the unicorn beside Janna, for example \"Polina machte grosse Augen: «Ein Einhorn!»\", before Polina says \"Da bist du ja!\".",
+   "sources": [
+    "book-audit"
+   ],
+   "id": "T2",
+   "outcome": "page-rewritten",
+   "reason": null
+  }
+ ],
+ "before": {
+  "2": "Drinnen klemmte der Reissverschluss an Jannas Mantel. «Das dauert viel zu lange!», murmelte sie. Dann rannte sie zur Tür hinaus.\n\nVor der Tür lag ein Haufen Herbstlaub. Janna trat mit dem Stiefel kräftig hinein, und die Blätter flogen auf. Ein silbernes Blatt hob sich aus dem Haufen und glänzte. Janna blieb stehen und starrte es an.",
+  "9": "Melodi hörte Polinas Ruf. Sie sah die Lücke im Ring. «Halt!», rief sie mit zittriger Stimme und hielt die Hand hoch. Die Reihe blieb stehen, bevor sich der Ring schloss.\n\nMelisa hob Jannas bemalte Laterne so hoch sie konnte. «Janna, hier!», sagte sie. Janna sah die Laterne leuchten und rannte darauf zu. Sie trat in die Lücke neben Polina, und Silbermond ging neben ihr her. «Da bist du ja!», sagte Polina."
+ },
+ "after": {
+  "2": "Drinnen wollten die Knebel an Jannas Mantel nicht zugehen. «Das dauert viel zu lange!», murmelte sie. Dann rannte sie zur Tür hinaus.\n\nVor der Tür lag ein Haufen Herbstlaub. Janna trat mit dem Stiefel kräftig hinein, und die Blätter flogen auf. Ein silbernes Blatt hob sich aus dem Haufen und glänzte. Janna blieb stehen und starrte es an.",
+  "9": "Melodi hörte Polinas Ruf und sah die Lücke im Ring. «Halt!», rief sie mit zittriger Stimme und hielt die Hand hoch. Die Reihe blieb stehen, bevor sich der Ring schloss.\n\nMelisa hob Jannas bemalte Laterne so hoch sie konnte. «Janna, hier!», sagte sie. Janna sah die Laterne leuchten und rannte darauf zu. Sie trat in die Lücke neben Polina, und Silbermond ging neben ihr her. «Ein Einhorn!», rief Polina, und auch Melodi und Melisa machten grosse Augen. «Da bist du ja!», sagte Polina."
+ },
+ "retest": null,
+ "majorChangePages": [],
+ "analysis": "---ANALYSIS---\nT1: Page 2, «Drinnen klemmte der Reissverschluss an Jannas Mantel.» is recast to «Drinnen wollten die Knebel an Jannas Mantel nicht zugehen.» The rest of the page is unchanged.\n\nT2: Page 9. Silbermond appears beside Janna, but the other girls never react to it. I add one sentence before Polina's «Da bist du ja!»: «Ein Einhorn!», rief Polina, und auch Melodi und Melisa machten grosse Augen. This is a reaction to a creature only children can see, so it fits the owed fact. To stay within 9 sentences, I join «Melodi hörte Polinas Ruf.» and «Sie sah die Lücke im Ring.» into one sentence. The hint for s9 is already met, because the text says Melodi hears Polina's shout and then holds up her hand.\n\nScan of the other pages for the four cases:\n- Pages 1, 3 to 8 and 10 have no outline contradiction.\n- None of them carries an abbreviation.\n- None of them carries a banned dash.\n- No MISMATCH move is needed.\n- These pages ship unchanged.\n\nLedger:\n- T1: fixed on p2.\n- T2: fixed on p9.\n- p2: no sentence removed; one sentence recast (zip to toggles).\n- p9: no sentence removed; «Melodi hörte Polinas Ruf.» and «Sie sah die Lücke im Ring.» joined into one sentence; one sentence added.\n\n---STORY TEXT---\n## Page 2\nDrinnen wollten die Knebel an Jannas Mantel nicht zugehen. «Das dauert viel zu lange!», murmelte sie. Dann rannte sie zur Tür hinaus.\n\nVor der Tür lag ein Haufen Herbstlaub. Janna trat mit dem Stiefel kräftig hinein, und die Blätter flogen auf. Ein silbernes Blatt hob sich aus dem Haufen und glänzte. Janna blieb stehen und starrte es an.\n\n## Page 9\nMelodi hörte Polinas Ruf und sah die Lücke im Ring. «Halt!», rief sie mit zittriger Stimme und hielt die Hand hoch. Die Reihe blieb stehen, bevor sich der Ring schloss.\n\nMelisa hob Jannas bemalte Laterne so hoch sie konnte. «Janna, hier!», sagte sie. Janna sah die Laterne leuchten und rannte darauf zu. Sie trat in die Lücke neben Polina, und Silbermond ging neben ihr her. «Ein Einhorn!», rief Polina, und auch Melodi und Melisa machten grosse Augen. «Da bist du ja!», sagte Polina.",
+ "cost": 0.056428000000000006,
+ "usage": {
+  "input_tokens": 16809,
+  "output_tokens": 2281
+ }
+}

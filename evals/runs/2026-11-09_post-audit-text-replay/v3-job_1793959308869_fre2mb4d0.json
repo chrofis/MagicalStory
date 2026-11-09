@@ -1,0 +1,54 @@
+{
+ "id": "job_1793959308869_fre2mb4d0",
+ "faults": [
+  "FAULT[TEXT][MINOR]: p5 — After «Das Licht wurde schon blasser», add a sentence saying that if the light goes out, Rubi cannot get home.",
+  "FAULT[TEXT][MINOR]: p10 — Before «Auf dem Hof schaute das Pony über die Stalltür», add a sentence saying that the four girls walked back home to the farm."
+ ],
+ "ok": true,
+ "changedPages": [
+  5,
+  10
+ ],
+ "outcomes": [
+  {
+   "category": "TEXT",
+   "pageNumber": 5,
+   "text": "After «Das Licht wurde schon blasser», add a sentence saying that if the light goes out, Rubi cannot get home.",
+   "line": "FAULT[TEXT][MINOR]: p5 — After «Das Licht wurde schon blasser», add a sentence saying that if the light goes out, Rubi cannot get home.",
+   "sources": [
+    "book-audit"
+   ],
+   "id": "T1",
+   "outcome": "page-rewritten",
+   "reason": null
+  },
+  {
+   "category": "TEXT",
+   "pageNumber": 10,
+   "text": "Before «Auf dem Hof schaute das Pony über die Stalltür», add a sentence saying that the four girls walked back home to the farm.",
+   "line": "FAULT[TEXT][MINOR]: p10 — Before «Auf dem Hof schaute das Pony über die Stalltür», add a sentence saying that the four girls walked back home to the farm.",
+   "sources": [
+    "book-audit"
+   ],
+   "id": "T2",
+   "outcome": "page-rewritten",
+   "reason": null
+  }
+ ],
+ "before": {
+  "5": "Rubi erschrak. Er stampfte und warf das Laub hoch. Auf der einen Seite waren Brombeeren, auf der anderen der Bach. Er kam nicht an den Mädchen vorbei.\n\nDas Licht wurde schon blasser. «Er will dort hindurch», dachte Janna. «Aber er hat Angst vor uns.»",
+  "10": "Ganz leise gingen die vier mit Rubi bis zum Licht. Dort drehte er sich noch einmal um, und sein Horn leuchtete. Dann trabte er hindurch.\n\nAuf dem Hof schaute das Pony über die Stalltür. «Da bist du ja!», lachte Melodi. Janna hielt ihr rotes Blatt fest und lächelte."
+ },
+ "after": {
+  "5": "Rubi erschrak. Er stampfte und warf das Laub hoch. Auf der einen Seite waren Brombeeren, auf der anderen der Bach. Er kam nicht an den Mädchen vorbei.\n\nDas Licht wurde schon blasser. «Wenn es ausgeht, kommt er nicht mehr heim», dachte Janna. «Er will dort hindurch. Aber er hat Angst vor uns.»",
+  "10": "Ganz leise gingen die vier mit Rubi bis zum Licht. Dort drehte er sich noch einmal um. Sein Horn leuchtete den vieren den Weg zwischen den grossen Buchen hinaus. Dann trabte er hindurch, und die vier gingen zum Hof zurück.\n\nAuf dem Hof schaute das Pony über die Stalltür. «Da bist du ja!», lachte Melodi. Janna hielt ihr rotes Blatt fest und lächelte."
+ },
+ "retest": null,
+ "majorChangePages": [],
+ "analysis": "---ANALYSIS---\n**T1 (p5):** The page shows the light fading but never says what Rubi loses if it goes out. The sentence is added as Janna's thought, so it carries the stake as her words and not as narrator explanation. After «Das Licht wurde schon blasser.» comes «Wenn es ausgeht, kommt er nicht mehr heim», dachte Janna. The existing thoughts «Er will dort hindurch» and «Aber er hat Angst vor uns» stay unchanged.\n\n**T2 (p10):** The page jumps from the gap to «Auf dem Hof schaute das Pony über die Stalltür» without the girls returning. I join «und die vier gingen zum Hof zurück» into the sentence «Dann trabte er hindurch».\n\nThe return through the two big beeches by Rubi's light is an owed fact that this page also leaves out. I recast the sentence «sein Horn leuchtete» so the horn lights the children's way out between the two big beeches. That adds nothing new to the story. It also matches the picture, where the children step out and Rubi looks back.\n\n**Scan of the other pages for the four cases:** There is no MISMATCH move, no outline contradiction, no abbreviation and no banned dash on any other page. They ship unchanged.\n\n**Ledger**\n- T1: fixed on p5 (one added thought of Janna's).\n- T2: fixed on p10 (the girls' walk back to the farm, joined into the sentence about Rubi trotting through).\n- Owed return by the two big beeches, lit by Rubi's horn: fixed on p10 by recasting «sein Horn leuchtete». It rides along with T2 on the same page and adds no new event.\n- p5: no sentence removed.\n- p10: the sentence «Dort drehte er sich noch einmal um, und sein Horn leuchtete.» is split into two sentences, and «Dann trabte er hindurch.» is joined with the girls' return. No fact is removed.\n\n---STORY TEXT---\n## Page 5\nRubi erschrak. Er stampfte und warf das Laub hoch. Auf der einen Seite waren Brombeeren, auf der anderen der Bach. Er kam nicht an den Mädchen vorbei.\n\nDas Licht wurde schon blasser. «Wenn es ausgeht, kommt er nicht mehr heim», dachte Janna. «Er will dort hindurch. Aber er hat Angst vor uns.»\n\n## Page 10\nGanz leise gingen die vier mit Rubi bis zum Licht. Dort drehte er sich noch einmal um. Sein Horn leuchtete den vieren den Weg zwischen den grossen Buchen hinaus. Dann trabte er hindurch, und die vier gingen zum Hof zurück.\n\nAuf dem Hof schaute das Pony über die Stalltür. «Da bist du ja!», lachte Melodi. Janna hielt ihr rotes Blatt fest und lächelte.",
+ "cost": 0.07860400000000001,
+ "usage": {
+  "input_tokens": 16282,
+  "output_tokens": 4604
+ }
+}
