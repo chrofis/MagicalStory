@@ -4689,6 +4689,30 @@
       "status": "fixed",
       "fixedIn": "52cc5cd2c",
       "fixedAt": "2026-11-09"
+    },
+    {
+      "id": "population-ignores-night-and-redraw-restores-onlookers",
+      "title": "A public outdoor place gets passers-by on every page, also at night during a monster attack, and a redraw asked to remove them restores them",
+      "reportedAt": "2026-11-09",
+      "source": "Prod job_1794231161354_l3n2o3afm: jevDecisions.population.byLocation.LOC004 publicP 0.82 -> ambient for pages 4-7 (night, monsters attacking). Book review asked to remove the onlookers on p6; Lab 1849/1850 (4 redraws) all kept them; pinBrief restores population ambient after every rewrite.",
+      "rootCause": "Population is decided once per location, never per page moment; the iterate pin restores it over a repair that removes background people.",
+      "status": "open"
+    },
+    {
+      "id": "iterate-rewrite-not-told-fixed-fields",
+      "title": "The iterate rewrite is not given the page FIXED block (population, objects, looksAt, emotions), so it writes fields and prose against them; it copied the parent brief onlookers into a cast_only page",
+      "reportedAt": "2026-11-09",
+      "source": "Staging Lab 1851 (job_1794231161354_l3n2o3afm p6, jevFixed.population cast_only): the rewrite prose kept \"two distant village onlookers in brown tunics\" and the image drew them; only the light line was added to the rewrite in 52cc5cd2c.",
+      "rootCause": "iteratePageCore passes only the plan line and (since 52cc5cd2c) the light line; the Art Director gets the whole jevDecisions.fixedBlock.",
+      "status": "open"
+    },
+    {
+      "id": "vb-invents-names-and-splits-groups",
+      "title": "The Visual Bible forces a proper name on every animal and invented person and splits a group into differently coloured members, so the citation check never finds them and pages draw their own look",
+      "reportedAt": "2026-11-09",
+      "source": "Prod job_1794231161354_l3n2o3afm: three monsters became Grumbo/Plodd/Squelch (green/brown/purple); Jev vb scores 0.22-0.47 on pages 4-7 (bar 0.7), no reference cell; redraws drew the bible colours (Lab 1849/1850).",
+      "rootCause": "visual-bible.txt schema \"name\": \"[Name]\" for CHR/ANI, no group shape; matching sites need exact names. Plan: tasks/vb-name-or-role-groups-2026-11-09.md (owner design 2026-11-09).",
+      "status": "open"
     }
   ]
 }
