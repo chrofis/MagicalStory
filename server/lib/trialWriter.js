@@ -17,6 +17,7 @@ const { buildTrialArcPrompt, buildTrialPagesPrompt, markVerseWriter } = require(
 const { callTextModelStreaming, describeTruncation } = require('./textModels');
 const { UnifiedStoryParser } = require('./outlineParser');
 const { log } = require('../utils/logger');
+const { applyStorySeason, parseStorySeasonSection } = require('./season');
 const { MODEL_DEFAULTS } = require('../config/models');
 
 const PAGES_MARKER = '---STORY PAGES---';
@@ -84,6 +85,11 @@ async function runTrialWriter({ inputData, sceneCount, pagesModel, arcSuffix = '
   for (const section of ['---STORY ARC---', '---VISUAL BIBLE---']) {
     if (!arcText.includes(section)) throw new Error(`trial planner ${arcResult.modelId || MODEL_DEFAULTS.trialArcModel} returned no ${section} section (${arcText.length} chars)`);
   }
+  // THE STORY'S OWN SEASON (owner, 2026-11-09): the planner's typed section, applied before the cover and the pages
+  // writer read `inputData.season`. A missing or malformed section is an error in the log and the requested season stands.
+  const storySeason = parseStorySeasonSection(arcText);
+  if (storySeason) applyStorySeason(inputData, storySeason);
+  else log.error(`[TRIAL-WRITER] planner ${arcResult.modelId || MODEL_DEFAULTS.trialArcModel} gave no valid ---STORY SEASON--- section; the requested season "${inputData?.season}" stands`);
   // Ends on the marker B's output starts with, so the progressive parser closes the cover scene now.
   if (onArcText) onArcText(arcText, `${arcText}\n\n${PAGES_MARKER}\n`);
 

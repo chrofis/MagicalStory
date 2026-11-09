@@ -54,6 +54,7 @@ const G = require('./gazeTargets');
 const { EMOTIONS, EMOTION_MOOD } = require('./emotionVocabulary');
 const { openRouterUsage } = require('./providerUsage');
 const { recordTextUsage } = require('./usageContext');
+const { STORY_SEASON_CHOICES } = require('./season');
 const { log } = require('../utils/logger');
 
 class JevDecisionError extends Error {
@@ -74,6 +75,7 @@ const JEV_DECISIONS = {
   needed: { reps: 3, cutBelow: 0.5 }, // AUC 0.98, 51 cuts 0 wrong
   shot: { reps: 1 },                // A1 0.918 acceptable, 0 rule violations
   light: { reps: 1, indoorAt: 0.5, newDayAt: 0.5 },
+  season: { reps: 1 },              // ONE call per story: the season the arc places itself in (owner, 2026-11-09)
   lightSource: { reps: 1, at: 0.5 }, // which cited element lights a dark page (owner, 2026-10-06)
   vb: { reps: 1, creature: 0.7, vehicle: 0.5, secondary: 0.5, object: 0.7, objectBand: 0.5 },
   aboard: { reps: 1, at: 0.5 },     // 9/10 on the one ship book
@@ -707,6 +709,19 @@ function lightQuestions() {
   };
 }
 
+/** The season question (decideStorySeason); the wording is the evaluated one (evals/results/results.jsonl, 2026-11-09). */
+const STORY_SEASON_QUESTION = {
+  type: 'choice',
+  instructions: 'The season of the year the story itself is set in, as the story tells it: a date, a holiday or festival that falls in one season, a named school break, a first snow, a harvest, a blossom. `none` when the story gives no such sign and could happen in any season; a story set in an invented world or a place with no seasons is `none`. Judge the story, not the time it is told.',
+  criteria: {
+    spring: 'The story is set in spring: a date in March to May, a spring festival, blossom, the thaw, newly green fields.',
+    summer: 'The story is set in summer: a date in June to August, summer holidays, long hot days, bathing, a summer festival.',
+    autumn: 'The story is set in autumn: a date in September to November, a harvest, falling leaves, an autumn festival.',
+    winter: 'The story is set in winter: a date in December to February, a winter festival or the holiday season, snow and ice lying, the cold months.',
+    none: 'The story names or shows no season and could happen in any season, or it is set in a world without seasons.',
+  },
+};
+
 /** Hours at the day's end: after them, an earlier hour is the next day. */
 const DAY_END = new Set(['evening', 'dusk', 'night']);
 const DAY_START = new Set(['dawn', 'morning', 'midday']);
@@ -762,6 +777,31 @@ async function decideLight({ arc, pages }, opts = {}) {
   for (const h of clockHeld) log.warn(`🌗 [JEV/light] page ${h.pageNumber}: Jev said ${h.jev} after ${h.held} — the clock never runs backwards, held at ${h.held}`);
   log.info(`🌗 [JEV/light] ${raw.map(r => `p${r.pageNumber}:${r.timeOfDay}${r.indoor ? '/in' : ''}`).join(' ')} (${stats.calls} calls)`);
   return { pages: raw, clockHeld, stats: summarise(stats) };
+}
+
+/**
+ * THE STORY'S OWN SEASON (owner, 2026-11-09, "Story's own date decides"): one choice over the finished arc. The
+ * options are season.js's STORY_SEASON_CHOICES; `none` is a story that places itself in no season, which keeps the
+ * requested one. Code reads the typed answer only, never the arc's words (season.applyStorySeason applies it).
+ * State: the arc alone (the plan does not exist yet when this runs, so the season reaches the plan, the Visual Bible
+ * and the Art Director).
+ *
+ * @param {{arc:string}} input
+ * @returns {Promise<{season:string, top:string[], stats:Object}>}
+ */
+async function decideStorySeason({ arc }, opts = {}) {
+  if (!String(arc || '').trim()) throw new JevDecisionError('decideStorySeason: no arc to judge');
+  const stats = newStats();
+  const state = `THE STORY, beat by beat:
+${String(arc).trim()}`;
+  const reqs = repeat({ key: 'season', state, questions: { SEASON: STORY_SEASON_QUESTION } }, JEV_DECISIONS.season.reps);
+  const ans = await runJevRequests(reqs, { ...opts, usageLabel: 'jev_decisions_season', stats });
+  const season = modalChoice(ans.get('season'), 'SEASON');
+  if (!STORY_SEASON_CHOICES.includes(season)) throw new JevDecisionError(`Jev SEASON answer "${season}" is outside ${STORY_SEASON_CHOICES.join('|')}`);
+  const tp = (ans.get('season')[0].SEASON && ans.get('season')[0].SEASON.probabilities) || {};
+  const top = Object.entries(tp).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([k, v]) => `${k} ${(+v).toFixed(2)}`);
+  log.info(`🍁 [JEV/season] ${season} (${top.join(', ')}) (${stats.calls} call)`);
+  return { season, top, stats: summarise(stats) };
 }
 
 /**
@@ -1711,6 +1751,8 @@ module.exports = {
   lightQuestions,
   forwardClock,
   decideLight,
+  decideStorySeason,
+  STORY_SEASON_QUESTION,
   decideSubmergedLight,
   applyClock,
   decideLightSources,

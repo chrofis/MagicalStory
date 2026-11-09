@@ -11433,6 +11433,22 @@
         "kind": "human",
         "what": "Read jevDecisions.population.moment.byPage in the stored story (momentP per page), the stored jevFixed.population of each page, and for a redraw the eval_calls iterate_rebrief prompt (FIXED block present) and the rewrite prose (no unnamed people on a cast_only page)."
       }
+    },
+    {
+      "id": "story-season-from-text-2026-11-09",
+      "title": "The story's own season decides the season of every image prompt",
+      "commits": [],
+      "addedAt": "2026-11-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "A Christmas story generated in a non-winter month draws winter on every page and both covers: stories.data.season is winter, requestedSeason is the month's season, seasonSource is 'story', and no page prompt carries another SEASON line; a story that names no season keeps the requested one.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Generate (staging, 4 pages) a Christmas-premise story in a non-winter month; read stories.data.season / requestedSeason / seasonSource, the log line '[SEASON] The story places itself in winter' (generation-log entry beats_story_season), and look at every page and cover for snow and bare or evergreen trees, no orange foliage. Then a story with no seasonal premise: season equals the requested one unless the arc names another season."
+      }
     }
   ],
   "runs": [

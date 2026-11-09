@@ -22,7 +22,13 @@
  * stamped story and a wizard-launched story agree.
  */
 
+const { log } = require('../utils/logger');
+
 const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+
+/** The answer for a story that places itself in no season: the requested season stands. */
+const STORY_SEASON_NONE = 'none';
+const STORY_SEASON_CHOICES = [...SEASONS, STORY_SEASON_NONE];
 
 /** Aliases a launcher or an older row might carry. */
 const SEASON_ALIASES = {
@@ -73,6 +79,53 @@ function normalizeSeason(value) {
 function resolveSeason(inputData = {}, { now = null } = {}) {
   return normalizeSeason(inputData?.season)
     || seasonForDate(now || inputData?.createdAt || new Date());
+}
+
+/**
+ * THE STORY'S OWN SEASON (owner, 2026-11-09, "Story's own date decides"). A story that places itself in a season (a
+ * date, a holiday, a school break, the first snow) is drawn in THAT season, whatever the request or the creation date
+ * said: prod job_1793736454070_0ir5y6hlh, a Christmas story made on 2026-11-03, carried `season: autumn` and drew
+ * autumn foliage on snow on ten pages. The decision is Jev's typed answer (jevDecisions.decideStorySeason) over the
+ * finished arc; code never reads the prose. This is the ONE place the answer meets the resolver: it replaces
+ * `inputData.season`, so every consumer that reads the season (page, cover, Visual Bible, plate, iterate and repair
+ * prompts, the stored row) gets the story's. The season that was asked for is kept as `requestedSeason`.
+ *
+ * Precedence: the story's own season, then the request, then the creation date (resolveSeason).
+ * Throws on an answer outside STORY_SEASON_CHOICES: a malformed answer is an error, never a quiet "none".
+ *
+ * @param {Object} inputData  mutated: `season`, and `requestedSeason` + `seasonSource` when the story overrides
+ * @param {string} storySeason  one of STORY_SEASON_CHOICES
+ * @param {{now?: Date|string}} [opts]
+ * @returns {{season: string, source: 'story'|'request', overridden: boolean, requested: string}}
+ */
+function applyStorySeason(inputData, storySeason, { now = null } = {}) {
+  const answer = typeof storySeason === 'string' ? storySeason.trim().toLowerCase() : storySeason;
+  if (!STORY_SEASON_CHOICES.includes(answer)) {
+    throw new Error(`story season answer ${JSON.stringify(storySeason)} is outside ${STORY_SEASON_CHOICES.join('|')}`);
+  }
+  const requested = resolveSeason(inputData, { now });
+  if (answer === STORY_SEASON_NONE) {
+    inputData.season = requested;
+    return { season: requested, source: 'request', overridden: false, requested };
+  }
+  inputData.season = answer;
+  inputData.seasonSource = 'story';
+  if (answer === requested) return { season: answer, source: 'story', overridden: false, requested };
+  inputData.requestedSeason = requested;
+  log.info(`🍁 [SEASON] The story places itself in ${answer}; requested season "${requested}" is overridden for every image prompt`);
+  return { season: answer, source: 'story', overridden: true, requested };
+}
+
+/**
+ * The trial planner's typed `---STORY SEASON---` section (prompts/story-trial-arc.txt): `SEASON: <choice>`. Code reads
+ * the typed value, never the arc's prose. Returns the choice, or null when the section or the value is absent or
+ * outside STORY_SEASON_CHOICES (the caller logs it at error level and the requested season stands).
+ */
+function parseStorySeasonSection(text) {
+  const m = String(text || '').match(/---STORY SEASON---\s*SEASON:[ \t]*\[?[ \t]*([A-Za-z]+)[ \t]*\]?[ \t]*(?:\r?\n|$)/);
+  if (!m) return null;
+  const v = m[1].toLowerCase();
+  return STORY_SEASON_CHOICES.includes(v) ? v : null;
 }
 
 /** `Summer` — the label for the story brief / prompt lines. */
@@ -189,6 +242,10 @@ function seasonOutfitGuidance(inputData = {}, opts = {}) {
 }
 
 module.exports = {
+  applyStorySeason,
+  parseStorySeasonSection,
+  STORY_SEASON_NONE,
+  STORY_SEASON_CHOICES,
   buildSeasonInstruction,
   seasonOutfitGuidance,
   SEASON_OUTFIT,

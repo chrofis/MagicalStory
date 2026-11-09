@@ -1610,6 +1610,33 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
 const { jevActive, jevFallBack } = jevDecisions;
 
 /** Shots authored by the planner: only a story that started on the backup. */
+/**
+ * Jev decides the season the arc places itself in; season.applyStorySeason writes it onto `inputData.season` (the
+ * requested one is kept as `requestedSeason`). No arc, or Jev on the backup path: the requested season stands and
+ * the miss is logged at error level, never silent. A Jev outage switches the story to the backup (jevFallBack).
+ * Exported for the Lab replay and the tests.
+ */
+async function decideAndApplyStorySeason({ inputData, approvedArc, jevReport = null, gl, callImpl = null }) {
+  const { applyStorySeason } = require('./season');
+  if (!String(approvedArc || '').trim() || !jevActive(jevReport)) {
+    log.error(`🍁 [BEATS] The story's own season was NOT decided (${!String(approvedArc || '').trim() ? 'no arc' : 'Jev backup path'}) — the requested season "${inputData.season}" stands`);
+    gl.error('beats_story_season_undecided', 'The story season was not decided (no arc or Jev on the backup path); the requested season stands');
+    return null;
+  }
+  try {
+    const d = await jevDecisions.decideStorySeason({ arc: approvedArc }, callImpl ? { callImpl } : {});
+    const applied = applyStorySeason(inputData, d.season);
+    if (jevReport) jevReport.season = { ...d, ...applied };
+    gl.info('beats_story_season', `Story season by Jev: ${d.season} (${d.top.join(', ')}); ${applied.overridden ? `overrides the requested ${applied.requested}` : applied.source === 'story' ? 'agrees with the request' : 'the story places itself in no season, the requested one stands'}`);
+    return applied;
+  } catch (err) {
+    if (!(err instanceof JevDecisionError) || !jevReport) throw err;
+    jevFallBack(jevReport, 'season', err, gl);
+    log.error(`🍁 [BEATS] The story's own season was NOT decided (Jev outage) — the requested season "${inputData.season}" stands`);
+    return null;
+  }
+}
+
 function legacyShotsOf(jevReport) { return !!(jevReport && jevReport.fallback && jevReport.fallback.step === 'start'); }
 
 /**
@@ -2308,7 +2335,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // layer makes on this story — cast cuts per re-plan round, shots, light, VB
   // citations, aboard, population, gaze — stored as `stories.data.jevDecisions`
   // so a run can be replayed; `fallback` is the backup switch (jevFallBack).
-  const jevReport = { castCuts: [], shots: null, light: null, vb: null, population: null, gaze: null, emotions: null, fallback: null, probe: null };
+  const jevReport = { castCuts: [], shots: null, light: null, season: null, vb: null, population: null, gaze: null, emotions: null, fallback: null, probe: null };
   // B — THE PRE-START HEALTH CHECK: one tiny Jev question. Down → the whole
   // story runs the backup (today's setup before the layer), never refused.
   {
@@ -2887,6 +2914,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   }
   // The typed list for every later prompt (divider, plan check, Art Director). null = no arc.
   inputData.landmarksStaged = arcLandmarksStaged;
+
+  // THE STORY'S OWN SEASON (owner, 2026-11-09, docs/decisions.md): decided from the finished arc, before the plan,
+  // the Visual Bible and the Art Director read `inputData.season`. A story that places itself in a season is drawn in
+  // it whatever the request or the creation date said. Jev answers (typed), season.applyStorySeason applies.
+  await decideAndApplyStorySeason({ inputData, approvedArc, jevReport, gl });
 
   // ── Step 1: beats plan ────────────────────────────────────────────────────
   await checkCancellation();
@@ -3835,4 +3867,4 @@ async function applyTitleProofread(inputData, parsed, gl, deps = {}) {
   };
 }
 
-module.exports = { adStageModels, generateStoryViaBeats, applyTitleProofread, reportChallengeMemoryBreach, finalizePlanShots, presentOf, decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf, runArtDirector, arcTempFor, makeArcCreatorCall, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { adStageModels, generateStoryViaBeats, applyTitleProofread, reportChallengeMemoryBreach, finalizePlanShots, presentOf, decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf, runArtDirector, decideAndApplyStorySeason, arcTempFor, makeArcCreatorCall, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

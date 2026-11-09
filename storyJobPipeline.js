@@ -6594,6 +6594,11 @@ ${trialWriter.pagesPrompt}`;
       pages: inputData.pages || sceneCount,
       dedication: inputData.dedication || '',
       season: inputData.season || '', // Season when story takes place
+      // Set when the story placed itself in a season (jevDecisions.decideStorySeason, season.applyStorySeason): then
+      // `season` above is the story's and `requestedSeason` the one asked for. A story from before 2026-11-09 has
+      // neither and keeps the season it was stored with (docs/decisions.md 2026-11-09).
+      seasonSource: inputData.seasonSource || null,
+      requestedSeason: inputData.requestedSeason || null,
       userLocation: inputData.userLocation || null, // User's location for personalization
       // Whether the premise names its own binding world (server/lib/premiseWorld.js).
       // Persisted so Test Lab replays rebuild the same commission block.

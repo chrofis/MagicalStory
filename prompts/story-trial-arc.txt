@@ -54,6 +54,10 @@ No PAGE line begins its sentence on a character's name: each begins on the place
 
 The arc is the whole story, so build it right: every beat follows from the one before it for a reason the reader can see, the low point has a scene of its own, and an object keeps its state and its place until a beat changes it (a wet thing stays wet until time or a drying beat; a thing set down stays there until someone picks it up). Build it sound: every setup (a skill, clue, trick, object, promise) pays off in a later beat or is not introduced; counts, object states and places stay consistent from page to page; the commissioned topic and the Story Idea drive the problem; each page's action follows from the previous page; no figure, animal or place gets a name except the characters and the Visual Bible entries. Every figure, animal and object the Story Idea names, and every one it plainly implies (a companion, a toy, a creature, an object the plot turns on), appears in the arc on the scenes where it matters.
 
+---STORY SEASON---
+SEASON: [spring | summer | autumn | winter | none]
+(The season of the year the arc above is set in, as the arc tells it: a date, a holiday or festival that falls in one season, a named school break, a first snow, a harvest, a blossom. `none` when the arc gives no such sign and could happen in any season, or is set in a world without seasons. When it names a season, the Visual Bible, the cover scene and every scene hint below are written in that season, whatever the SEASON line above says.)
+
 ---TITLE---
 TITLE: [A creative, specific title in {LANGUAGE}, containing the name {MAIN_CHARACTER_NAME}]
 ({TITLE_RULE} The title is judged in this order: {TITLE_CRITERIA})

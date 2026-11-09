@@ -1,0 +1,28 @@
+{
+ "jev": {
+  "arcs": 118,
+  "errors": 0,
+  "answers": {
+   "summer": 31,
+   "none": 12,
+   "autumn": 74,
+   "winter": 1
+  },
+  "overrides_of_stored_season": 1,
+  "correct_override": 1,
+  "wrong_override": 0,
+  "none_without_season_cue": 12,
+  "none_checked_by_hand": 12,
+  "season_answers_with_arc_cue": 104,
+  "season_answers_checked_manually_borderline": 2,
+  "cost_usd": 0.0078
+ },
+ "trial_planner": {
+  "cases": 10,
+  "valid_sections": 10,
+  "seasonal_premise_to_winter": "2/2",
+  "neutral_premise_kept_requested": "8/8",
+  "wrong_override": 0,
+  "cost_usd": 0.16
+ }
+}
