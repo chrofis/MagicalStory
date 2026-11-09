@@ -4679,6 +4679,14 @@
       "rootCause": "coverTypography.js FONT_FILES held only lettering fonts without emoji glyphs and loadSystemFonts is false, so resvg drew the missing-glyph box. Fixed by bundling Noto Emoji as the fallback font.",
       "status": "fixed",
       "fixedIn": "01c8ddd85"
+    },
+    {
+      "id": "iterate-redraw-outdoor-page-gets-indoor-light",
+      "title": "A full redraw (iterate) of an outdoor page is sent the INDOOR light line (\"night: dark at the windows, the room lit only by its own lamps and fires; indoors\"), so the redraw paints a lamp-lit, warm scene instead of the night outdoors",
+      "reportedAt": "2026-11-09",
+      "source": "Reproduced from stored prod data job_1794231161354_l3n2o3afm: the image prompts of p8 v1+v2, p9 v1, p11 v1 and p15 v1 (all iterate-round-N, all outdoor) carry the indoor line, while v0 and every inpaint version of the same pages carry \"night: a dark sky, the scene lit by the moon ... a clear sky\". The stored sceneMetadata of p8 after the redraw has weather none (interior); before it was clear.",
+      "rootCause": "Not yet pinned: the rewritten iterate brief declares weather none (interior) on 4 of 4 outdoor redraws, and sceneLight.lightParts turns weather none into the indoor variant. Open question: does the iterate model write none, or does code set it? The raw iterate reply is not in the story data.",
+      "status": "open"
     }
   ]
 }
