@@ -4696,7 +4696,8 @@
       "reportedAt": "2026-11-09",
       "source": "Prod job_1794231161354_l3n2o3afm: jevDecisions.population.byLocation.LOC004 publicP 0.82 -> ambient for pages 4-7 (night, monsters attacking). Book review asked to remove the onlookers on p6; Lab 1849/1850 (4 redraws) all kept them; pinBrief restores population ambient after every rewrite.",
       "rootCause": "Population is decided once per location, never per page moment; the iterate pin restores it over a repair that removes background people.",
-      "status": "open"
+      "status": "fixed",
+      "fixedIn": "3c52dc7d7"
     },
     {
       "id": "iterate-rewrite-not-told-fixed-fields",
@@ -4704,7 +4705,8 @@
       "reportedAt": "2026-11-09",
       "source": "Staging Lab 1851 (job_1794231161354_l3n2o3afm p6, jevFixed.population cast_only): the rewrite prose kept \"two distant village onlookers in brown tunics\" and the image drew them; only the light line was added to the rewrite in 52cc5cd2c.",
       "rootCause": "iteratePageCore passes only the plan line and (since 52cc5cd2c) the light line; the Art Director gets the whole jevDecisions.fixedBlock.",
-      "status": "open"
+      "status": "fixed",
+      "fixedIn": "3c52dc7d7"
     },
     {
       "id": "vb-invents-names-and-splits-groups",
