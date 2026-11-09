@@ -4917,7 +4917,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // null, buildSceneDescriptionPrompt fills the authoritative SCENE_SUMMARY
     // slot from the previous brief's own imageSummary, and the rewrite has no
     // narrative anchor outside the artefact it is rewriting.
-    { planLine },
+    // `fixedLight`: the page's decided light, the FIXED line the Art Director sees under the same
+    // plan line (jevDecisions.fixedLine). Without it the rewrite invented its own hour and sky:
+    // prod job_1794231161354_l3n2o3afm p6/p8 rewrites wrote "autumn afternoon" and `weather: none`
+    // on outdoor night pages.
+    { planLine, fixedLight: require('./jevDecisions').fixedLine(savedScene?.jevFixed) },
     previewFeedback,  // The actual image analysis feedback!
     // clothingRequirements so the EXPECTED_CLOTHING block can state each
     // character's actual outfit TEXT. Without it the Art Director only sees the
@@ -5022,6 +5026,10 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       const meta = extractSceneMetadata(String(text || ''));
       return require('./sceneBriefCheck').checkEmotionEnum({ pageNumber }, meta?.fullData || meta);
     })(),
+    // An outdoor page whose rewrite writes `weather: none` (the indoor value) is sent to the same
+    // re-ask as on an authored brief (briefChecks.weatherNoneOutdoorsFinding). Unchecked, the
+    // pin below reported it and dropped it, and the page got the indoor light line.
+    ...[require('./briefChecks').weatherNoneOutdoorsFinding(pageNumber, text, savedScene?.jevFixed)].filter(Boolean),
   ];
   // ── ONE CORRECTIVE RE-ASK, FOR BOTH CHECK FAMILIES (2026-09-17) ───────────
   // Owner: "All 3 same as pipeline. These should be siblings or even identical

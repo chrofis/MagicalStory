@@ -4225,6 +4225,11 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       // authoritative slot; DRAFT_SCENE_DESCRIPTION below keeps the previous
       // brief as the starting point, which is a different job.
       sceneSummary = `Page plan line (the page's narrative beat — authoritative for what happens on this page and who is staged in it):\n${rawOutlineContext.planLine}\n\n`;
+      // The page's decided light (jevDecisions.fixedLine): the prose and `timeOfDay` / `weather`
+      // follow it; outdoors, `weather` is one of the outdoor values, never `none`.
+      if (rawOutlineContext.fixedLight) {
+        sceneSummary += `${rawOutlineContext.fixedLight} — the prose and \`timeOfDay\` / \`weather\` follow this light${/outdoors/.test(rawOutlineContext.fixedLight) ? '; outdoors, `weather` is an outdoor value, never `none`' : ''}.\n\n`;
+      }
       if (shortSceneDesc) {
         sceneSummary += `Previous brief summary (what was drawn last time): ${shortSceneDesc}\n\n`;
       }

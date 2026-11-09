@@ -11401,6 +11401,22 @@
         "result": "HUMAN",
         "note": "human check | LOOK: Read the page text of the staging rerun: share of couplets that rhyme, filler lines, inversions, line breaks preserved on every page, plot independent of rhyme; open the PDF and the viewer once."
       }
+    },
+    {
+      "id": "iterate-outdoor-light-2026-11-09",
+      "title": "An iterate redraw of an outdoor page keeps an outdoor sky and the decided hour",
+      "commits": [],
+      "addedAt": "2026-11-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "The next staging iterate of an outdoor page (Lab iterate stage on a stored story, or any story run with a redraw) declares an outdoor weather value (not none) and the decided timeOfDay, and its image prompt carries the outdoor LIGHT line, not \"dark at the windows, the room lit only by its own lamps\".",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read the iterate rewrite (eval_calls iterate_rebrief) and the stored image prompt of each redrawn outdoor page: weather not none, outdoor light line, timeOfDay = jevFixed.timeOfDay."
+      }
     }
   ],
   "runs": [

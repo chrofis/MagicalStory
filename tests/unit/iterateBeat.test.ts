@@ -240,7 +240,7 @@ describe('iteratePageCore wiring', () => {
   });
 
   it('passes the page plan line and the staged-figures block', () => {
-    expect(source).toContain('{ planLine },');
+    expect(source).toMatch(/{ planLine, fixedLight: /);
     expect(source).toContain('stagedFigures: renderStagedFiguresBlock(stagedFigures)');
   });
 

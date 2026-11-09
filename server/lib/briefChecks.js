@@ -247,18 +247,31 @@ function collectBriefFindings(expansions, ctx) {
   // A decided field the brief cannot hold as written: an outdoor page whose
   // weather is `none` (jevDecisions.pinBrief reports it, never guesses one).
   for (const x of expansions) {
-    const fixed = beatOf(x.pageNumber).jevFixed;
-    if (!fixed) continue;
-    const problem = pinBrief(x.brief, fixed).changes.find(c => c.problem === 'outdoors');
-    if (problem) {
-      findings.push({
-        pageNumber: x.pageNumber,
-        type: 'weather_none_outdoors',
-        detail: 'The page is outdoors, and `weather` is `none` or missing. Choose the story\'s sky — one of the outdoor values — and write it into the prose.',
-      });
-    }
+    const f = weatherNoneOutdoorsFinding(x.pageNumber, x.brief, beatOf(x.pageNumber).jevFixed);
+    if (f) findings.push(f);
   }
   return { findings, withheld };
+}
+
+/**
+ * An outdoor page (decided `indoor: false`) whose brief says `weather: none` or
+ * none at all. ONE construction for the authored brief (above) and the iterate
+ * rewrite (images.js iteratePageCore), so both send it to their one corrective
+ * re-ask. The rewrite used to skip it: pinBrief reported the problem and the
+ * iterate path kept only the fields it restored, so an outdoor night page
+ * shipped `weather: none` and got the INDOOR night light line (prod
+ * job_1794231161354_l3n2o3afm p8/p9/p11/p15).
+ * @returns {Object|null} the finding, or null
+ */
+function weatherNoneOutdoorsFinding(pageNumber, brief, fixed) {
+  if (!fixed) return null;
+  const problem = require('./jevDecisions').pinBrief(brief, fixed).changes.find(c => c.problem === 'outdoors');
+  if (!problem) return null;
+  return {
+    pageNumber,
+    type: 'weather_none_outdoors',
+    detail: 'The page is outdoors, and `weather` is `none` or missing. Choose the story\'s sky — one of the outdoor values — and write it into the prose.',
+  };
 }
 
 /** The names a brief puts in the picture: its `characters[]` rows and the bible figures it cites. */
@@ -516,6 +529,7 @@ module.exports = {
   keepDeclaredLight,
   briefCastNames,
   collectBriefFindings,
+  weatherNoneOutdoorsFinding,
   applyBibleTextLane,
   namesInBrief,
   whoColumnDropped,
