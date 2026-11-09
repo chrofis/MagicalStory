@@ -271,11 +271,6 @@ const FINDING_OUTCOME = {
    * the prose: a declared decline OPENS a finding, a claimed fix never closes one.
    */
   DECLINED: 'declined',
-  /**
-   * The pass changed the page past the edit cap, the one fed-back re-ask did
-   * too, and the page kept its draft (capEditedPages). The finding is open.
-   */
-  EDIT_CAP_REJECTED: 'edit-cap-rejected',
 };
 
 /** The id the refine is shown a merged audit finding under, and cites in its ledger. */
@@ -465,7 +460,7 @@ function wordEditDistance(a, b) {
  * CHANGED-WORD RATIO (owner, 2026-10-06): the share of a page's words that
  * differ between two versions, by word-level edit distance (case and
  * punctuation ignored) over the longer version's word count. 0 = identical,
- * 1 = nothing kept. The one number the edit cap and the stored report share.
+ * 1 = nothing kept. The one number the major-change threshold and the stored report share.
  */
 function changedWordRatio(before, after) {
   const n = Math.max(wordTokens(before).length, wordTokens(after).length);
@@ -482,27 +477,16 @@ function computeEditRatios(original = [], pages = []) {
 }
 
 /**
- * THE EDIT CAP, ENFORCED IN CODE (owner, 2026-10-06). A page the repair changed
- * is kept only while its changed-word ratio against the WRITER's draft stays
- * within `cap`; an over-cap page reverts to `base` (the text the pass was given)
- * and is returned in `over`. The ratio is cumulative: it is measured against
- * `original`, so a later corrective pass cannot spend the cap again. A page in
- * `exempt` is never reverted: the pages a MISMATCH finding names, whose allowed
- * move carries a whole passage across.
+ * MAJOR CHANGES, MEASURED (owner, 2026-11-09, docs/decisions.md; replaces the 2026-10-06 edit cap).
+ * No rewrite is ever thrown away for size: a page the fix needed rewritten ships rewritten. What
+ * the size buys is a RE-READ: a page whose changed-word ratio against `original` passes
+ * MODEL_DEFAULTS.textRefineMajorChangeRatio is returned here so the caller can have the whole book
+ * read once more for what the rewrite broke elsewhere. Pure.
  *
- * @returns {{pages: Array, over: Array<{pageNumber:number, ratio:number}>}}
+ * @returns {Array<{pageNumber:number, ratio:number}>}
  */
-function capEditedPages({ base = [], next = [], original = [], cap, exempt = new Set() }) {
-  const orig = new Map((original || []).map(p => [p.pageNumber, p.text]));
-  const over = [];
-  const pages = next.map((p, idx) => {
-    if (p.text === base[idx].text || exempt.has(p.pageNumber) || !orig.has(p.pageNumber)) return p;
-    const ratio = changedWordRatio(orig.get(p.pageNumber), p.text);
-    if (ratio <= cap) return p;
-    over.push({ pageNumber: p.pageNumber, ratio: Math.round(ratio * 1000) / 1000 });
-    return { ...p, text: base[idx].text };
-  });
-  return { pages, over };
+function majorChangePages({ next = [], original = [], threshold = require('../config/models').MODEL_DEFAULTS.textRefineMajorChangeRatio } = {}) {
+  return computeEditRatios(original, next).filter(r => r.ratio > threshold);
 }
 
 /**
@@ -1311,14 +1295,9 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
     // SCOPE, ENFORCED. A page no finding names keeps the text it shipped with.
     const outOfScopePages = returnedPages.filter(n => !scope.includes(n));
     const byPage = new Map(parsed.pages.filter(p => scope.includes(p.pageNumber)).map(p => [p.pageNumber, stripTrailingSeparator(p.text)]));
-    // THE EDIT CAP applies to this round too (owner, 2026-10-06), measured against
-    // the pages it was given; no re-ask here, an over-cap page keeps its text.
-    const postCap = capEditedPages({
-      base: pages, original: pages, cap: MODEL_DEFAULTS.textRefineMaxChangedRatio,
-      next: pages.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text })),
-    });
-    const next = postCap.pages;
-    for (const o of postCap.over) log.warn(`✂️ [TEXT-POST-AUDIT] p${o.pageNumber} changed ${Math.round(o.ratio * 100)}% of its words, over the edit cap — kept its text`);
+    // No size limit (owner 2026-11-09): every rewrite of a scoped page ships. A page that changed by
+    // more than the major-change threshold triggers ONE whole-book logic read below.
+    const next = pages.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
     const changedPages = next.filter((p, idx) => p.text !== pages[idx].text).map(p => p.pageNumber);
     const findingOutcomes = resolveFindingOutcomes(findings, pages, changedPages, returnedPages, parseDeclinedFindings(parsed.analysis, findings.length));
     for (const f of unresolvedFindings(findingOutcomes)) {
@@ -1330,10 +1309,29 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
     const arcFaults = parseArcFaultLines(parsed.analysis);
     for (const a of arcFaults) log.warn(`⚠️ [TEXT-POST-AUDIT] ARC FAULT left standing (a mechanism the pages cannot make work): ${a}`);
     const elapsedMs = Date.now() - t0;
+    // THE RETEST (owner 2026-11-09): when a fix rewrote a page past the major-change threshold, the whole
+    // book is read ONCE for story logic on the new text, because a big rewrite can contradict a page that
+    // was not touched. The logic read's own fix round calls this function again with opts.noRetest, so a
+    // retest never starts another: at most one per round.
+    const majorChange = majorChangePages({ next: changedPages.length ? next : [], original: pages });
+    let retest = null;
+    let finalPages = next;
+    if (majorChange.length && !opts.noRetest) {
+      log.info(`🔁 [TEXT-POST-AUDIT] page(s) ${majorChange.map(o => `p${o.pageNumber} ${Math.round(o.ratio * 100)}%`).join(', ')} changed past the ${Math.round(MODEL_DEFAULTS.textRefineMajorChangeRatio * 100)}% major-change threshold — one logic re-read of the whole book`);
+      const lr = await require('./textLogicRead').runLogicReadStep(storyData, next, {
+        arc: opts.arc, arcHints: opts.arcHints, storyLogic: opts.storyLogic,
+      });
+      finalPages = lr.pages;
+      retest = {
+        ran: !!lr.logicRead.ran, ok: !!lr.logicRead.ok, error: lr.logicRead.error || null,
+        findings: lr.logicRead.findings, majorCount: lr.logicRead.majorCount,
+        fixedPages: lr.logicRead.fixedPages, cost: lr.logicRead.cost || 0, rounds: lr.rounds,
+      };
+    }
     log.info(`📖✍️  [TEXT-POST-AUDIT] ${model}: ${lines.length} TEXT fault(s) on page(s) ${scope.join(', ')} → rewrote page(s) ${changedPages.join(', ') || 'none'} in ${(elapsedMs / 1000).toFixed(0)}s`);
     const beforeByPage = new Map(pages.map(p => [p.pageNumber, p.text]));
     return {
-      pages: next,
+      pages: finalPages,
       entry: {
         kind: 'post_audit',
         ok: true,
@@ -1341,13 +1339,15 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
         modelId: r.modelId || TEXT_MODELS[model].modelId,
         elapsedMs,
         usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 },
-        cost: priceUsage(r.modelId || TEXT_MODELS[model].modelId, r.usage || {}),
+        cost: priceUsage(r.modelId || TEXT_MODELS[model].modelId, r.usage || {}) + (retest?.cost || 0),
         faults: lines,
         scopedPages: scope,
         returnedPages,
         outOfScopePages,
         changedPages,
-        editCapRejected: postCap.over,
+        editRatios: computeEditRatios(pages, next),
+        majorChangePages: majorChange,
+        retest,
         arcFaults,
         findingOutcomes,
         unresolvedCount: unresolvedFindings(findingOutcomes).length,
@@ -1764,60 +1764,18 @@ async function refineStoryText(storyData, pages, opts = {}) {
     // under the illustration. See stripTrailingSeparator (sceneMetadata.js).
     const byPage = new Map(parsed.pages.map(p => [p.pageNumber, stripTrailingSeparator(p.text)]));
     const strayPages = parsed.pages.map(p => p.pageNumber).filter(n => !expected.includes(n));
-    // THE EDIT CAP (2026-10-06). Over-cap pages get ONE fed-back re-ask naming
-    // only their findings and their measured ratio; a page still over keeps its
-    // draft. Never a loop, and never a silent pass-through.
-    const cap = MODEL_DEFAULTS.textRefineMaxChangedRatio;
-    const mismatchPages = new Set(findings.filter(f => f.category === 'MISMATCH').map(f => f.pageNumber));
-    let next = base.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
-    const capped = capEditedPages({ base, next, original, cap, exempt: mismatchPages });
-    next = capped.pages;
-    const overFirst = capped.over;
-    let reask = null;
-    let rejectedPages = [];
-    if (overFirst.length) {
-      const overSet = new Set(overFirst.map(o => o.pageNumber));
-      log.warn(`✂️ [TEXT-REPAIR/${kind}] over the ${Math.round(cap * 100)}% edit cap: ${overFirst.map(o => `p${o.pageNumber} ${Math.round(o.ratio * 100)}%`).join(', ')} — one re-ask`);
-      try {
-        const notice = `EDIT CAP: your rewrite of ${overFirst.map(o => `page ${o.pageNumber} (${Math.round(o.ratio * 100)}% of its words changed)`).join(', ')} went past the ${Math.round(cap * 100)}% limit and was thrown out. Return the page again as an edit of the text shown: change only the sentence each finding below names, copy every other sentence word for word, add at most one sentence.`;
-        const subset = findings.filter(f => overSet.has(f.pageNumber));
-        const askPrompt = opts.promptOverride
-          ? `${opts.promptOverride}
-
-${notice}
-
-${numberedFindingsText(subset)}`
-          : buildTextRefinePrompt(storyData, base, `${notice}
-
-${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
-        const t1 = Date.now();
-        const r2 = await callTextModelStreaming(askPrompt, null, null, repairModel, { usageLabel: `${usageLabel}_${kind}_cap_reask` });
-        if (r2.truncation?.suspected) throw new Error(`reply ${describeTruncation(r2.truncation)} — rewrites unusable`);
-        const parsed2 = parseRefinedText(r2.text || '', expected);
-        const byPage2 = new Map(parsed2.pages.filter(p => overSet.has(p.pageNumber)).map(p => [p.pageNumber, stripTrailingSeparator(p.text)]));
-        const next2 = next.map(p => (byPage2.has(p.pageNumber) ? { ...p, text: byPage2.get(p.pageNumber) } : p));
-        const capped2 = capEditedPages({ base, next: next2, original, cap, exempt: mismatchPages });
-        next = capped2.pages;
-        rejectedPages = overFirst.map(o => o.pageNumber).filter(n => capped2.over.some(o => o.pageNumber === n) || !byPage2.has(n));
-        reask = {
-          ok: true, elapsedMs: Date.now() - t1, prompt: askPrompt, rawResponse: (r2.text || '').slice(0, 40000),
-          usage: { input_tokens: r2.usage?.input_tokens || 0, output_tokens: r2.usage?.output_tokens || 0 },
-          cost: priceUsage(r2.modelId || TEXT_MODELS[repairModel].modelId, r2.usage || {}),
-          stillOver: capped2.over,
-        };
-      } catch (e) {
-        rejectedPages = overFirst.map(o => o.pageNumber);
-        reask = { ok: false, error: e.message, cost: 0 };
-        log.error(`❌ [TEXT-REPAIR/${kind}] cap re-ask failed (${e.message}) — page(s) ${rejectedPages.join(', ')} keep their draft`);
-      }
-      for (const n of rejectedPages) log.warn(`✂️ [TEXT-REPAIR/${kind}] p${n} still over the edit cap — kept its text from before the pass`);
+    // NO SIZE LIMIT (owner 2026-11-09, replaces the 2026-10-06 edit cap): every rewrite ships, however
+    // much of the page it changed. The size is only measured: a page past the major-change threshold is
+    // logged here, and the whole-book logic read that follows the lector (below) is the retest, so this
+    // pass needs none of its own. (opts.logicRead === false, a Lab replay, skips both by request.)
+    const next = base.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
+    const majorChange = majorChangePages({ next, original });
+    if (majorChange.length) {
+      log.info(`🔁 [TEXT-REPAIR/${kind}] page(s) ${majorChange.map(o => `p${o.pageNumber} ${Math.round(o.ratio * 100)}%`).join(', ')} changed past the ${Math.round(MODEL_DEFAULTS.textRefineMajorChangeRatio * 100)}% major-change threshold — the logic read after the lector re-reads the whole book`);
     }
     const changedPages = next.filter((p, idx) => p.text !== base[idx].text).map(p => p.pageNumber);
     const returnedPages = parsed.pages.map(p => p.pageNumber);
-    const findingOutcomes = resolveFindingOutcomes(findings, base, changedPages, returnedPages, parseDeclinedFindings(parsed.analysis, findings.length))
-      .map(f => (rejectedPages.includes(f.pageNumber) && f.outcome !== FINDING_OUTCOME.PAGE_REWRITTEN && f.outcome !== FINDING_OUTCOME.DECLINED
-        ? { ...f, outcome: FINDING_OUTCOME.EDIT_CAP_REJECTED, reason: `the pass changed page ${f.pageNumber} past the ${Math.round(cap * 100)}% edit cap, twice, and the page kept its text` }
-        : f));
+    const findingOutcomes = resolveFindingOutcomes(findings, base, changedPages, returnedPages, parseDeclinedFindings(parsed.analysis, findings.length));
     for (const f of unresolvedFindings(findingOutcomes)) {
       log.warn(`⚠️ [TEXT-REPAIR/${kind}] UNANSWERED [${f.category}] p${f.pageNumber ?? '?'} — ${f.reason}: ${f.text}`);
     }
@@ -1854,9 +1812,9 @@ ${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
         // call is unexplainable (same model+provider has measured 60 vs 137 tok/s).
         ttftMs: r.ttft ?? null,
         usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 },
-        cost: (priceUsage(r.modelId || TEXT_MODELS[repairModel].modelId, r.usage || {})) + (reask?.cost || 0),
-        // EDIT CAP: what each pass held to (changedWordRatio vs the writer's draft).
-        editCap: { cap, exempt: [...mismatchPages].filter(n => n != null), overFirst, reask, rejected: rejectedPages },
+        cost: priceUsage(r.modelId || TEXT_MODELS[repairModel].modelId, r.usage || {}),
+        // changedWordRatio vs the writer's draft; majorChange = pages past the major-change threshold.
+        majorChange: { threshold: MODEL_DEFAULTS.textRefineMajorChangeRatio, pages: majorChange },
         editRatios: computeEditRatios(original, next),
         promptChars: prompt.length,
         prompt,
@@ -2596,7 +2554,7 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
       cost: r.cost ?? null,
       changedPages: r.changedPages || [],
       appliedCount: r.appliedCount ?? null,
-      editCap: r.editCap || null,
+      majorChange: r.majorChange || null,
       droppedCount: r.droppedCount ?? null,
       returnedIdentical: r.returnedIdentical || [],
       changedUnasked: r.changedUnasked || [],
@@ -2627,7 +2585,7 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
     })),
     changedPages: changed,
     // Per-page changed-word ratio of the SHIPPED text against the writer's draft
-    // (owner cap 2026-10-06: <= MODEL_DEFAULTS.textRefineMaxChangedRatio).
+    // (measured only; past MODEL_DEFAULTS.textRefineMajorChangeRatio = a major change, owner 2026-11-09).
     editRatios: computeEditRatios(usable.original || [], usable.pages || []),
     // A15 — where the (deliberately pre-refine) plan line and the shipped text
     // disagree. Computed free in the chain; projected here because a value the
@@ -2719,7 +2677,7 @@ module.exports = {
   wordEditDistance,
   changedWordRatio,
   computeEditRatios,
-  capEditedPages,
+  majorChangePages,
   settleLedgerAfterDiff,
   countPageWords,
   measurePages,

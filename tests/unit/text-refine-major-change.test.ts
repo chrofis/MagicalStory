@@ -1,16 +1,15 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
 /**
- * The text repair EDITS, it does not recompose (owner, 2026-10-06: "the first
- * text is rewritten by 70-80%; the changes should be 20-30% max"). The cap is
- * enforced in code: changedWordRatio / capEditedPages, and refineStoryText's
- * repair pass reverts an over-cap page after ONE fed-back re-ask.
- * Offline: the model is stubbed.
+ * No text-stage rewrite is thrown away for size (owner 2026-11-09, replaces the 2026-10-06 edit cap).
+ * changedWordRatio / majorChangePages only MEASURE; a page past MODEL_DEFAULTS.textRefineMajorChangeRatio
+ * is recorded as a major change, and runPostAuditTextRound re-reads the book once for it
+ * (text-post-audit-retest.test.ts). Offline: the model is stubbed.
  */
 // @ts-ignore CommonJS
 const textModels = require('../../server/lib/textModels');
 // @ts-ignore CommonJS
-const { refineStoryText, changedWordRatio, computeEditRatios, capEditedPages, projectTextRefineReport, FINDING_OUTCOME } = require('../../server/lib/textRefine.js');
+const { refineStoryText, changedWordRatio, computeEditRatios, majorChangePages, projectTextRefineReport, FINDING_OUTCOME } = require('../../server/lib/textRefine.js');
 // @ts-ignore CommonJS
 const { MODEL_DEFAULTS } = require('../../server/config/models');
 // @ts-ignore CommonJS
@@ -39,29 +38,21 @@ describe('changedWordRatio', () => {
   });
 });
 
-describe('capEditedPages', () => {
+describe('majorChangePages', () => {
   const original = [{ pageNumber: 1, text: DRAFT }, { pageNumber: 2, text: DRAFT }];
-  it('keeps an edit under the cap and reverts a recomposed page to the base', () => {
+  it('flags a recomposed page and not a one-sentence edit; it never reverts anything', () => {
     const next = [{ pageNumber: 1, text: ONE_SENTENCE_EDIT }, { pageNumber: 2, text: RECOMPOSED }];
-    const r = capEditedPages({ base: original, next, original, cap: 0.3 });
-    expect(r.pages[0].text).toBe(ONE_SENTENCE_EDIT);
-    expect(r.pages[1].text).toBe(DRAFT);
-    expect(r.over.map((o: any) => o.pageNumber)).toEqual([2]);
+    const r = majorChangePages({ next, original });
+    expect(r.map((o: any) => o.pageNumber)).toEqual([2]);
+    expect(r[0].ratio).toBeGreaterThan(MODEL_DEFAULTS.textRefineMajorChangeRatio);
   });
-  it('measures against the writer draft, not the pass base (cumulative)', () => {
-    const base = [{ pageNumber: 1, text: ONE_SENTENCE_EDIT }];
-    const r = capEditedPages({ base, next: [{ pageNumber: 1, text: RECOMPOSED }], original: [{ pageNumber: 1, text: DRAFT }], cap: 0.3 });
-    expect(r.over).toHaveLength(1);
-    expect(r.pages[0].text).toBe(ONE_SENTENCE_EDIT);
-  });
-  it('never reverts an exempt (MISMATCH-move) page', () => {
-    const r = capEditedPages({ base: original, next: [original[0], { pageNumber: 2, text: RECOMPOSED }], original, cap: 0.3, exempt: new Set([2]) });
-    expect(r.over).toEqual([]);
-    expect(r.pages[1].text).toBe(RECOMPOSED);
+  it('measures against the writer draft (cumulative)', () => {
+    const r = majorChangePages({ next: [{ pageNumber: 1, text: RECOMPOSED }], original: [{ pageNumber: 1, text: DRAFT }] });
+    expect(r).toHaveLength(1);
   });
 });
 
-describe('refineStoryText enforces the cap', () => {
+describe('refineStoryText keeps every rewrite, whatever its size', () => {
   const original = textModels.callTextModelStreaming;
   let calls: { label: string; prompt: string }[] = [];
   let replies: string[] = [];
@@ -82,37 +73,25 @@ describe('refineStoryText enforces the cap', () => {
   });
   afterAll(() => { textModels.callTextModelStreaming = original; });
 
-  it('keeps a one-sentence edit with no re-ask and logs the ratio', async () => {
+  it('keeps a one-sentence edit and logs the ratio', async () => {
     calls = []; replies = [page(ONE_SENTENCE_EDIT)];
     const res = await refineStoryText(STORY, PAGES, { audits: AUDITS });
     expect(res.pages[0].text).toBe(ONE_SENTENCE_EDIT);
-    expect(calls.filter(c => c.label.endsWith('cap_reask'))).toHaveLength(0);
     const repair = res.rounds.find((r: any) => r.kind === 'repair');
-    expect(repair.editCap.overFirst).toEqual([]);
+    expect(repair.majorChange.pages).toEqual([]);
     const report = projectTextRefineReport(res, new Map([[1, DRAFT]]));
-    expect(report.editRatios[0].pageNumber).toBe(1);
-    expect(report.editRatios[0].ratio).toBeLessThanOrEqual(MODEL_DEFAULTS.textRefineMaxChangedRatio);
+    expect(report.editRatios[0].ratio).toBeLessThanOrEqual(MODEL_DEFAULTS.textRefineMajorChangeRatio);
   });
 
-  it('re-asks once for a recomposed page and keeps the corrected edit', async () => {
-    calls = []; replies = [page(RECOMPOSED), page(ONE_SENTENCE_EDIT)];
+  it('keeps a recomposed page: no re-ask, no revert, and the major change is recorded', async () => {
+    calls = []; replies = [page(RECOMPOSED)];
     const res = await refineStoryText(STORY, PAGES, { audits: AUDITS });
-    const reasks = calls.filter(c => c.label.endsWith('cap_reask'));
-    expect(reasks).toHaveLength(1);
-    expect(reasks[0].prompt).toMatch(/EDIT CAP: your rewrite of page 1/);
-    expect(res.pages[0].text).toBe(ONE_SENTENCE_EDIT);
+    expect(res.pages[0].text).toBe(RECOMPOSED);
+    expect(calls.filter(c => c.label.includes('reask'))).toHaveLength(0);
     const repair = res.rounds.find((r: any) => r.kind === 'repair');
-    expect(repair.editCap.rejected).toEqual([]);
-    expect(repair.cost).toBeCloseTo(0.02, 5);
-  });
-
-  it('keeps the draft and opens the finding when the re-ask is still over the cap', async () => {
-    calls = []; replies = [page(RECOMPOSED), page(RECOMPOSED)];
-    const res = await refineStoryText(STORY, PAGES, { audits: AUDITS });
-    expect(calls.filter(c => c.label.endsWith('cap_reask'))).toHaveLength(1);
-    expect(res.pages[0].text).toBe(DRAFT);
-    expect(res.findingLedger[0].outcome).toBe(FINDING_OUTCOME.EDIT_CAP_REJECTED);
-    expect(computeEditRatios(res.original, res.pages)[0].ratio).toBe(0);
+    expect(repair.majorChange.pages.map((o: any) => o.pageNumber)).toEqual([1]);
+    expect(res.findingLedger[0].outcome).toBe(FINDING_OUTCOME.PAGE_REWRITTEN);
+    expect(computeEditRatios(res.original, res.pages)[0].ratio).toBeGreaterThan(0.7);
   });
 });
 
@@ -176,8 +155,10 @@ describe('built prompts carry the load-bearing rule, the cap and the oddity rule
     expect(owed).not.toContain('wants the sail up');
     for (const prompt of out) expect(prompt).toContain(owed);
   });
-  it('the repair states the cap the code enforces', () => {
-    expect(built.repair).toContain(`more than ${Math.round(MODEL_DEFAULTS.textRefineMaxChangedRatio * 100)} percent`);
+  it('the repair states the major-change threshold and no longer threatens a rejection', () => {
+    expect(built.repair).toContain(`more than ${Math.round(MODEL_DEFAULTS.textRefineMajorChangeRatio * 100)} percent`);
+    expect(built.repair).not.toMatch(/thrown out whole|keeps its current text/);
+    expect(built.repair).not.toContain('{MAJOR_CHANGE_PERCENT}');
   });
   it('the rulebook names the four oddity classes for every prose pass', () => {
     for (const re of [/a physical cause stated as what happened/, /never beside an act that already shows it/, /said once in the book, in one short line/, /No roll call/]) {

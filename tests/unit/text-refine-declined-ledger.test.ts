@@ -109,4 +109,4 @@ describe('both callers of the refine template record a decline', () => {
 
 // These fixtures replace whole one-line pages; the edit cap (text-refine-edit-cap.test.ts) is not what they test.
 // @ts-ignore CommonJS
-require("../../server/config/models").MODEL_DEFAULTS.textRefineMaxChangedRatio = 1;
+require("../../server/config/models").MODEL_DEFAULTS.textRefineMajorChangeRatio = 1;

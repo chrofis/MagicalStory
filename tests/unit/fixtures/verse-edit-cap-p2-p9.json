@@ -1,0 +1,16 @@
+{
+ "source": "job_1793964466256_1tmyzh1do",
+ "note": "before = stored pages (staging DB), after = the refiner reply stored in evals/runs/2026-11-09_post-audit-text-replay",
+ "storyCategory": "educational",
+ "storyTopic": "rhyming",
+ "pages": {
+  "2": {
+   "before": "Drinnen klemmte der Reissverschluss an Jannas Mantel. «Das dauert viel zu lange!», murmelte sie. Dann rannte sie zur Tür hinaus.\n\nVor der Tür lag ein Haufen Herbstlaub. Janna trat mit dem Stiefel kräftig hinein, und die Blätter flogen auf. Ein silbernes Blatt hob sich aus dem Haufen und glänzte. Janna blieb stehen und starrte es an.",
+   "after": "Die Knebel am Mantel wollten nicht zugehen.\nJanna murmelte: «Ich kann nicht länger stehen!»\n\nJanna rannte zur Tür hinaus.\nEin Haufen Herbstlaub lag vor dem Haus.\n\nSie trat mit dem Stiefel kräftig hinein.\nDie Blätter flogen auf, und ein Blatt glänzte fein.\n\nEin silbernes Blatt hob sich aus dem Haufen.\nJanna starrte es an, statt weiterzulaufen."
+  },
+  "9": {
+   "before": "Melodi hörte Polinas Ruf. Sie sah die Lücke im Ring. «Halt!», rief sie mit zittriger Stimme und hielt die Hand hoch. Die Reihe blieb stehen, bevor sich der Ring schloss.\n\nMelisa hob Jannas bemalte Laterne so hoch sie konnte. «Janna, hier!», sagte sie. Janna sah die Laterne leuchten und rannte darauf zu. Sie trat in die Lücke neben Polina, und Silbermond ging neben ihr her. «Da bist du ja!», sagte Polina.",
+   "after": "Melodi hörte Polinas Ruf. Sie konnte die Lücke sehen.\n«Halt!», rief sie zittrig, und die Reihe blieb stehen.\n\nMelisa hob Jannas Laterne hoch: «Janna, hier!»\nJanna sah das Licht und rannte zu ihr.\n\nJanna trat in die Lücke mit einem Schritt,\nund Silbermond ging neben ihr mit.\n\nPolina machte grosse Augen: «Ein Einhorn ist da!»\nDann sagte sie zu Janna: «Da bist du ja!»"
+  }
+ }
+}

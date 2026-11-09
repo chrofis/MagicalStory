@@ -6578,7 +6578,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     LOAD_BEARING: LOAD_BEARING_RULE,
     OWED_FACTS: buildOwedFacts(storyLogic),
     MUST_SAY: buildMustSay(storyLogic),
-    EDIT_CAP_PERCENT: Math.round(MODEL_DEFAULTS.textRefineMaxChangedRatio * 100),
+    MAJOR_CHANGE_PERCENT: Math.round(MODEL_DEFAULTS.textRefineMajorChangeRatio * 100),
   });
 }
 

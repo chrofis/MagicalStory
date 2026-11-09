@@ -8,7 +8,7 @@
  *      answers prompts/story-text-logic-read.txt. The reply is JSON; parseLogicRead types it.
  *   2. Findings typed MAJOR go through ONE fix round: the EXISTING scoped rewrite (textRefine.runPostAuditTextRound,
  *      the same round the book audit's TEXT route uses: whole-page rewrite, only the pages a finding names, the
- *      30% edit cap). There is no second rewrite implementation here.
+ *      no size limit; a big rewrite is why a retest exists). There is no second rewrite implementation here.
  *   MINOR findings are stored and never rewritten.
  *
  * CODE NEVER READS THE PROSE. Which findings are fixed is decided by the typed `severity` field alone. The only
@@ -171,6 +171,7 @@ async function runLogicReadStep(storyData, pages, opts = {}) {
     const fix = await runPostAuditTextRound(storyData, pages, toFaultLines(major), {
       arc: opts.arc, arcHints: opts.arcHints, storyLogic: opts.storyLogic,
       scopeNote: LOGIC_FIX_SCOPE_NOTE, usageLabel: 'text_logic_fix',
+      noRetest: true,   // this IS the retest's (or the chain's) fix round: it never starts another logic read
     });
     if (fix) {
       const e = { ...fix.entry, round: nextRound(), kind: 'logic_fix' };

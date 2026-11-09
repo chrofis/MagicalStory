@@ -580,14 +580,15 @@ const MODEL_DEFAULTS = {
   // and below any duplicated sentence pair of ordinary length (two adjacent
   // ~9-word sentences copied whole share 5+).
   textRepetitionMinShingles: 4,
-  // EDIT CAP of the text repair (owner, 2026-10-06: "the first text is rewritten
-  // by 70-80%; that is not acceptable. The changes should be 20-30% max"). A
-  // page the repair returns is kept only if at most this share of its words
-  // differ from the writer's draft (textRefine.changedWordRatio); an over-cap
-  // page gets ONE fed-back re-ask and, still over, keeps its draft. Measured on
-  // staging job_1791222889407_ypl33vk8u: per-page vocabulary overlap between
-  // draft and shipped text 0.28-0.56. see docs/decisions.md 2026-10-06
-  textRefineMaxChangedRatio: 0.3,
+  // MAJOR-CHANGE THRESHOLD of the text stages (owner 2026-11-09: "Why not rewrite the whole page. The limit
+  // was made earlier when we used more stupid models ... add some retest if major change was done"). It no
+  // longer rejects anything: a page the fix rewrote past this share of its words ships, and triggers ONE
+  // whole-book logic re-read (textRefine.runPostAuditTextRound). It was the 2026-10-06 edit cap
+  // ("the first text is rewritten by 70-80%; that is not acceptable. The changes should be 20-30% max"),
+  // which threw an over-cap page back. Measured on staging job_1791222889407_ypl33vk8u: per-page vocabulary
+  // overlap between draft and shipped text 0.28-0.56; the ratio is textRefine.changedWordRatio.
+  // see docs/decisions.md 2026-11-09
+  textRefineMajorChangeRatio: 0.3,
   // The LECTOR: dedicated grammar proofreader of the FINAL text, after the last
   // corrective round (owner ruling 2026-09-03). A sixth question on the
   // causality audit catches a different 1-2 of 4 known defects each run
