@@ -201,3 +201,8 @@ Order: #1+#3 -> #4+#5 -> #6,#7,#10 -> #2,#8,#9 (at most 2 agents at a time).
   - Not caught by real D3: the book13 price of failing (the stand-ins did catch it).
   - No noise lines: no natel, no "shorten", no invented lore.
   - The Lab genericity warning ("The main character is: Janna") comes from the per-book pre-fill. In production the name comes from the placeholder.
+- 2026-11-09: D3 built in 0d3a10bbe (bookAuditStoryFill; mainCharactersText and logicReadQuestions single-sourced). 896 test files pass; fill replay ALL OK on books 13/06/15.
+- 2026-11-09, replay of the real post-audit text round (runPostAuditTextRound) with D3's TEXT faults, staging key. USD 0.20; check total USD 3.48. Script: evals/runs/2026-11-09_post-audit-text-replay.
+  - Rubi: both fixes applied (price of failing p5, walk back to the farm p10).
+    - p5 now reads clumsily: two «...», dachte Janna sentences in a row.
+  - Laternen (stored text is verse): both fixes were made, but the refiner recomposed the couplets (64%/65% of words changed). The edit cap threw both pages back, so 0 fixes shipped, and only a warn was logged. This is pre-existing (any TEXT fix on a verse page), but D3 sends more TEXT fixes, so it matters more now. Owner decision needed.
