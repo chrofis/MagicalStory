@@ -749,6 +749,10 @@ function entryMatchesCitation(entry, searchTerm, strictMode = false) {
   const idMatch = String(searchTerm || '').match(/\[([A-Z]{3}\d+(?:\.\d+)?)\]/);
   if (idMatch && entryBase && baseVbId(idMatch[1]) === entryBase) return true;
   if (nameLower === searchLower) return true;
+  // the same name with an article or in the plural ("the bog monsters" cites the "bog monster" entry)
+  const { canonicalName } = require('./castResolver');
+  const nameCanon = canonicalName(entry.name);
+  if (nameCanon && nameCanon === canonicalName(searchTerm)) return true;
   if (strictMode) return false;
   if (nameLower.includes(searchLower)) return true;
   if (searchLower.includes(nameLower) && nameLower.length >= 3) return true;
@@ -1168,6 +1172,21 @@ function scaleAdultHeightFraction(raw) {
 }
 
 /**
+ * How many members a group entry stands for. A group the story never tells apart
+ * ("three monsters", "two guards") is ONE entry with `count` (owner, 2026-11-09,
+ * decisions.md "Visual Bible: name or role"); one look, one reference cell. Only an
+ * integer >= 2 counts: absent, 1 or anything else means a single figure and the field
+ * is left off.
+ *
+ * @param {*} raw
+ * @returns {number|undefined}
+ */
+function normaliseCount(raw) {
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 2 && n <= 12 ? n : undefined;
+}
+
+/**
  * A CREATURE AT LEAST AS TALL AS A STANDING ADULT IS A GROWN ONE (owner, 2026-09-26).
  *
  * Staging job_1790373080139_vnx5l8iy7: the grown dragon (ANI001,
@@ -1328,6 +1347,7 @@ function tryParseVisualBibleJSON(outline) {
         id: char.id || generateId('CHR', visualBible.secondaryCharacters.length),
         label: typeof char.label === 'string' && char.label.trim() ? char.label.trim() : null,
         name: char.name,
+        ...(normaliseCount(char.count) ? { count: normaliseCount(char.count) } : {}),
         appearsInPages: char.pages || [],
         scaleClass: normaliseScaleClass(char.scaleClass, char.id),
         description: buildCharacterDescription(char),
@@ -1347,6 +1367,7 @@ function tryParseVisualBibleJSON(outline) {
         id: animal.id || generateId('ANI', visualBible.animals.length),
         label: typeof animal.label === 'string' && animal.label.trim() ? animal.label.trim() : null,
         name: animal.name,
+        ...(normaliseCount(animal.count) ? { count: normaliseCount(animal.count) } : {}),
         appearsInPages: animal.pages || [],
         scaleClass: normaliseScaleClass(animal.scaleClass, animal.id),
         // A pre-enum bible's free-text size. The description no longer carries
@@ -2485,6 +2506,7 @@ function tryParseNewEntriesJSON(section) {
         id: char.id || generateId('CHR', idCounter.CHR++),
         label: typeof char.label === 'string' && char.label.trim() ? char.label.trim() : null,
         name: char.name,
+        ...(normaliseCount(char.count) ? { count: normaliseCount(char.count) } : {}),
         description: buildCharacterDescription(char),
         scaleClass: normaliseScaleClass(char.scaleClass, char.id),
         pages: char.pages || [],
@@ -2497,6 +2519,7 @@ function tryParseNewEntriesJSON(section) {
         id: animal.id || generateId('ANI', idCounter.ANI++),
         label: typeof animal.label === 'string' && animal.label.trim() ? animal.label.trim() : null,
         name: animal.name,
+        ...(normaliseCount(animal.count) ? { count: normaliseCount(animal.count) } : {}),
         description: buildAnimalDescription(animal),
         size: animal.size || null,
         scaleClass: normaliseScaleClass(animal.scaleClass, animal.id),
@@ -4133,6 +4156,7 @@ module.exports = {
   elementScaleNote,
   withScaleNote,
   normaliseScaleClass,
+  normaliseCount,
   isGenericEntry,
   LARGE_SCALE_CLASSES,
   isLargeScaleClass,

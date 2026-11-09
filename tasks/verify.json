@@ -11449,6 +11449,22 @@
         "kind": "human",
         "what": "Generate (staging, 4 pages) a Christmas-premise story in a non-winter month; read stories.data.season / requestedSeason / seasonSource, the log line '[SEASON] The story places itself in winter' (generation-log entry beats_story_season), and look at every page and cover for snow and bare or evergreen trees, no orange foliage. Then a story with no seasonal premise: season equals the requested one unless the arc names another season."
       }
+    },
+    {
+      "id": "vb-name-or-role-2026-11-09",
+      "title": "The Visual Bible names a figure by the story name or its role, and a group the story never tells apart is one counted entry",
+      "commits": [],
+      "addedAt": "2026-11-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On a story with an unnamed animal or role and a group of three alike (e.g. monsters), the stored bible has the role noun as name (no invented proper names), ONE entry with count 3, the pages that show them cite it and carry its reference cell, the three on a page are drawn with one look and match the reference, and no duplicate_character is filed for the members.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Generate (staging, 4 pages) a story whose premise has an unnamed animal and a group of three alike (three monsters, three guards); read stories.data.visualBible (name is a role noun or the story name, count 3 on the group, one entry), the Jev vb scores for the group on the pages whose plan names them (>= bar, cell attached), and look at the pages: three members, one look each, matching the reference cell."
+      }
     }
   ],
   "runs": [

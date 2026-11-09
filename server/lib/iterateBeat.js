@@ -64,7 +64,7 @@
 
 const { log } = require('../utils/logger');
 const { vbIdFacet, baseVbId } = require('./vbIdGuard');
-const { isNameMentioned } = require('./castResolver');
+const { isNameMentioned, canonicalName } = require('./castResolver');
 
 const PLAN_PREFIX = /^\s*PLAN:\s*/i;
 
@@ -726,11 +726,11 @@ function checkDeclaredSet({ newMetadata = null, allowedObjects = [], allowedName
     if (id) stillCited.add(id);
   }
   const nameToId = new Map(Object.entries(nameIds || {})
-    .map(([n, id]) => [String(n).trim().toLowerCase(), baseVbId(id)])
+    .map(([n, id]) => [canonicalName(n), baseVbId(id)])
     .filter(([, id]) => id));
   for (const c of (Array.isArray(newMetadata?.characters) ? newMetadata.characters : [])) {
     const raw = String((c && c.name) || c || '').trim();
-    const id = baseVbId(raw) || nameToId.get(raw.toLowerCase()) || null;
+    const id = baseVbId(raw) || nameToId.get(canonicalName(raw)) || null;
     if (id) stillCited.add(id);
   }
   const droppedIds = [...new Set((requiredObjects || [])

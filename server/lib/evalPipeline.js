@@ -1589,6 +1589,17 @@ function buildExpectedCastBlock({
     labels.splice(i, 1);
   }
 
+  // A COUNTED GROUP IS ONE ROSTER ENTRY WITH N MEMBERS (owner, 2026-11-09; the writer's `count`, same constant the
+  // illustrator is told). The judge is told the number; `groups` carries it to the arithmetic (castPeopleCount).
+  const groups = {};
+  names.forEach((n, i) => {
+    const hit = resolveEntity(n, idx);
+    const count = hit && hit.entry && Number.isInteger(hit.entry.count) && hit.entry.count >= 2 ? hit.entry.count : 0;
+    if (!count) return;
+    groups[n] = count;
+    labels[i] = `${labels[i]} x${count}, one group of ${count} alike members`;
+  });
+
   const lines = [names.length === 0
     // Spelled out, not an empty list: the count is the instruction, and "none"
     // has to read as a roster of zero rather than as a missing roster.
@@ -1617,7 +1628,7 @@ function buildExpectedCastBlock({
   const nonHumanNames = names.filter(n =>
     nonHumanSet.has(canonicalName(n)) || isNonHuman(resolveEntity(n, idx, { pageLabel })));
   if (pageLabel) flushResolverStats(idx, log, pageLabel);
-  return { block: lines.join('\n'), names, count: names.length, declared: true, population, crowdExpected, nonHumanNames };
+  return { block: lines.join('\n'), names, count: names.length, declared: true, population, crowdExpected, nonHumanNames, groups };
 }
 
 /**
@@ -1880,7 +1891,9 @@ function castNonHumanTest(cast, castIndex = null) {
 function castPeopleCount(cast, castIndex = null) {
   if (!cast || cast.declared !== true) return null;
   const isNH = castNonHumanTest(cast, castIndex);
-  return (Array.isArray(cast.names) ? cast.names : []).filter(n => !isNH(n)).length;
+  // a counted group of people is `count` people, not one
+  return (Array.isArray(cast.names) ? cast.names : []).filter(n => !isNH(n))
+    .reduce((sum, n) => sum + ((cast.groups && cast.groups[n]) || 1), 0);
 }
 
 function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, detectorFigures = null, referenceNames, castIndex = null } = {}) {
@@ -1927,7 +1940,7 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, de
 
   const castNames = (Array.isArray(cast.names) ? cast.names : [])
     .filter(n => !isNonHumanName(n));
-  const castCount = castNames.length;
+  const castCount = castNames.reduce((sum, n) => sum + ((cast.groups && cast.groups[n]) || 1), 0);
   // Who did the evaluator place in the picture? Names only, lowercased.
   const claimed = new Set();
   for (const m of mts) {

@@ -16,7 +16,7 @@
 
 const { log } = require('../utils/logger');
 const jevDecisions = require('./jevDecisions');
-const { isNameMentioned } = require('./castResolver');
+const { isNameMentioned, figurePhrase } = require('./castResolver');
 const { JevDecisionError } = jevDecisions;
 const { resolveShotId } = require('./shotVocabulary');
 const { isDimLight, isSkyHidden, isSkylessLight } = require('./sceneLight');
@@ -266,7 +266,7 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
   const emotionFigures = perPage.map((pp) => {
     const b = storyBeats.find(s => Number(s.pageNumber) === pp.pageNumber);
     const creatures = [...new Set(b.jevFixed.cites.map(baseOf))].map(id => gIndex[id]).filter(e => e && e.kind === 'creature');
-    return { pageNumber: pp.pageNumber, figures: [...pp.roster.map(n => ({ key: n, label: n })), ...creatures.map(e => ({ key: e.id, label: e.name }))] };
+    return { pageNumber: pp.pageNumber, figures: [...pp.roster.map(n => ({ key: n, label: n })), ...creatures.map(e => ({ key: e.id, label: figurePhrase(e) }))] };
   });
   const [gaze, emotions] = await Promise.all([
     jevDecisions.decideGaze({ arc: approvedArc, pages: storyBeats, perPage }),

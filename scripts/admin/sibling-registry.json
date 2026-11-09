@@ -214,6 +214,20 @@
       }
     },
     {
+      "id": "vb-group-count-vs-image-eval",
+      "axis": "generator-vs-critic",
+      "reason": "A Visual Bible entry with `count` >= 2 is a group the story never tells apart (2026-11-09, prod job_1794231161354_l3n2o3afm: three monsters had become three differently coloured named figures). The illustrator is told GROUP_ALIKE_RULE on the page's REQUIRED CAST line (promptBuilders.buildRequiredCastRule) and the quality judge's D-03 `duplicate_character` reads the same sentence ({GROUP_ALIKE}, prompts/services buildEvaluationPrompt) plus the EXPECTED CAST entry marked xN (evalPipeline.buildExpectedCastBlock); castPeopleCount counts the members. A rule on one side only scores a page for drawing the N members it was told to draw.",
+      "generators": [
+        "prompts/visual-bible.txt",
+        "prompts/story-trial-arc.txt",
+        "prompts/image-generation.txt"
+      ],
+      "critics": [
+        "prompts/image-evaluation.txt"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "vb-secondary-clothing-vs-image-eval",
       "axis": "generator-vs-critic",
       "reason": "The Visual Bible writers author an invented character's `clothing`; image-evaluation.txt D-05f `child_torso_uncovered` scores a child's bare torso CRITICAL. The covering-top rule (WARDROBE_RULES.CHILD_TOP_DEF) was held by the wardrobe writer and reviewer only, so the bible wrote \"no garment; bare shoulders\" for an invented child (prod job_1793561351885_kkg5gxkbj, 2026-11-01), the judge scored it CRITICAL, and the repair dressed her in the main child's outfit. One constant now reaches both bible writers.",

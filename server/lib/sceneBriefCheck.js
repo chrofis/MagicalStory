@@ -53,7 +53,7 @@
 
 const { log } = require('../utils/logger');
 const { extractSceneMetadata, findCastMissingFromMetadata } = require('./sceneMetadata');
-const { sameEntity } = require('./castResolver');
+const { sameEntity, canonicalName } = require('./castResolver');
 
 function requireCastIndex(castIndex, who) {
   if (!castIndex) throw new Error(`${who}: castIndex is required (castResolver.buildCastIndex)`);
@@ -227,7 +227,7 @@ function checkPlanCastCited(page, metadata, visualBible, castIndex) {
   if (!Number.isFinite(n) || n <= 0) return [];
   requireCastIndex(castIndex, 'checkPlanCastCited');
   const castField = planSegments(String((page && page.planLine) || '').replace(/^\s*PLAN:\s*/i, ''))[1] || '';
-  const named = castField.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const named = castField.split(',').map(s => canonicalName(s)).filter(Boolean);
   if (named.length === 0) return [];
   const vb = visualBible || {};
   const cited = citedBaseIds(metadata);
@@ -240,7 +240,7 @@ function checkPlanCastCited(page, metadata, visualBible, castIndex) {
     for (const e of list) {
       if (!e || !e.id) continue;
       const id = String(e.id).trim().toUpperCase().split('.')[0];
-      const handles = [e.name, e.label].map(s => String(s || '').trim().toLowerCase()).filter(Boolean);
+      const handles = [e.name, e.label].map(s => canonicalName(s)).filter(Boolean);
       if (!handles.some(h => named.includes(h)) || cited.has(id)) continue;
       if (onCast.some(name => sameEntity(name, e.name, castIndex))) continue;
       missing.push(`${e.name || e.label} (${id})`);

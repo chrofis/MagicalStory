@@ -1387,7 +1387,7 @@ function collectSceneCharacterNames(sceneMetadata, extraNames = []) {
   for (const entry of raw) {
     const name = String(typeof entry === 'string' ? entry : (entry && entry.name) || '').trim();
     if (!name) continue;
-    const key = name.toLowerCase();
+    const key = require('./castResolver').canonicalName(name);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(name);
@@ -1442,9 +1442,11 @@ function collectSceneObjectFigureNames(sceneMetadata, visualBible) {
     if (!token) continue;
     // `ART002.1` → `ART002`; anything not id-shaped stays whole and is matched
     // by name below.
-    const base = (/^[A-Za-z]{3}\d{3}(?:\.\d+)?$/.test(token) ? token.split('.')[0] : token).toLowerCase();
+    const isId = /^[A-Za-z]{3}\d{3}(?:\.\d+)?$/.test(token);
+    const base = (isId ? token.split('.')[0] : token).toLowerCase();
+    const { canonicalName } = require('./castResolver');
     const entry = figures.find(e => String(e.id || '').toLowerCase() === base
-      || String(e.name || '').toLowerCase() === base);
+      || (!isId && canonicalName(e.name) === canonicalName(token)));
     if (!entry) continue;
     const key = String(entry.name).toLowerCase();
     if (seen.has(key)) continue;

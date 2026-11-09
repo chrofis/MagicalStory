@@ -175,7 +175,7 @@ function resolveExpectedObjectLabels(entries, visualBible, language = 'en') {
       if (!label) continue;
       const canonical = label.toLowerCase();
       for (const alias of [label, e.label, e.name, stripQualifier(e.name), stripQualifier(label)]) {
-        const a = String(alias || '').trim().toLowerCase();
+        const a = canonicalName(alias);
         if (a) keyByAlias.set(a, canonical);
       }
     }
@@ -215,8 +215,8 @@ function resolveExpectedObjectLabels(entries, visualBible, language = 'en') {
     // anything (a mother creature and its young share words but are two
     // entries, and over-merging would hide a genuinely missing object).
     const lower = name.toLowerCase();
-    const key = keyByAlias.get(lower)
-      || keyByAlias.get(stripQualifier(name).toLowerCase())
+    const key = keyByAlias.get(canonicalName(name))
+      || keyByAlias.get(canonicalName(stripQualifier(name)))
       || stripQualifier(lower) || lower;
     if (seen.has(key)) continue;
     seen.add(key);

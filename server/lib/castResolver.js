@@ -33,9 +33,30 @@ function anchoredVbIdPattern() {
   return new RegExp(`^(?:${VB_ID_PATTERN.source})$`, 'i');
 }
 
+/** Leading articles dropped before comparing ("the bog monster" = "bog monster"). Only when a word remains. */
+const LEADING_ARTICLE = /^(?:the|a|an|der|die|das|den|dem|ein|eine|le|la|les|l'|un|une)\s+(?=\S)/;
+
+/**
+ * The last word of a role noun in its singular, for comparison only: "monsters"
+ * and "monster" compare equal, so a counted group ("the bog monsters") finds its
+ * single entry. A word ending in ss/us/is/as stays (Lucas, Thomas, glass).
+ * Both sides of every comparison go through this, so a collision needs two
+ * different names that collapse to the same stem inside one story.
+ */
+function singularLast(word) {
+  if (word.length > 4 && /ies$/.test(word)) return `${word.slice(0, -3)}y`;
+  if (word.length > 4 && /(?:ses|xes|zes|ches|shes)$/.test(word)) return word.slice(0, -2);
+  if (word.length > 3 && /[^suia]s$/.test(word)) return word.slice(0, -1);
+  return word;
+}
+
 /**
  * The comparable form of a name: no trailing parenthetical, no diacritics,
- * single-spaced, lowercase. "Kapitänin Rossa (the captain)" → "kapitanin rossa".
+ * single-spaced, lowercase, no leading article, last word singular.
+ * "Kapitänin Rossa (the captain)" → "kapitanin rossa"; "The bog monsters" →
+ * "bog monster" (a story with no name for a figure carries its role noun, and
+ * the plan, the prose and the bible write it with or without an article and
+ * in the plural: decisions.md 2026-11-09).
  *
  * Diacritics fold because the same person is spelled both ways across a German
  * or French story's bible, prose and metadata.
@@ -45,13 +66,39 @@ function anchoredVbIdPattern() {
  */
 function canonicalName(s) {
   if (s === null || s === undefined) return '';
-  return String(s)
+  const base = String(s)
     .replace(/\s*\([^)]*\)\s*$/, '')
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
-    .toLowerCase();
+    .toLowerCase()
+    .replace(LEADING_ARTICLE, '');
+  if (!base) return '';
+  const words = base.split(' ');
+  words[words.length - 1] = singularLast(words[words.length - 1]);
+  return words.join(' ');
+}
+
+/**
+ * How a question or label names a Visual Bible figure (a secondary character or animal): the story's name
+ * ("Bello, the dog") or, when the story gave none, the role noun the bible stores in lower case
+ * ("the bog monster"; no "X, the X"). A counted group says so ("the bog monster (3 of them, all alike)").
+ * ONE wording for the Jev citation, look and ride questions and the emotion label (decisions.md 2026-11-09).
+ *
+ * @param {{name?:string, species?:string, count?:number}} fig
+ * @returns {string} '' when the figure has no name
+ */
+function figurePhrase(fig) {
+  const name = String((fig && fig.name) || '').trim();
+  if (!name) return '';
+  const isRole = /^\p{Ll}/u.test(name);
+  const species = String((fig && fig.species) || '').trim();
+  let out = isRole ? `the ${name}` : name;
+  if (!isRole && species && !canonicalName(species).includes(canonicalName(name))) out += `, the ${species}`;
+  const count = Number(fig && fig.count);
+  if (Number.isInteger(count) && count >= 2) out += ` (${count} of them, all alike)`;
+  return out;
 }
 
 /**
@@ -273,7 +320,10 @@ function nameRegExp(name, { possessive = true, global = false, caseSensitive = f
   // A one-letter "name" is a word of the language ("A", "I"), never a person in a text.
   if (String(name === null || name === undefined ? '' : name).trim().length < 2) return global ? /(?!)/g : /(?!)/;
   const after = possessive ? '[\\p{L}\\p{N}]' : "[\\p{L}\\p{N}'’]";
-  return new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(name)}(?!${after})`, `${global ? 'g' : ''}${caseSensitive ? '' : 'i'}u`);
+  // A role noun (the bible stores it lower-case: "bog monster") is also met in the plural a counted group is
+  // written in; a proper name never is. decisions.md 2026-11-09.
+  const plural = /^\p{Ll}/u.test(String(name).trim()) ? '(?:e?s)?' : '';
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(name)}${plural}(?!${after})`, `${global ? 'g' : ''}${caseSensitive ? '' : 'i'}u`);
 }
 
 /** Is `name` a whole word of `text`? An empty name is in no text. */
@@ -397,6 +447,7 @@ function charactersByIds(characters, ids) {
 
 module.exports = {
   canonicalName,
+  figurePhrase,
   buildCastIndex,
   resolveEntity,
   sameEntity,

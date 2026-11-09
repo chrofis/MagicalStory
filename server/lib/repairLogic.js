@@ -2004,8 +2004,9 @@ function findVbFigure(visualBible, lowerName) {
   if (!visualBible || !lowerName) return null;
   for (const pool of VB_FIGURE_POOLS) {
     for (const entry of (visualBible[pool] || [])) {
-      const names = [entry?.name, entry?.properName].map(n => String(n || '').trim().toLowerCase());
-      if (names.includes(lowerName)) return { entry, pool };
+      const { canonicalName } = require('./castResolver');
+      const names = [entry?.name, entry?.properName].map(n => canonicalName(n));
+      if (names.includes(canonicalName(lowerName))) return { entry, pool };
     }
   }
   return null;

@@ -2042,8 +2042,8 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
 
           // Check VB for non-main characters (animals, secondary chars)
           if (!fullChar && vb) {
-            const vbAnimal = vb.animals?.find(a => a.name === name || a.id === name);
-            const vbSecondary = vb.secondaryCharacters?.find(c => c.name === name || c.id === name);
+            const vbAnimal = vb.animals?.find(a => canonicalName(a.name) === canonicalName(name) || a.id === name);
+            const vbSecondary = vb.secondaryCharacters?.find(c => canonicalName(c.name) === canonicalName(name) || c.id === name);
             const vbEntry = vbAnimal || vbSecondary;
             if (vbEntry) {
               // A creature's description states no size (cells get no size,

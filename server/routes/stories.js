@@ -1193,6 +1193,7 @@ router.get('/:id/dev-metadata', authenticateToken, requireAdminActing, async (re
         secondaryCharacters: (story.visualBible.secondaryCharacters || []).map(char => ({
           id: char.id,
           name: char.name,
+          count: char.count,
           description: char.description,
           extractedDescription: char.extractedDescription,
           attributes: char.attributes,
@@ -1203,6 +1204,7 @@ router.get('/:id/dev-metadata', authenticateToken, requireAdminActing, async (re
         animals: (story.visualBible.animals || []).map(animal => ({
           id: animal.id,
           name: animal.name,
+          count: animal.count,
           description: animal.description,
           extractedDescription: animal.extractedDescription,
           attributes: animal.attributes,

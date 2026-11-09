@@ -2492,4 +2492,4 @@ three below are prompt/classification questions and are the owner's call.
 - [x] (fixed 2026-11-09, decisions.md "Adults in a theme story wear a costume too") Adults never get the theme costume, even when the customer's own text asks for it ("Fabiola une guerrière avec une épée") → promptBuilders.js themeCostumeRule ~7737; owner decision docs/decisions.md:68706
 - [ ] The new review (D3, Opus, Lab 1848) missed the p1 cheek-vs-forehead text/picture mismatch the old review found; one book, not a rate → evals/results/results.jsonl 2026-11-09 line
 - [ ] Front cover drew a square chapel tower: no tower reference was sent and the bible entry never says "round" → coverHints null, front brief cites only LOC006.4
-- [ ] Visual Bible name-or-role + one entry per group (owner design 2026-11-09): plan awaiting owner OK → tasks/vb-name-or-role-groups-2026-11-09.md
+- [x] Visual Bible name-or-role + one entry per group (owner design 2026-11-09): built 2026-11-09, unit-tested, stored replay done; paid writer re-run (runner written, not run) + staging check (verify.json vb-name-or-role-2026-11-09) pending the owner → tasks/vb-name-or-role-groups-2026-11-09.md

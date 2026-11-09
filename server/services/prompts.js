@@ -985,6 +985,8 @@ function buildEvaluationPrompt(opts = {}) {
     TEXT_RULES: opts.textRules || '',
     // Side-blind one-sided features (owner 2026-10-15): the same sentence the VB writers and cell gates read.
     ONE_SIDED_FEATURE: require('../lib/promptBuilders').ONE_SIDED_FEATURE_RULE,
+    // A counted group of alike members is never a D-03 duplicate: the sentence the illustrator's REQUIRED CAST line carries.
+    GROUP_ALIKE: require('../lib/promptBuilders').GROUP_ALIKE_RULE,
     // NO TEXT_NOT_A_CHECKLIST here, deliberately (owner, 2026-09-18). That rule
     // goes to every template that judges a page against its TEXT; this judge is
     // handed no page text on any path — all three call sites pass a brief as

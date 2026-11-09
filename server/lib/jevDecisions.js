@@ -47,7 +47,7 @@
  */
 
 const J = require('./jevAudit');
-const { isNameMentioned } = require('./castResolver');
+const { isNameMentioned, figurePhrase } = require('./castResolver');
 const SV = require('./shotVocabulary');
 const { TIMES_OF_DAY, CLOCK_HOURS, isSkylessLight, isSkyHidden, WEATHERS, JEV_TIME_CRITERIA, JEV_WEATHER_CRITERIA, JEV_SUBMERGED_CRITERIA } = require('./sceneLight');
 const G = require('./gazeTargets');
@@ -900,7 +900,7 @@ function vbElements(visualBible, commissionedNames = []) {
       if (!e || !e.id || e.generic === true) continue;
       if (type === 'secondary' && comm.has(String(e.name || '').trim().toLowerCase())) continue;
       const desc = String(e.description || [e.species, e.coloring, e.features].filter(Boolean).join(', ') || '').replace(/\s+/g, ' ').slice(0, 220);
-      out.push({ type, id: baseId(e.id), name: e.name || e.label || e.id, label: e.label || '', species: e.species || '', desc, entry: e });
+      out.push({ type, id: baseId(e.id), name: e.name || e.label || e.id, label: e.label || '', species: e.species || '', count: e.count, desc, entry: e });
     }
   };
   add('creature', visualBible?.animals);
@@ -912,7 +912,7 @@ function vbElements(visualBible, commissionedNames = []) {
 
 function vbQuestion(e) {
   const what = e.type === 'creature' || e.type === 'secondary'
-    ? `${e.name}${e.species ? `, the ${e.species}` : ''} (${e.desc.slice(0, 140)})`
+    ? `${figurePhrase(e)} (${e.desc.slice(0, 140)})`
     : `the ${e.label || e.name} (${e.desc.slice(0, 140)})`;
   return `${what} is in the picture of the page to judge, wholly or in part: the page's text or its picture plan puts it in the scene at that moment.`;
 }
@@ -929,7 +929,7 @@ function aboardQuestion(v) {
  * highest of both sets. The creature stays in the picture, drawn from its own cell, as the ground the cast is on.
  */
 function rideQuestion(c) {
-  return `In the picture of the page to judge, the cast ride on ${c.name}${c.species ? `, the ${c.species}` : ''} (${c.desc.slice(0, 120)}), grip it or sit inside its body: its body is what they stand on, hold or sit in, so the camera is on it or in it.`;
+  return `In the picture of the page to judge, the cast ride on ${figurePhrase(c)} (${c.desc.slice(0, 120)}), grip it or sit inside its body: its body is what they stand on, hold or sit in, so the camera is on it or in it.`;
 }
 
 /**
@@ -965,7 +965,7 @@ function stateOptions(entry) {
 
 function stateQuestion(e) {
   const what = e.type === 'creature' || e.type === 'secondary'
-    ? `${e.name}${e.species ? `, the ${e.species}` : ''}`
+    ? figurePhrase(e)
     : `the ${e.label || e.name}`;
   return `In the instant of the page to judge, which look does ${what} show? Its looks are listed in the order the story reaches them.`;
 }
@@ -1207,7 +1207,7 @@ function gazeIndex(visualBible) {
       if (!e?.id) continue;
       const name = e.properName || e.name || e.label || e.id;
       const desc = String(e.description || [e.species, e.coloring, e.features, e.setting].filter(Boolean).join(', ')).replace(/\s+/g, ' ').slice(0, 160);
-      out[e.id] = { id: e.id, kind, name, desc };
+      out[e.id] = { id: e.id, kind, name, desc, ...(Number.isInteger(e.count) && e.count >= 2 ? { count: e.count } : {}) };
       for (const v of e.vantages || []) if (v && v.id) out[v.id] = { id: e.id, kind, name, desc, vantage: v.name };
     }
   }

@@ -555,7 +555,7 @@ function characterAgeCue(el) {
 function elementKindSentence(el) {
   if (!el || el.type === 'character') return '';
   const { elementDisplayLabel } = require('./vbIdGuard');
-  const clean = (v) => String(v || '').replace(/\s*\([^)]*\)\s*$/, '').replace(/[.\s]+$/, '').trim();
+  const clean = (v) => String(v || '').replace(/\s*\([^)]*\)\s*$/, '').replace(/[.\s]+$/, '').trim().replace(/^(?:the|a|an)\s+(?=\S)/i, '');
   // ONE authored English label per element (vbLabel.labelOf) — the same string
   // the page prompt's REQUIRED OBJECTS lead and the detector use.
   const name = clean(el.displayName || elementDisplayLabel(el));

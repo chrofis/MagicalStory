@@ -3445,6 +3445,7 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     STATE_REPLACES_PART: STATE_REPLACES_PART_RULE,
     STATE_FULL_DESCRIPTION: STATE_FULL_DESCRIPTION_RULE,
     VB_CATEGORY: VB_CATEGORY_RULE,
+    VB_FIGURE_NAME: VB_FIGURE_NAME_RULE,
     BODY_CONDITION_MARKER: BODY_CONDITION_MARKER_RULE,
     // The shot rules per path: on the Jev path a story page's shot is fixed
     // (owner, 2026-09-28) and no rule sets or widens it.
@@ -5404,7 +5405,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
           ? obj.name
           : elementLeadLabel(refEntry, { language, type: obj.type });
         const lead = (obj.type === 'animal' && obj.name)
-          ? `**${obj.name}** (animal)`
+          ? `**${obj.name}** (animal)${Number.isInteger(obj.entry?.count) && obj.entry.count >= 2 ? `, ${obj.entry.count} of them, all alike` : ''}`
           : `**${refName}${qualifier}** (${obj.type})`;
         if (obj.id && vbRefIds.has(String(obj.id).toUpperCase())) {
           gridRefNames.push(refName);
@@ -5706,7 +5707,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       REQUIRED_CAST: buildRequiredCastRule(normalisePopulation(
         metadata?.population || metadata?.fullData?.population || null,
         metadata?.crowdExpected === true || metadata?.fullData?.crowdExpected === true,
-      )),
+      ), pageGroups(metadata, visualBible)),
       // REQUIRED TEXT. In the protected tail, beside the other two rule
       // constants: shrinkPromptForModel drops head blocks first, and a page
       // over the Grok cap losing the only statement of what its signpost has
@@ -9651,10 +9652,34 @@ const REQUIRED_CAST_BACKGROUND = {
   crowd: ". Paint the unnamed people the scene description places, as it places them: busy with their own business, every face fully drawn, varied hair and garment colours and shapes, dressed for the story's era, none sharing a listed character's hair, build, outfit or garment colour. No one else is added.",
 };
 
-/** The REQUIRED CAST line for a page of this `population` (normalised). */
-function buildRequiredCastRule(population) {
+/**
+ * The counted groups of the Visual Bible this page puts in frame (a figure with `count` >= 2: one entry, one look,
+ * N members). In frame = the brief cites its id, or lists it in `characters[]` by name. Identity by id/name, no prose.
+ *
+ * @returns {Array<{name:string, count:number}>}
+ */
+function pageGroups(metadata, visualBible) {
+  if (!visualBible) return [];
+  const { canonicalName } = require('./castResolver');
+  const cited = new Set(collectVbObjectCitations(metadata).map(o => baseVbId(String(o))).filter(Boolean).map(s => s.toUpperCase()));
+  const named = new Set(((metadata && metadata.characters) || []).map(c => canonicalName(typeof c === 'string' ? c : c && c.name)).filter(Boolean));
+  const out = [];
+  for (const key of ['secondaryCharacters', 'animals']) {
+    for (const e of (Array.isArray(visualBible[key]) ? visualBible[key] : [])) {
+      if (!e || !(Number.isInteger(e.count) && e.count >= 2)) continue;
+      if (cited.has(String(e.id || '').toUpperCase()) || named.has(canonicalName(e.name))) out.push({ name: e.name, count: e.count });
+    }
+  }
+  return out;
+}
+
+/** The REQUIRED CAST line for a page of this `population` (normalised); `groups` = pageGroups(). */
+function buildRequiredCastRule(population, groups = []) {
   const tail = REQUIRED_CAST_BACKGROUND[population] || REQUIRED_CAST_BACKGROUND.cast_only;
-  return `${REQUIRED_CAST_LEAD}${tail} ${REQUIRED_CAST_UNACTED}`;
+  const except = groups.length
+    ? `, except ${groups.map(g => `the ${g.name} (a group: exactly ${g.count} members, all alike)`).join('; ')}`
+    : '';
+  return `${REQUIRED_CAST_LEAD}${except}${tail} ${REQUIRED_CAST_UNACTED}${groups.length ? ` ${GROUP_ALIKE_RULE}` : ''}`;
 }
 
 /**
@@ -9985,6 +10010,23 @@ const PLACE_INSIDE_OUTSIDE_RULE = 'A page whose plan line puts its figures insid
  * that is not noted-only like Q18.
  */
 const ONE_SIDED_FEATURE_RULE = 'Which of a pair carries a one-sided feature (one limb, ear or eye that hangs, is marked or differs from its twin) is never stated as left or right and never judged by side: the specification is relational ("one hangs limp, the other is folded neatly"), and the same figure drawn with the feature on the other side matches it.';
+/**
+ * VB_FIGURE_NAME_RULE: what a secondary character's or animal's `name` holds, and how a group is written. ONE
+ * constant read by both Visual Bible writers (visual-bible.txt, story-trial-arc.txt; registry set vb-authoring-sites)
+ * and by the Jev citation questions' wording (jevDecisions), which ask about the figure by this same name
+ * (owner, 2026-11-09; docs/decisions.md "Visual Bible: name or role"). Prod job_1794231161354_l3n2o3afm: the schema
+ * forced `"name": "[Name]"`, so "three monsters" became Grumbo / Plodd / Squelch in three colours, the citation
+ * question asked about "Grumbo" (never on a page) and scored 0.22-0.47 against the bar 0.7: no page got a cell.
+ */
+/**
+ * GROUP_ALIKE_RULE: what a counted group on a page means. ONE sentence read by the illustrator (the page's REQUIRED CAST
+ * line when it holds a group) and by the quality judge's D-03 `duplicate_character` (image-evaluation.txt), so a page is
+ * never scored for drawing the N members it was told to draw (syncing-generator-and-critic; registry set
+ * `group-alike-vs-image-eval`).
+ */
+const GROUP_ALIKE_RULE = 'A counted group is ONE roster entry of N members that share one look: all N are drawn, alike.';
+const VB_FIGURE_NAME_RULE = 'The `name` of a secondary character or animal is the name the story gives it ("Bob", "Bello"); when the story gives none, it is the role in English: one singular noun, lower case, no article ("shopkeeper", "dog", "bog monster"). Never make up a name the story and the plan do not use. Only two figures of the SAME role that the story tells apart get one look word each ("old shopkeeper", "young shopkeeper"). A figure the story names lives in `name` itself: it has no `properName`. A group the story never tells apart ("three monsters", "two guards", a pack of wolves) is ONE entry: `name` is the singular role noun, `count` is how many (an integer from 2), and the single look in its entry is the look of every member. Members the story names or tells apart one by one are separate entries without `count`.';
+
 /**
  * VB_CATEGORY_RULE: which Visual Bible category a vehicle and a toy figure belong in. ONE sentence pair read by
  * both Visual Bible writers (visual-bible.txt, story-trial-arc.txt; registry set vb-authoring-sites). The trial
@@ -13810,6 +13852,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       STATE_REPLACES_PART: STATE_REPLACES_PART_RULE,
       STATE_FULL_DESCRIPTION: STATE_FULL_DESCRIPTION_RULE,
       VB_CATEGORY: VB_CATEGORY_RULE,
+      VB_FIGURE_NAME: VB_FIGURE_NAME_RULE,
       PICTURE_COUNT: PICTURE_COUNT_RULE,
       CLOSING_MOMENT: CLOSING_MOMENT_RULE,
       // Trial has no Art Director either: the scene-hint composition rules
@@ -14708,6 +14751,8 @@ module.exports = {
   HIDDEN_FEATURE_STATE_RULE,
   STATE_WINS_RULE,
   VB_CATEGORY_RULE,
+  VB_FIGURE_NAME_RULE,
+  GROUP_ALIKE_RULE,
   BODY_CONDITION_MARKER_RULE,
   DECLARED_CONDITION_DEF,
   PEAK_OF_ACTION_RULE,
@@ -14785,6 +14830,7 @@ module.exports = {
   NO_CHARACTER_MARKING_RULE,
   HANDS_HOLD_ONLY_NAMED_RULE,
   buildRequiredCastRule,
+  pageGroups,
   COMPOSITION_HEADER,
   COMPOSITION_FACING_BULLET,
   COMPOSITION_GROUND_BULLET,
