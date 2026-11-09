@@ -206,3 +206,9 @@ Order: #1+#3 -> #4+#5 -> #6,#7,#10 -> #2,#8,#9 (at most 2 agents at a time).
   - Rubi: both fixes applied (price of failing p5, walk back to the farm p10).
     - p5 now reads clumsily: two «...», dachte Janna sentences in a row.
   - Laternen (stored text is verse): both fixes were made, but the refiner recomposed the couplets (64%/65% of words changed). The edit cap threw both pages back, so 0 fixes shipped, and only a warn was logged. This is pre-existing (any TEXT fix on a verse page), but D3 sends more TEXT fixes, so it matters more now. Owner decision needed.
+- 2026-11-09: owner reversed the 30% edit cap: "Why not rewrite the whole page ... raise limit. But add some retest if major change was done." a64e99992 (not pushed yet): no size reject; a page over 30% triggers one whole-book logic read on the post-audit round.
+- Replay on the new code, USD 0.26 (check total USD 3.74). v2-*.json; v1/ holds the capped run.
+  - Laternen: both fixes ship (68% / 63%). The retest ran: 8 MINOR, 0 MAJOR, no fix round.
+    - Defect: the stored book is PROSE, but its topic is "educational / rhyming", so isVerseStory is true and the refiner turned p2 and p9 into verse inside a prose book. This is a legacy story made before verse; any old book with that topic is at risk.
+  - Rubi: both fixes ship (31% / 42%). The retest ran: 3 MINOR.
+    - Defect: the refiner INVENTED "seine Herde" (a herd; the story has none) on p5 and p10, and added «Danke, Rubi» unasked. The capped v1 run made the minimal fix. The logic read does not catch inventions.
