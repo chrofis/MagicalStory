@@ -2485,3 +2485,10 @@ three below are prompt/classification questions and are the owner's call.
 - Lab: experiment logWarnings are captured by time window, so two concurrent experiments show each other's warnings (exps 1842/1843, 2026-11-09) -> tasks/quality-suggestions-2026-11-08.md
 - Verse books: post-audit text fixes are lost to the edit cap (refiner recomposes couplets, 64% changed; replay 2026-11-09) -> tasks/quality-suggestions-2026-11-08.md
 - Production push of the 2026-11-08/09 quality work needs first: a count of rhyming-topic stories on prod and a textForm backfill (prose before 2026-11-07 18:23 CH, verse after); otherwise isVerseStory throws on them -> docs/decisions.md 2026-11-09, tasks/quality-suggestions-2026-11-08.md
+
+## 2026-11-09 Amaya prod book (job_1794231161354_l3n2o3afm) findings
+- [ ] Creatures scored below the visual-bible cut-off get no reference on any page, so the same three monsters are invented per page (p6 grey vs p4/5/7 green) → server/lib/jevDecisions.js:78 (`vb.creature 0.7`), applyVbPages ~1575; brief check `vb_page_uncited` is JEV_OWNED and only logged → server/lib/briefChecks.js:69
+- [ ] A magically darkened outdoor place has no light option: the light choice is night (moonlit, clear sky) or dark (cave/sealed room), plus "never a near-black frame" and the season line forcing autumn colours → server/lib/sceneLight.js:77,~95; prompts/empty-scene.txt:24; server/lib/season.js:111
+- [ ] Adults never get the theme costume, even when the customer's own text asks for it ("Fabiola une guerrière avec une épée") → promptBuilders.js themeCostumeRule ~7737; owner decision docs/decisions.md:68706
+- [ ] The new review (D3, Opus, Lab 1848) missed the p1 cheek-vs-forehead text/picture mismatch the old review found; one book, not a rate → evals/results/results.jsonl 2026-11-09 line
+- [ ] Front cover drew a square chapel tower: no tower reference was sent and the bible entry never says "round" → coverHints null, front brief cites only LOC006.4
