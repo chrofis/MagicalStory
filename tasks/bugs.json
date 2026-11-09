@@ -4715,6 +4715,14 @@
       "source": "Prod job_1794231161354_l3n2o3afm: three monsters became Grumbo/Plodd/Squelch (green/brown/purple); Jev vb scores 0.22-0.47 on pages 4-7 (bar 0.7), no reference cell; redraws drew the bible colours (Lab 1849/1850).",
       "rootCause": "visual-bible.txt schema \"name\": \"[Name]\" for CHR/ANI, no group shape; matching sites need exact names. Plan: tasks/vb-name-or-role-groups-2026-11-09.md (owner design 2026-11-09).",
       "status": "open"
+    },
+    {
+      "id": "season-ignores-story-date-christmas-drawn-autumn",
+      "title": "A Christmas story written in November is drawn in autumn: the SEASON line says Autumn on every page while the text is set on 23-24 December, so the pages show orange autumn trees and fallen leaves on the snow",
+      "reportedAt": "2026-11-09",
+      "source": "Prod job_1793736454070_0ir5y6hlh (Lia und der verschwundene Weihnachtsstern, made 2026-11-03): stories.data.season = autumn, storyTheme christmas; every page prompt carries **SEASON:** Autumn; pages 3-9, 19, cover and back cover show autumn foliage under snow.",
+      "rootCause": "server/lib/season.js resolves the season from the request or the creation date; neither the theme nor the date the story itself is set on overrides it. How to fix (theme implies winter, or the story date decides) is an owner decision; not asked yet.",
+      "status": "open"
     }
   ]
 }
