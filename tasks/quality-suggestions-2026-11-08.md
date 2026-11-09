@@ -184,3 +184,8 @@ Order: #1+#3 -> #4+#5 -> #6,#7,#10 -> #2,#8,#9 (at most 2 agents at a time).
   - Book15: a water-safety line.
   - Still missed: friends end the problem in book13 (arc stage).
   - Not yet graded line by line for false alarms.
+- 2026-11-09, real-Opus check, exps 1842 (A, today's prompt) and 1843 (D3), books 13/06/04/15/09. USD 2.48, over the USD 2 cap (estimate was 1.5).
+  - D3 is INVALID: the per-book placeholders were not filled for the Lab override. MAIN_CHARACTERS, LOGIC_* and BUY_CRITERION were stripped, so D3 ran without its logic rules, main-character list or child-question lens. The stand-in packets had them pre-filled by build-packets.js; my runner did not.
+  - Arm A is valid: its template has none of those placeholders. Its warnings come from D3's concurrent run; the Lab log capture is time-windowed, a small Lab issue.
+  - A gave 0 TEXT lines on all 5 books, the same as the stand-in arm A.
+  - Rerun of D3 only, with per-book pre-filled overrides (5 experiments): about USD 1.30. Waiting for the owner.
