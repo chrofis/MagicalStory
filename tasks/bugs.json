@@ -4670,6 +4670,14 @@
       "rootCause": "Active-row lookup was `rows.find(active) || rows.find(version 0)` over rows that exclude is_test; plus PUT active-image let an is_test index through its blob-length last-resort check.",
       "status": "fixed",
       "fixedIn": "fddb71c0c"
+    },
+    {
+      "id": "dedication-emoji-renders-as-box",
+      "title": "An emoji in the customer dedication is printed as an empty box on the dedication page (font has no emoji glyph)",
+      "reportedAt": "2026-11-09",
+      "source": "Reproduced from stored prod data: job_1794231161354_l3n2o3afm, dedication ends with U+2764 U+FE0F (red heart); the stored initialPage image shows a hollow square in its place.",
+      "rootCause": "Not yet traced: the dedication text renderer draws the string with a font that has no emoji glyph.",
+      "status": "open"
     }
   ]
 }
