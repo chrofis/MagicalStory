@@ -37,3 +37,12 @@ All fonts are redistributable and embeddable in web + print. Sourced from the
 | Poppins | `Poppins-SemiBold.ttf` | SIL OFL 1.1 |
 
 SIL OFL 1.1: https://openfontlicense.org · Apache 2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+## Emoji fallback
+
+| Family | File | License |
+|--------|------|---------|
+| Noto Emoji (monochrome) | `NotoEmoji.ttf` | SIL OFL 1.1 |
+
+Loaded last so resvg falls back to it for emoji the lettering fonts lack (a heart in a
+dedication printed as an empty box, prod job_1794231161354_l3n2o3afm, 2026-11-09).

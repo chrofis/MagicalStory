@@ -17,6 +17,9 @@ const FONT_FILES = [
   'TitanOne-Regular.ttf', 'LilitaOne-Regular.ttf', 'Chewy-Regular.ttf', 'Shrikhand-Regular.ttf',
   'Pacifico-Regular.ttf', 'Caveat-SemiBold.ttf', 'Kalam-Regular.ttf', 'PatrickHand-Regular.ttf',
   'GochiHand-Regular.ttf', 'EBGaramond-Italic.ttf', 'Poppins-SemiBold.ttf',
+  // Fallback for emoji: no lettering font above has emoji glyphs and system fonts are off,
+  // so a heart in a dedication printed as an empty box (prod job_1794231161354_l3n2o3afm).
+  'NotoEmoji.ttf',
 ].map(f => path.join(FONT_DIR, f));
 
 // ---------------------------------------------------------------------------
