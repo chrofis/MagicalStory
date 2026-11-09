@@ -403,8 +403,37 @@ async function judgeParts(parts, modelId, thinkingLevel) {
  * it thinned the reader's-eye faults to 5 and 6 where the same call without it
  * found 16 on the same story. Returns raw text + usage.
  */
-async function judgeChunk(template, chunk, modelId, thinkingLevel = null, review = null) {
+async function judgeChunk(template, chunk, modelId, thinkingLevel = null, review = null, storyFill = null) {
+  const { instructions, pageHeading } = buildChunkInstructions(template, chunk, review, storyFill);
+  const parts = [{ text: instructions }];
+  appendChunkPages(parts, chunk, pageHeading);
+  assertPromptFilled(parts, 'bookAudit.judgeChunk');
+  return judgeParts(parts, modelId, thinkingLevel);
+}
+
+/**
+ * The per-story placeholders of prompts/book-audit.txt (D3, 2026-11-09, docs/decisions.md): who the main character
+ * is, the four logic-read questions the consistency question reuses, and the idea prompts' buy questions. Built
+ * ONCE per audit and handed to every chunk call — a long book is sent in several calls and each needs them. Fails
+ * loudly when the story or a source template is missing (no fallback).
+ */
+function bookAuditStoryFill(storyData) {
+  if (!storyData) throw new Error('bookAudit: storyData missing, cannot name the main character or the buy questions');
+  const { mainCharactersText, logicReadQuestions } = require('./promptBuilders');
+  const { buildIdeaContract } = require('./ideaContract');
+  const mainIds = storyData.mainCharacters || [];
+  const chars = (storyData.characters || []).map(c => ({ ...c, isMain: c.isMain || c.isMainCharacter || mainIds.includes(c.id) }));
+  return {
+    MAIN_CHARACTERS: mainCharactersText(storyData),
+    ...logicReadQuestions(),
+    BUY_CRITERION: buildIdeaContract(chars).BUY_CRITERION,
+  };
+}
+
+/** The filled instructions of one chunk call (pure; no model call). Exported for the tests and the replay script. */
+function buildChunkInstructions(template, chunk, review = null, storyFill = null) {
   const { fillTemplate, PROMPT_TEMPLATES } = require('../services/prompts');
+  if (!storyFill) throw new Error('bookAudit: storyFill missing — the audit prompt needs the per-story placeholders');
   const { coverLabelForPage } = require('./coverKeys');
   // A cover reached the judge as a bare "PAGE -3" and was read as a story page
   // in sequence, so question 6 reported it for showing a moment the text
@@ -415,6 +444,7 @@ async function judgeChunk(template, chunk, modelId, thinkingLevel = null, review
     return label ? `PAGE ${n} (${label})` : `PAGE ${n}`;
   };
   const instructions = fillTemplate(template, {
+    ...storyFill,
     PAGE_LIST: chunk.map(p => {
       const label = coverLabelForPage(p.pageNumber);
       return label ? `${p.pageNumber} (${label})` : String(p.pageNumber);
@@ -438,10 +468,11 @@ async function judgeChunk(template, chunk, modelId, thinkingLevel = null, review
     BOOK_REVIEW_RULES: review ? reviewRulesText(review, PROMPT_TEMPLATES, fillTemplate) : '',
   });
 
-  // Instructions FIRST, then the book. The judge must know what it is looking
-  // for before it starts looking, and the trailing part is the last thing it
-  // read either way.
-  const parts = [{ text: instructions }];
+  return { instructions, pageHeading };
+}
+
+/** Instructions FIRST (already in parts), then the book: the judge must know what it is looking for before it looks. */
+function appendChunkPages(parts, chunk, pageHeading) {
   for (const p of chunk) {
     parts.push({ text: `${pageHeading(p.pageNumber)} TEXT: ${p.text || '(no text on this page)'}` });
     const brief = briefLine(pageHeading(p.pageNumber), p.brief);
@@ -455,8 +486,6 @@ async function judgeChunk(template, chunk, modelId, thinkingLevel = null, review
     parts.push(p.part);
   }
 
-  assertPromptFilled(parts, 'bookAudit.judgeChunk');
-  return judgeParts(parts, modelId, thinkingLevel);
 }
 
 /**
@@ -769,6 +798,7 @@ async function auditStoryBook(storyData, opts = {}) {
       log.warn(`⚠️ [BOOK-AUDIT] ${missing.length} page(s) skipped — no shipped image: ${missing.sort((a, b) => a - b).join(', ')}`);
     }
 
+    const storyFill = bookAuditStoryFill(storyData);
     const review = bookReview ? { title: bookReview.title, hasRepairedPages: prepared.some(p => p.previousPart) } : null;
     const chunks = [];
     for (let i = 0; i < prepared.length; i += MAX_PAGES_PER_CALL) {
@@ -817,7 +847,7 @@ async function auditStoryBook(storyData, opts = {}) {
     const raws = [];
     for (const chunk of chunks) {
       try {
-        const r = await judgeChunk(template, chunk, modelId, thinkingLevel, review);
+        const r = await judgeChunk(template, chunk, modelId, thinkingLevel, review, storyFill);
         raws.push(r.text);
         chunkUsage.push({
           pages: `${chunk[0].pageNumber}-${chunk[chunk.length - 1].pageNumber}`,
@@ -913,6 +943,8 @@ async function auditStoryBook(storyData, opts = {}) {
 
 module.exports = {
   auditStoryBook,
+  bookAuditStoryFill,
+  buildChunkInstructions,
   buildAuditPages,
   auditPageBrief,
   auditPageHeightLine,

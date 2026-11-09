@@ -51,20 +51,20 @@ describe('a cover is named, not just numbered', () => {
   });
 });
 
-describe('question 6 does not bind a cover', () => {
+describe('question 7 does not bind a cover', () => {
   it('the FUTURE question exempts covers', () => {
-    const q6 = read().split('\n').find((l) => l.startsWith('6. FUTURE:')) || '';
-    expect(q6).toMatch(/cover/i);
-    expect(q6).toMatch(/never report one here/i);
+    const q7 = read().split('\n').find((l) => l.startsWith('7. FUTURE:')) || '';
+    expect(q7).toMatch(/cover/i);
+    expect(q7).toMatch(/never report one here/i);
   });
 
-  it('the exemption sits in question 6 and nowhere else', () => {
+  it('the exemption sits in question 7 and nowhere else', () => {
     // Scoped deliberately: a cover drawn in the wrong colours, or contradicting
     // its own words, is still a fault under the other five questions.
     const lines = read().split('\n');
     const withCover = lines.filter((l) => /^\d\. /.test(l) && /never report one here/i.test(l));
     expect(withCover).toHaveLength(1);
-    expect(withCover[0]).toMatch(/^6\. FUTURE:/);
+    expect(withCover[0]).toMatch(/^7\. FUTURE:/);
   });
 
   it('leaves the other questions able to fault a cover', () => {

@@ -12712,6 +12712,38 @@ function declaredMainNames(inputData) {
 }
 
 /**
+ * The text that fills {MAIN_CHARACTERS} wherever a judge is told who "the main character" is: the logic read and
+ * the book audit (ONE builder, 2026-11-09). Nobody marked (older jobs): the first character is the focus, the
+ * long-standing fallback (pickMainCharacters); no characters at all reads as 'the character the story follows'.
+ */
+function mainCharactersText(inputData) {
+  const names = declaredMainNames(inputData);
+  const chars = (inputData?.characters || []).map(c => c.name).filter(Boolean);
+  const mains = names.length ? names : chars.slice(0, 1);
+  return mains.length > 1
+    ? `${mains.join(', ')} (together: the deciding act may be any one of them)`
+    : (mains[0] || 'the character the story follows');
+}
+
+/**
+ * The four question texts of the logic read that the book audit's consistency question reuses, READ from the
+ * loaded prompts/story-text-logic-read.txt (lines "OBSTACLE. ...") so the audit and the logic read cannot drift:
+ * the template is the single source. Throws when the template or a line is missing (no fallback).
+ */
+const LOGIC_QUESTION_IDS = ['OBSTACLE', 'KNOWLEDGE', 'PLACE', 'CONTRADICTION'];
+function logicReadQuestions() {
+  const template = PROMPT_TEMPLATES.storyTextLogicRead;
+  if (!template) throw new Error('storyTextLogicRead template not loaded — the book audit cannot reuse its questions');
+  const out = {};
+  for (const id of LOGIC_QUESTION_IDS) {
+    const line = template.split(/\r?\n/).find(l => l.startsWith(`${id}. `));
+    if (!line) throw new Error(`story-text-logic-read.txt has no "${id}. " line`);
+    out[`LOGIC_${id}`] = line.slice(id.length + 2).trim();
+  }
+  return out;
+}
+
+/**
  * THE LOGIC READ of the finished text (2026-11-08): one TEXT-ONLY call that reads the text the lector left and
  * answers the story-logic questions a listening child trips over (obstacle, stakes, who knows what, who is where,
  * contradictions, unkind friends, empty pages, cause, verse beat). Typed JSON out (parseLogicRead,
@@ -12723,17 +12755,10 @@ function buildTextLogicReadPrompt(inputData, pages = []) {
     log.error('[PROMPT] storyTextLogicRead template not loaded — logic read unavailable');
     return null;
   }
-  const names = declaredMainNames(inputData);
-  const chars = (inputData?.characters || []).map(c => c.name).filter(Boolean);
-  // Nobody marked (older jobs): the first character is the focus, the long-standing fallback (pickMainCharacters).
-  const mains = names.length ? names : chars.slice(0, 1);
-  const mainText = mains.length > 1
-    ? `${mains.join(', ')} (together: the deciding act may be any one of them)`
-    : (mains[0] || 'the character the story follows');
   const verse = isVerseStory(inputData);
   return fillTemplate(template, {
     LANGUAGE: inputData?.language ? getLanguageNameEnglish(inputData.language) : 'the language of the pages',
-    MAIN_CHARACTERS: mainText,
+    MAIN_CHARACTERS: mainCharactersText(inputData),
     PAGES: pages.map(p => `--- Page ${p.pageNumber} ---\n${String(p.text || '').trim()}`).join('\n\n'),
     FRIEND_REASON: FRIEND_REASON_RULE,
     VERSE_FORM: verseFormFor(inputData, 'logic'),
@@ -14767,6 +14792,8 @@ module.exports = {
   buildTextProofreadPrompt,
   buildTextLogicReadPrompt,
   declaredMainNames,
+  mainCharactersText,
+  logicReadQuestions,
   FRIEND_REASON_RULE,
   buildTextDiffPrompt,
   countFaults,
