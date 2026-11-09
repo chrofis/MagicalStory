@@ -212,3 +212,13 @@ Order: #1+#3 -> #4+#5 -> #6,#7,#10 -> #2,#8,#9 (at most 2 agents at a time).
     - Defect: the stored book is PROSE, but its topic is "educational / rhyming", so isVerseStory is true and the refiner turned p2 and p9 into verse inside a prose book. This is a legacy story made before verse; any old book with that topic is at risk.
   - Rubi: both fixes ship (31% / 42%). The retest ran: 3 MINOR.
     - Defect: the refiner INVENTED "seine Herde" (a herd; the story has none) on p5 and p10, and added «Danke, Rubi» unasked. The capped v1 run made the minimal fix. The logic read does not catch inventions.
+- 2026-11-09: c9048214e added three things (not pushed):
+  - NO_NEW_ELEMENT_RULE, shared by book-audit, the logic read and text-refine;
+  - an ADDED question in the retest;
+  - a typed textForm field (isVerseStory throws for a rhyming-topic record without it).
+- Replay v3, USD 0.14 (check total USD 3.88):
+  - All 4 fixes ship and are minimal: no herd, no unrequested line, and the Laternen prose stays prose. No page went over 30%, so the retest (and ADDED) did not fire; ADDED is unmeasured live.
+- Staging backfill NOT run (the classifier blocked the DB write; it needs the owner):
+  - prose: job_1793964466256_1tmyzh1do;
+  - verse: job_1794128424739_0j933o99i5u.
+- Production also needs a counted backfill before any prod push (decisions.md 2026-11-09).
