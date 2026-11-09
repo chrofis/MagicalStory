@@ -2482,11 +2482,11 @@ app.get('/robots.txt', (req, res) => {
   res.type('text/plain').sendFile(robotsPath);
 });
 
-// Built once per process: its lastmod values are the prerendered files' build
-// times, and those only change with a deploy (= a restart).
+// Built once per process: its lastmod values come from the committed
+// server/data/seo-lastmod.json, which only changes with a deploy (= a restart).
 let sitemapXml = null;
 app.get('/sitemap.xml', (req, res) => {
-  if (sitemapXml === null) sitemapXml = generateSitemap({ prerenderDir: PRERENDER_DIR });
+  if (sitemapXml === null) sitemapXml = generateSitemap();
   res.type('application/xml').send(sitemapXml);
 });
 

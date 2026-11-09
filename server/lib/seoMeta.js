@@ -500,6 +500,12 @@ const NOINDEX_ROUTES = [
   '/gutschein/einloesen', '/gutschein/buch',
 ];
 
+// noindex AND crawlable: the wizard has 0 words of body and no H1, so Google listed it as
+// a thin page (2026-11-09 audit); /kinderbuch-erstellen is the indexable page for that
+// intent. It is linked from everywhere, so it must NOT be in robots.txt: a blocked URL
+// can still be indexed from its links, and the noindex would never be read.
+const NOINDEX_CRAWLABLE_ROUTES = ['/try'];
+
 // Client-only routes (App.tsx) that have no prerendered page: the SPA shell is
 // the right 200 answer for them. Any other path without a prerendered file is
 // a page that does not exist and answers 404 — before 2026-10-07 every unknown
@@ -507,7 +513,7 @@ const NOINDEX_ROUTES = [
 // app routes above were served with "index, follow" and a canonical pointing
 // at the homepage because the shell was sent untouched.
 // '/gutschein/kaufen' is the public voucher buy page: indexable, shell with its own meta.
-const APP_ROUTES = [...NOINDEX_ROUTES, '/try', '/shared', '/s', '/gutschein/kaufen'];
+const APP_ROUTES = [...NOINDEX_ROUTES, ...NOINDEX_CRAWLABLE_ROUTES, '/shared', '/s', '/gutschein/kaufen'];
 
 function isAppRoute(routePath) {
   const p = String(routePath || '').replace(/\/+$/, '') || '/';
@@ -581,8 +587,8 @@ const COMPARISONS = {
   buchheldenwelt: { name: 'BuchHeldenWelt', de: 'Magical Story vs BuchHeldenWelt', en: 'Magical Story vs BuchHeldenWelt', fr: 'Magical Story vs BuchHeldenWelt', it: 'Magical Story vs BuchHeldenWelt' },
   // NOTE: mirrors client/src/constants/comparisonData.ts — both must be edited.
   'magisches-kinderbuch': { name: 'Magisches Kinderbuch', de: 'Magical Story vs Magisches Kinderbuch', en: 'Magical Story vs Magisches Kinderbuch', fr: 'Magical Story vs Magisches Kinderbuch', it: 'Magical Story vs Magisches Kinderbuch' },
-  'beste-personalisierte-kinderbuecher': { name: 'Beste Kinderbücher', de: 'Beste personalisierte Kinderbücher Schweiz 2026', en: 'Best Personalized Children\'s Books Switzerland 2026', fr: 'Meilleurs livres personnalisés pour enfants Suisse 2026', it: 'Migliori libri personalizzati per bambini Svizzera 2026' },
-  'beste-ki-kinderbuch-generatoren': { name: 'Beste KI-Generatoren', de: 'Beste KI-Kinderbuch-Generatoren 2026', en: 'Best AI Children\'s Book Generators 2026', fr: 'Meilleurs générateurs de livres IA pour enfants 2026', it: 'Migliori generatori IA di libri per bambini 2026' },
+  'beste-personalisierte-kinderbuecher': { roundup: true, name: 'Beste Kinderbücher', de: 'Beste personalisierte Kinderbücher Schweiz 2026', en: 'Best Personalized Children\'s Books Switzerland 2026', fr: 'Meilleurs livres personnalisés pour enfants Suisse 2026', it: 'Migliori libri personalizzati per bambini Svizzera 2026' },
+  'beste-ki-kinderbuch-generatoren': { roundup: true, name: 'Beste KI-Generatoren', de: 'Beste KI-Kinderbuch-Generatoren 2026', en: 'Best AI Children\'s Book Generators 2026', fr: 'Meilleurs générateurs de livres IA pour enfants 2026', it: 'Migliori generatori IA di libri per bambini 2026' },
 };
 
 // ─── Guide Data (for meta tags) ───────────────────────────────────────────────
@@ -694,7 +700,7 @@ const GIFT_PAGES = {
   'taufgeschenk': { de: 'Taufgeschenk — persönlich & unvergesslich', en: 'Baptism Gift — Personal & Unforgettable', fr: 'Cadeau de baptême — personnel & inoubliable', it: 'Regalo di battesimo — personale e indimenticabile' },
   'einschulungsgeschenk': { de: 'Einschulungsgeschenk für Kinder', en: 'First Day of School Gift', fr: 'Cadeau de rentrée scolaire', it: 'Regalo per il primo giorno di scuola' },
   'nikolausgeschenk': { de: 'Nikolausgeschenk für Kinder', en: 'St. Nicholas Gift for Kids', fr: 'Cadeau de Saint-Nicolas pour enfants', it: 'Regalo di San Nicolao per bambini' },
-  'einzigartiges-geschenk': { de: 'Einzigartiges Geschenk für Kinder', en: 'Unique Gift for Kids', fr: 'Cadeau unique pour enfants', it: 'Regalo unico per bambini' },
+  'einzigartiges-geschenk': { de: 'Einzigartige Geschenkidee mit Foto und Name', en: 'Unique Gift Idea with Photo and Name', fr: 'Idée cadeau unique avec photo et prénom', it: 'Idea regalo unica con foto e nome' },
   'personalisiertes-geschenk': { de: 'Personalisiertes Geschenk für Kinder', en: 'Personalized Gift for Kids', fr: 'Cadeau personnalisé pour enfants', it: 'Regalo personalizzato per bambini' },
   'sinnvolles-geschenk': { de: 'Sinnvolles Geschenk für Kinder', en: 'Meaningful Gift for Kids', fr: 'Cadeau éducatif pour enfants', it: 'Regalo educativo per bambini' },
   'last-minute-geschenk': { de: 'Last-Minute-Geschenk für Kinder', en: 'Last-Minute Gift for Kids', fr: 'Cadeau de dernière minute pour enfants', it: 'Regalo dell\'ultimo minuto per bambini' },
@@ -1138,7 +1144,7 @@ function getMetaForRoute(routePath, lang) {
     : `${BASE_URL}${isRoot ? '/' : cleanPath}?lang=${lang}`;
 
   // Check noindex routes (prefix match for routes like /create/*)
-  const isNoindex = NOINDEX_ROUTES.some(nr => cleanPath === nr || cleanPath.startsWith(nr + '/'));
+  const isNoindex = [...NOINDEX_ROUTES, ...NOINDEX_CRAWLABLE_ROUTES].some(nr => cleanPath === nr || cleanPath.startsWith(nr + '/'));
 
   // 1. Static routes
   const staticMeta = STATIC_ROUTES[cleanPath];
@@ -1149,7 +1155,8 @@ function getMetaForRoute(routePath, lang) {
       canonical: canonicalUrl,
       path: cleanPath,
       noindex: isNoindex,
-      hreflang: buildHreflang(cleanPath),
+      // A noindex page claims no alternates (same as the app routes below).
+      hreflang: isNoindex ? [] : buildHreflang(cleanPath),
       jsonLd: [],
     };
 
@@ -1174,11 +1181,6 @@ function getMetaForRoute(routePath, lang) {
       meta.jsonLd = [
         buildProductJsonLd(lang),
         buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: lang === 'de' ? 'Preise' : lang === 'fr' ? 'Tarifs' : lang === 'it' ? 'Prezzi' : 'Pricing' }]),
-      ];
-    } else if (cleanPath === '/try') {
-      meta.jsonLd = [
-        buildHowToJsonLd(lang),
-        buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: lang === 'de' ? 'Gratis Geschichte erstellen' : lang === 'fr' ? 'Créer une histoire' : lang === 'it' ? 'Crea una storia gratis' : 'Create Your Story' }]),
       ];
     } else if (cleanPath === '/kinderbuch-erstellen') {
       // Same HowTo as /try — this is the indexable, content-bearing version of that
@@ -1237,13 +1239,7 @@ function getMetaForRoute(routePath, lang) {
     if (found) {
       const themeName = pickLang(found.theme, lang);
       const catName = pickLang(THEME_CATEGORIES[categoryId], lang) || categoryId;
-      const titleTemplate = lang === 'de'
-        ? `Personalisiertes ${themeName}-Kinderbuch | Magical Story`
-        : lang === 'fr'
-          ? `Livre personnalisé ${themeName} | Magical Story`
-          : lang === 'it'
-            ? `Libro personalizzato ${themeName} | Magical Story`
-            : `Personalized ${themeName} Story | Magical Story`;
+      const titleTemplate = buildThemeTitle(themeName, lang);
       return {
         title: titleTemplate,
         description: buildThemeDescription(themeName, lang),
@@ -1304,7 +1300,7 @@ function getMetaForRoute(routePath, lang) {
             : lang === 'en'
               ? `${title} — an honest comparison | Magical Story`
               : `${title} — Ehrlicher Vergleich | Magical Story`,
-        description: buildComparisonDescription(comp.name, lang),
+        description: comp.roundup ? buildRoundupDescription(title, lang) : buildComparisonDescription(comp.name, lang),
         canonical: canonicalUrl,
         path: cleanPath,
         noindex: false,
@@ -1480,6 +1476,29 @@ function buildCategoryDescription(catName, lang) {
   return pickLang(templates, lang);
 }
 
+// Theme page title: "<theme> – <product> | MagicalStory.ch". The theme name is a
+// free noun phrase ("Geheimer Ninja", "Cowboys und Indianer", "Christmas Story"),
+// so it must never be glued into a grammatical slot ("Personalisiertes X-Kinderbuch",
+// "Personalized X Story") - that is what produced the broken German titles found in
+// the 2026-11-09 SEO audit. The full brand "MagicalStory.ch" separates us from the
+// other "Magic Story" products. A long theme name drops to the short product word so
+// the title stays near the ~60 character display limit (62: fits Google in practice).
+const THEME_TITLE_PRODUCT = {
+  de: { full: 'personalisiertes Kinderbuch', short: 'Kinderbuch' },
+  fr: { full: 'livre personnalisé', short: 'livre' },
+  it: { full: 'libro personalizzato', short: 'libro' },
+  en: { full: 'personalized story book', short: 'story book' },
+};
+const THEME_TITLE_BRAND = 'MagicalStory.ch';
+const THEME_TITLE_MAX = 62;
+
+function buildThemeTitle(themeName, lang) {
+  const product = THEME_TITLE_PRODUCT[lang] || THEME_TITLE_PRODUCT.en;
+  const make = (p) => `${themeName} – ${p} | ${THEME_TITLE_BRAND}`;
+  const full = make(product.full);
+  return full.length <= THEME_TITLE_MAX ? full : make(product.short);
+}
+
 function buildThemeDescription(themeName, lang) {
   const templates = {
     de: `Erstelle ein personalisiertes ${themeName}-Kinderbuch mit dem Foto deines Kindes. KI-illustriert, einzigartig, ab CHF 29. Erste Geschichte gratis.`,
@@ -1516,6 +1535,20 @@ function buildComparisonDescription(competitorName, lang) {
     en: `Honest comparison: Magical Story vs ${competitorName}. Features, pricing, pros and cons. Find the best personalized children's book.`,
     fr: `Comparaison honnête : Magical Story vs ${competitorName}. Fonctionnalités, prix, avantages et inconvénients. Trouvez le meilleur livre personnalisé.`,
     it: `Confronto onesto: Magical Story vs ${competitorName}. Funzioni, prezzi, pro e contro. Trova il miglior libro personalizzato per bambini.`,
+  };
+  return pickLang(templates, lang);
+}
+
+// The two "beste-*" pages are roundups of several providers, not "Magical Story vs <one
+// competitor>": feeding their name into the vs template read "Magical Story vs Beste
+// KI-Generatoren" (Marketing audit 2026-11-09). They get their own sentence built from
+// the page title.
+function buildRoundupDescription(pageTitle, lang) {
+  const templates = {
+    de: `${pageTitle}: ehrlicher Vergleich der Anbieter mit Funktionen, Preisen sowie Vor- und Nachteilen, auch von Magical Story.`,
+    en: `${pageTitle}: an honest comparison of the providers with features, pricing, pros and cons, Magical Story included.`,
+    fr: `${pageTitle} : comparaison honnête des offres avec fonctionnalités, prix, avantages et inconvénients, Magical Story inclus.`,
+    it: `${pageTitle}: confronto onesto dei fornitori con funzioni, prezzi, pro e contro, Magical Story incluso.`,
   };
   return pickLang(templates, lang);
 }
@@ -1859,37 +1892,39 @@ function escapeAttr(str) {
 
 // ─── generateSitemap ──────────────────────────────────────────────────────────
 
+// Sitemap lastmod per URL set - see generateSitemap and scripts/admin/update-seo-lastmod.js.
+const SEO_LASTMOD = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/seo-lastmod.json'), 'utf-8'));
+
+/** Date (YYYY-MM-DD) of the set a route belongs to, or null when it belongs to none. */
+function lastmodForRoute(routePath) {
+  for (const set of Object.values(SEO_LASTMOD.sets)) {
+    for (const r of set.routes) {
+      if (r === routePath || (r.endsWith('/*') && routePath.startsWith(r.slice(0, -1)))) return set.lastmod || null;
+    }
+  }
+  return null;
+}
+
 /**
  * Generates a complete XML sitemap string.
  *
- * <lastmod> is the build time of the page's prerendered file (the German one;
- * all four languages are written in the same run), read from
- * `prerenderDir`. It used to be the current date on every request, which
- * told crawlers that all ~1400 URLs changed every day — a lastmod that is
- * always "now" carries no information and Google documents that it ignores
- * one that is consistently wrong. A URL without a prerendered file (/try is
- * the SPA wizard) gets no <lastmod> at all: nothing is known, nothing is claimed.
+ * <lastmod> comes from server/data/seo-lastmod.json: per URL set, the newest git
+ * commit date over the files holding that set's page content (scripts/admin/
+ * update-seo-lastmod.js). It used to be the mtime of the prerendered file - the
+ * build time, which in the Docker image is the deploy day for every URL (1396 of
+ * 1400 lastmods were "today" in the 2026-11-09 audit), and before that the request
+ * date. Google ignores a lastmod that is constant and wrong. A route that belongs
+ * to no set gets no <lastmod>: nothing is known, nothing is claimed.
  *
- * @param {{ prerenderDir: string }} opts - directory of the prerendered HTML
  * @returns {string} XML sitemap
  */
-function generateSitemap({ prerenderDir } = {}) {
-  if (!prerenderDir) throw new Error('generateSitemap: prerenderDir is required');
+function generateSitemap() {
   const paths = [];
-  const lastmodFor = (routePath) => {
-    const slug = routePath === '/' ? '/index' : routePath;
-    try {
-      return fs.statSync(path.join(prerenderDir, `${slug}.de.html`)).mtime.toISOString().split('T')[0];
-    } catch (err) {
-      if (err.code === 'ENOENT') return null;
-      throw err;
-    }
-  };
+  const lastmodFor = (routePath) => lastmodForRoute(routePath);
 
   // Priority mappings
   const staticPriorities = {
     '/': '1.0',
-    '/try': '0.9',
     '/pricing': '0.9',
     '/themes': '0.8',
     // '/geschichten-aus' hub removed — see the town-pages note below.
@@ -2058,4 +2093,4 @@ function escapeXml(str) {
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
-module.exports = { getMetaForRoute, injectMeta, renderSpaShell, isAppRoute, generateSitemap, preferredLangFromHeader, isCrawlerUserAgent, HTML_LANG, NOINDEX_ROUTES, APP_ROUTES, THEMES };
+module.exports = { lastmodForRoute, getMetaForRoute, injectMeta, renderSpaShell, isAppRoute, generateSitemap, preferredLangFromHeader, isCrawlerUserAgent, HTML_LANG, NOINDEX_ROUTES, APP_ROUTES, THEMES };

@@ -17,15 +17,16 @@ const routePaths = (src: string) =>
   [...src.matchAll(/<Route path="([^"]+)"/g)].map(m => m[1]).filter(p => p !== '*');
 
 describe('SPA shell: a route without a prerendered page gets its own meta', () => {
-  it('/try keeps its title, self-canonical and HowTo in every language', () => {
+  it('/try keeps its title and self-canonical in every language, but is noindex (0-word wizard, 2026-11-09)', () => {
     for (const lang of ['de', 'en', 'fr', 'it']) {
       const { html, status } = renderSpaShell(shell, '/try', lang);
       expect(status).toBe(200);
       const meta = getMetaForRoute('/try', lang);
       expect(html).toContain(`<title>${meta.title}</title>`);
       expect(html).toContain(`<link rel="canonical" href="${meta.canonical}" />`);
-      expect(html).toContain('"@type":"HowTo"');
-      expect(html).not.toContain('noindex');
+      expect(html).toContain('<meta name="robots" content="noindex, nofollow" />');
+      expect(html).not.toContain('hreflang=');
+      expect(html).not.toContain('"@type":"HowTo"');
     }
     // BASE_URL comes from the environment, so compare the path part only.
     expect(getMetaForRoute('/try', 'en').canonical).toMatch(/\/try\?lang=en$/);

@@ -1,0 +1,173 @@
+{
+  "_comment": "Sitemap <lastmod> per URL set. 'lastmod' = newest git commit date over 'sources' (page content of that set). Maintained by scripts/admin/update-seo-lastmod.js; read by generateSitemap. A route in no set gets NO lastmod. Per-set, not per-page: every page of a set shares its set's date. Shared chrome (Footer, Layout, seoMeta.js templates) is deliberately not a source, so a nav tweak does not claim every page changed. See docs/decisions.md 2026-11-09 sitemap lastmod.",
+  "sets": {
+    "home": {
+      "routes": [
+        "/"
+      ],
+      "sources": [
+        "client/src/pages/LandingPage.tsx"
+      ],
+      "lastmod": "2026-11-10"
+    },
+    "pricing": {
+      "routes": [
+        "/pricing"
+      ],
+      "sources": [
+        "client/src/pages/Pricing.tsx",
+        "client/src/constants/credits.ts"
+      ],
+      "lastmod": "2026-10-25"
+    },
+    "faq": {
+      "routes": [
+        "/faq"
+      ],
+      "sources": [
+        "client/src/pages/FAQ.tsx"
+      ],
+      "lastmod": "2026-11-03"
+    },
+    "about": {
+      "routes": [
+        "/about"
+      ],
+      "sources": [
+        "client/src/pages/About.tsx"
+      ],
+      "lastmod": "2026-10-05"
+    },
+    "contact": {
+      "routes": [
+        "/contact"
+      ],
+      "sources": [
+        "client/src/pages/Contact.tsx"
+      ],
+      "lastmod": "2026-10-05"
+    },
+    "terms": {
+      "routes": [
+        "/terms"
+      ],
+      "sources": [
+        "client/src/pages/TermsOfService.tsx"
+      ],
+      "lastmod": "2026-11-03"
+    },
+    "privacy": {
+      "routes": [
+        "/privacy"
+      ],
+      "sources": [
+        "client/src/pages/PrivacyPolicy.tsx"
+      ],
+      "lastmod": "2026-11-03"
+    },
+    "impressum": {
+      "routes": [
+        "/impressum"
+      ],
+      "sources": [
+        "client/src/pages/Impressum.tsx"
+      ],
+      "lastmod": "2026-11-03"
+    },
+    "science": {
+      "routes": [
+        "/science"
+      ],
+      "sources": [
+        "client/src/pages/Science.tsx"
+      ],
+      "lastmod": "2026-10-05"
+    },
+    "kinderbuch-erstellen": {
+      "routes": [
+        "/kinderbuch-erstellen"
+      ],
+      "sources": [
+        "client/src/pages/HowItWorks.tsx"
+      ],
+      "lastmod": "2026-11-03"
+    },
+    "themes": {
+      "routes": [
+        "/themes",
+        "/themes/*"
+      ],
+      "sources": [
+        "client/src/pages/Themes.tsx",
+        "client/src/pages/ThemeCategory.tsx",
+        "client/src/pages/ThemePage.tsx",
+        "client/src/constants/themeContent.ts",
+        "client/src/constants/themeContentAll.ts",
+        "client/src/constants/themeContent",
+        "client/src/constants/storyTypes.ts"
+      ],
+      "lastmod": "2026-11-07"
+    },
+    "stadt": {
+      "routes": [
+        "/stadt",
+        "/stadt/*"
+      ],
+      "sources": [
+        "client/src/pages/CityListing.tsx",
+        "client/src/pages/CityPage.tsx",
+        "server/data/swiss-cities.json"
+      ],
+      "lastmod": "2026-10-07"
+    },
+    "anlass": {
+      "routes": [
+        "/anlass",
+        "/anlass/*"
+      ],
+      "sources": [
+        "client/src/pages/Occasions.tsx",
+        "client/src/pages/OccasionPage.tsx",
+        "client/src/constants/occasionData.ts"
+      ],
+      "lastmod": "2026-10-07"
+    },
+    "geschenk": {
+      "routes": [
+        "/geschenk",
+        "/geschenk/*"
+      ],
+      "sources": [
+        "client/src/pages/GiftHub.tsx",
+        "client/src/pages/GiftPage.tsx",
+        "client/src/constants/giftData.ts",
+        "client/src/constants/giftOccasionPairs.ts"
+      ],
+      "lastmod": "2026-11-03"
+    },
+    "vergleich": {
+      "routes": [
+        "/vergleich",
+        "/vergleich/*"
+      ],
+      "sources": [
+        "client/src/pages/Comparisons.tsx",
+        "client/src/pages/ComparisonPage.tsx",
+        "client/src/constants/comparisonData.ts"
+      ],
+      "lastmod": "2026-11-03"
+    },
+    "ratgeber": {
+      "routes": [
+        "/ratgeber",
+        "/ratgeber/*"
+      ],
+      "sources": [
+        "client/src/pages/GuideHub.tsx",
+        "client/src/pages/GuidePage.tsx",
+        "client/src/constants/guideData.ts"
+      ],
+      "lastmod": "2026-10-07"
+    }
+  }
+}

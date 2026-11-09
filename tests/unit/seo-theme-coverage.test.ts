@@ -38,10 +38,10 @@ describe('every theme page the client renders has server meta (title, Product, s
     for (const route of ['/themes/adventure/princess', '/themes/adventure/mothers-day', '/themes/adventure/fathers-day', '/themes/educational/spelling-name']) {
       const meta = getMetaForRoute(route, 'de');
       expect(meta.noindex, route).toBe(false);
-      expect(meta.title).toMatch(/^Personalisiertes .+-Kinderbuch \| Magical Story$/);
+      expect(meta.title).toMatch(/^.+ – (personalisiertes )?Kinderbuch \| MagicalStory\.ch$/);
       expect(meta.jsonLd.map((j: { '@type': string }) => j['@type'])).toEqual(['Product', 'BreadcrumbList']);
     }
-    expect(getMetaForRoute('/themes/adventure/mothers-day', 'de').title).toBe('Personalisiertes Muttertags-Kinderbuch | Magical Story');
+    expect(getMetaForRoute('/themes/adventure/mothers-day', 'de').title).toBe('Muttertags – personalisiertes Kinderbuch | MagicalStory.ch');
     expect(getMetaForRoute('/themes/adventure/custom', 'de').noindex).toBe(true);
     // The French theme title must not collide with the occasion page's
     // ("Livre personnalisé fête des mères" is /anlass/muttertag).

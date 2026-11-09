@@ -12,6 +12,8 @@ const sectionTranslations = {
     // Section 1: Characters
     step1: 'Step 1',
     createCharacters: 'Create Your Characters',
+    yourPicture: 'Your Picture',
+    yourCharacter: 'Your Character',
     createCharactersDesc: 'Upload photos of your family and watch them appear as illustrated characters throughout the story. Each character keeps their unique look on every page.',
     addFamily: 'Add your whole family – children, parents, grandparents, or friends',
     defineNames: 'Define names, ages, and relationships between characters',
@@ -73,6 +75,8 @@ const sectionTranslations = {
     // Section 1: Characters
     step1: 'Schritt 1',
     createCharacters: 'Erstelle deine Charaktere',
+    yourPicture: 'Dein Foto',
+    yourCharacter: 'Dein Charakter',
     createCharactersDesc: 'Lade Fotos deiner Familie hoch und sieh sie als illustrierte Figuren in der ganzen Geschichte. Jede Figur behält ihr einzigartiges Aussehen auf jeder Seite.',
     addFamily: 'Füge deine ganze Familie hinzu – Kinder, Eltern, Grosseltern oder Freunde',
     defineNames: 'Definiere Namen, Alter und Beziehungen zwischen den Charakteren',
@@ -134,6 +138,8 @@ const sectionTranslations = {
     // Section 1: Characters
     step1: 'Étape 1',
     createCharacters: 'Créez vos personnages',
+    yourPicture: 'Votre photo',
+    yourCharacter: 'Votre personnage',
     createCharactersDesc: "Importez des photos de votre famille et retrouvez-les comme personnages illustrés tout au long de l'histoire. Chaque personnage garde son apparence unique sur chaque page.",
     addFamily: 'Ajoutez toute votre famille – les enfants, parents, grands-parents ou amis',
     defineNames: 'Définissez les noms, âges et relations entre les personnages',
@@ -195,6 +201,8 @@ const sectionTranslations = {
     // Section 1: Characters
     step1: 'Passo 1',
     createCharacters: 'Crea i tuoi personaggi',
+    yourPicture: 'La tua foto',
+    yourCharacter: 'Il tuo personaggio',
     createCharactersDesc: 'Carica le foto della tua famiglia e ritrovali come personaggi illustrati per tutta la storia. Ogni personaggio mantiene il suo aspetto unico in ogni pagina.',
     addFamily: 'Aggiungi tutta la famiglia – bambini, genitori, nonni o amici',
     defineNames: 'Definisci nomi, età e relazioni tra i personaggi',
@@ -465,32 +473,32 @@ export default function LandingPage() {
                 {/* Real Photo */}
                 <div className="text-center">
                   <div className="mb-1 lg:mb-2">
-                    <img src="/images/Real person.webp" alt="Your Picture" width="360" height="433" fetchPriority="high" decoding="async" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
+                    <img src="/images/Real person.webp" alt={st.yourPicture} width="360" height="433" fetchPriority="high" decoding="async" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
                   </div>
                   <p className="text-xs lg:text-base text-black font-semibold">
-                    {language === 'de' ? 'Dein Foto' : language === 'fr' ? 'Votre photo' : language === 'it' ? 'La tua foto' : 'Your Picture'}
+                    {st.yourPicture}
                   </p>
                 </div>
 
                 {/* Arrow Down */}
                 <div className="flex justify-center my-1 lg:my-2">
-                  <img src="/images/arrow-icon-1162.png" alt="Arrow Down" width="128" height="128" decoding="async" className="w-6 h-6 lg:w-12 lg:h-12" style={{transform: 'rotate(90deg)'}} />
+                  <img src="/images/arrow-icon-1162.png" alt="" aria-hidden="true" width="128" height="128" decoding="async" className="w-6 h-6 lg:w-12 lg:h-12" style={{transform: 'rotate(90deg)'}} />
                 </div>
 
                 {/* Avatar */}
                 <div className="text-center">
                   <div className="mb-1 lg:mb-2">
-                    <img src="/images/Avatar.webp" alt="Your Character" width="360" height="360" fetchPriority="high" decoding="async" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
+                    <img src="/images/Avatar.webp" alt={st.yourCharacter} width="360" height="360" fetchPriority="high" decoding="async" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
                   </div>
                   <p className="text-xs lg:text-base text-black font-semibold">
-                    {language === 'de' ? 'Dein Charakter' : language === 'fr' ? 'Votre personnage' : language === 'it' ? 'Il tuo personaggio' : 'Your Character'}
+                    {st.yourCharacter}
                   </p>
                 </div>
               </div>
 
               {/* Arrow Right - Hidden on mobile */}
               <div className="hidden lg:flex justify-center items-center lg:w-[8%] self-center">
-                <img src="/images/arrow-icon-1162.png" alt="Arrow Right" width="128" height="128" decoding="async" className="w-14 h-14 lg:w-16 lg:h-16" />
+                <img src="/images/arrow-icon-1162.png" alt="" aria-hidden="true" width="128" height="128" decoding="async" className="w-14 h-14 lg:w-16 lg:h-16" />
               </div>
 
               {/* Video Column */}
