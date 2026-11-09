@@ -4676,8 +4676,9 @@
       "title": "An emoji in the customer dedication is printed as an empty box on the dedication page (font has no emoji glyph)",
       "reportedAt": "2026-11-09",
       "source": "Reproduced from stored prod data: job_1794231161354_l3n2o3afm, dedication ends with U+2764 U+FE0F (red heart); the stored initialPage image shows a hollow square in its place.",
-      "rootCause": "Not yet traced: the dedication text renderer draws the string with a font that has no emoji glyph.",
-      "status": "open"
+      "rootCause": "coverTypography.js FONT_FILES held only lettering fonts without emoji glyphs and loadSystemFonts is false, so resvg drew the missing-glyph box. Fixed by bundling Noto Emoji as the fallback font.",
+      "status": "fixed",
+      "fixedIn": "01c8ddd85"
     }
   ]
 }
