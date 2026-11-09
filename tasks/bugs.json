@@ -4721,8 +4721,9 @@
       "title": "A Christmas story written in November is drawn in autumn: the SEASON line says Autumn on every page while the text is set on 23-24 December, so the pages show orange autumn trees and fallen leaves on the snow",
       "reportedAt": "2026-11-09",
       "source": "Prod job_1793736454070_0ir5y6hlh (Lia und der verschwundene Weihnachtsstern, made 2026-11-03): stories.data.season = autumn, storyTheme christmas; every page prompt carries **SEASON:** Autumn; pages 3-9, 19, cover and back cover show autumn foliage under snow.",
-      "rootCause": "server/lib/season.js resolves the season from the request or the creation date; neither the theme nor the date the story itself is set on overrides it. How to fix (theme implies winter, or the story date decides) is an owner decision; not asked yet.",
-      "status": "open"
+      "rootCause": "server/lib/season.js resolves the season from the request or the creation date; neither the theme nor the date the story itself is set on overrides it. How to fix (theme implies winter, or the story date decides) is an owner decision; not asked yet. FIXED 2026-11-09: owner chose the story's own date; Jev (full) / typed planner section (trial) decide the season, season.applyStorySeason applies it (docs/decisions.md 2026-11-09).",
+      "status": "fixed",
+      "fixedIn": "2c426a026"
     }
   ]
 }
