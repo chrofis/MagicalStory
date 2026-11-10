@@ -4763,7 +4763,8 @@
       "reportedAt": "2026-11-10",
       "source": "Prod stories with data={} : 8 rows; 3 for one customer (vi***@gmail.com) from 2026-11-01 (job_1793545525778_vccdez10p, job_1793560136987_ohe71lhr4, job_1793560620937_jgraekouh), all with story_jobs.status=cancelled. GET /api/stories excludes only pending/processing jobs (server/routes/stories.js ~146), so these rows are listed with metadata {}.",
       "rootCause": "ensureStoryRow (server/services/database.js ~2704) creates the row at job start so images have a parent; nothing removes it when the job ends cancelled/failed with no content, and the library filter only hides running jobs.",
-      "status": "open"
+      "status": "fixed",
+      "fixedIn": "1ed7e750d"
     }
   ]
 }
