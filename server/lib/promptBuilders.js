@@ -10511,6 +10511,10 @@ const EXPRESSION_FIELD_RULE = "Every foreground or midground character carries `
  * by default", which documented the silent default as if it were a feature and
  * gave the author a reason to leave rows out.
  */
+// The trial costume is fixed and its avatar already draws every piece; a second item the writer invents for the
+// same body slot is overridden by the avatar and the story beat then contradicts the picture (prod trials
+// 9v3igrbnb, 37p11sdnm, gr4cnr0u8). Owner decision 2026-11-10 "Story uses the costume"; docs/decisions.md.
+const COSTUME_IS_THE_STORY_ITEM_RULE = "**The costume is the story's wardrobe.** The `costumed` line above lists every piece the character already wears, and the illustration draws exactly those. Any garment or worn item the story uses (put on, taken off, lost, found, swapped, handed over) that sits on a body part where the costume has a piece IS that costume piece, named as the costume names it; its Visual Bible entry (`wornAs`) and its `wornItems[]` rows describe that costume piece. Never invent a second item for a body part the costume covers, and never write an item the costume line rules out (a costume with a bare head has no hat or helmet).";
 const WORN_ITEMS_ROW_RULE = "one row for every Visual Bible element that is a garment of a character on this page, whether or not the page mentions it: any element with a `wornAs` link, and any `clothing` or `artifacts` element whose `wornBy` names a character or whose `type` is an outfit slot. `{id, owner, state, location, wearer, redressNote}`: `owner` is the `wornAs` owner or the `wornBy` character, `state` is `\"worn\"` or `\"off\"`, and `off` requires both `location`, a short phrase naming where it now lies or who holds it, and `redressNote`, the wardrobe instruction of the garment-removal rule, and `keptGarments`, the list of garments that stay on, as that rule describes. `wearer` is set only when another character on this page wears the item instead of its owner, and then `state` is `\"worn\"`. The prose must agree with the row. A garment given a row on one page and left out on another has no state on that page, and that is reported back as a fault. A row refers to the outfit of the character's clothing category on this page: on a `nightwear` page that outfit is the pyjamas, and a garment of the day outfit is not on the page.";
 
 /**
@@ -13734,7 +13738,9 @@ The main character has two avatar styles available:
 
 **IMPORTANT**: The MAJORITY of scenes (at least ${costumedMin} out of ${pageCount}) MUST use \`costumed\` for the main character's clothing in scene hints. Use \`standard\` only for 1-${standardMax} scenes where it makes narrative sense (e.g., the opening pages before the character puts the costume on, or a brief real-world moment).
 
-**Self-check before the output:** for every page whose main-character \`clothing\` differs from the page before, the text of that page shows the change as an action (putting on, taking off, being dressed); a page 1 marked \`standard\` has the character in everyday clothes in its text, and a page 1 whose text has the character in role is marked \`costumed\`.${nightwear ? `\n- \`nightwear\` — ${nightwear.description}` : ''}`;
+**Self-check before the output:** for every page whose main-character \`clothing\` differs from the page before, the text of that page shows the change as an action (putting on, taking off, being dressed); a page 1 marked \`standard\` has the character in everyday clothes in its text, and a page 1 whose text has the character in role is marked \`costumed\`.
+
+${COSTUME_IS_THE_STORY_ITEM_RULE}${nightwear ? `\n- \`nightwear\` — ${nightwear.description}` : ''}`;
     } else if (nightwear) {
       avatarSelection = `# Avatar Selection
 The main character has two avatar styles available:
@@ -14809,6 +14815,7 @@ module.exports = {
   CREATURE_FEATURES_RULE,
   GARMENT_REMOVED_RULE,
   WORN_ITEMS_ROW_RULE,
+  COSTUME_IS_THE_STORY_ITEM_RULE,
   WORN_ON_OTHER_RULE,
   OUTFIT_ONLY_RULE,
   ACTION_DIRECTION_RULE,
