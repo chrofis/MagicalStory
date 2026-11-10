@@ -4725,6 +4725,22 @@
       "rootCause": "server/lib/season.js resolves the season from the request or the creation date; neither the theme nor the date the story itself is set on overrides it. How to fix (theme implies winter, or the story date decides) is an owner decision; not asked yet. FIXED 2026-11-09: owner chose the story's own date; Jev (full) / typed planner section (trial) decide the season, season.applyStorySeason applies it (docs/decisions.md 2026-11-09).",
       "status": "fixed",
       "fixedIn": "2c426a026"
+    },
+    {
+      "id": "change-title-dead-on-baked-front-covers",
+      "title": "\"Change title\" (Titel ändern) never changes the front cover: every repaint is refused with \"no textless art layer\" and refunded, so the cover keeps the old painted title",
+      "reportedAt": "2026-11-10",
+      "source": "Prod credit ledger: all 4 title_repaint charges ever made on production were refunded with \"Refund: title repaint not painted\" (3 by one customer on job_1794060455874_w2sbl0o0s, 2026-11-09/10, who then paid for 5 cover edits and a cover regeneration). story_images on prod: last frontCoverArt row 2026-09-03; 0 of 37 stories made in the last 30 days have one.",
+      "rootCause": "Front covers are model-baked since 2026-09-06 (SETTLED: coverTitleMode baked; decisions.md 2026-09-03 says a baked cover gets NO frontCoverArt row). PUT /:id/title restamp and POST /:id/repaint-title (paintServedCoverTitle) both need that textless layer, so on a baked cover the title edit leaves the cover unchanged and the repaint always returns painted:false. The repaint path was never moved to the baked mode. Fix shape is an owner decision (not asked yet).",
+      "status": "open"
+    },
+    {
+      "id": "worn-item-lost-in-story-still-worn-in-prompt",
+      "title": "A worn item the story loses (the child's unicorn headband slips off and is searched for) is still drawn on the child's head: every page prompt says \"IS wearing this on this page\"",
+      "reportedAt": "2026-11-10",
+      "source": "Prod trial job_1794301299055_9v3igrbnb (Lina und das kleine Einhorn, 2026-11-10): VB ART002 has one state \"unaltered\" pages 1-6 and no lost/hidden state; pages 2-4 text: the horn slips off and disappears under cushions, Lina searches and cries; the image prompts of pages 2, 3, 4 all carry WORN ITEMS ON THIS PAGE: Lina IS wearing this on this page: toy unicorn headband with horn; images p3/p4 show the horn on her head.",
+      "rootCause": "Not traced yet: the Visual Bible writer gives the worn item no state for the pages where it is off, and the worn-item lookup (server/lib/wornItems.js ~1094-1114) then pins it as worn on every page. Which layer owns the fix is open.",
+      "status": "open"
     }
   ]
 }
