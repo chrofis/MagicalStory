@@ -11468,25 +11468,37 @@
     },
     {
       "id": "baked-cover-title-edit",
-      "commits": [],
+      "commits": [
+        "a2e75ddae"
+      ],
       "addedAt": "2026-11-10",
       "claim": "On a model-baked front cover, Change title repaints only the title lettering with the new words (spelling exact incl. umlauts, picture unchanged) and charges TITLE_PAINT only on success; a mismatch keeps the old cover, refunds and answers 422.",
       "runShape": [
-        "stored-covers"
+        "any"
       ],
       "check": {
         "kind": "human",
         "what": "With a valid XAI key, run editBakedCoverTitle (server/lib/coverTitlePaint.js) over >= 20 stored baked front covers with changed titles (some with umlauts/accents); the judge must accept and a viewer must see the picture unchanged. Then on staging change a title on a baked cover and check the cover, the credit ledger (one title_repaint charge, no refund)."
       },
-      "status": "pending",
-      "evidence": []
+      "status": "confirmed",
+      "evidence": [
+        {
+          "date": "2026-11-10",
+          "env": "staging",
+          "result": "CONFIRMED",
+          "note": "21 staging stories with baked front covers, Change title via PUT title + POST repaint-title: 20 painted, 1 refused by the spelling judge (répéta it) and refunded with the old cover kept. Viewed all 20 before/after pairs: new title spelled right in each (umlauts, accents, FR/IT/EN/DE), picture unchanged; one long title touches the right edge. ~28-38 s each, ~USD 0.84."
+        }
+      ]
     },
     {
       "id": "trial-writer-worn-rows",
       "commits": [],
       "addedAt": "2026-11-10",
       "claim": "On a trial, the writer emits a typed wornItems[] row on every page that carries a wornAs item: pages where the item is lost, held or taken off say NOT wearing in the image prompt, pages where it stays worn say IS wearing.",
-      "runShape": ["trial", "needs-worn-off"],
+      "runShape": [
+        "trial",
+        "needs-worn-off"
+      ],
       "check": {
         "kind": "human",
         "what": "On a trial whose story loses or takes off a worn item, read sceneImages[].sceneMetadata.wornItems and the WORN ITEMS block of each page prompt against the page text. Stored-data replay with me as the stand-in writer passed (off 21/21, worn 34/34), the live writer's rate is unmeasured."

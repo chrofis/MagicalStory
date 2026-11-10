@@ -4731,8 +4731,9 @@
       "title": "\"Change title\" (Titel ändern) never changes the front cover: every repaint is refused with \"no textless art layer\" and refunded, so the cover keeps the old painted title",
       "reportedAt": "2026-11-10",
       "source": "Prod credit ledger: all 4 title_repaint charges ever made on production were refunded with \"Refund: title repaint not painted\" (3 by one customer on job_1794060455874_w2sbl0o0s, 2026-11-09/10, who then paid for 5 cover edits and a cover regeneration). story_images on prod: last frontCoverArt row 2026-09-03; 0 of 37 stories made in the last 30 days have one.",
-      "rootCause": "Front covers are model-baked since 2026-09-06 (SETTLED: coverTitleMode baked; decisions.md 2026-09-03 says a baked cover gets NO frontCoverArt row). PUT /:id/title restamp and POST /:id/repaint-title (paintServedCoverTitle) both need that textless layer, so on a baked cover the title edit leaves the cover unchanged and the repaint always returns painted:false. The repaint path was never moved to the baked mode. Fix shape is an owner decision (not asked yet).",
-      "status": "open"
+      "rootCause": "Front covers are model-baked since 2026-09-06 (SETTLED: coverTitleMode baked; decisions.md 2026-09-03 says a baked cover gets NO frontCoverArt row). PUT /:id/title restamp and POST /:id/repaint-title (paintServedCoverTitle) both need that textless layer, so on a baked cover the title edit leaves the cover unchanged and the repaint always returns painted:false. The repaint path was never moved to the baked mode. Fix shape is an owner decision (not asked yet). FIXED 2026-11-10: owner chose edit only the lettering; one Grok edit of the served cover + existing spelling judge (20/21 painted on staging, 1 correctly refused).",
+      "status": "fixed",
+      "fixedIn": "a2e75ddae"
     },
     {
       "id": "worn-item-lost-in-story-still-worn-in-prompt",
