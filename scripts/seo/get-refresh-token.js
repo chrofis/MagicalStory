@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * One-time: mint a refresh token for the Search Console API
- * (webmasters.readonly) using the same OAuth client as scripts/ads.
+ * (webmasters, read + sitemap submit) using the same OAuth client as scripts/ads.
  * The Ads refresh token is NOT touched — this writes a separate token to
  * scripts/seo/config.json.
  *
@@ -16,7 +16,8 @@ const path = require('path');
 const adsCfg = require('../ads/config.json');
 const PORT = 8765;
 const REDIRECT = `http://localhost:${PORT}/oauth2callback`;
-const SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly';
+// Full scope (not .readonly): sitemap submission needs write access; reporting works with it too.
+const SCOPE = 'https://www.googleapis.com/auth/webmasters';
 const OUT = path.join(__dirname, 'config.json');
 
 const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
