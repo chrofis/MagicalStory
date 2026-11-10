@@ -257,6 +257,9 @@ async function loadPromptTemplates() {
     // Square book (mini / facing pages): each portrait cover is redrawn square with ONE Grok edit
     // (server/lib/squareCovers.js, decisions.md 2026-10-28). Plain text, no placeholders.
     ['squareCover', 'square-cover.txt'],
+    // Change title on a model-baked front cover: ONE Grok edit of the served cover that repaints only the
+    // title lettering ({TITLE}); server/lib/coverTitlePaint.js editBakedCoverTitle, decisions.md 2026-11-10.
+    ['coverTitleEdit', 'cover-title-edit.txt'],
     // The cover CRITIC's three notes — the cover-only preamble evaluateImageQuality
     // prepends to the evaluator prompt. String literals in evalPipeline.js until
     // 2026-09-15; a template file so the generator/critic sibling set can name a

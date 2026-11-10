@@ -11465,6 +11465,21 @@
         "kind": "human",
         "what": "Generate (staging, 4 pages) a story whose premise has an unnamed animal and a group of three alike (three monsters, three guards); read stories.data.visualBible (name is a role noun or the story name, count 3 on the group, one entry), the Jev vb scores for the group on the pages whose plan names them (>= bar, cell attached), and look at the pages: three members, one look each, matching the reference cell."
       }
+    },
+    {
+      "id": "baked-cover-title-edit",
+      "commits": [],
+      "addedAt": "2026-11-10",
+      "claim": "On a model-baked front cover, Change title repaints only the title lettering with the new words (spelling exact incl. umlauts, picture unchanged) and charges TITLE_PAINT only on success; a mismatch keeps the old cover, refunds and answers 422.",
+      "runShape": [
+        "stored-covers"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "With a valid XAI key, run editBakedCoverTitle (server/lib/coverTitlePaint.js) over >= 20 stored baked front covers with changed titles (some with umlauts/accents); the judge must accept and a viewer must see the picture unchanged. Then on staging change a title on a baked cover and check the cover, the credit ledger (one title_repaint charge, no refund)."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

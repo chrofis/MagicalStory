@@ -272,6 +272,13 @@
   <td>Slot 0 = the portrait cover, <code>padInputWithExtension: true</code> (magenta padding plus the extension instruction), <code>aspectRatio: '1:1'</code>, prompt <code>prompts/square-cover.txt</code>. Plain white <code>padInput</code> is never used here (white bars survived in 10 of 16 back/dedication covers).</td>
   <td>Square JPEG in R2 (<code>stories/{id}/squareCover/{cover}-{source hash}.jpg</code>), validated: square, no edge band over 20% white or holding magenta. Measured 23/24 clean. Failure throws; no crop fallback. decisions.md 2026-10-28.</td>
 </tr>
+<tr>
+  <td><code>editBakedCoverTitle(coverBuffer, title)</code> (call site of <code>editWithGrok</code>)</td>
+  <td><code>server/lib/coverTitlePaint.js</code>; reached from <code>paintServedCoverTitle</code> (<code>POST /api/stories/:id/repaint-title</code>) when the front cover has no <code>frontCoverArt</code> row and <code>resolveCoverTitleMode</code> says baked</td>
+  <td>Grok edit on <code>runtime('coverTitleBakedModel')</code> (Imagine 2.0, $0.04), one call per title change; TITLE_PAINT credits only on success.</td>
+  <td>Slot 0 = the served cover (already the cover aspect), prompt <code>prompts/cover-title-edit.txt</code> repaints only the title lettering.</td>
+  <td>Judged by <code>verifyTitleRender</code>; a match is saved as the active cover version in place, a mismatch or failure keeps the old cover (422, refund). decisions.md 2026-11-10. Live spelling rate not yet measured (no valid xAI key at build time).</td>
+</tr>
 </tbody>
 </table>
 

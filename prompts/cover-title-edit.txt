@@ -1,0 +1,5 @@
+This is a finished children's book cover. Change only the title lettering on it. Replace the words of the title with the new title below, and keep everything else exactly as it is: the illustration, the characters, the colours, the framing and every other element stay unchanged, pixel for pixel where possible.
+The new title reads exactly:
+{TITLE}
+Every word appears once, spelled letter for letter as written, with every accent and umlaut. Letter it in the same style, colour, material and size as the title that is on the cover now, in the same place on the cover; break it into lines the way the old title was where the words allow it, and make the lettering smaller if the new words need the room, so no letter touches an edge or is cut off.
+Remove every trace of the old title words. Do not add any other text, logo, frame or border, and do not leave a second copy of the title.

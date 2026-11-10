@@ -3720,7 +3720,10 @@ router.put('/:id/title', authenticateToken, async (req, res) => {
       coverImage = restamped.imageData;
       console.log(`🅰️ Front cover re-stamped with new title (v${restamped.versionIndex})`);
     } catch (e) {
-      console.warn(`⚠️ Front cover restamp skipped: ${e.message}`);
+      // A model-baked cover has no textless layer by design (NO_ART_LAYER): the lettering is
+      // changed by POST /repaint-title (decisions.md 2026-11-10), so this is not a warning.
+      if (e.code === 'NO_ART_LAYER') console.log(`ℹ️ Front cover has no textless layer (baked title) — lettering changes via repaint-title`);
+      else console.warn(`⚠️ Front cover restamp skipped: ${e.message}`);
     }
 
     // The restamp above put the FLAT title back, so any previously painted title

@@ -462,4 +462,44 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   }
 }
 
-module.exports = { paintCoverTitle, PLATE_PROMPT, titleEvalCropRect, verifyTitleRender };
+/**
+ * Change the title of a MODEL-BAKED front cover (no textless art layer exists):
+ * ONE Grok edit of the current served cover that repaints only the lettering,
+ * then the existing judge (verifyTitleRender) reads the result against the new
+ * title. A mismatch or a model failure returns ok:false and the caller keeps
+ * the old cover. Owner decision 2026-11-10, decisions.md.
+ *
+ * @param {Buffer} coverBuffer  the served front cover
+ * @param {string} title        the new title
+ * @param {Object} [deps]       test seam: { editWithGrok, verifyTitleRender }
+ * @returns {Promise<{ok:boolean, imageData?:string, reason?:string, problem?:string, raw?:string}>}
+ */
+async function editBakedCoverTitle(coverBuffer, title, deps = {}) {
+  const { PROMPT_TEMPLATES, fillTemplate, guardPromptString: guard } = require('../services/prompts');
+  const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
+  const { resolveCoverTitleMode } = require('./coverTypography');
+  const edit = deps.editWithGrok || require('./grok').editWithGrok;
+  const verify = deps.verifyTitleRender || verifyTitleRender;
+  const t = String(title || '').trim();
+  if (!t) return { ok: false, reason: 'no title' };
+  const mode = resolveCoverTitleMode('frontCover', t);
+  if (!mode.baked) return { ok: false, reason: 'cover title mode is not baked' };
+  const template = PROMPT_TEMPLATES.coverTitleEdit;
+  if (!template) throw new Error('prompt template coverTitleEdit is not loaded');
+  const prompt = guard(fillTemplate(template, { TITLE: t }), 'editBakedCoverTitle');
+  const modelId = IMAGE_MODELS[mode.bakedModel]?.modelId;
+  if (!modelId) throw new Error(`baked cover model "${mode.bakedModel}" has no modelId`);
+  // The input already has the cover aspect, so Grok's output keeps it; default crop
+  // only corrects a drifted output (full-frame artwork caller, see grok.js).
+  const res = await edit(prompt, [`data:image/jpeg;base64,${coverBuffer.toString('base64')}`],
+    { model: modelId, aspectRatio: MODEL_DEFAULTS.coverAspect, resolution: '1k' });
+  if (!res?.imageData) return { ok: false, reason: 'grok returned no image' };
+  const verdict = await verify(res.imageData, t);
+  if (!verdict.matches) {
+    log.warn(`🅰️ [TITLE EDIT] judge rejected the edited cover: ${verdict.problem}`);
+    return { ok: false, reason: `eval: ${verdict.problem || 'title does not match'}`, problem: verdict.problem, raw: res.imageData };
+  }
+  return { ok: true, imageData: res.imageData };
+}
+
+module.exports = { paintCoverTitle, editBakedCoverTitle, PLATE_PROMPT, titleEvalCropRect, verifyTitleRender };

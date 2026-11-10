@@ -980,6 +980,31 @@ async function restampServedCover(storyId, storyData, coverKey, { style } = {}) 
 }
 
 
+// editServedBakedCoverTitle — Change title on a model-baked front cover (no art layer): one Grok edit
+// of the served cover repaints only the lettering (coverTitlePaint.editBakedCoverTitle), judged against
+// the new title. Saves the result as the ACTIVE version in place, exactly like the composited path.
+// Any failure or mismatch keeps the old cover: { painted:false, reason }.
+async function editServedBakedCoverTitle(storyId, storyData, { coverKey, activeIdx, title }) {
+  const { log } = require('../utils/logger');
+  const { dbQuery, saveStoryImage } = require('../services/database');
+  const r2 = require('./r2');
+  const { editBakedCoverTitle } = require('./coverTitlePaint');
+  const rows = await dbQuery(
+    "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND version_index=$3 AND NOT is_test LIMIT 1",
+    [storyId, coverKey, activeIdx]);
+  const src = rows[0]?.image_url || (rows[0]?.image_data ? 'data:image/jpeg;base64,' + rows[0].image_data.toString('base64') : null);
+  const bytes = src ? await r2.bytesFromAnyImage(src) : null;
+  if (!bytes) return { painted: false, reason: 'could not resolve the served cover bytes' };
+  const res = await editBakedCoverTitle(bytes, title);
+  if (!res.ok) {
+    log.info(`🅰️ [TITLE EDIT] ${coverKey}: kept the old cover (${res.reason})`);
+    return { painted: false, reason: res.reason };
+  }
+  await saveStoryImage(storyId, coverKey, null, res.imageData, { versionIndex: activeIdx, cacheBust: true, preserveScore: true });
+  log.info(`🅰️ [TITLE EDIT] ${coverKey}: new title lettered onto the baked cover (v${activeIdx})`);
+  return { painted: true, imageData: res.imageData };
+}
+
 // ---------------------------------------------------------------------------
 // paintServedCoverTitle — replace the SERVED front cover's flat title with a
 // painted one (server/lib/coverTitlePaint.js). Reads the textless ${key}Art row,
@@ -1002,7 +1027,12 @@ async function paintServedCoverTitle(storyId, storyData, { coverKey = 'frontCove
     const artRows = await dbQuery(
       "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND NOT is_test ORDER BY (version_index = $3) DESC, version_index DESC",
       [storyId, `${coverKey}Art`, activeIdx]);
-    if (!artRows[0]) return { painted: false, reason: 'no textless art layer' };
+    if (!artRows[0]) {
+      // No textless layer = a MODEL-BAKED cover (decisions.md 2026-11-10): edit the lettering
+      // of the served cover itself. One resolver (resolveCoverTitleMode) says whether that is legal.
+      if (resolveCoverTitleMode(coverKey, title).baked) return await editServedBakedCoverTitle(storyId, storyData, { coverKey, activeIdx, title });
+      return { painted: false, reason: 'no textless art layer' };
+    }
     const src = artRows[0].image_url || (artRows[0].image_data ? 'data:image/jpeg;base64,' + artRows[0].image_data.toString('base64') : null);
     const bytes = await r2.bytesFromAnyImage(src);
     if (!bytes) return { painted: false, reason: 'could not resolve art bytes' };
