@@ -4740,7 +4740,10 @@
       "reportedAt": "2026-11-10",
       "source": "Prod trial job_1794301299055_9v3igrbnb (Lina und das kleine Einhorn, 2026-11-10): VB ART002 has one state \"unaltered\" pages 1-6 and no lost/hidden state; pages 2-4 text: the horn slips off and disappears under cushions, Lina searches and cries; the image prompts of pages 2, 3, 4 all carry WORN ITEMS ON THIS PAGE: Lina IS wearing this on this page: toy unicorn headband with horn; images p3/p4 show the horn on her head.",
       "rootCause": "Trial writer (story-trial-pages.txt) has no typed wornItems row, so every trial page defaults to worn; full path has the row (WORN_ITEMS_ROW_RULE). Measured 2026-11-10: 5 of 9 prod trials with a worn item wrong on ~15 of 54 pages; full path 2 of 25. Fix: trial writer writes the same rows.",
-      "status": "open"
+      "status": "fixed",
+      "fixedAt": "2026-11-10",
+      "fixedIn": "2ce99a2fb",
+      "fix": "The trial writer now writes the typed wornItems[] row (story-trial-pages.txt carries WORN_ITEMS_ROW and GARMENT_REMOVED from the same constants as the Art Director). Test: tests/unit/worn-rows-trial-and-regen-2026-11-10.test.ts; stored replay off 0/21 -> 21/21, worn 34/34 (docs/decisions.md 2026-11-10)."
     },
     {
       "id": "regeneration-drops-worn-item-rows",
@@ -4748,7 +4751,10 @@
       "reportedAt": "2026-11-10",
       "source": "Prod job_1794060455874_w2sbl0o0s p10: original and edit versions carry NOT wearing; the two later regeneration versions carry IS wearing. sceneImages[p10].sceneMetadata holds the off row; sceneDescriptions[p10].wornItems is [].",
       "rootCause": "The regeneration path builds the worn block from sceneDescriptions (no rows) instead of the scene metadata the generation path reads (wornItemsFromMetadata).",
-      "status": "open"
+      "status": "fixed",
+      "fixedAt": "2026-11-10",
+      "fixedIn": "2ce99a2fb",
+      "fix": "wornItems.carryWornRowsIntoBrief carries the page's stored sceneMetadata rows into the brief text in regenerate (image and scene), iterate, Test Lab and style lab. Test: tests/unit/worn-rows-trial-and-regen-2026-11-10.test.ts; stored replay on 339 pages, off pages 96/103 -> 103/103."
     }
   ]
 }
