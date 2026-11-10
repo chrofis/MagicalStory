@@ -1547,7 +1547,7 @@ function buildRoundupDescription(pageTitle, lang) {
   const templates = {
     de: `${pageTitle}: ehrlicher Vergleich der Anbieter mit Funktionen, Preisen sowie Vor- und Nachteilen, auch von Magical Story.`,
     en: `${pageTitle}: an honest comparison of the providers with features, pricing, pros and cons, Magical Story included.`,
-    fr: `${pageTitle} : comparaison honnête des offres avec fonctionnalités, prix, avantages et inconvénients, Magical Story inclus.`,
+    fr: `${pageTitle} : comparaison honnête des offres avec fonctionnalités, prix, avantages et inconvénients, Magical Story inclus.`,
     it: `${pageTitle}: confronto onesto dei fornitori con funzioni, prezzi, pro e contro, Magical Story incluso.`,
   };
   return pickLang(templates, lang);
