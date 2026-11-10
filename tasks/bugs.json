@@ -4739,7 +4739,15 @@
       "title": "A worn item the story loses (the child's unicorn headband slips off and is searched for) is still drawn on the child's head: every page prompt says \"IS wearing this on this page\"",
       "reportedAt": "2026-11-10",
       "source": "Prod trial job_1794301299055_9v3igrbnb (Lina und das kleine Einhorn, 2026-11-10): VB ART002 has one state \"unaltered\" pages 1-6 and no lost/hidden state; pages 2-4 text: the horn slips off and disappears under cushions, Lina searches and cries; the image prompts of pages 2, 3, 4 all carry WORN ITEMS ON THIS PAGE: Lina IS wearing this on this page: toy unicorn headband with horn; images p3/p4 show the horn on her head.",
-      "rootCause": "Not traced yet: the Visual Bible writer gives the worn item no state for the pages where it is off, and the worn-item lookup (server/lib/wornItems.js ~1094-1114) then pins it as worn on every page. Which layer owns the fix is open.",
+      "rootCause": "Trial writer (story-trial-pages.txt) has no typed wornItems row, so every trial page defaults to worn; full path has the row (WORN_ITEMS_ROW_RULE). Measured 2026-11-10: 5 of 9 prod trials with a worn item wrong on ~15 of 54 pages; full path 2 of 25. Fix: trial writer writes the same rows.",
+      "status": "open"
+    },
+    {
+      "id": "regeneration-drops-worn-item-rows",
+      "title": "A user page regeneration loses the page's worn-item state: a page drawn with \"NOT wearing\" is redrawn with \"IS wearing\"",
+      "reportedAt": "2026-11-10",
+      "source": "Prod job_1794060455874_w2sbl0o0s p10: original and edit versions carry NOT wearing; the two later regeneration versions carry IS wearing. sceneImages[p10].sceneMetadata holds the off row; sceneDescriptions[p10].wornItems is [].",
+      "rootCause": "The regeneration path builds the worn block from sceneDescriptions (no rows) instead of the scene metadata the generation path reads (wornItemsFromMetadata).",
       "status": "open"
     }
   ]
