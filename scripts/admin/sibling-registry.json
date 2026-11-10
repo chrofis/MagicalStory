@@ -116,6 +116,32 @@
       }
     },
     {
+      "id": "worn-items-row-writers",
+      "axis": "full-path Art Director vs trial writer: the per-page typed wornItems[] row",
+      "reason": "the per-page worn state is the typed wornItems[] row (WORN_ITEMS_ROW_RULE, promptBuilders). The Art Director writes it on the full path; the trial writer had no such row, so every trial page resolved a wornAs item to WORN by silence and the image prompt said IS wearing while the text said the item was lost (5 of 9 prod trials, ~15 of 54 pages, 2026-11-10; docs/decisions.md). Both sites are filled from the one constant,.",
+      "members": [
+        "prompts/scene-briefs-all.txt",
+        "prompts/story-trial-pages.txt"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "{WORN_ITEMS_ROW}"
+        ]
+      }
+    },
+    {
+      "id": "worn-rows-redraw-routes",
+      "axis": "every route that redraws a page from a brief TEXT: customer regenerate, iterate, Test Lab, style lab",
+      "reason": "the image prompt reads the page's worn state from the brief TEXT, while the page's own sceneMetadata is where its declared wornItems rows live and the stored text can lag it (prod job_1794060455874_w2sbl0o0s p10: text wornItems [], metadata the off row, so two customer regenerations drew the item back on). Each route carries the rows in through wornItems.carryWornRowsIntoBrief, the one function; a redraw route that builds a prompt from a brief text without it reads the item as WORN by silence.",
+      "members": [
+        "server/routes/regeneration.js",
+        "server/lib/images.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "story-prose-writers",
       "axis": "beats text writer vs trial writer",
       "reason": "story-text-from-beats.txt (the live beats path, every full story) and story-trial-pages.txt (the live /try funnel writer) both write page prose under the same shared rules; a prose rule that becomes a promptBuilders constant reaches a path only through the placeholder that path declares, so a new one is declared at both sites or it silently reads as absent there. Since 2026-11-07 both writers carry the MUST SAY rule ({MUST_SAY}: the stakes line and each invented figure's motive are told in plain words somewhere on the pages; the full writer gets the typed lines from the STORY LOGIC, the trial writer, which has no logic, the generic MUST_SAY_TRIAL_RULE). This set now also carries the retired trial-vs-full-writer axis: the trial path has repeatedly lagged the full path by weeks. story-unified.txt / story-unified-imagefirst.txt were members until 2026-09-15, when both were deleted as unreachable (docs/decisions.md).",

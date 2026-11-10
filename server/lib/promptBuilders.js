@@ -13960,6 +13960,11 @@ function buildTrialPagesPrompt(inputData, sceneCount = null, arcText = '') {
     ...trialFillValues(inputData, sceneCount),
     ARC_PLAN: String(arcText || '').trim(),
     MUST_SAY: MUST_SAY_TRIAL_RULE,
+    // The per-page worn state is the typed `wornItems[]` row, one constant for the
+    // full-path Art Director and this writer (docs/decisions.md 2026-11-10). Without
+    // it every trial page resolved a `wornAs` item to WORN by silence.
+    WORN_ITEMS_ROW: WORN_ITEMS_ROW_RULE,
+    GARMENT_REMOVED: GARMENT_REMOVED_RULE,
     MANDATORY_CAST: buildTrialMandatoryCast(inputData),
   });
 }

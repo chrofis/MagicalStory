@@ -955,18 +955,36 @@ function carryForwardWornItems(newSceneMetadata, savedSceneMetadata) {
  */
 function carryForwardWornItemsInBrief(newBrief, savedBrief) {
   const { parseProseMetadataFormat } = require('./sceneMetadata');
-  const after = parseProseMetadataFormat(String(newBrief || ''));
   const before = parseProseMetadataFormat(String(savedBrief || ''));
-  if (!after || !before) return null;
+  if (!before) return null;
+  return carryWornRowsIntoBrief(newBrief, before.metadata);
+}
+
+/**
+ * The same carry from the page's STORED sceneMetadata (extractSceneMetadata
+ * shape, or its `fullData`) instead of a brief text (2026-11-10). The stored
+ * `sceneImages[].sceneMetadata` is where a page's declared rows live; the
+ * stored brief TEXT can lag it (prod job_1794060455874_w2sbl0o0s p10: text
+ * `wornItems: []`, metadata the off row), and the image prompt reads the brief
+ * text. Every redraw route that builds a prompt from a brief text carries the
+ * page's rows through this one function.
+ */
+function carryWornRowsIntoBrief(newBrief, savedMetadata) {
+  const { parseProseMetadataFormat } = require('./sceneMetadata');
+  const after = parseProseMetadataFormat(String(newBrief || ''));
+  if (!after || !savedMetadata) return null;
   const freshRows = Array.isArray(after.metadata.wornItems) ? after.metadata.wornItems : [];
-  const rows = carryForwardWornItems(after.metadata, before.metadata);
+  const rows = carryForwardWornItems(after.metadata, savedMetadata);
   const idOf = (r) => String((r && r.id) || '').trim().toUpperCase();
   const freshIds = new Set(freshRows.map(idOf));
   const carried = rows.map(idOf).filter(id => id && !freshIds.has(id));
   if (carried.length === 0) return null;
   const metadata = { ...after.metadata, wornItems: rows };
   return {
-    brief: `${after.prose}\n\n---METADATA---\n${JSON.stringify(metadata, null, 2)}`,
+    brief: `${after.prose}
+
+---METADATA---
+${JSON.stringify(metadata, null, 2)}`,
     carried,
   };
 }
@@ -1964,6 +1982,7 @@ module.exports = {
   wornItemLook,
   carryForwardWornItems,
   carryForwardWornItemsInBrief,
+  carryWornRowsIntoBrief,
   splitClauses,
   splitClausesDetailed,
   DEPENDENT_OPENER_RE,

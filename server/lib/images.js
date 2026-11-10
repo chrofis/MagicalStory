@@ -5219,6 +5219,17 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // (same drop as the authored brief: jevBriefFields.dropAbsentWearerCites).
   newSceneDescription = require('./jevBriefFields').dropAbsentWearerCites(newSceneDescription, visualBible, pageNumber, 'iterate rewrite');
 
+  // The parent page's worn-item rows ride into the rewritten brief TEXT, which the image prompt
+  // reads: iterateSceneMetadata carries them for the sheets, but a rewrite that restates no row
+  // is read as WORN by the prompt's worn block (docs/decisions.md 2026-11-10).
+  {
+    const wornCarry = require('./wornItems').carryWornRowsIntoBrief(newSceneDescription, parentSceneMetadata);
+    if (wornCarry) {
+      log.warn(`🎩 [ITERATE] Page ${pageNumber}: the rewrite dropped the declared wornItems row(s) ${wornCarry.carried.join(', ')} — carried forward from the parent page`);
+      newSceneDescription = wornCarry.brief;
+    }
+  }
+
   // Extract previewMismatches + checks from the metadata JSON block. parseProseMetadataFormat
   // splits on ---METADATA--- and parses the JSON — the fields live alongside scene structure.
   let previewMismatches = [];

@@ -436,6 +436,16 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
         newSceneDescription = carry.brief;
       }
     }
+    // ...and so does the page's worn-item state (wornItems.carryWornRowsIntoBrief): the rewrite
+    // restates a row only when it decides one, and an absent row is read as WORN.
+    {
+      const wornCarry = require('../lib/wornItems').carryWornRowsIntoBrief(
+        newSceneDescription, storedImage?.sceneMetadata || extractSceneMetadata(storedScene?.description || ''));
+      if (wornCarry) {
+        log.warn(`🎩 [REGEN SCENE ${pageNumber}] the rewrite dropped the declared wornItems row(s) ${wornCarry.carried.join(', ')} — carried forward from the stored metadata`);
+        newSceneDescription = wornCarry.brief;
+      }
+    }
 
     // Update the scene description in story data (sceneDescriptions already loaded above)
     const existingIndex = sceneDescriptions.findIndex(s => s.pageNumber === pageNumber);
@@ -705,6 +715,20 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       ({ text: expandedDescription } = await callIterateBrief(expansionPrompt, { pageNumber }));
       log.debug(`[REGEN] Scene expanded to ${expandedDescription.length} chars`);
       log.debug(`[REGEN] Expanded scene preview: ${expandedDescription.substring(0, 300)}...`);
+    }
+
+    // THE PAGE'S WORN-ITEM ROWS ride into the prompt text (docs/decisions.md 2026-11-10).
+    // The image prompt reads the brief TEXT, and the stored text can lag the page's own
+    // sceneMetadata (prod job_1794060455874_w2sbl0o0s p10: text `wornItems: []`, metadata the
+    // off row), while a rewrite restates only what it decides: either way the row was lost and
+    // a page drawn "NOT wearing" was redrawn "IS wearing". Same carry as iterate and beats.
+    {
+      const wornCarry = require('../lib/wornItems').carryWornRowsIntoBrief(
+        expandedDescription, sceneEntry?.sceneMetadata || extractSceneMetadata(originalDescription));
+      if (wornCarry) {
+        log.warn(`🎩 [REGEN] Page ${pageNumber}: the brief lacked the declared wornItems row(s) ${wornCarry.carried.join(', ')} — carried forward from the page's stored metadata`);
+        expandedDescription = wornCarry.brief;
+      }
     }
 
     // Get clothing category - prefer outline pageClothing, then parse from description
@@ -2147,6 +2171,9 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
       : { kept: [], visualBibleGrid: null };
     visualBibleGrid = styleLabGrid.visualBibleGrid;
 
+    // The stored brief text carries the page's declared worn rows (wornItems.carryWornRowsIntoBrief).
+    const styleLabBrief = (text) => require('../lib/wornItems').carryWornRowsIntoBrief(text, styleLabSceneMetadata)?.brief ?? text;
+
     // Build per-model prompts and generate in parallel
     const results = {};
     const settled = await Promise.allSettled(models.map(async (model) => {
@@ -2161,7 +2188,7 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
       // the reference claim from the cells actually in the grid); only the style
       // text is this lab's variable.
       const prompt = String(require('../lib/pageRenderCall').makePageImagePrompt({
-        sceneDescription: sceneDesc, inputData: storyData, sceneCharacters: chars, visualBible, pageNumber,
+        sceneDescription: styleLabBrief(sceneDesc), inputData: storyData, sceneCharacters: chars, visualBible, pageNumber,
         characterPhotos, pageImageModel: model, extraOptions: { customStyleDescription: effectiveStyle },
       })(styleLabGrid.kept.map(e => e.id).filter(Boolean)));
 

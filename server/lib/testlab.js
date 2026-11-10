@@ -791,7 +791,10 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   const makePrompt = pageRender.makePageImagePrompt({
     // sceneDescriptionOverride: test a corrected scene brief without
     // regenerating the story.
-    sceneDescription: params.sceneDescriptionOverride || ctx.scene.sceneDescription,
+    // The stored brief TEXT can lag the page's own sceneMetadata rows (wornItems.carryWornRowsIntoBrief),
+    // and production reads the rows; a hand-written override is tested exactly as written.
+    sceneDescription: params.sceneDescriptionOverride
+      || (require('./wornItems').carryWornRowsIntoBrief(ctx.scene.sceneDescription, ctx.scene.sceneMetadata)?.brief ?? ctx.scene.sceneDescription),
     inputData,
     sceneCharacters: ctx.scene.sceneCharacters || null,
     visualBible: ctx.visualBible,

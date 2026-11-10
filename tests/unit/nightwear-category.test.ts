@@ -321,7 +321,9 @@ describe('the trial: pyjamas for a bedtime topic only, keyed on the typed topic 
   it('every other trial topic is unchanged: no nightwear anywhere in the pages prompt', () => {
     const p = PB.buildTrialPagesPrompt(input, 6, 'ARC');
     expect(p).toContain('"clothing": "[standard | costumed]"');
-    expect(p).not.toMatch(/nightwear/);
+    // The shared worn-row rule (WORN_ITEMS_ROW_RULE, docs/decisions.md 2026-11-10) names the
+    // `nightwear` outfit in passing; what this pins is that no nightwear CATEGORY text is added.
+    expect(p.split(PB.WORN_ITEMS_ROW_RULE).join('')).not.toMatch(/nightwear/);
   });
 
   it('a costume AND pyjamas can both be offered', () => {

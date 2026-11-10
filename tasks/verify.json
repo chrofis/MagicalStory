@@ -11480,6 +11480,19 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-writer-worn-rows",
+      "commits": [],
+      "addedAt": "2026-11-10",
+      "claim": "On a trial, the writer emits a typed wornItems[] row on every page that carries a wornAs item: pages where the item is lost, held or taken off say NOT wearing in the image prompt, pages where it stays worn say IS wearing.",
+      "runShape": ["trial", "needs-worn-off"],
+      "check": {
+        "kind": "human",
+        "what": "On a trial whose story loses or takes off a worn item, read sceneImages[].sceneMetadata.wornItems and the WORN ITEMS block of each page prompt against the page text. Stored-data replay with me as the stand-in writer passed (off 21/21, worn 34/34), the live writer's rate is unmeasured."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
