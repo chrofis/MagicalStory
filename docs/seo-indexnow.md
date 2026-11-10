@@ -19,3 +19,6 @@ IndexNow (https://www.indexnow.org/documentation) tells Bing (and Yandex etc.) a
 5. Bing Webmaster Tools (https://www.bing.com/webmasters): sign in, "Import from Google Search Console", pick `magicalstory.ch`. This verifies the site and pulls the sitemap in one step.
 
 Re-run the script after content/sitemap changes. It is not hooked into deploys.
+
+## Status
+- 2026-11-10/11: key set on Railway production (and in local .env), key file live, all 634 sitemap URLs submitted (HTTP 200). The first POST, seconds after the key file went live, got HTTP 403; the same request a few minutes later got 200. A fresh key needs a few minutes before the engines accept it.
