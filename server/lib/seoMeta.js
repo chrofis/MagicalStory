@@ -1918,6 +1918,16 @@ function lastmodForRoute(routePath) {
  *
  * @returns {string} XML sitemap
  */
+// Which language copies get their own sitemap entry. The 2026-11-09 Search Console audit: 860 pages
+// "crawled - currently not indexed", mostly the ?lang= copies of the templated theme, city, occasion
+// and gift pages. Owner decision 2026-11-09: list only the German URL of those sets (the copies stay
+// live, linked, and named in every entry's hreflang alternates); life-challenge themes, comparisons,
+// guides and the static pages keep all four languages, since they are where the clicks are.
+// See docs/decisions.md 2026-11-09 "Sitemap lists only the German URL of templated page sets".
+const SITEMAP_LANGS = ['de', 'en', 'fr', 'it'];
+const SITEMAP_ALL_LANG_THEME_CATEGORY = 'life-challenges';
+const themeLangs = (categoryId) => (categoryId === SITEMAP_ALL_LANG_THEME_CATEGORY ? SITEMAP_LANGS : ['de']);
+
 function generateSitemap() {
   const paths = [];
   const lastmodFor = (routePath) => lastmodForRoute(routePath);
@@ -1958,6 +1968,7 @@ function generateSitemap() {
     paths.push({
       path: `/themes/${categoryId}`,
       lastmod: lastmodFor(`/themes/${categoryId}`),
+      langs: themeLangs(categoryId),
       changefreq: 'monthly',
       priority: '0.7',
     });
@@ -1969,6 +1980,7 @@ function generateSitemap() {
       paths.push({
         path: `/themes/${categoryId}/${themeId}`,
         lastmod: lastmodFor(`/themes/${categoryId}/${themeId}`),
+        langs: themeLangs(categoryId),
         changefreq: 'monthly',
         priority: '0.6',
       });
@@ -2008,6 +2020,7 @@ function generateSitemap() {
     paths.push({
       path: `/anlass/${occasionSlug}`,
       lastmod: lastmodFor(`/anlass/${occasionSlug}`),
+      langs: ['de'],
       changefreq: 'monthly',
       priority: '0.6',
     });
@@ -2018,6 +2031,7 @@ function generateSitemap() {
     paths.push({
       path: `/geschenk/${giftSlug}`,
       lastmod: lastmodFor(`/geschenk/${giftSlug}`),
+      langs: ['de'],
       changefreq: 'monthly',
       priority: '0.7',
     });
@@ -2028,17 +2042,18 @@ function generateSitemap() {
     paths.push({
       path: `/stadt/${city.id}`,
       lastmod: lastmodFor(`/stadt/${city.id}`),
+      langs: ['de'],
       changefreq: 'monthly',
       priority: '0.6',
     });
   }
 
-  // Build XML — each path gets 4 <url> entries (de, en, fr, it) with xhtml:link alternates
-  const LANGS = ['de', 'en', 'fr', 'it'];
+  // Build XML — each path gets one <url> entry per listed language (all four unless `langs` narrows it),
+  // and every entry carries all xhtml:link alternates, so an unlisted language copy stays known to Google.
   const urlEntries = [];
 
   for (const p of paths) {
-    for (const lang of LANGS) {
+    for (const lang of (p.langs || SITEMAP_LANGS)) {
       const loc = lang === 'de'
         ? `${BASE_URL}${p.path === '/' ? '' : p.path}`
         : `${BASE_URL}${p.path === '/' ? '' : p.path}?lang=${lang}`;

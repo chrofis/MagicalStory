@@ -28,10 +28,10 @@ describe('sitemap lastmod is the real last content change of the URL set', () =>
 
   it('every language entry of a page carries its set date; sets differ', () => {
     const xml = generateSitemap();
-    const theme = lastmodForRoute('/themes/adventure/ninja');
+    const theme = lastmodForRoute('/themes/life-challenges/first-steps');
     const guide = lastmodForRoute('/ratgeber/kinderbuch-mit-ki-erstellen');
     expect(theme).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    for (const loc of ['/themes/adventure/ninja', '/themes/adventure/ninja?lang=fr']) {
+    for (const loc of ['/themes/life-challenges/first-steps', '/themes/life-challenges/first-steps?lang=fr']) { // only life-challenge themes keep ?lang= entries (2026-11-09)
       expect(urlBlock(xml, loc)).toContain(`<lastmod>${theme}</lastmod>`);
     }
     expect(guide).not.toBe(theme);
