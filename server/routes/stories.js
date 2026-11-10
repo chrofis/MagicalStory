@@ -8,6 +8,7 @@
 
 const express = require('express');
 const { canonicalName } = require('../lib/castResolver');
+const { LIBRARY_HIDDEN_JOB_FILTER } = require('../lib/storyLibraryFilter');
 const router = express.Router();
 
 const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getNextVersionIndex, saveStoryImage, getAllActiveVersions, getAllStoryImages, getActiveStoryImages, getRetryHistoryImages, rehydrateStoryImages, buildStoryMetadata, imgBytesAsync, stripInlineImagesFromStoryData } = require('../services/database');
@@ -139,13 +140,11 @@ router.get('/', authenticateToken, async (req, res) => {
       // ensureStoryRow). Without this, an unfinished story would sit in the
       // library as a blank entry for the whole ~10 minutes of generation.
       //
-      // The job's own status is the source of truth — no in_progress column and
-      // no flag on the row, both of which would go stale the moment a job died.
+      // The job's own status is the source of truth (server/lib/storyLibraryFilter.js): it also hides
+      // the empty row of a cancelled/failed job that never saved content.
       // A story saved outside the job flow has no matching job row, so
       // NOT EXISTS is true and it lists normally.
-      const inProgressFilter = ` AND NOT EXISTS (
-        SELECT 1 FROM story_jobs j WHERE j.id = s.id AND j.status IN ('pending', 'processing')
-      )`;
+      const inProgressFilter = LIBRARY_HIDDEN_JOB_FILTER;
       const countResult = await dbQuery(
         `SELECT COUNT(*) as count FROM stories s WHERE s.user_id = $1${draftFilter}${inProgressFilter}`,
         [req.user.id]);
