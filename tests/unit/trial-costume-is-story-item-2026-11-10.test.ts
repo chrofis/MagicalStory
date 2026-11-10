@@ -26,3 +26,21 @@ describe('costume is the story wardrobe', () => {
     expect(PB.buildTrialPagesPrompt(inp, 6, ARC)).not.toContain(PB.COSTUME_IS_THE_STORY_ITEM_RULE);
   });
 });
+
+// Owner decisions 2026-11-10 (second round): stronger trial wording, customer's idea wins over the costume line.
+describe('trial worn rows wording and idea-wins rule', () => {
+  it('trial pages prompt says every page carries a row, off with a location for not-yet/lost items', () => {
+    const p = PB.buildTrialPagesPrompt({ ...base, storyTheme: 'unicorn' }, 6, ARC);
+    expect(p).toContain('Every page, every worn item.');
+    expect(p).toMatch(/does not exist yet/);
+    expect(p).toMatch(/`off` on every such page, with a `location`/);
+  });
+  it('the shared WORN_ITEMS_ROW_RULE is untouched by the trial-only wording', () => {
+    expect(PB.WORN_ITEMS_ROW_RULE).not.toContain('does not exist yet');
+  });
+  it('costume rule lets the customer idea add a worn piece with wornAs', () => {
+    expect(PB.COSTUME_IS_THE_STORY_ITEM_RULE).toMatch(/story idea wins over the costume line/);
+    expect(PB.COSTUME_IS_THE_STORY_ITEM_RULE).toContain('`wornAs`');
+    expect(PB.COSTUME_IS_THE_STORY_ITEM_RULE).toMatch(/addition to the costume/);
+  });
+});
