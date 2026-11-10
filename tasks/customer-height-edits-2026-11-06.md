@@ -176,3 +176,8 @@ New prod story job_1794136064260_8qgo59eyb «Janna und Silbermond» for user 025
 - Free, no job row, no email. Her original Laternen book job_1793964466256_1tmyzh1do is untouched.
 - Verified: 0 staging URLs, 0 old ids, final text (p5 and p7 fixes present), active p5 v8 / p6 v1 / p9 v3 all answer 200.
 - Undo manifest: backups/story-promotions/job_1794136064260_8qgo59eyb-created.json.
+
+## 2026-11-10: Titel ändern broken for them, fixed
+- 9-10 Nov they tried «Titel ändern» 3x on job_1794060455874_w2sbl0o0s (last «Janna und Silva im Nebel»); every attempt refunded, cover and title unchanged (bug change-title-dead-on-baked-front-covers, fixed a2e75ddae, live fbab6f06).
+- Owner: title and cover changed for them to «Janna und Silva im Nebel» (admin account, backup in backups/story-promotions/); credits topped up 14 -> 150 (admin_add 136).
+- Marketing asked to mail them: Marketing inbox 2026-11-10-magicalstory-janna-title-fixed-credits.md.
