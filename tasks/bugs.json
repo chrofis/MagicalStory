@@ -4773,7 +4773,7 @@
       "source": "Customer mail 2026-11-11 (user 025579e7…, story job_1794060455874_w2sbl0o0s): opened the book builder at 12:45 CH, square covers made, never reached checkout (no checkout log line). Staging screenshot of a 10-page book: 7 blank pages, tick box far above the grey button, every thumbnail in the strip broken.",
       "rootCause": "BookBuilder disables the button while needsBlankAck && !blankAck and says nothing near it. BlankPagesPreview wrapped R2 image URLs as data:image/jpeg;base64,https://… (the shape toImgSrc in client/src/utils/imgSrc.ts already handles).",
       "status": "fixed",
-      "fixedIn": "pending"
+      "fixedIn": "0f401a31b"
     }
   ]
 }
