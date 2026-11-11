@@ -11558,6 +11558,21 @@
         "result": "HUMAN",
         "note": "human check | LOOK: On a trial whose story loses or takes off a worn item, read sceneImages[].sceneMetadata.wornItems and the WORN ITEMS block of each page prompt against the page text. Stored-data replay with me as the stand-in writer passed (off 21/21, worn 34/34), the live writer's rate is unmeasured."
       }
+    },
+    {
+      "id": "no-output-caps-full-max",
+      "commits": [
+        "f908bf6c1"
+      ],
+      "addedAt": "2026-11-11",
+      "claim": "With every hand-picked output cap removed (bbox detection maxOutputTokens 2500 dropped, Anthropic calls at maxOutputTokensFor), the next story run still completes: bbox detection returns boxes, no call is cut off at max tokens, no provider rejects a max_tokens value.",
+      "runShape": "any",
+      "check": {
+        "kind": "human",
+        "what": "On the next staging story, grep the log for MAX_TOKENS / max_tokens / truncat errors and confirm bbox detection logged boxes on the pages."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
