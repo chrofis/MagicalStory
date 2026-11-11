@@ -54,7 +54,7 @@ Where top/left/bottom/right are pixel values from 0 to 1024. Return ALL visible 
         { inline_data: { mime_type: 'image/jpeg', data: imageBase64 } },
         { text: prompt }
       ]}],
-      generationConfig: { maxOutputTokens: 4000, temperature: 0.1, responseMimeType: 'application/json' },
+      generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
       safetySettings: [
         { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
         { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },

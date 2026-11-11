@@ -10,7 +10,7 @@ async function testModel(apiKey, modelName) {
     },
     body: JSON.stringify({
       model: modelName,
-      max_tokens: 100,
+      max_tokens: require('../../server/config/models').maxOutputTokensFor(modelName),
       messages: [{ role: 'user', content: 'Say "API test successful"' }]
     })
   });

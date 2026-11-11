@@ -15,13 +15,8 @@ import path from 'node:path';
 
 const ROOT = path.join(__dirname, '../..');
 
-// Direct provider calls that keep a numeric cap, with the reason.
-const KEPT_DIRECT_CAPS: Array<{ file: string; match: RegExp; why: string }> = [
-  { file: 'server/routes/admin/diagnostics.js', match: /max_tokens: 1,/,
-    why: 'API-key liveness ping ("hi"); the reply is discarded' },
-  { file: 'server/lib/bboxDetection.js', match: /maxOutputTokens: 2500,/,
-    why: 'documented pressure valve: gemini-2.5-flash-lite repetition loops run to 15k+ tokens inside one label; failing fast hands off to the Grok fallback' },
-];
+// Direct provider calls that keep a numeric cap: NONE (owner rule 2026-11-11: no output token limits).
+const KEPT_DIRECT_CAPS: Array<{ file: string; match: RegExp; why: string }> = [];
 
 // Files whose numeric max-tokens are NOT call-site caps.
 const NOT_CALL_SITES = new Set([
@@ -45,6 +40,7 @@ const FILES = [
   ...listJs(path.join(ROOT, 'scripts')),
   path.join(ROOT, 'storyJobPipeline.js'),
   path.join(ROOT, 'server.js'),
+  ...listJs(path.join(ROOT, 'tests/manual')),
 ].filter(f => fs.existsSync(f));
 
 const rel = (f: string) => path.relative(ROOT, f).replace(/\\/g, '/');
@@ -132,12 +128,39 @@ describe('no output caps — direct provider calls (max_tokens / maxOutputTokens
     for (const k of KEPT_DIRECT_CAPS) expect(seenKept.has(k.file + k.match.source), `kept cap no longer present: ${k.file} ${k.match}`).toBe(true);
   });
 
-  it('client-controlled passthroughs keep no server-side numeric default the model could hit silently', () => {
-    // ai-proxy forwards the client's max_tokens with an 8192 fallback and WARNS
-    // on stop_reason max_tokens; listed for the owner in BACKLOG, not a call this
-    // pipeline makes. Pin the warning so a silent truncation there stays impossible.
+  it('no `max_tokens || N` / `maxTokens ?? N` fallback and no numeric max-tokens CLI default', () => {
+    const offenders: string[] = [];
+    for (const f of FILES) {
+      const r = rel(f);
+      if (NOT_CALL_SITES.has(r)) continue;
+      const lines = fs.readFileSync(f, 'utf8').split(/\r?\n/);
+      lines.forEach((l, i) => {
+        if (/^\s*(\/\/|\*)/.test(l)) return;
+        if (/(max_tokens|maxTokens|maxOutputTokens|max_output_tokens)\s*(\|\||\?\?)\s*\d+/.test(l)
+          || /max-tokens['"]\]?\s*\|\|\s*['"]?\d+/.test(l)) offenders.push(`${r}:${i + 1} ${l.trim()}`);
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('the ai-proxy route sends the model maximum and still warns on a truncated reply', () => {
     const src = fs.readFileSync(path.join(ROOT, 'server/routes/ai-proxy.js'), 'utf8');
+    expect(src).toMatch(/maxOutputTokensFor\(PROXY_MODEL\)/);
     expect(src).toMatch(/stop_reason === 'max_tokens'/);
+  });
+});
+
+describe('no output caps — the one central default', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { resolveMaxTokens, TEXT_MODELS } = require('../../server/lib/textModels');
+  const { maxOutputTokensFor } = require('../../server/config/models');
+  it('resolveMaxTokens returns the model maximum whatever the caller passes', () => {
+    const m = TEXT_MODELS['claude-sonnet'];
+    for (const v of [null, undefined, 0, 100, 32000, 1e9]) expect(resolveMaxTokens(m, v)).toBe(m.maxOutputTokens);
+  });
+  it('maxOutputTokensFor knows the proxy model (64K, Anthropic models overview) and throws on unknown ids', () => {
+    expect(maxOutputTokensFor('claude-sonnet-4-5-20250929')).toBe(64000);
+    expect(() => maxOutputTokensFor('no-such-model')).toThrow();
   });
 });
 

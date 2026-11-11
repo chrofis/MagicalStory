@@ -14,7 +14,6 @@
  *   node scripts/test-json-output.js --prompt-file=path/to/p.txt  # use a local prompt
  *   node scripts/test-json-output.js --skip-markdown              # only run JSON mode
  *   node scripts/test-json-output.js --skip-json                  # only run markdown mode
- *   node scripts/test-json-output.js --max-tokens=16000           # default 32000
  *
  * Cost per run: ~$0.50–$1.50 per mode (depends on filled prompt size + story length).
  */
@@ -32,7 +31,7 @@ const args = Object.fromEntries(
 );
 
 const SONNET_MODEL = 'claude-sonnet-5-5';
-const MAX_TOKENS = parseInt(args['max-tokens'] || '32000', 10);
+const MAX_TOKENS = require('../server/config/models').maxOutputTokensFor('claude-sonnet-5-5');  // model max (owner rule: no output caps)
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 if (!ANTHROPIC_KEY) {
   console.error('FATAL: ANTHROPIC_API_KEY missing in .env');

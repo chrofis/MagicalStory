@@ -86,6 +86,14 @@ const TEXT_MODELS = {
     maxOutputTokens: 64000,
     description: 'Claude Haiku 4.5 - Fast and affordable'
   },
+  // Claude Sonnet 4.5: 64K max output (platform.claude.com/docs/en/models/overview, read 2026-11-11).
+  // Only the /api/claude proxy route uses it; here so maxOutputTokensFor() can answer for it.
+  'claude-sonnet-4-5-20250929': {
+    provider: 'anthropic',
+    modelId: 'claude-sonnet-4-5-20250929',
+    maxOutputTokens: 64000,
+    description: 'Claude Sonnet 4.5 - /api/claude proxy route only'
+  },
   // Claude Haiku 5.5 (launched 2026-10-07). Ceiling: 128K output, 1M context
   // (platform.claude.com/docs/en/models/haiku-5-5/overview). Adaptive thinking is
   // ON by default; effort low..max, default medium. Takes no temperature knob

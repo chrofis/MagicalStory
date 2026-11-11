@@ -66,7 +66,10 @@ router.post('/claude', aiProxyLimiter, authenticateToken, requireAdmin, async (r
       return res.status(500).json({ error: 'Anthropic API key not configured' });
     }
 
-    const { prompt, max_tokens } = req.body;
+    const { prompt } = req.body;
+    const PROXY_MODEL = 'claude-sonnet-4-5-20250929';
+    // Owner rule: no output caps. The client's max_tokens is ignored; the model's own maximum is sent.
+    const max_tokens = require('../config/models').maxOutputTokensFor(PROXY_MODEL);
 
     await logActivity(req.user.id, req.user.username, 'CLAUDE_API_CALL', {
       promptLength: prompt?.length || 0,
@@ -81,8 +84,8 @@ router.post('/claude', aiProxyLimiter, authenticateToken, requireAdmin, async (r
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: max_tokens || 8192,
+        model: PROXY_MODEL,
+        max_tokens,
         messages: [{ role: 'user', content: prompt }]
       })
     });
@@ -101,7 +104,7 @@ router.post('/claude', aiProxyLimiter, authenticateToken, requireAdmin, async (r
       log.debug(`  Input tokens:  ${data.usage.input_tokens.toLocaleString()}`);
       log.debug(`  Output tokens: ${data.usage.output_tokens.toLocaleString()}`);
       log.debug(`  Total tokens:  ${(data.usage.input_tokens + data.usage.output_tokens).toLocaleString()}`);
-      log.debug(`  Max requested: ${max_tokens?.toLocaleString() || 'default'}`);
+      log.debug(`  Max requested: ${max_tokens.toLocaleString()}`);
 
       // Warn if output limit was reached
       if (data.stop_reason === 'max_tokens') {

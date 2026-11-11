@@ -25,9 +25,9 @@ export default {
       const { apiKey, prompt, model, max_tokens } = body;
 
       // Validate required fields
-      if (!apiKey || !prompt || !model) {
+      if (!apiKey || !prompt || !model || !max_tokens) {
         return new Response(JSON.stringify({
-          error: { message: 'Missing required fields: apiKey, prompt, or model' }
+          error: { message: 'Missing required fields: apiKey, prompt, model, or max_tokens (the model's maximum)' }
         }), {
           status: 400,
           headers: {
@@ -47,7 +47,7 @@ export default {
         },
         body: JSON.stringify({
           model: model,
-          max_tokens: max_tokens || 4000,
+          max_tokens,  // no default cap (owner rule): the client sends the model's maximum; this worker cannot know the model
           messages: [
             {
               role: 'user',

@@ -1450,10 +1450,20 @@ function guardReply(result, model, modelName, capInForce, options) {
 }
 
 /**
+ * THE one place the output limit is decided (owner rule 2026-08-29, restated 2026-11-11:
+ * no output token limits). Every call runs at the model's own maximum from TEXT_MODELS;
+ * the `maxTokens` argument of the public entry points is kept only so existing
+ * positional callers stay valid, and any value in it is IGNORED. A hand-picked cap
+ * truncated real work (scene review at 16000, Mordsabend places plan at 32000).
+ */
+function resolveMaxTokens(model, _ignoredMaxTokens) {
+  return model.maxOutputTokens;
+}
+
+/**
  * Main text model caller - routes to appropriate provider
  * @param {string} prompt - The prompt to send
- * @param {number|null} maxTokens - null/0 (the default, and the rule: no output
- *   caps) = the model's own maxOutputTokens; a number is clamped to it
+ * @param {number|null} maxTokens - IGNORED (see resolveMaxTokens): always the model's own maxOutputTokens
  * @returns {Promise<{text: string, usage: object, truncation: object}>}
  *   `truncation` = assessTextReply verdict (see textReplyGuard.js); a suspected
  *   cut is logged at ERROR and counted, never thrown.
@@ -1476,14 +1486,7 @@ async function callTextModel(prompt, maxTokens = null, modelOverride = null, opt
     log.debug(`🔧 [TEXT] Using model override: ${modelOverride}`);
   }
 
-  // Cap to the model's limit — and treat a null/0 request as "give me the
-  // model's maximum" (owner, 2026-08-09). Hard-coded budgets at the call
-  // sites silently truncated real work: the scene reviewer hit exactly 16000
-  // output tokens, emitted rewritten briefs for pages 1-6 and was cut off
-  // before pages 7, 12 and 13 — the ones it had correctly named as faulted.
-  // The failure looked like the model ignoring instructions.
-  const requested = (maxTokens == null || maxTokens <= 0) ? model.maxOutputTokens : maxTokens;
-  const effectiveMaxTokens = Math.min(requested, model.maxOutputTokens);
+  const effectiveMaxTokens = resolveMaxTokens(model, maxTokens);
 
   log.verbose(`🤖 [TEXT] Calling ${modelName} (${model.modelId}) with max ${effectiveMaxTokens} tokens`);
 
@@ -1549,14 +1552,7 @@ async function callTextModelStreaming(prompt, maxTokens = null, onChunk = null, 
     log.debug(`🔧 [TEXT STREAM] Using model override: ${modelOverride}`);
   }
 
-  // Cap to the model's limit — and treat a null/0 request as "give me the
-  // model's maximum" (owner, 2026-08-09). Hard-coded budgets at the call
-  // sites silently truncated real work: the scene reviewer hit exactly 16000
-  // output tokens, emitted rewritten briefs for pages 1-6 and was cut off
-  // before pages 7, 12 and 13 — the ones it had correctly named as faulted.
-  // The failure looked like the model ignoring instructions.
-  const requested = (maxTokens == null || maxTokens <= 0) ? model.maxOutputTokens : maxTokens;
-  const effectiveMaxTokens = Math.min(requested, model.maxOutputTokens);
+  const effectiveMaxTokens = resolveMaxTokens(model, maxTokens);
 
   log.verbose(`🌊 [TEXT STREAM] Calling ${modelName} (${model.modelId}) with max ${effectiveMaxTokens} tokens`);
 
@@ -1611,6 +1607,7 @@ async function callClaudeAPI(prompt, maxTokens = null, modelOverride = null, opt
 }
 
 module.exports = {
+  resolveMaxTokens,
   // Configuration
   TEXT_MODELS,
   MODEL_DEFAULTS,

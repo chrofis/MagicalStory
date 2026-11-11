@@ -62,6 +62,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
   if (req.query.ping !== '0') {
     try {
       const { TEXT_MODELS, MODEL_DEFAULTS } = require('../../config/models');
+      const MODEL_CFG = require('../../config/models');
       const modelId = TEXT_MODELS[MODEL_DEFAULTS.idea]?.modelId || TEXT_MODELS['claude-sonnet'].modelId;
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -70,7 +71,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
           'anthropic-version': '2023-06-01',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ model: modelId, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+        body: JSON.stringify({ model: modelId, max_tokens: MODEL_CFG.maxOutputTokensFor(modelId), messages: [{ role: 'user', content: 'hi' }] }),
         signal: AbortSignal.timeout(15000),
       });
       const body = await r.json().catch(() => ({}));
