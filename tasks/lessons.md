@@ -1027,3 +1027,10 @@ My p5 rewrite let Janna call the animal a unicorn while the text never showed ho
 learned on exactly one page before it is used. Rule: before proposing any story-text change, list each secret or
 fact, the page each character learns it, and check every page of the book against it, including names only the
 narrator knows.
+
+## 2026-11-11: price a printer action with the printer's own quote before doing it
+Merged one customer's 3 Gelato orders into one parcel on an ESTIMATE of the combined shipping (~CHF 9.50). The real
+shipment was CHF 17.47, so the saving was CHF 11.70, not ~19, and the planned CHF 20 refund would have made us worse off.
+Rule: before any cancel / reorder / new Gelato order, call the Gelato quote endpoint (POST /v4/orders:quote) with the
+exact items and address, and show the owner the real before/after numbers. Never present an estimate as the basis
+for an irreversible step.
