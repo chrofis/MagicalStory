@@ -102,8 +102,9 @@ describe('printed book section: covers, then spreads', () => {
     expect(sec).not.toMatch(/legend|summary/i);
     expect(builder).not.toMatch(/blankLegend|blankPreviewSummary/);
   });
-  it('the page puts the covers and the preview button into the section when there are blank pages', () => {
-    expect(builder).toMatch(/<PrintedBookSpreads[\s\S]*?covers=\{pageInfo\.layout === 'spread' \? coversEl : undefined\}[\s\S]*?\{previewEl\}\s*<\/PrintedBookSpreads>/);
+  it('the page always shows the section (no blank-pages condition) with the preview button inside it', () => {
+    expect(builder).toMatch(/<PrintedBookSpreads[\s\S]*?squareCovers=\{pageInfo\.layout === 'spread' \? squareCovers : undefined\}[\s\S]*?<BookPreviewButton[\s\S]*?<\/PrintedBookSpreads>/);
+    expect(builder).not.toMatch(/needsBlankAck \? \(\s*<PrintedBookSpreads/);
   });
   it('a square book shows its square dedication page', () => {
     expect(builder).toMatch(/dedicationOverride=\{squareDedications\}/);
@@ -145,10 +146,10 @@ describe('mini book box', () => {
     expect(builder).toMatch(/\$\{SQUARE_BOOK_SIZE_LABEL\}/);
     expect(builder).not.toMatch(/20 × 20 cm/);
   });
-  it('spreadNote is deleted and the mini note no longer lives in BookFacingOption', () => {
+  it('spreadNote is deleted and BookFacingOption (hidden more-options link) is deleted', () => {
     const nudge = read('client/src/components/book/AddStoryNudge.tsx');
     expect(nudge).not.toMatch(/spreadNote/);
-    expect(read('client/src/components/book/BookFacingOption.tsx')).not.toMatch(/book-mini-note|mini:/);
+    expect(fs.existsSync(path.resolve(__dirname, '../../client/src/components/book/BookFacingOption.tsx'))).toBe(false);
   });
 });
 
@@ -162,7 +163,7 @@ describe('square covers', () => {
 
 describe('preview button placement', () => {
   it('sits in the left column, not next to the order button', () => {
-    expect(builder.indexOf('<BookPreviewButton')).toBeGreaterThan(builder.indexOf('{/* Printed book: covers first'));
+    expect(builder.indexOf('<BookPreviewButton')).toBeGreaterThan(builder.indexOf('{/* Printed book, shown the same way in every case'));
     expect(builder.indexOf('<BookPreviewButton')).toBeLessThan(builder.indexOf('{/* Right: Format & Price */}'));
   });
 });

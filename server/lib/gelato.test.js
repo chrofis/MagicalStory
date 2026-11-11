@@ -173,7 +173,7 @@ test('countBookContentPages: dedication + story pages; story 2+ adds title/dedic
 test('computeBookPageInfo: 10-page story on a 30-page minimum hardcover prints as a spread (9 blank, was 19)', async () => {
   const info = await computeBookPageInfo(poolWith(ROWS), [storyOf(10)], 'hardcover');
   assert.strictEqual(info.layout, 'spread');
-  assert.strictEqual(info.contentPagesSingle, 11, 'price tier stays on the single-layout count');
+  assert.strictEqual(info.layouts.single.contentPages, 11, 'each layout carries its own content count (its price tier)');
   assert.strictEqual(info.contentPages, 21);
   assert.strictEqual(info.printedPages, 30);
   assert.strictEqual(info.blankPages, 9);
@@ -273,7 +273,6 @@ test('computeBookPageInfo: mini book (6 and 15 scenes) is square, facing pages, 
     assert.strictEqual(info.bookFormat, 'square');
     assert.strictEqual(info.productUid, HARDCOVER_SQUARE.product_uid);
     assert.strictEqual(info.layouts.single.available, false);
-    assert.strictEqual(info.layoutSurchargeChf, 0);
   }
 });
 
@@ -282,11 +281,11 @@ test('computeBookPageInfo: 29 scenes (30-page minimum SKU) default to single A4;
   assert.strictEqual(main.layout, 'single');
   assert.strictEqual(main.bookFormat, 'A4');
   assert.strictEqual(main.productUid, HARDCOVER_A4.product_uid);
-  assert.strictEqual(main.layoutSurchargeChf, 0);
   const facing = await computeBookPageInfo(poolWith(ROWS), [storyOf(29)], 'hardcover', { layout: 'spread' });
   assert.strictEqual(facing.bookFormat, 'square');
   assert.strictEqual(facing.productUid, HARDCOVER_SQUARE.product_uid);
-  assert.strictEqual(facing.layoutSurchargeChf, 5);
+  assert.strictEqual(facing.contentPages, 59, 'square: two pages per scene; its price tier is read from this count');
+  assert.strictEqual(main.contentPages, 30);
 });
 
 test('computeBookPageInfo: 61 scenes cannot be printed as facing pages', async () => {

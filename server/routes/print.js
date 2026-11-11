@@ -23,7 +23,7 @@ const { getPool, rehydrateStoryImages, logActivity } = require('../services/data
 
 // Lib modules
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf, pdfContentDisposition } = require('../lib/pdf');
-const { processBookOrder, resumeBookOrder, createGelatoOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo, isBlankPagesAckMissing, BLANK_PAGES_ACK_FROM, shippingFromSession } = require('../lib/gelato');
+const { processBookOrder, resumeBookOrder, createGelatoOrder, getCoverDimensions, computeBookPageInfo, isBlankPagesAckMissing, BLANK_PAGES_ACK_FROM, shippingFromSession } = require('../lib/gelato');
 const { stripDataUriPrefix } = require('../lib/r2');
 const { attachSquareCovers } = require('../lib/squareCovers');
 const email = require('../../email');
@@ -1588,10 +1588,8 @@ router.post('/book-page-info', authenticateToken, async (req, res) => {
     res.json({
       layout: info.layout,
       bookFormat: info.bookFormat, // derived from the layout: spread = square, single = A4
-      layouts: info.layouts, // both cards of the layout picker: available + reason + printed/blank pages
-      layoutSurchargeChf: info.layoutSurchargeChf, // 0 or BOOK_LAYOUT_SURCHARGE_CHF (facingSurchargeApplies)
+      layouts: info.layouts, // both cards of the layout picker: available + reason + printed/blank/content pages (the price tier is read from each layout's contentPages)
       contentPages: info.contentPages,
-      contentPagesSingle: info.contentPagesSingle, // what the price tier is based on
       printedPages: info.printedPages,
       blankPages: info.blankPages,
       blankAckFrom: BLANK_PAGES_ACK_FROM,
@@ -1644,17 +1642,15 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         : storyResult.rows[0].data;
       stories.push({ id: sid, data: storyData });
     }
-    // Same counter the print PDF and the book-builder preview use
-    // (dedication + story pages + per-extra-story title/dedication/back cover).
-    // Price tier = one-page content count whichever layout is printed; facing pages add the layout
-    // surcharge when text in the picture was available (decisions.md, the customer picks the book layout 2026-10-27).
-    const totalPages = countBookContentPages(stories.map(s => s.data), 'single');
-
     // The requested layout is validated here: an unavailable one throws (BookLayoutError -> 400), no silent downgrade.
     // Blank-page guard: the customer must have ticked the acknowledgement in the
     // book builder (docs/decisions.md, blank-page preview). Not bypassable by
     // calling this endpoint directly.
     const pageInfo = await computeBookPageInfo(getDbPool(), stories.map(s => s.data), coverType, { layout: req.body.layout });
+    // The price tier is read from the content page count of the layout the customer chose (A4 = one page per scene,
+    // square = two): the same counter the print PDF and the book-builder quote use. No separate surcharge
+    // (decisions.md 2026-11-11 "Price per layout from the page tiers").
+    const totalPages = pageInfo.contentPages;
     if (isBlankPagesAckMissing(pageInfo.blankPages, req.body.blankPagesAcknowledged)) {
       return res.status(400).json({
         error: `This book has ${pageInfo.blankPages} blank pages; the blank pages must be acknowledged before checkout.`,
@@ -1666,7 +1662,7 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     // Calculate price based on pages and cover type (using database pricing)
     // Pricing tiers store the BOOK price only — shipping is added once per order.
     const isHardcover = coverType === 'hardcover';
-    const priceInChf = (await getPriceForPages(totalPages, isHardcover)) + pageInfo.layoutSurchargeChf;
+    const priceInChf = await getPriceForPages(totalPages, isHardcover);
     const SHIPPING_COST_CHF = 10; // Flat CHF 10 shipping per order (Switzerland)
     const booksSubtotal = priceInChf * quantity;
     const totalPriceChf = booksSubtotal + SHIPPING_COST_CHF;

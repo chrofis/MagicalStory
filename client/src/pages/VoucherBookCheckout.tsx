@@ -8,8 +8,8 @@ import { Navigation, LoadingSpinner } from '@/components/common';
 import BlankPagesPreview from '@/components/book/BlankPagesPreview';
 import AddStoryNudge from '@/components/book/AddStoryNudge';
 import type { BookLayout } from '@/services/storyService';
-import { bookSizeLabel } from '@/utils/bookPricing';
-import BookFacingOption from '@/components/book/BookFacingOption';
+import { bookSizeLabel, A4_BOOK_SIZE_LABEL } from '@/utils/bookPricing';
+import BookFormatChoice from '@/components/book/BookFormatChoice';
 import BookSquareCovers from '@/components/book/BookSquareCovers';
 import BookPreviewButton from '@/components/book/BookPreviewButton';
 import { storyService } from '@/services';
@@ -45,7 +45,7 @@ const texts = {
     softcoverPrice: 'free',
     hardcover: 'Hardcover',
     hardcoverPrice: (chf: string) => `+ CHF ${chf}`,
-    size: '21 × 28 cm',
+    size: A4_BOOK_SIZE_LABEL,
     blankPagesTitle: 'Your book has room for another story',
     blankPagesDesc: (printed: number, content: number, blank: number) => `Your book has ${printed} pages. Your stories fill ${content} of them, ${blank} ${blank === 1 ? 'page' : 'pages'} will stay blank.`,
     blankPreviewTitle: 'Your printed book',
@@ -77,7 +77,7 @@ const texts = {
     softcoverPrice: 'gratis',
     hardcover: 'Hardcover',
     hardcoverPrice: (chf: string) => `+ CHF ${chf}`,
-    size: '21 × 28 cm',
+    size: A4_BOOK_SIZE_LABEL,
     blankPagesTitle: 'In deinem Buch ist Platz für eine weitere Geschichte',
     blankPagesDesc: (printed: number, content: number, blank: number) => `Dein Buch hat ${printed} Seiten. Deine Geschichten füllen ${content} davon, ${blank} ${blank === 1 ? 'Seite bleibt' : 'Seiten bleiben'} leer.`,
     blankPreviewTitle: 'Dein gedrucktes Buch',
@@ -109,7 +109,7 @@ const texts = {
     softcoverPrice: 'gratuite',
     hardcover: 'Couverture rigide',
     hardcoverPrice: (chf: string) => `+ CHF ${chf}`,
-    size: '21 × 28 cm',
+    size: A4_BOOK_SIZE_LABEL,
     blankPagesTitle: 'Votre livre a de la place pour une autre histoire',
     blankPagesDesc: (printed: number, content: number, blank: number) => `Votre livre compte ${printed} pages. Vos histoires en remplissent ${content}, ${blank} ${blank === 1 ? 'page restera vierge' : 'pages resteront vierges'}.`,
     blankPreviewTitle: 'Votre livre imprimé',
@@ -141,7 +141,7 @@ const texts = {
     softcoverPrice: 'gratis',
     hardcover: 'Copertina rigida',
     hardcoverPrice: (chf: string) => `+ CHF ${chf}`,
-    size: '21 × 28 cm',
+    size: A4_BOOK_SIZE_LABEL,
     blankPagesTitle: 'Nel tuo libro c’è spazio per un’altra storia',
     blankPagesDesc: (printed: number, content: number, blank: number) => `Il tuo libro ha ${printed} pagine. Le tue storie ne riempiono ${content}, ${blank} ${blank === 1 ? 'pagina resterà vuota' : 'pagine resteranno vuote'}.`,
     blankPreviewTitle: 'Il tuo libro stampato',
@@ -236,7 +236,7 @@ export default function VoucherBookCheckout() {
     return () => { cancelled = true; };
   }, [selectedKey, coverType, layoutChoice, language]);
 
-  const pageCount = pageInfo?.contentPagesSingle ?? listedPages;
+  const pageCount = pageInfo?.contentPages ?? listedPages;
   const isTooLong = pageCount > maxPages;
   const needsBlankAck = !!pageInfo && !isTooLong && pageInfo.blankPages >= pageInfo.blankAckFrom;
   useEffect(() => { setBlankAck(false); }, [pageInfo?.blankPages, selectedKey]);
@@ -256,8 +256,8 @@ export default function VoucherBookCheckout() {
     setSelected(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
   };
 
-  // Due now: the hardcover surcharge plus the facing-pages surcharge; the voucher covers neither (server: vouchers.bookCouponCents).
-  const amountDue = (coverType === 'hardcover' ? Number(surchargeChf) : 0) + (pageInfo?.layoutSurchargeChf ?? 0);
+  // Due now: the hardcover surcharge only; the voucher covers the rest of the list price (server: vouchers.bookCouponCents).
+  const amountDue = coverType === 'hardcover' ? Number(surchargeChf) : 0;
   const canOrder = selected.length > 0 && !!pageInfo && !isTooLong && !busy && (!needsBlankAck || blankAck) && squareCoversReady;
 
   const handleOrder = async () => {
@@ -375,7 +375,7 @@ export default function VoucherBookCheckout() {
                 </div>
               )}
               {pageInfo && !isTooLong && (
-                <BookFacingOption language={language} layouts={pageInfo.layouts} selected={pageInfo.layout} onSelect={setLayoutChoice} />
+                <BookFormatChoice language={language} layouts={pageInfo.layouts} selected={pageInfo.layout} onSelect={setLayoutChoice} />
               )}
               {pageInfo && !isTooLong && (
                 <BookSquareCovers language={language} active={pageInfo.layout === 'spread'} stories={stories.filter(s => selected.includes(s.id))} onReadyChange={setSquareCoversReady} />

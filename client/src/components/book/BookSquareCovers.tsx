@@ -30,11 +30,13 @@ interface Props {
   onReadyChange: (ready: boolean) => void;
   /** Optional: gets the made covers (incl. the square dedication page) by story id, so the page can show what prints. */
   onCoversChange?: (covers: Record<string, Partial<Record<string, string>>>) => void;
+  /** False: only the progress/error box is drawn (the order page shows the book's one cover pair in PrintedBookSpreads). Default true. */
+  showImages?: boolean;
 }
 
 type Covers = Record<string, Partial<Record<string, string>>>;
 
-export default function BookSquareCovers({ language, active, stories, onReadyChange, onCoversChange }: Props) {
+export default function BookSquareCovers({ language, active, stories, onReadyChange, onCoversChange, showImages = true }: Props) {
   const t = TEXT[(language as Lang) in TEXT ? (language as Lang) : 'en'];
   const [covers, setCovers] = useState<Covers>({});
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -68,6 +70,7 @@ export default function BookSquareCovers({ language, active, stories, onReadyCha
   }, [active, idsKey, attempt]);
 
   if (!active) return null;
+  if (!showImages && status === 'ready') return null;
   const label: Record<CoverKey, string> = { frontCover: t.front, backCover: t.back };
   return (
     <div className="mt-3 p-3 bg-white border border-gray-200 rounded-lg" data-testid="book-square-covers">

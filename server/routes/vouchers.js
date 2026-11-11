@@ -11,7 +11,7 @@ const { CREDIT_CONFIG } = require('../config/credits');
 const { getPool } = require('../services/database');
 const { log } = require('../utils/logger');
 const vouchers = require('../lib/vouchers');
-const { countBookContentPages, computeBookPageInfo, isBlankPagesAckMissing } = require('../lib/gelato');
+const { computeBookPageInfo, isBlankPagesAckMissing } = require('../lib/gelato');
 const { getPriceForPages, getStripeForUser, isUserTestMode } = require('./print');
 
 const V = CREDIT_CONFIG.VOUCHER;
@@ -194,14 +194,14 @@ router.post('/vouchers/book-checkout', authenticateToken, async (req, res) => {
       if (r.rows.length === 0) return res.status(404).json({ error: `Story not found: ${sid}` });
       stories.push({ id: sid, data: typeof r.rows[0].data === 'string' ? JSON.parse(r.rows[0].data) : r.rows[0].data });
     }
-    // Price tier = one-page content count whichever layout is printed; the layout surcharge (facing pages chosen
-    // while text in the picture was available) is NOT covered by the voucher (decisions.md 2026-10-27).
-    const totalPages = countBookContentPages(stories.map(s => s.data), 'single');
+    // An unavailable requested layout throws BookLayoutError (-> 400 below), no silent downgrade.
+    const pageInfo = await computeBookPageInfo(pool, stories.map(s => s.data), coverType, { layout: req.body.layout });
+    // One rule for price and limit: the content pages of the layout the customer chose (decisions.md 2026-11-11
+    // "Price per layout from the page tiers"). The coupon covers the whole list price except the hardcover surcharge.
+    const totalPages = pageInfo.contentPages;
     if (totalPages > V.MAX_BOOK_PAGES) {
       return res.status(400).json({ error: `A voucher book has at most ${V.MAX_BOOK_PAGES} pages`, code: 'VOUCHER_BOOK_TOO_LONG', totalPages, max: V.MAX_BOOK_PAGES });
     }
-    // An unavailable requested layout throws BookLayoutError (-> 400 below), no silent downgrade.
-    const pageInfo = await computeBookPageInfo(pool, stories.map(s => s.data), coverType, { layout: req.body.layout });
     if (isBlankPagesAckMissing(pageInfo.blankPages, req.body.blankPagesAcknowledged)) {
       return res.status(400).json({
         error: `This book has ${pageInfo.blankPages} blank pages; the blank pages must be acknowledged before checkout.`,
@@ -212,9 +212,8 @@ router.post('/vouchers/book-checkout', authenticateToken, async (req, res) => {
 
     const isHardcover = coverType === 'hardcover';
     const SHIPPING_COST_CHF = 10; // same flat CH shipping as the normal checkout
-    const layoutSurchargeCents = pageInfo.layoutSurchargeChf * 100;
-    const listTotalCents = ((await getPriceForPages(totalPages, isHardcover)) + SHIPPING_COST_CHF) * 100 + layoutSurchargeCents;
-    const couponCents = vouchers.bookCouponCents({ listTotalCents, hardcover: isHardcover, layoutSurchargeCents });
+    const listTotalCents = ((await getPriceForPages(totalPages, isHardcover)) + SHIPPING_COST_CHF) * 100;
+    const couponCents = vouchers.bookCouponCents({ listTotalCents, hardcover: isHardcover });
     log.info(`🎁 [VOUCHER BOOK] user ${userId}: list CHF ${listTotalCents / 100}, voucher -CHF ${couponCents / 100}, pays CHF ${(listTotalCents - couponCents) / 100}`);
 
     const firstTitle = stories[0].data.title;

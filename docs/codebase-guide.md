@@ -333,15 +333,15 @@ Stripe `bookFormat` metadata, the order, the Gelato product match and the PDF us
   edge. Available unless it leaves `>= BLANK_PAGES_ACK_FROM` (4) filler pages (23 scenes and fewer on a 28-page SKU).
 - **spread** (square, facing pages): one scene = two pages, scene image on the LEFT (even) page, text on the facing RIGHT
   page (`addSpreadPages` in `server/lib/pdf.js`, via `options.layout`). With `single` unavailable it is the MINI book, the only
-  option, no surcharge; otherwise it is the exception behind the "more options" link, up to `FACING_PAGES_MAX_SCENES` (60).
-- **Price** = the tier of the one-page count (`contentPagesSingle`) for both layouts, plus
-  `BOOK_LAYOUT_SURCHARGE_CHF` (`server/config/credits.js`) when `facingSurchargeApplies(pageInfo)`: facing pages chosen
-  while text in the picture was available. `layoutSurchargeChf` in the page info is that amount; `create-checkout-session`
-  and `vouchers/book-checkout` add it to the Stripe line item (the voucher coupon never covers it) and the builders show it.
+  option; when A4 is also available the customer sees two equal format cards (`BookFormatChoice`), square up to `FACING_PAGES_MAX_SCENES` (60).
+- **Price** = the pricing tier of the CHOSEN layout's own content page count (`pageInfo.contentPages`; each layout also
+  carries `layouts.<x>.contentPages`, so the order page shows both prices on the format cards). No separate surcharge
+  (decisions.md 2026-11-11 "Price per layout from the page tiers"). `create-checkout-session`, `vouchers/book-checkout`
+  (the coupon covers everything but the hardcover surcharge) and the builders all read `pageInfo.contentPages`.
 - **The pick travels** builder -> `POST /api/book-page-info {layout}` -> checkout `layout` -> Stripe metadata `bookLayout` ->
-  `resolveBookOrderInputs` -> `processBookOrder(..., layout)` -> PDF. `BookFacingOption` (de/en/fr/it) renders the mini-book note
-  or the small "more options" link with the facing-pages checkbox from `pageInfo.layouts`.
-- The result carries `layout`, `bookFormat`, `layouts`, `layoutSurchargeChf`, `contentPages` (of the chosen layout), `contentPagesSingle`, `printedPages`, `blankPages`
+  `resolveBookOrderInputs` -> `processBookOrder(..., layout)` -> PDF. `BookFormatChoice` (de/en/fr/it) renders the two format
+  cards (reusing `ChoiceCard`) from `pageInfo.layouts` when both layouts are available, nothing otherwise.
+- The result carries `layout`, `bookFormat`, `layouts`, `contentPages` (of the chosen layout), `printedPages`, `blankPages`
   and `sequence` (`buildPrintedPageSequence`: `storyImage` + `storyText` entries for a spread, `story` for single).
   `POST /api/book-page-info`, the PDF generators and `processBookOrder` all read it; none recompute it.
 - Blank-page warning (`BLANK_PAGES_ACK_FROM`): amber box with "room for another story", the `AddStoryNudge`

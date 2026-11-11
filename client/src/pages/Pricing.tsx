@@ -5,7 +5,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { Navigation } from '@/components/common';
 import { storyService } from '@/services';
-import { fallbackPricingTiers, SHIPPING_COST_CHF, type PricingTier } from '@/utils/bookPricing';
+import { fallbackPricingTiers, SHIPPING_COST_CHF, type PricingTier, A4_BOOK_SIZE_LABEL } from '@/utils/bookPricing';
 
 interface CreditPackage {
   credits: number;
@@ -78,8 +78,8 @@ export default function Pricing() {
       internationalNote: 'Order multiple books and pay shipping only once',
       softcover: 'Softcover',
       hardcover: 'Hardcover',
-      softcoverSize: '21 × 28 cm',
-      hardcoverSize: '21 × 28 cm',
+      softcoverSize: A4_BOOK_SIZE_LABEL,
+      hardcoverSize: A4_BOOK_SIZE_LABEL,
       pages: 'Pages',
       // Credit-back callout
       rewardTitle: bookCreditMultiplier > 1
@@ -113,8 +113,8 @@ export default function Pricing() {
       internationalNote: 'Mehrere Bücher bestellen und Versand nur einmal zahlen',
       softcover: 'Softcover',
       hardcover: 'Hardcover',
-      softcoverSize: '21 × 28 cm',
-      hardcoverSize: '21 × 28 cm',
+      softcoverSize: A4_BOOK_SIZE_LABEL,
+      hardcoverSize: A4_BOOK_SIZE_LABEL,
       pages: 'Seiten',
       rewardTitle: bookCreditMultiplier > 1
         ? `${bookCreditMultiplier}× Credits zurück beim Bestellen des Buches`
@@ -147,8 +147,8 @@ export default function Pricing() {
       internationalNote: 'Commandez plusieurs livres et ne payez la livraison qu\'une fois',
       softcover: 'Couverture souple',
       hardcover: 'Couverture rigide',
-      softcoverSize: '21 × 28 cm',
-      hardcoverSize: '21 × 28 cm',
+      softcoverSize: A4_BOOK_SIZE_LABEL,
+      hardcoverSize: A4_BOOK_SIZE_LABEL,
       pages: 'Pages',
       rewardTitle: bookCreditMultiplier > 1
         ? `${bookCreditMultiplier}× crédits récupérés à la commande du livre`
@@ -181,8 +181,8 @@ export default function Pricing() {
       internationalNote: 'Ordina più libri e paga la spedizione una sola volta',
       softcover: 'Copertina morbida',
       hardcover: 'Copertina rigida',
-      softcoverSize: '21 × 28 cm',
-      hardcoverSize: '21 × 28 cm',
+      softcoverSize: A4_BOOK_SIZE_LABEL,
+      hardcoverSize: A4_BOOK_SIZE_LABEL,
       pages: 'Pagine',
       rewardTitle: bookCreditMultiplier > 1
         ? `Ricevi ${bookCreditMultiplier}× crediti quando ordini il libro`

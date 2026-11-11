@@ -3,7 +3,7 @@
  *
  * Gelato's minimum is 28 pages. A story whose one-page A4 layout leaves 4 or more empty pages (below 24 scenes) is the
  * MINI book: facing pages, SQUARE, the only option, no surcharge. Every other book is A4, one page per scene; facing pages
- * (square, +CHF 5) is the exception, up to 60 scenes. The format follows the layout (computeBookPageInfo.bookFormat).
+ * (square, priced on its own page count) is the exception, up to 60 scenes. The format follows the layout (computeBookPageInfo.bookFormat).
  * Plan: tasks/short-book-layout-2026-10-26.md, tasks/strip-edge-by-picture-2026-10-27.md (Part B v4)
  */
 import { describe, it, expect } from 'vitest';
@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 const database = require('../../server/services/database');
 database.getPool = () => ({});
 const {
-  computeBookPageInfo, countBookContentPages, buildPrintedPageSequence, chooseBookLayout, facingSurchargeApplies, FACING_PAGES_MAX_SCENES,
+  computeBookPageInfo, countBookContentPages, buildPrintedPageSequence, chooseBookLayout, FACING_PAGES_MAX_SCENES,
   isBlankPagesAckMissing,
 } = require('../../server/lib/gelato.js');
 
@@ -112,19 +112,18 @@ describe('the format follows the layout (never picked by the customer)', () => {
       expect(r.bookFormat).toBe('square');
       expect(r.productUid).toBe(SQUARE28.product_uid);
       expect(r.layouts.single.available).toBe(false);
-      expect(r.layoutSurchargeChf).toBe(0);
     }
   });
-  it('25 scenes: single A4 by default; spread on request is square with +5', async () => {
+  it('25 scenes: single A4 by default; spread on request is square, its price tier read from its own two-pages-per-scene count', async () => {
     const d = await info([story(25)]);
     expect(d.layout).toBe('single');
     expect(d.bookFormat).toBe('A4');
     expect(d.productUid).toBe(SKU28.product_uid);
-    expect(d.layoutSurchargeChf).toBe(0);
+    expect(d.contentPages).toBe(26);
     const s = await info([story(25)], [SKU28], { layout: 'spread' });
     expect(s.bookFormat).toBe('square');
     expect(s.productUid).toBe(SQUARE28.product_uid);
-    expect(s.layoutSurchargeChf).toBe(5);
+    expect(s.contentPages).toBe(51);
   });
   it('61 scenes: no spread, A4', async () => {
     const r = await info([story(25), story(25), story(11)]);
@@ -138,37 +137,35 @@ describe('the format follows the layout (never picked by the customer)', () => {
   });
 });
 
-describe('price: one-page tier for both layouts, CHF 5 only when facing pages beat an available one-page layout', () => {
-  it('BOOK_LAYOUT_SURCHARGE_CHF is the one constant', () => {
-    expect(CREDIT_CONFIG.BOOK_LAYOUT_SURCHARGE_CHF).toBe(5);
+describe('price: the tier is read from the chosen layout own content page count, no surcharge (decisions.md 2026-11-11)', () => {
+  it('the CHF 5 surcharge constant and the surcharge helpers are gone', () => {
+    expect(CREDIT_CONFIG.BOOK_LAYOUT_SURCHARGE_CHF).toBeUndefined();
+    const g = require('../../server/lib/gelato.js');
+    for (const k of ['facingSurchargeApplies', 'facingSurchargeIfChosenChf', 'layoutSurchargeChf']) expect(g[k]).toBeUndefined();
   });
-  it('6- and 15-scene books: facing is the only layout, surcharge CHF 0, price tier on the one-page count', async () => {
+  it('6- and 15-scene books: facing is the only layout; the tier is read from its own two-pages-per-scene count', async () => {
     for (const n of [6, 15]) {
       const r = await info([story(n)]);
       expect(r.layout).toBe('spread');
-      expect(facingSurchargeApplies(r)).toBe(false);
-      expect(r.layoutSurchargeChf).toBe(0);
-      expect(r.contentPagesSingle).toBe(n + 1);
+      expect(r.contentPages).toBe(2 * n + 1);
+      expect(r.layouts.single.contentPages).toBe(n + 1);
     }
   });
-  it('25-scene book: facing chosen over an available one-page layout = +5, one-page = 0', async () => {
+  it('25-scene book: each layout is billed on its own count (square 51, A4 26)', async () => {
     const f = await info([story(25)], [SKU28], { layout: 'spread' });
-    expect(facingSurchargeApplies(f)).toBe(true);
-    expect(f.layoutSurchargeChf).toBe(5);
-    expect(f.contentPagesSingle).toBe(26);   // tier still read from the one-page count
+    expect(f.contentPages).toBe(51);
+    expect(f.layouts.single.contentPages).toBe(26);
     const s = await info([story(25)], [SKU28], { layout: 'single' });
-    expect(facingSurchargeApplies(s)).toBe(false);
-    expect(s.layoutSurchargeChf).toBe(0);
+    expect(s.contentPages).toBe(26);
   });
   it('countBookContentPages defaults to single and doubles scenes for spread', () => {
     expect(countBookContentPages([story(6), story(6)])).toBe(1 + 6 + 2 + 6);
     expect(countBookContentPages([story(6), story(6)], 'spread')).toBe(1 + 12 + 2 + 12);
   });
-  it('voucher coupon never covers the layout surcharge', () => {
+  it('voucher coupon covers the whole list price except the hardcover surcharge (no layout surcharge any more)', () => {
     const { bookCouponCents } = require('../../server/lib/vouchers.js');
-    expect(bookCouponCents({ listTotalCents: 5600, hardcover: false, layoutSurchargeCents: 500 })).toBe(5100);
-    expect(bookCouponCents({ listTotalCents: 6600, hardcover: true, layoutSurchargeCents: 500 })).toBe(5100);
     expect(bookCouponCents({ listTotalCents: 5100, hardcover: false })).toBe(5100);
+    expect(bookCouponCents({ listTotalCents: 6100, hardcover: true })).toBe(5100);
   });
 });
 
@@ -201,7 +198,8 @@ describe('the layout travels builder -> page info -> checkout -> order -> PDF', 
       const src = read(f);
       expect(src).toContain('{ layout: req.body.layout }');
       expect(src).toContain('bookLayout: pageInfo.layout');
-      expect(src).toContain('pageInfo.layoutSurchargeChf');
+      expect(src).not.toMatch(/layoutSurcharge/);
+      expect(src).toContain('pageInfo.contentPages');
       expect(src).toContain("err.name === 'BookLayoutError'");
     }
   });
@@ -221,12 +219,13 @@ describe('the layout travels builder -> page info -> checkout -> order -> PDF', 
     expect(read('server/lib/gelato.js')).toContain('inp.quantity, inp.layout');
     expect(read('server.js')).toContain('orderQuantity, orderLayout');
   });
-  it('clients bill the one-page count plus the server surcharge', () => {
+  it('clients bill the content count of the chosen layout, show the format cards and carry no surcharge', () => {
     const b = read('client/src/pages/BookBuilder.tsx');
-    expect(b).toContain('pageInfo?.contentPagesSingle');
-    expect(b).toContain('layoutSurchargeChf');
-    expect(b).toContain('<BookFacingOption');
-    expect(read('client/src/pages/VoucherBookCheckout.tsx')).toContain('<BookFacingOption');
+    expect(b).toContain('pageInfo?.contentPages');
+    expect(b).not.toMatch(/layoutSurcharge|contentPagesSingle/);
+    expect(b).toContain('<BookFormatChoice');
+    expect(read('client/src/pages/VoucherBookCheckout.tsx')).toContain('<BookFormatChoice');
+    expect(read('client/src/pages/VoucherBookCheckout.tsx')).not.toMatch(/layoutSurcharge|contentPagesSingle/);
   });
   it('both blank-page warnings carry the add-story action', () => {
     expect(read('client/src/pages/BookBuilder.tsx')).toContain('<AddStoryNudge');

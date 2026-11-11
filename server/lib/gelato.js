@@ -9,7 +9,6 @@ const { generatePrintPdf, generateCombinedBookPdf } = require('./pdf');
 const { GROK_FILL_MODEL } = require('./pageFill');
 const { attachSquareCovers } = require('./squareCovers');
 const { MODEL_PRICING } = require('../config/models');
-const { CREDIT_CONFIG } = require('../config/credits');
 
 // Per page USD of the Grok-outpainted print strip (price table: models.js MODEL_PRICING).
 const GROK_STRIP_FILL_USD = MODEL_PRICING[GROK_FILL_MODEL].perImage;
@@ -274,35 +273,20 @@ function chooseBookLayout(layouts, requested) {
 }
 
 /**
- * The surcharge rule: facing pages cost BOOK_LAYOUT_SURCHARGE_CHF only when the customer chose them
- * over an AVAILABLE text-in-picture layout; when facing pages is the only layout offered there is no
- * surcharge (owner 2026-10-27). Quote, both Stripe checkouts and the client price line all read this.
- */
-function facingSurchargeApplies(pageInfo) {
-  return pageInfo.layout === 'spread' && pageInfo.layouts.single.available;
-}
-/** What facing pages would cost extra if chosen (shown on the picker card): 0 when they are the only layout offered. */
-function facingSurchargeIfChosenChf(layouts) {
-  return layouts.single.available ? CREDIT_CONFIG.BOOK_LAYOUT_SURCHARGE_CHF : 0;
-}
-function layoutSurchargeChf(pageInfo) {
-  return facingSurchargeApplies(pageInfo) ? facingSurchargeIfChosenChf(pageInfo.layouts) : 0;
-}
-
-/**
  * Single source of truth for "how many pages will this book be printed with,
  * and how many of them are blank". Used by the order flow (PDF layout + padding)
  * and by the pre-payment preview in the book builder.
  *
- * `contentPagesSingle` is the content count of the one-page layout and is what the price tier is
- * read from whichever layout is chosen; facing pages add layoutSurchargeChf on top.
+ * `contentPages` is the content count of the CHOSEN layout and is what the price tier is read from (decisions.md
+ * 2026-11-11 "Price per layout from the page tiers"); `layouts.<x>.contentPages` is the count of each layout, so the
+ * quote can price both. There is no separate surcharge.
  *
  * @param {import('pg').Pool} dbPool
  * @param {Object[]} storyDatas - stories.data objects, in book order
  * @param {'softcover'|'hardcover'} coverType
  * @param {{layout?: 'single'|'spread'}} [options] - the customer's requested layout
- * @returns {Promise<{layout:'single'|'spread', bookFormat:'A4'|'square' (derived from the layout), layouts:Object, contentPages:number, contentPagesSingle:number,
- *   layoutSurchargeChf:number, estimatedPageCount:number, printedPages:number, blankPages:number,
+ * @returns {Promise<{layout:'single'|'spread', bookFormat:'A4'|'square' (derived from the layout), layouts:Object, contentPages:number,
+ *   estimatedPageCount:number, printedPages:number, blankPages:number,
  *   productUid:string|null, product:Object|null, sequence:Object[]}>}
  */
 async function computeBookPageInfo(dbPool, storyDatas, coverType, { layout: requested } = {}) {
@@ -319,8 +303,6 @@ async function computeBookPageInfo(dbPool, storyDatas, coverType, { layout: requ
   const single = planLayoutPages(rowsFor(bookFormatForLayout('single')), storyDatas, 'single');
   const spread = planLayoutPages(rowsFor(bookFormatForLayout('spread')), storyDatas, 'spread');
   const layouts = describeLayouts(single, spread, countBookScenes(storyDatas));
-  layouts.single.surchargeChf = 0;
-  layouts.spread.surchargeChf = facingSurchargeIfChosenChf(layouts);
   const layout = chooseBookLayout(layouts, requested);
   const plan = layout === 'spread' ? spread : single;
   const info = {
@@ -328,7 +310,6 @@ async function computeBookPageInfo(dbPool, storyDatas, coverType, { layout: requ
     bookFormat: bookFormatForLayout(layout),
     layouts,
     contentPages: plan.contentPages,
-    contentPagesSingle: single.contentPages,
     estimatedPageCount: plan.estimatedPageCount,
     printedPages: plan.printedPages,
     blankPages: plan.blankPages,
@@ -336,7 +317,6 @@ async function computeBookPageInfo(dbPool, storyDatas, coverType, { layout: requ
     product: plan.product,
     sequence: buildPrintedPageSequence(storyDatas, plan.printedPages, layout),
   };
-  info.layoutSurchargeChf = layoutSurchargeChf(info);
   return info;
 }
 
@@ -968,8 +948,6 @@ module.exports = {
   chooseBookLayout,
   bookFormatForLayout,
   describeLayouts,
-  facingSurchargeApplies,
-  layoutSurchargeChf,
   countBookScenes,
   BookLayoutError,
   FACING_PAGES_MAX_SCENES,

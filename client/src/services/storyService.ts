@@ -1,6 +1,6 @@
 import api from './api';
 
-/** POST /api/book-page-info. `contentPagesSingle` is what the price tier is based on, whatever `layout` prints; facing pages add layoutSurchargeChf. */
+/** POST /api/book-page-info. `contentPages` (of the chosen layout) is what the price tier is read from; each layout also carries its own `contentPages`. */
 export type BookLayout = 'single' | 'spread';
 /** One layout of the book, from the server (gelato.describeLayouts). `reason` is a code plus numbers. */
 export interface BookLayoutOption {
@@ -8,7 +8,8 @@ export interface BookLayoutOption {
   reason: { code: 'TOO_FEW_PAGES'; emptyPages: number } | { code: 'TOO_MANY_PAGES'; printedPages: number; maxPages: number } | null;
   printedPages: number;
   blankPages: number;
-  surchargeChf: number;
+  /** Content pages of this layout: the page count its price tier is read from. */
+  contentPages: number;
 }
 export interface BookPreviewManifest {
   layout: BookLayout;
@@ -28,10 +29,7 @@ export interface BookPageInfo {
   /** Derived by the server from the layout (spread = square, single = A4); never sent by the client. */
   bookFormat: 'square' | 'A4';
   layouts: Record<BookLayout, BookLayoutOption>;
-  /** Surcharge of the layout in `layout` (0 or BOOK_LAYOUT_SURCHARGE_CHF; gelato.facingSurchargeApplies). */
-  layoutSurchargeChf: number;
   contentPages: number;
-  contentPagesSingle: number;
   printedPages: number;
   blankPages: number;
   blankAckFrom: number;

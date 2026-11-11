@@ -46,5 +46,7 @@ export function getPriceForPages(pageCount: number, isHardcover: boolean, tiers?
 // (BOOK_FORMAT_PATTERN.square), 'single' the A4 210x280 mm one. The language texts carry the A4 size
 // only, so the square size is a number, not a translation.
 export const SQUARE_BOOK_SIZE_LABEL = '20 × 20 cm';
+/** The A4 trim size (Gelato 210x280 mm); the one place the order, pricing and voucher pages read it. */
+export const A4_BOOK_SIZE_LABEL = '21 × 28 cm';
 export const bookSizeLabel = (layout: 'single' | 'spread' | undefined, a4Label: string): string =>
   layout === 'spread' ? SQUARE_BOOK_SIZE_LABEL : a4Label;

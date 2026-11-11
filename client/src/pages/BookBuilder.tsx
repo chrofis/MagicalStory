@@ -8,13 +8,13 @@ import { Navigation, LoadingSpinner } from '@/components/common';
 import PrintedBookSpreads from '@/components/book/PrintedBookSpreads';
 import BlankPagesChoice from '@/components/book/BlankPagesChoice';
 import AddStoryNudge from '@/components/book/AddStoryNudge';
-import BookFacingOption from '@/components/book/BookFacingOption';
+import BookFormatChoice from '@/components/book/BookFormatChoice';
 import BookSquareCovers from '@/components/book/BookSquareCovers';
 import BookPreviewButton from '@/components/book/BookPreviewButton';
 import type { BookPageInfo } from '@/services/storyService';
 import { storyService } from '@/services';
 import type { BookLayout } from '@/services/storyService';
-import { getPriceForPages, bookSizeLabel, SQUARE_BOOK_SIZE_LABEL, MAX_BOOK_PAGES, SHIPPING_COST_CHF, type PricingTier } from '@/utils/bookPricing';
+import { getPriceForPages, bookSizeLabel, SQUARE_BOOK_SIZE_LABEL, MAX_BOOK_PAGES, SHIPPING_COST_CHF, type PricingTier, A4_BOOK_SIZE_LABEL } from '@/utils/bookPricing';
 import { createLogger } from '@/services/logger';
 import { localizedApiError } from '@/utils/apiErrors';
 import { toImgSrc } from '@/utils/imgSrc';
@@ -140,10 +140,9 @@ export default function BookBuilder() {
       chooseCover: 'Choose cover',
       softcover: 'Softcover',
       hardcover: 'Hardcover',
-      softcoverSize: '21 × 28 cm',
-      hardcoverSize: '21 × 28 cm',
+      softcoverSize: A4_BOOK_SIZE_LABEL,
+      hardcoverSize: A4_BOOK_SIZE_LABEL,
       price: 'Price',
-      facingPagesSurcharge: 'Facing pages',
       bookPriceLabel: 'Book',
       shippingLabel: 'Shipping (Switzerland)',
       shippingTime: 'Delivery in 5-7 business days',
@@ -194,10 +193,9 @@ export default function BookBuilder() {
       chooseCover: 'Einband wählen',
       softcover: 'Softcover',
       hardcover: 'Hardcover',
-      softcoverSize: '21 × 28 cm',
-      hardcoverSize: '21 × 28 cm',
+      softcoverSize: A4_BOOK_SIZE_LABEL,
+      hardcoverSize: A4_BOOK_SIZE_LABEL,
       price: 'Preis',
-      facingPagesSurcharge: 'Gegenüberliegende Seiten',
       bookPriceLabel: 'Buch',
       shippingLabel: 'Versand (Schweiz)',
       shippingTime: 'Lieferung in 5-7 Werktagen',
@@ -248,10 +246,9 @@ export default function BookBuilder() {
       chooseCover: 'Choisir la couverture',
       softcover: 'Couverture souple',
       hardcover: 'Couverture rigide',
-      softcoverSize: '21 × 28 cm',
-      hardcoverSize: '21 × 28 cm',
+      softcoverSize: A4_BOOK_SIZE_LABEL,
+      hardcoverSize: A4_BOOK_SIZE_LABEL,
       price: 'Prix',
-      facingPagesSurcharge: 'Pages en regard',
       bookPriceLabel: 'Livre',
       shippingLabel: 'Livraison (Suisse)',
       shippingTime: 'Livraison en 5-7 jours ouvrables',
@@ -302,10 +299,9 @@ export default function BookBuilder() {
       chooseCover: 'Scegli la copertina',
       softcover: 'Copertina morbida',
       hardcover: 'Copertina rigida',
-      softcoverSize: '21 × 28 cm',
-      hardcoverSize: '21 × 28 cm',
+      softcoverSize: A4_BOOK_SIZE_LABEL,
+      hardcoverSize: A4_BOOK_SIZE_LABEL,
       price: 'Prezzo',
-      facingPagesSurcharge: 'Pagine affiancate',
       bookPriceLabel: 'Libro',
       shippingLabel: 'Spedizione (Svizzera)',
       shippingTime: 'Consegna in 5-7 giorni lavorativi',
@@ -409,14 +405,18 @@ export default function BookBuilder() {
     return () => { cancelled = true; };
   }, [storyIdsKey, coverType, layoutChoice, isOverLimit, language, showToast]);
 
-  // Price for the billed page count; null until the server has counted the book.
-  // contentPagesSingle: the tier is read from the one-page count whichever layout prints; facing pages add
-  // layoutSurchargeChf when text in the picture was available (decisions.md 2026-10-27, the customer picks the layout).
-  const billedPages = pageInfo?.contentPagesSingle ?? null;
-  const layoutSurcharge = pageInfo?.layoutSurchargeChf ?? 0;
+  // Price for the billed page count; null until the server has counted the book. The tier is read from the content
+  // pages of the CHOSEN layout (A4 one page per scene, square two); each format card shows its own full price
+  // (decisions.md 2026-11-11 "Price per layout from the page tiers"). There is no separate surcharge.
+  const billedPages = pageInfo?.contentPages ?? null;
   const price = useMemo(() => {
     return billedPages === null ? null : getPriceForPages(billedPages, coverType === 'hardcover', pricingTiers);
   }, [billedPages, coverType, pricingTiers]);
+  const layoutPrice = (l: 'single' | 'spread'): string | undefined => {
+    const layoutPages = pageInfo?.layouts[l].contentPages;
+    const p = layoutPages === undefined ? null : getPriceForPages(layoutPages, coverType === 'hardcover', pricingTiers);
+    return p === null ? undefined : `CHF ${p}.-`;
+  };
   // Owner 2026-10-04: up to 3 blank pages are fine and stay silent; from the
   // server's blankAckFrom (BLANK_PAGES_ACK_FROM) on: warn, show the printed-book
   // preview and require the acknowledgement. The checkout endpoint enforces it too.
@@ -715,7 +715,7 @@ export default function BookBuilder() {
                 </div>
               )}
               {pageInfo && !isOverLimit && (
-                <BookFacingOption language={language} layouts={pageInfo.layouts} selected={pageInfo.layout} onSelect={setLayoutChoice} />
+                <BookFormatChoice language={language} layouts={pageInfo.layouts} selected={pageInfo.layout} onSelect={setLayoutChoice} prices={{ single: layoutPrice('single'), spread: layoutPrice('spread') }} />
               )}
               {needsBlankAck && pageInfo && (
                 <div className={isMini ? 'mt-2' : 'mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg'}>
@@ -737,35 +737,27 @@ export default function BookBuilder() {
               )}
             </div>
 
-            {/* Printed book: covers first, then the first spreads, then the preview button. Without blank pages
-                only the preview button and the covers show. */}
-            {pageInfo && !isOverLimit && (() => {
-              const coversEl = (
-                <BookSquareCovers language={language} active={pageInfo.layout === 'spread'} stories={stories} onReadyChange={setSquareCoversReady} onCoversChange={setSquareCovers} />
-              );
-              const previewEl = (
-                <BookPreviewButton language={language} storyIds={stories.map(st => st.id)} layout={pageInfo.layout} coverType={coverType} />
-              );
-              return needsBlankAck ? (
+            {/* Printed book, shown the same way in every case (with or without blank pages, one story or several):
+                one front and one back cover of the BOOK, the first 3 spreads, "+ N more pages", the preview button.
+                BookSquareCovers keeps making the square covers (order button waits for them) but draws no images
+                here: the strip shows the book's single cover pair. */}
+            {pageInfo && !isOverLimit && (
+              <>
+                <BookSquareCovers language={language} active={pageInfo.layout === 'spread'} stories={stories} onReadyChange={setSquareCoversReady} onCoversChange={setSquareCovers} showImages={false} />
                 <PrintedBookSpreads
                   sequence={pageInfo.sequence}
                   storyIds={stories.map(st => st.id)}
                   square={pageInfo.layout === 'spread'}
                   dedicationOverride={squareDedications}
-                  covers={pageInfo.layout === 'spread' ? coversEl : undefined}
+                  squareCovers={pageInfo.layout === 'spread' ? squareCovers : undefined}
                   coverLabels={{ front: t.printedFront, back: t.printedBack }}
                   title={t.blankPreviewTitle}
                   morePages={t.morePages}
                 >
-                  {previewEl}
+                  <BookPreviewButton language={language} storyIds={stories.map(st => st.id)} layout={pageInfo.layout} coverType={coverType} />
                 </PrintedBookSpreads>
-              ) : (
-                <>
-                  <div className="mt-4">{previewEl}</div>
-                  {coversEl}
-                </>
-              );
-            })()}
+              </>
+            )}
           </div>
 
           {/* Right: Format & Price */}
@@ -885,7 +877,7 @@ export default function BookBuilder() {
 
             {/* Use referral balance — only when user has CHF in their balance */}
             {!isOverLimit && price && balanceAvailableCents > 0 && (() => {
-              const booksSubtotal = (price + layoutSurcharge) * quantity;
+              const booksSubtotal = price * quantity;
               const promoDisc = promoValid ? promoDiscount : 0;
               const priceAfterPromo = Math.max(0, booksSubtotal + SHIPPING_COST_CHF - promoDisc);
               // Server clamps to (orderTotal - 100) cents to leave CHF 1 for Stripe; mirror here.
@@ -937,7 +929,7 @@ export default function BookBuilder() {
             {!isOverLimit && price && (
               <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 sm:p-6 mb-6">
                 {(() => {
-                  const booksSubtotal = (price + layoutSurcharge) * quantity;
+                  const booksSubtotal = price * quantity;
                   const discount = promoValid ? promoDiscount : 0;
                   const priceAfterPromo = Math.max(0, booksSubtotal + SHIPPING_COST_CHF - discount);
                   const maxSpendCents = Math.max(0, priceAfterPromo * 100 - 100);
@@ -951,12 +943,6 @@ export default function BookBuilder() {
                         </span>
                         <span>CHF {price * quantity}.-</span>
                       </div>
-                      {layoutSurcharge > 0 && (
-                        <div className="flex items-center justify-between mb-1 text-sm text-gray-600">
-                          <span>{quantity > 1 ? `${quantity} × CHF ${layoutSurcharge}.- ` : ''}{t.facingPagesSurcharge}</span>
-                          <span>CHF {layoutSurcharge * quantity}.-</span>
-                        </div>
-                      )}
                       <div className="flex items-center justify-between mb-2 text-sm text-gray-600">
                         <span>{t.shippingLabel}</span>
                         <span>CHF {SHIPPING_COST_CHF}.-</span>

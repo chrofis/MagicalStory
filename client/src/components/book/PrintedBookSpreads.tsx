@@ -3,11 +3,11 @@ import { storyService } from '@/services';
 import type { PrintedPage } from '@/services/storyService';
 import { createLogger } from '@/services/logger';
 import { toImgSrc } from '@/utils/imgSrc';
-import { spreadPages } from '@/utils/printedSpreads';
+import { spreadPages, pickBookCovers } from '@/utils/printedSpreads';
 
 const log = createLogger('PrintedBookSpreads');
 
-// "Your printed book" on the order page: front/back cover first, then the first 3 open-book spreads (left page | right
+// "Your printed book" on the order page, the same in every case (blank pages or not, one story or several): the book's one front/back cover first, then the first 3 open-book spreads (left page | right
 // page) of the printed sequence, then "+ N more pages" and the preview button (children) as the way to see the rest.
 // docs/decisions.md 2026-11-11 "Printed-book spreads".
 interface StoryImages {
@@ -24,8 +24,8 @@ interface Props {
   square: boolean;
   /** Square dedication page per story id (what a square book prints); replaces the A4 dedication image. */
   dedicationOverride?: Record<string, string | undefined>;
-  /** Cover row supplied by the page (square covers). When absent the story's own front/back covers are shown. */
-  covers?: ReactNode;
+  /** Square covers made by BookSquareCovers by story id (square book). When absent the stories' own covers are shown. */
+  squareCovers?: Record<string, Partial<Record<string, string>>>;
   coverLabels: { front: string; back: string };
   title: string;
   morePages: (n: number) => string;
@@ -37,7 +37,7 @@ const asSrc = (d?: string) => toImgSrc(d) ?? undefined;
 const isEmptyKind = (k: PrintedPage['kind']) => k === 'filler' || k === 'insideFront' || k === 'insideBack' || k === 'separator';
 
 export default function PrintedBookSpreads({
-  sequence, storyIds, square, dedicationOverride, covers, coverLabels, title, morePages, children,
+  sequence, storyIds, square, dedicationOverride, squareCovers, coverLabels, title, morePages, children,
 }: Props) {
   const [images, setImages] = useState<Record<number, StoryImages>>({});
   const idsKey = storyIds.join(',');
@@ -96,28 +96,23 @@ export default function PrintedBookSpreads({
     );
   };
 
-  const ownCovers = (si: number) => {
-    const set = images[si];
-    return [
-      { key: 'front', src: asSrc(set?.frontCover), label: coverLabels.front },
-      { key: 'back', src: asSrc(set?.backCover), label: coverLabels.back },
-    ].filter(c => c.src);
-  };
+  // ONE cover pair for the whole book, whatever the story count (pickBookCovers: the PDF's own front/back rule).
+  const picked = pickBookCovers(storyIds.map((id, si) => (squareCovers ? squareCovers[id] ?? {} : images[si] ?? {})) as { frontCover?: string; backCover?: string }[]);
+  const bookCovers = [
+    { key: 'front', src: asSrc(picked.front), label: coverLabels.front },
+    { key: 'back', src: asSrc(picked.back), label: coverLabels.back },
+  ].filter(c => c.src);
 
   return (
     <div className="mt-4" data-testid="printed-book-section">
       <div className="font-semibold text-sm text-gray-800 mb-2">{title}</div>
-      <div data-testid="printed-book-covers">
-        {covers ?? (
-          <div className="grid grid-cols-2 gap-2">
-            {ownCovers(0).map(c => (
-              <figure key={c.key}>
-                <img src={c.src} alt={c.label} className={`w-full ${aspect} object-cover rounded border border-gray-200`} />
-                <figcaption className="text-xs text-gray-500 mt-1 text-center">{c.label}</figcaption>
-              </figure>
-            ))}
-          </div>
-        )}
+      <div data-testid="printed-book-covers" className="grid grid-cols-2 gap-2">
+        {bookCovers.map(c => (
+          <figure key={c.key}>
+            <img src={c.src} alt={c.label} className={`w-full ${aspect} object-cover rounded border border-gray-200`} />
+            <figcaption className="text-xs text-gray-500 mt-1 text-center">{c.label}</figcaption>
+          </figure>
+        ))}
       </div>
       <div className="mt-3 space-y-3" data-testid="printed-book-spreads">
         {spreads.map((pair, i) => (

@@ -8,3 +8,14 @@ export function spreadPages(sequence: PrintedPage[]): { shown: PrintedPage[]; mo
   const inner = sequence.filter(p => p.kind !== 'cover' && p.kind !== 'backCover');
   return { shown: inner.slice(0, SPREAD_PAGES_SHOWN), more: Math.max(0, inner.length - SPREAD_PAGES_SHOWN) };
 }
+
+/**
+ * The ONE cover pair of the printed BOOK, whatever the story count (what pdf.js generateCombinedBookPdf puts on the
+ * cover): front = the first story's front cover; back = the first story's back cover or, when it has none, the back
+ * cover of the LAST story that has one (the same borrow rule as the PDF). `covers` is in book order.
+ */
+export function pickBookCovers(covers: { frontCover?: string; backCover?: string }[]): { front?: string; back?: string } {
+  let back = covers[0]?.backCover;
+  for (let i = covers.length - 1; !back && i > 0; i--) back = covers[i]?.backCover;
+  return { front: covers[0]?.frontCover, back };
+}
