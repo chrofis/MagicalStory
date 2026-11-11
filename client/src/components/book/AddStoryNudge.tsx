@@ -1,52 +1,40 @@
 import { Plus } from 'lucide-react';
 
-type Lang = 'en' | 'de' | 'fr' | 'it';
-
 // Short-book nudge (decisions.md, short-book layout 2026-10-26): a book with blank pages has
-// room for another story, so the warning's main action is adding one (no price change).
-const TEXT: Record<Lang, { add: string; spreadNote: string }> = {
-  en: {
-    add: 'Add another story',
-    spreadNote: 'Short stories are printed with the picture on one page and the text on the facing page.',
-  },
-  de: {
-    add: 'Weitere Geschichte hinzufügen',
-    spreadNote: 'Kurze Geschichten werden mit dem Bild auf einer Seite und dem Text auf der gegenüberliegenden Seite gedruckt.',
-  },
-  fr: {
-    add: 'Ajouter une autre histoire',
-    spreadNote: 'Les histoires courtes sont imprimées avec l’image sur une page et le texte sur la page en face.',
-  },
-  it: {
-    add: 'Aggiungi un’altra storia',
-    spreadNote: 'Le storie brevi vengono stampate con l’immagine su una pagina e il testo sulla pagina a fronte.',
-  },
+// room for another story, so one of the warning's two actions is adding one (no price change).
+// The two action buttons of the warning share this one className (sibling-button rule, CLAUDE.md).
+export const BLANK_ACTION_BUTTON_CLASS =
+  'bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-indigo-600';
+
+type Lang = 'en' | 'de' | 'fr' | 'it';
+const ADD: Record<Lang, string> = {
+  en: 'Add another story',
+  de: 'Weitere Geschichte hinzufügen',
+  fr: 'Ajouter une autre histoire',
+  it: 'Aggiungi un’altra storia',
 };
 
 interface Props {
-  language: string;
-  /** 'spread' adds the one-line note that explains the picture/text page layout. */
-  layout: 'single' | 'spread';
+  /** Button text; defaults to the built-in translation for `language`. */
+  label?: string;
+  language?: string;
   onAdd: () => void;
   busy?: boolean;
 }
 
-/** Primary "Add another story" button for the blank-pages warning, plus the spread-layout note. */
-export default function AddStoryNudge({ language, layout, onAdd, busy = false }: Props) {
-  const t = TEXT[(language as Lang) in TEXT ? (language as Lang) : 'en'];
+/** "Add another story" button for the blank-pages warning. */
+export default function AddStoryNudge({ label, language, onAdd, busy = false }: Props) {
+  const text = label ?? ADD[(language as Lang) in ADD ? (language as Lang) : 'en'];
   return (
-    <div className="mt-2">
-      <button
-        type="button"
-        onClick={onAdd}
-        disabled={busy}
-        data-testid="add-story-nudge"
-        className="bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-indigo-600 disabled:opacity-60"
-      >
-        <Plus size={16} />
-        {t.add}
-      </button>
-      {layout === 'spread' && <p className="text-xs text-gray-600 mt-2">{t.spreadNote}</p>}
-    </div>
+    <button
+      type="button"
+      onClick={onAdd}
+      disabled={busy}
+      data-testid="add-story-nudge"
+      className={BLANK_ACTION_BUTTON_CLASS}
+    >
+      <Plus size={16} />
+      {text}
+    </button>
   );
 }

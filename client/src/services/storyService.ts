@@ -43,6 +43,8 @@ export interface PrintedPage {
   kind: 'cover' | 'insideFront' | 'dedication' | 'title' | 'story' | 'storyImage' | 'storyText' | 'backCover' | 'separator' | 'filler' | 'insideBack';
   storyIndex?: number;
   pageNumber?: number;
+  /** storyText pages only: the page's story text. */
+  text?: string;
 }
 
 import type {

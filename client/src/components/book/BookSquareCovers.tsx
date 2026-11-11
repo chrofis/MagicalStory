@@ -10,14 +10,15 @@ const log = createLogger('BookSquareCovers');
 // BEFORE payment, so the customer sees what will be printed. The order button stays off until they are ready.
 // docs/decisions.md 2026-10-28 "Square covers".
 type Lang = 'en' | 'de' | 'fr' | 'it';
-type CoverKey = 'frontCover' | 'backCover' | 'initialPage';
-const COVER_ORDER: CoverKey[] = ['frontCover', 'backCover', 'initialPage'];
+type CoverKey = 'frontCover' | 'backCover';
+// The dedication page is still made and printed (squareCovers.js) but not shown here (owner 2026-11-11).
+const COVER_ORDER: CoverKey[] = ['frontCover', 'backCover'];
 
-const TEXT: Record<Lang, { title: string; making: string; failed: string; retry: string; front: string; back: string; dedication: string }> = {
-  en: { title: 'Your square book covers', making: 'Preparing the square covers, this takes about 10 seconds…', failed: 'The square covers could not be made.', retry: 'Try again', front: 'Front cover', back: 'Back cover', dedication: 'Dedication page' },
-  de: { title: 'Die Umschläge deines quadratischen Buchs', making: 'Die quadratischen Umschläge werden vorbereitet, das dauert etwa 10 Sekunden…', failed: 'Die quadratischen Umschläge konnten nicht erstellt werden.', retry: 'Erneut versuchen', front: 'Vorderseite', back: 'Rückseite', dedication: 'Widmungsseite' },
-  fr: { title: 'Les couvertures de votre livre carré', making: 'Préparation des couvertures carrées, environ 10 secondes…', failed: 'Les couvertures carrées n’ont pas pu être créées.', retry: 'Réessayer', front: 'Couverture', back: 'Quatrième de couverture', dedication: 'Page de dédicace' },
-  it: { title: 'Le copertine del tuo libro quadrato', making: 'Preparazione delle copertine quadrate, circa 10 secondi…', failed: 'Non è stato possibile creare le copertine quadrate.', retry: 'Riprova', front: 'Copertina', back: 'Retro di copertina', dedication: 'Pagina della dedica' },
+const TEXT: Record<Lang, { making: string; failed: string; retry: string; front: string; back: string }> = {
+  en: { making: 'Preparing the square covers, this takes about 10 seconds…', failed: 'The square covers could not be made.', retry: 'Try again', front: 'Front cover', back: 'Back cover' },
+  de: { making: 'Die quadratischen Umschläge werden vorbereitet, das dauert etwa 10 Sekunden…', failed: 'Die quadratischen Umschläge konnten nicht erstellt werden.', retry: 'Erneut versuchen', front: 'Vorderseite', back: 'Rückseite' },
+  fr: { making: 'Préparation des couvertures carrées, environ 10 secondes…', failed: 'Les couvertures carrées n’ont pas pu être créées.', retry: 'Réessayer', front: 'Couverture', back: 'Quatrième de couverture' },
+  it: { making: 'Preparazione delle copertine quadrate, circa 10 secondi…', failed: 'Non è stato possibile creare le copertine quadrate.', retry: 'Riprova', front: 'Copertina', back: 'Retro di copertina' },
 };
 
 interface Props {
@@ -29,7 +30,7 @@ interface Props {
   onReadyChange: (ready: boolean) => void;
 }
 
-type Covers = Record<string, Partial<Record<CoverKey, string>>>;
+type Covers = Record<string, Partial<Record<string, string>>>;
 
 export default function BookSquareCovers({ language, active, stories, onReadyChange }: Props) {
   const t = TEXT[(language as Lang) in TEXT ? (language as Lang) : 'en'];
@@ -63,10 +64,9 @@ export default function BookSquareCovers({ language, active, stories, onReadyCha
   }, [active, idsKey, attempt]);
 
   if (!active) return null;
-  const label: Record<CoverKey, string> = { frontCover: t.front, backCover: t.back, initialPage: t.dedication };
+  const label: Record<CoverKey, string> = { frontCover: t.front, backCover: t.back };
   return (
     <div className="mt-3 p-3 bg-white border border-gray-200 rounded-lg" data-testid="book-square-covers">
-      <div className="text-sm font-semibold text-gray-700 mb-2">{t.title}</div>
       {status === 'loading' && (
         <div className="flex items-center gap-2 text-sm text-gray-600" data-testid="book-square-covers-loading">
           <div className="animate-spin rounded-full h-4 w-4 border-2 border-indigo-600 border-t-transparent" />
@@ -82,7 +82,7 @@ export default function BookSquareCovers({ language, active, stories, onReadyCha
       {status === 'ready' && stories.map(s => (
         <div key={s.id} className="mb-2 last:mb-0">
           {stories.length > 1 && <div className="text-xs text-gray-500 mb-1 truncate">{s.title}</div>}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {COVER_ORDER.filter(k => covers[s.id]?.[k]).map(k => (
               <figure key={k}>
                 <img src={covers[s.id]![k]} alt={label[k]} className="w-full aspect-square object-cover rounded border border-gray-200" />

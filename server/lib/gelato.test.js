@@ -302,3 +302,10 @@ test('computeBookPageInfo: a client-sent format (legacy 4th argument) is ignored
   assert.strictEqual(info.bookFormat, 'A4');
   assert.strictEqual(info.layout, 'single');
 });
+
+test('buildPrintedPageSequence: spread storyText entries carry the real page text', () => {
+  const seq = buildPrintedPageSequence([storyOf(3)], 28, 'spread');
+  const texts = seq.filter(s => s.kind === 'storyText');
+  assert.deepStrictEqual(texts.map(s => s.text), ['Text 1', 'Text 2', 'Text 3']);
+  assert.ok(seq.filter(s => s.kind === 'storyImage').every(s => s.text === undefined));
+});

@@ -135,7 +135,7 @@ function isBlankPagesAckMissing(blankPages, acknowledged) {
  *
  * @param {number} printedPages - Gelato page count (from computeBookPageInfo)
  * @param {'single'|'spread'} [layout='single']
- * @returns {{kind:string, storyIndex?:number, pageNumber?:number}[]}
+ * @returns {{kind:string, storyIndex?:number, pageNumber?:number, text?:string}[]}
  */
 function buildPrintedPageSequence(storyDatas, printedPages, layout = 'single') {
   const { parseStoryPages } = require('./pdf');
@@ -144,10 +144,12 @@ function buildPrintedPageSequence(storyDatas, printedPages, layout = 'single') {
     if (si > 0) {
       seq.push({ kind: 'title', storyIndex: si }, { kind: 'dedication', storyIndex: si });
     }
-    const n = parseStoryPages(storyDatas[si]).length;
+    const pageTexts = parseStoryPages(storyDatas[si]);
+    const n = pageTexts.length;
     for (let p = 1; p <= n; p++) {
       if (layout === 'spread') {
-        seq.push({ kind: 'storyImage', storyIndex: si, pageNumber: p }, { kind: 'storyText', storyIndex: si, pageNumber: p });
+        // The text page carries the real page text so the order page can show it (owner 2026-11-11).
+        seq.push({ kind: 'storyImage', storyIndex: si, pageNumber: p }, { kind: 'storyText', storyIndex: si, pageNumber: p, text: pageTexts[p - 1].trim() });
       } else {
         seq.push({ kind: 'story', storyIndex: si, pageNumber: p });
       }

@@ -82,15 +82,15 @@ export default function BlankPagesPreview({
             <div
               key={i}
               data-kind={p.kind}
-              className={`w-9 h-12 sm:w-11 sm:h-14 rounded-sm overflow-hidden flex items-center justify-center text-[9px] ${
+              className={`w-14 h-[4.5rem] sm:w-16 sm:h-20 rounded-sm overflow-hidden flex items-center justify-center ${
                 blank ? 'bg-white border border-dashed border-gray-300' : 'bg-indigo-50 border border-indigo-200'
               }`}
             >
               {src && <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />}
-              {/* spread layout: the right-hand page holds the text */}
+              {/* spread layout: the right-hand page holds the text, shown tiny and clipped to the cell */}
               {p.kind === 'storyText' && (
-                <div className="w-full px-1 space-y-1" aria-hidden="true">
-                  <div className="h-px bg-indigo-300" /><div className="h-px bg-indigo-300" /><div className="h-px bg-indigo-300" /><div className="h-px bg-indigo-300 w-2/3" />
+                <div className="w-full h-full p-0.5 overflow-hidden text-[5px] leading-[6px] text-gray-700 break-words" data-testid="printed-page-text">
+                  {p.text}
                 </div>
               )}
             </div>

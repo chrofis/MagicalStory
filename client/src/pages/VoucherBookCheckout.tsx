@@ -387,7 +387,7 @@ export default function VoucherBookCheckout() {
                     <div>
                       <div className="font-semibold text-sm">{t.blankPagesTitle}</div>
                       <span className="text-sm">{t.blankPagesDesc(pageInfo.printedPages, pageInfo.contentPages, pageInfo.blankPages)}</span>
-                      <AddStoryNudge language={language} layout={pageInfo.layout} onAdd={handleAddStory} />
+                      <div className="mt-2"><AddStoryNudge language={language} onAdd={handleAddStory} /></div>
                     </div>
                   </div>
                   <BlankPagesPreview
