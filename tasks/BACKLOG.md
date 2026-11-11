@@ -2494,3 +2494,5 @@ three below are prompt/classification questions and are the owner's call.
 - [ ] Front cover drew a square chapel tower: no tower reference was sent and the bible entry never says "round" → coverHints null, front brief cites only LOC006.4
 - [x] Visual Bible name-or-role + one entry per group (owner design 2026-11-09): built 2026-11-09, unit-tested, stored replay done; paid writer re-run (runner written, not run) + staging check (verify.json vb-name-or-role-2026-11-09) pending the owner → tasks/vb-name-or-role-groups-2026-11-09.md
 - [ ] SEO: Marketing request items 3 (Christmas content), 4 (reviews/outreach texts), 5 (comparison pages), 7 (parenting guides), /vergleich structured data, GBP question → inbox/2026-11-09-marketing-seo-organic-traffic.md
+
+- [ ] **Several different books in one order (cart), one shipping** — a new customer ordered 3 books in 3 orders on 2026-11-11 and paid shipping 3 times; merged by hand (tasks/customer-combined-parcel-2026-11-11.md, local). Phase 2 of the plan is not built → docs/plans/2026-03-31-multi-book-orders.md:19
