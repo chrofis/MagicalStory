@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, ArrowUp, ArrowDown, Book, BookOpen, ShoppingCart, AlertTriangle, Info, Check, Printer, Plus, Minus } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ArrowDown, Book, BookOpen, ShoppingCart, AlertTriangle, Info, Printer, Plus, Minus } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Navigation, LoadingSpinner } from '@/components/common';
-import BlankPagesPreview from '@/components/book/BlankPagesPreview';
-import AddStoryNudge, { BLANK_ACTION_BUTTON_CLASS } from '@/components/book/AddStoryNudge';
+import PrintedBookSpreads from '@/components/book/PrintedBookSpreads';
+import BlankPagesChoice from '@/components/book/BlankPagesChoice';
+import AddStoryNudge from '@/components/book/AddStoryNudge';
 import BookFacingOption from '@/components/book/BookFacingOption';
 import BookSquareCovers from '@/components/book/BookSquareCovers';
 import BookPreviewButton from '@/components/book/BookPreviewButton';
@@ -151,16 +152,13 @@ export default function BookBuilder() {
       tooManyPages: 'Too many pages',
       tooManyPagesDesc: 'Maximum is 100 pages. Please remove some stories.',
       blankPagesTitle: 'Your book has room for another story',
-      blankPagesDesc: (printed: number, content: number, blank: number) => `Your book has ${printed} pages. Your story fills ${content} of them – ${blank} ${blank === 1 ? 'page' : 'pages'} will be blank.`,
       blankPreviewTitle: 'Your printed book',
-      blankPreviewSummary: (f: number, p: number, b: number) => `${f} of ${p} pages filled, ${b} blank`,
-      blankLegendFilled: 'Page with content',
-      blankLegendBlank: 'Blank page',
-      blankAck: (b: number) => `I confirm that my book has ${b} blank pages`,
       miniSentence: (n: number, multi: boolean) => `${multi ? `Your stories have ${n} pages in total.` : `Your story has ${n} pages.`} Short stories are printed as a square book (${SQUARE_BOOK_SIZE_LABEL}), picture on the left, text on the right.`,
-      miniBlankLine: (p: number, c: number, b: number, multi: boolean) => `The printer prints at least ${p} pages. ${multi ? 'Your stories fill' : 'Your story fills'} ${c} of them, ${b} pages stay blank.`,
-      agreeBlank: (b: number) => `I agree that ${b} pages stay blank`,
-      agreeBlankDone: (b: number) => `${b} blank pages confirmed`,
+      blankLine: (p: number, c: number, b: number, multi: boolean) => `A book has at least ${p} pages. ${multi ? 'Your stories fill' : 'Your story fills'} ${c} of them, ${b} pages stay blank. Another story in the same book fills them, often at no extra cost.`,
+      printBlank: (b: number) => `Print with ${b} blank pages`,
+      morePages: (n: number) => `+ ${n} more pages`,
+      printedFront: 'Front cover',
+      printedBack: 'Back cover',
       addStory: "Add another story",
       yourStory: "Your story",
       subtitleSingle: "Check your book and choose the cover",
@@ -208,16 +206,13 @@ export default function BookBuilder() {
       tooManyPages: 'Zu viele Seiten',
       tooManyPagesDesc: 'Maximal 100 Seiten erlaubt. Bitte entferne einige Geschichten.',
       blankPagesTitle: 'In deinem Buch ist Platz für eine weitere Geschichte',
-      blankPagesDesc: (printed: number, content: number, blank: number) => `Dein Buch hat ${printed} Seiten. Deine Geschichte füllt ${content} davon – ${blank} ${blank === 1 ? 'Seite' : 'Seiten'} bleiben leer.`,
       blankPreviewTitle: 'Dein gedrucktes Buch',
-      blankPreviewSummary: (f: number, p: number, b: number) => `${f} von ${p} Seiten gefüllt, ${b} leer`,
-      blankLegendFilled: 'Seite mit Inhalt',
-      blankLegendBlank: 'Leere Seite',
-      blankAck: (b: number) => `Ich bestätige, dass mein Buch ${b} leere Seiten hat`,
       miniSentence: (n: number, multi: boolean) => `${multi ? `Deine Geschichten haben zusammen ${n} Seiten.` : `Deine Geschichte hat ${n} Seiten.`} Kurze Geschichten werden als quadratisches Buch gedruckt (${SQUARE_BOOK_SIZE_LABEL}), Bild links, Text rechts.`,
-      miniBlankLine: (p: number, c: number, b: number, multi: boolean) => `Die Druckerei druckt mindestens ${p} Seiten. ${multi ? 'Deine Geschichten füllen' : 'Deine Geschichte füllt'} ${c} davon, ${b} Seiten bleiben leer.`,
-      agreeBlank: (b: number) => `Ich bin einverstanden, dass ${b} Seiten leer bleiben`,
-      agreeBlankDone: (b: number) => `${b} leere Seiten bestätigt`,
+      blankLine: (p: number, c: number, b: number, multi: boolean) => `Ein Buch hat mindestens ${p} Seiten. ${multi ? 'Deine Geschichten füllen' : 'Deine Geschichte füllt'} ${c} davon, ${b} Seiten bleiben leer. Mit einer weiteren Geschichte im gleichen Buch füllst du sie, oft ohne Aufpreis.`,
+      printBlank: (b: number) => `Mit ${b} leeren Seiten drucken`,
+      morePages: (n: number) => `+ ${n} weitere Seiten`,
+      printedFront: 'Vorderseite',
+      printedBack: 'Rückseite',
       addStory: "Weitere Geschichte hinzufügen",
       yourStory: "Deine Geschichte",
       subtitleSingle: "Prüfe dein Buch und wähle den Einband",
@@ -265,16 +260,13 @@ export default function BookBuilder() {
       tooManyPages: 'Trop de pages',
       tooManyPagesDesc: 'Maximum 100 pages. Veuillez retirer quelques histoires.',
       blankPagesTitle: 'Votre livre a de la place pour une autre histoire',
-      blankPagesDesc: (printed: number, content: number, blank: number) => `Votre livre compte ${printed} pages. Votre histoire en remplit ${content} – ${blank} ${blank === 1 ? 'page' : 'pages'} resteront vierges.`,
       blankPreviewTitle: 'Votre livre imprimé',
-      blankPreviewSummary: (f: number, p: number, b: number) => `${f} pages sur ${p} remplies, ${b} ${b === 1 ? 'vierge' : 'vierges'}`,
-      blankLegendFilled: 'Page avec contenu',
-      blankLegendBlank: 'Page vierge',
-      blankAck: (b: number) => `Je confirme que mon livre contient ${b} pages vierges`,
       miniSentence: (n: number, multi: boolean) => `${multi ? `Vos histoires comptent ${n} pages au total.` : `Votre histoire compte ${n} pages.`} Les histoires courtes sont imprimées en livre carré (${SQUARE_BOOK_SIZE_LABEL}), image à gauche, texte à droite.`,
-      miniBlankLine: (p: number, c: number, b: number, multi: boolean) => `L’imprimerie imprime au moins ${p} pages. ${multi ? 'Vos histoires en remplissent' : 'Votre histoire en remplit'} ${c}, ${b} pages restent vierges.`,
-      agreeBlank: (b: number) => `J’accepte que ${b} pages restent vierges`,
-      agreeBlankDone: (b: number) => `${b} pages vierges confirmées`,
+      blankLine: (p: number, c: number, b: number, multi: boolean) => `Un livre compte au moins ${p} pages. ${multi ? 'Vos histoires en remplissent' : 'Votre histoire en remplit'} ${c}, ${b} pages restent vierges. Une autre histoire dans le même livre les remplit, souvent sans supplément.`,
+      printBlank: (b: number) => `Imprimer avec ${b} pages vierges`,
+      morePages: (n: number) => `+ ${n} pages supplémentaires`,
+      printedFront: 'Couverture',
+      printedBack: 'Quatrième de couverture',
       addStory: "Ajouter une autre histoire",
       yourStory: "Votre histoire",
       subtitleSingle: "Vérifiez votre livre et choisissez la couverture",
@@ -322,16 +314,13 @@ export default function BookBuilder() {
       tooManyPages: 'Troppe pagine',
       tooManyPagesDesc: 'Massimo 100 pagine. Rimuovi alcune storie.',
       blankPagesTitle: 'Nel tuo libro c’è spazio per un’altra storia',
-      blankPagesDesc: (printed: number, content: number, blank: number) => `Il tuo libro ha ${printed} pagine. La tua storia ne riempie ${content} – ${blank} ${blank === 1 ? 'pagina' : 'pagine'} resteranno vuote.`,
       blankPreviewTitle: 'Il tuo libro stampato',
-      blankPreviewSummary: (f: number, p: number, b: number) => `${f} pagine su ${p} riempite, ${b} ${b === 1 ? 'vuota' : 'vuote'}`,
-      blankLegendFilled: 'Pagina con contenuto',
-      blankLegendBlank: 'Pagina vuota',
-      blankAck: (b: number) => `Confermo che il mio libro ha ${b} pagine vuote`,
       miniSentence: (n: number, multi: boolean) => `${multi ? `Le tue storie hanno insieme ${n} pagine.` : `La tua storia ha ${n} pagine.`} Le storie brevi vengono stampate come libro quadrato (${SQUARE_BOOK_SIZE_LABEL}), immagine a sinistra, testo a destra.`,
-      miniBlankLine: (p: number, c: number, b: number, multi: boolean) => `La tipografia stampa almeno ${p} pagine. ${multi ? 'Le tue storie ne riempiono' : 'La tua storia ne riempie'} ${c}, ${b} pagine restano vuote.`,
-      agreeBlank: (b: number) => `Accetto che ${b} pagine restino vuote`,
-      agreeBlankDone: (b: number) => `${b} pagine vuote confermate`,
+      blankLine: (p: number, c: number, b: number, multi: boolean) => `Un libro ha almeno ${p} pagine. ${multi ? 'Le tue storie ne riempiono' : 'La tua storia ne riempie'} ${c}, ${b} pagine restano vuote. Un’altra storia nello stesso libro le riempie, spesso senza costi aggiuntivi.`,
+      printBlank: (b: number) => `Stampa con ${b} pagine vuote`,
+      morePages: (n: number) => `+ ${n} altre pagine`,
+      printedFront: 'Copertina',
+      printedBack: 'Retro di copertina',
       addStory: "Aggiungi un’altra storia",
       yourStory: "La tua storia",
       subtitleSingle: "Controlla il tuo libro e scegli la copertina",
@@ -440,6 +429,19 @@ export default function BookBuilder() {
   const isMini = !!pageInfo && !isOverLimit && !pageInfo.layouts.single.available && pageInfo.layouts.spread.available;
   const needsBlankAck = !!pageInfo && !isOverLimit && pageInfo.blankPages >= pageInfo.blankAckFrom;
   useEffect(() => { setBlankAck(false); }, [pageInfo?.blankPages, storyIdsKey]);
+
+  // Square dedication pages made by BookSquareCovers (what a square book prints), shown in the printed-book spreads.
+  const [squareCovers, setSquareCovers] = useState<Record<string, Partial<Record<string, string>>>>({});
+  const squareDedications = Object.fromEntries(Object.entries(squareCovers).map(([id, c]) => [id, c.initialPage]));
+
+  // A square preview costs nothing (about 13 s cold, cached by the server), so start it in the background and it is
+  // ready when the customer clicks "Buch ansehen". Never for A4: its text strips cost about CHF 0.60 (Grok).
+  const previewLayout = pageInfo?.layout;
+  useEffect(() => {
+    if (previewLayout !== 'spread' || !storyIdsKey) return;
+    storyService.requestBookPreview(storyIdsKey.split(','), 'spread', coverType, false)
+      .catch(err => log.error('Square preview prefetch failed:', err));
+  }, [previewLayout, storyIdsKey, coverType]);
 
   // "Add another story": back to the story picker (selection is kept in sessionStorage by
   // MyStories) when the user has other stories, else straight to the story wizard.
@@ -722,50 +724,48 @@ export default function BookBuilder() {
                     <div>
                       {!isMini && <div className="font-semibold text-sm">{t.blankPagesTitle}</div>}
                       <span className="text-sm" data-testid="blank-pages-warning">
-                        {isMini
-                          ? t.miniBlankLine(pageInfo.printedPages, pageInfo.contentPages, pageInfo.blankPages, !isSingleStory)
-                          : t.blankPagesDesc(pageInfo.printedPages, pageInfo.contentPages, pageInfo.blankPages)}
+                        {t.blankLine(pageInfo.printedPages, pageInfo.contentPages, pageInfo.blankPages, !isSingleStory)}
                       </span>
                     </div>
                   </div>
-                  {/* Two identical buttons (same className): agree to the blank pages, or fill them with another story */}
-                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      data-testid="blank-ack-button"
-                      onClick={() => setBlankAck(true)}
-                      className={BLANK_ACTION_BUTTON_CLASS}
-                    >
-                      {blankAck && <Check size={16} />}
-                      {blankAck ? t.agreeBlankDone(pageInfo.blankPages) : t.agreeBlank(pageInfo.blankPages)}
-                    </button>
-                    <AddStoryNudge label={t.addStory} onAdd={handleAddStory} busy={addingStory} />
+                  {/* Either/or: print with the blank pages, or add a story (the second leaves blankAck false) */}
+                  <div role="radiogroup" className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <BlankPagesChoice label={t.printBlank(pageInfo.blankPages)} blankAck={blankAck} onChange={setBlankAck} testId="blank-ack-button" />
+                    <AddStoryNudge asChoice label={t.addStory} onAdd={handleAddStory} busy={addingStory} />
                   </div>
-                  <BlankPagesPreview
-                    sequence={pageInfo.sequence}
-                    storyIds={stories.map(st => st.id)}
-                    filledPages={pageInfo.contentPages}
-                    printedPages={pageInfo.printedPages}
-                    blankPages={pageInfo.blankPages}
-                    title={t.blankPreviewTitle}
-                    summary={t.blankPreviewSummary}
-                    legendFilled={t.blankLegendFilled}
-                    legendBlank={t.blankLegendBlank}
-                  />
                 </div>
               )}
             </div>
 
-            {/* Full-book preview in its own tab, directly under the printed-book strip */}
-            {pageInfo && !isOverLimit && (
-              <div className="mt-4">
+            {/* Printed book: covers first, then the first spreads, then the preview button. Without blank pages
+                only the preview button and the covers show. */}
+            {pageInfo && !isOverLimit && (() => {
+              const coversEl = (
+                <BookSquareCovers language={language} active={pageInfo.layout === 'spread'} stories={stories} onReadyChange={setSquareCoversReady} onCoversChange={setSquareCovers} />
+              );
+              const previewEl = (
                 <BookPreviewButton language={language} storyIds={stories.map(st => st.id)} layout={pageInfo.layout} coverType={coverType} />
-              </div>
-            )}
-
-            {pageInfo && !isOverLimit && (
-              <BookSquareCovers language={language} active={pageInfo.layout === 'spread'} stories={stories} onReadyChange={setSquareCoversReady} />
-            )}
+              );
+              return needsBlankAck ? (
+                <PrintedBookSpreads
+                  sequence={pageInfo.sequence}
+                  storyIds={stories.map(st => st.id)}
+                  square={pageInfo.layout === 'spread'}
+                  dedicationOverride={squareDedications}
+                  covers={pageInfo.layout === 'spread' ? coversEl : undefined}
+                  coverLabels={{ front: t.printedFront, back: t.printedBack }}
+                  title={t.blankPreviewTitle}
+                  morePages={t.morePages}
+                >
+                  {previewEl}
+                </PrintedBookSpreads>
+              ) : (
+                <>
+                  <div className="mt-4">{previewEl}</div>
+                  {coversEl}
+                </>
+              );
+            })()}
           </div>
 
           {/* Right: Format & Price */}
@@ -985,17 +985,11 @@ export default function BookBuilder() {
               </div>
             )}
 
-            {/* Same blankAck state as the agree button in the warning box */}
+            {/* Same component and same blankAck state as the option card in the warning box */}
             {needsBlankAck && pageInfo && !isOverLimit && (
-              <label data-testid="blank-ack" className="mb-3 flex items-start gap-2 text-sm font-medium text-gray-800 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={blankAck}
-                  onChange={e => setBlankAck(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 flex-shrink-0 accent-indigo-600"
-                />
-                <span>{t.blankAck(pageInfo.blankPages)}</span>
-              </label>
+              <div role="radiogroup" className="mb-3">
+                <BlankPagesChoice label={t.printBlank(pageInfo.blankPages)} blankAck={blankAck} onChange={setBlankAck} testId="blank-ack" />
+              </div>
             )}
 
             {/* Order button */}

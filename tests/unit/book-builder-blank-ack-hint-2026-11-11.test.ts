@@ -1,6 +1,8 @@
 /**
  * Book order page redesign, 2026-11-11 (customer could not order a 10-page book; owner redesign).
- * - one blankAck state, two controls: agree button in the warning box + tick box above the order button
+ * Round 2 (same day): either/or choice cards (one shared BlankPagesChoice used twice, one blankAck), covers before
+ * 3 open-book spreads, preview hint only for A4, square preview prefetch.
+ * - one blankAck state, two controls: option card in the warning box + the SAME card above the order button
  * - single story hides note / arrows / badge; spreadNote deleted; dedication not displayed
  * - printed-book strip uses toImgSrc and shows real page text
  */
@@ -8,11 +10,12 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { toImgSrc } from '../../client/src/utils/imgSrc';
+import { spreadPages, SPREAD_PAGES_SHOWN } from '../../client/src/utils/printedSpreads';
 
 const read = (...p: string[]) => fs.readFileSync(path.resolve(__dirname, '../..', ...p), 'utf8');
 const builder = read('client/src/pages/BookBuilder.tsx');
 
-describe('printed-book strip', () => {
+describe('printed-book strip (voucher page still uses it)', () => {
   const src = read('client/src/components/book/BlankPagesPreview.tsx');
   it('keeps an R2 URL as the image source', () => {
     expect(toImgSrc('https://images.magicalstory.ch/x/page1.jpg')).toBe('https://images.magicalstory.ch/x/page1.jpg');
@@ -21,20 +24,34 @@ describe('printed-book strip', () => {
     expect(src).toMatch(/toImgSrc\(/);
     expect(src).not.toMatch(/base64,\$\{/);
   });
-  it('shows the real page text on text pages, not placeholder lines', () => {
-    expect(src).toMatch(/\{p\.text\}/);
-    expect(src).not.toMatch(/h-px bg-indigo-300/);
-  });
 });
 
 describe('one blankAck state bound to both controls', () => {
+  const choice = read('client/src/components/book/BlankPagesChoice.tsx');
   it('has a single blankAck useState', () => {
-    expect((builder.match(/useState\(false\);\s*\n.*\n?/g) || []).length).toBeGreaterThan(0);
     expect((builder.match(/\[blankAck, setBlankAck\]/g) || []).length).toBe(1);
   });
-  it('the agree button sets it and the checkbox is bound to it', () => {
-    expect(builder).toMatch(/data-testid="blank-ack-button"\s+onClick=\{\(\) => setBlankAck\(true\)\}/);
-    expect(builder).toMatch(/checked=\{blankAck\}\s+onChange=\{e => setBlankAck\(e\.target\.checked\)\}/);
+  it('uses ONE shared BlankPagesChoice component twice, both bound to blankAck / setBlankAck', () => {
+    const uses = builder.match(/<BlankPagesChoice [^>]*>/g) || [];
+    expect(uses.length).toBe(2);
+    for (const u of uses) expect(u).toMatch(/blankAck=\{blankAck\} onChange=\{setBlankAck\}/);
+    expect(builder).not.toMatch(/checked=\{blankAck\}/);
+    expect(builder).not.toMatch(/t\.blankAck\b|agreeBlank/);
+  });
+  it('the choice is a radiogroup of radio cards with aria-checked, indigo when selected', () => {
+    expect(builder).toMatch(/role="radiogroup"/);
+    expect(choice).toMatch(/role="radio"/);
+    expect(choice).toMatch(/aria-checked=\{checked\}/);
+    expect(choice).toMatch(/checked \? 'border-indigo-500' : 'border-gray-300/);
+    expect(choice).toMatch(/\{checked && <span className="h-2\.5 w-2\.5 rounded-full bg-indigo-500"/);
+  });
+  it('selecting the blank card sets blankAck true', () => {
+    expect(choice).toMatch(/onSelect=\{\(\) => onChange\(true\)\}/);
+  });
+  it('the add-story card is an unselected card of the same ChoiceCard and runs handleAddStory', () => {
+    const nudge = read('client/src/components/book/AddStoryNudge.tsx');
+    expect(nudge).toMatch(/<ChoiceCard checked=\{false\} onSelect=\{onAdd\}/);
+    expect(builder).toMatch(/<AddStoryNudge asChoice [^>]*onAdd=\{handleAddStory\}/);
   });
   it('the order button stays disabled until acknowledged', () => {
     expect(builder).toMatch(/disabled=\{isOverLimit \|\| isCheckingOut \|\| \(needsBlankAck && !blankAck\)/);
@@ -42,11 +59,67 @@ describe('one blankAck state bound to both controls', () => {
   it('the old scroll hint is gone', () => {
     expect(builder).not.toMatch(/blank-ack-needed|blankAckRef|blankAckFlash|blankAckNeeded/);
   });
-  it('the two action buttons share one className', () => {
-    const nudge = read('client/src/components/book/AddStoryNudge.tsx');
-    expect(builder).toMatch(/className=\{BLANK_ACTION_BUTTON_CLASS\}/);
-    expect(nudge).toMatch(/className=\{BLANK_ACTION_BUTTON_CLASS\}/);
-    expect(nudge).toMatch(/bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1\.5 hover:bg-indigo-600/);
+  it('the blank-pages wording names no printer, comes from the page info and is in all 4 languages', () => {
+    expect(builder).not.toMatch(/Druckerei|imprimerie|tipografia|printer prints/i);
+    expect((builder.match(/blankLine: \(p: number/g) || []).length).toBe(4);
+    expect((builder.match(/printBlank: \(b: number\)/g) || []).length).toBe(4);
+    expect(builder).toMatch(/t\.blankLine\(pageInfo\.printedPages, pageInfo\.contentPages, pageInfo\.blankPages/);
+    expect(builder).toContain('Ein Buch hat mindestens ${p} Seiten.');
+    expect(builder).toContain('Mit ${b} leeren Seiten drucken');
+    expect(builder).not.toMatch(/ß/);
+  });
+});
+
+describe('printed book section: covers, then spreads', () => {
+  const sec = read('client/src/components/book/PrintedBookSpreads.tsx');
+  const seq = [
+    { kind: 'cover' }, { kind: 'insideFront' }, { kind: 'dedication' },
+    { kind: 'storyImage', pageNumber: 1 }, { kind: 'storyText', pageNumber: 1, text: 'a' },
+    { kind: 'storyImage', pageNumber: 2 }, { kind: 'storyText', pageNumber: 2, text: 'b' },
+    { kind: 'storyImage', pageNumber: 3 }, { kind: 'storyText', pageNumber: 3, text: 'c' },
+    { kind: 'backCover' },
+  ] as any[];
+  it('drops the cover entry and shows only the first 6 entries as spreads', () => {
+    const { shown, more } = spreadPages(seq);
+    expect(SPREAD_PAGES_SHOWN).toBe(6);
+    expect(shown.map(p => p.kind)).toEqual(['insideFront', 'dedication', 'storyImage', 'storyText', 'storyImage', 'storyText']);
+    expect(shown.some(p => p.kind === 'cover')).toBe(false);
+    expect(more).toBe(2); // storyImage 3 + storyText 3; the back cover is in the cover row
+  });
+  it('pairs left | right with a visible gutter and shows the real page text', () => {
+    expect(sec).toMatch(/printed-page-\$\{side\}/);
+    expect(sec).toMatch(/gap-px bg-gray-300/);
+    expect(sec).toMatch(/\{p\.text\}/);
+    expect(sec).not.toMatch(/border-dashed/);
+  });
+  it('covers come first inside the section, then the spreads, then the more note and the children (preview button)', () => {
+    expect(sec.indexOf('printed-book-covers')).toBeLessThan(sec.indexOf('printed-book-spreads'));
+    expect(sec.indexOf('printed-book-spreads')).toBeLessThan(sec.indexOf('printed-book-more'));
+    expect(sec.indexOf('printed-book-more')).toBeLessThan(sec.indexOf('{children &&'));
+  });
+  it('the cover is not repeated among the pages and there is no filled/blank summary or legend', () => {
+    expect(read('client/src/utils/printedSpreads.ts')).toMatch(/p\.kind !== 'cover' && p\.kind !== 'backCover'/);
+    expect(sec).not.toMatch(/legend|summary/i);
+    expect(builder).not.toMatch(/blankLegend|blankPreviewSummary/);
+  });
+  it('the page puts the covers and the preview button into the section when there are blank pages', () => {
+    expect(builder).toMatch(/<PrintedBookSpreads[\s\S]*?covers=\{pageInfo\.layout === 'spread' \? coversEl : undefined\}[\s\S]*?\{previewEl\}\s*<\/PrintedBookSpreads>/);
+  });
+  it('a square book shows its square dedication page', () => {
+    expect(builder).toMatch(/dedicationOverride=\{squareDedications\}/);
+    expect(sec).toMatch(/dedicationOverride\?\.\[storyIds\[si\]\] \?\? set\?\.initialPage/);
+  });
+});
+
+describe('preview hint and prefetch', () => {
+  const btn = read('client/src/components/book/BookPreviewButton.tsx');
+  it('the slow-preview hint shows for A4 only', () => {
+    expect(btn).toMatch(/layout !== 'spread' && <p[^>]*>\{HINT\[l\]\}<\/p>/);
+  });
+  it('a square preview is requested in the background once, never for A4', () => {
+    expect(builder).toMatch(/if \(previewLayout !== 'spread' \|\| !storyIdsKey\) return;/);
+    expect(builder).toMatch(/requestBookPreview\(storyIdsKey\.split\(','\), 'spread', coverType, false\)\s*\.catch\(err => log\.error/);
+    expect((builder.match(/requestBookPreview\(/g) || []).length).toBe(1);
   });
 });
 
@@ -88,8 +161,8 @@ describe('square covers', () => {
 });
 
 describe('preview button placement', () => {
-  it('sits in the left column before the covers, not next to the order button', () => {
-    expect(builder.indexOf('<BookPreviewButton')).toBeGreaterThan(builder.indexOf('<BlankPagesPreview'));
+  it('sits in the left column, not next to the order button', () => {
+    expect(builder.indexOf('<BookPreviewButton')).toBeGreaterThan(builder.indexOf('{/* Printed book: covers first'));
     expect(builder.indexOf('<BookPreviewButton')).toBeLessThan(builder.indexOf('{/* Right: Format & Price */}'));
   });
 });

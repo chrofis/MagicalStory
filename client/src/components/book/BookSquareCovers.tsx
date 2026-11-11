@@ -28,11 +28,13 @@ interface Props {
   stories: { id: string; title: string }[];
   /** Called with true once every story's square covers exist, false while they are made or after a failure. */
   onReadyChange: (ready: boolean) => void;
+  /** Optional: gets the made covers (incl. the square dedication page) by story id, so the page can show what prints. */
+  onCoversChange?: (covers: Record<string, Partial<Record<string, string>>>) => void;
 }
 
 type Covers = Record<string, Partial<Record<string, string>>>;
 
-export default function BookSquareCovers({ language, active, stories, onReadyChange }: Props) {
+export default function BookSquareCovers({ language, active, stories, onReadyChange, onCoversChange }: Props) {
   const t = TEXT[(language as Lang) in TEXT ? (language as Lang) : 'en'];
   const [covers, setCovers] = useState<Covers>({});
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -48,7 +50,9 @@ export default function BookSquareCovers({ language, active, stories, onReadyCha
     Promise.all(idsKey.split(',').map(id => storyService.makeSquareCovers(id).then(r => [id, r.covers] as const)))
       .then(entries => {
         if (cancelled) return;
-        setCovers(Object.fromEntries(entries));
+        const made = Object.fromEntries(entries);
+        setCovers(made);
+        onCoversChange?.(made);
         setStatus('ready');
         onReadyChange(true);
       })

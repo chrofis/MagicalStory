@@ -40,7 +40,8 @@ export default function BookPreviewButton({ language, storyIds, layout, coverTyp
         <Eye size={20} />
         {LABEL[l]}
       </button>
-      <p className="text-xs text-gray-500 mt-1 text-center">{HINT[l]}</p>
+      {/* Only A4 previews are slow (Grok text strips); a square preview is ready in seconds (prefetched by the order page). */}
+      {layout !== 'spread' && <p className="text-xs text-gray-500 mt-1 text-center">{HINT[l]}</p>}
     </div>
   );
 }
