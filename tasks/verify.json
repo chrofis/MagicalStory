@@ -11566,7 +11566,9 @@
       ],
       "addedAt": "2026-11-11",
       "claim": "With every hand-picked output cap removed (bbox detection maxOutputTokens 2500 dropped, Anthropic calls at maxOutputTokensFor), the next story run still completes: bbox detection returns boxes, no call is cut off at max tokens, no provider rejects a max_tokens value.",
-      "runShape": "any",
+      "runShape": [
+        "any"
+      ],
       "check": {
         "kind": "human",
         "what": "On the next staging story, grep the log for MAX_TOKENS / max_tokens / truncat errors and confirm bbox detection logged boxes on the pages."

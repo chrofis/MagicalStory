@@ -20,12 +20,13 @@ const tick = process.argv[4] === 'tick';
   await ctx.addInitScript(([t, u]) => { localStorage.setItem('auth_token', t); localStorage.setItem('current_user', u); localStorage.setItem('language', 'de'); },
     [token, JSON.stringify(me.user || me)]);
   const page = await ctx.newPage();
-  await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
-  await page.evaluate(([id, title]) => {
-    window.history.pushState({ usr: { selectedStories: [{ id, title, pages: 10 }] }, key: 'shot', idx: 1 }, '', '/book-builder');
-    window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
-  }, [storyId, st.title || (st.story && st.story.title) || 'Story']);
+  // The real customer path: My Stories -> "Hinzufügen" on the story card -> "Buch erstellen".
+  await page.goto(`${BASE}/stories`, { waitUntil: 'domcontentloaded' });
+  const title = st.title || (st.story && st.story.title);
+  const card = page.locator('div').filter({ hasText: title }).filter({ has: page.getByRole('button', { name: /^Hinzufügen$/ }) }).last();
+  await card.getByRole('button', { name: /^Hinzufügen$/ }).click({ timeout: 60000 });
+  await page.getByRole('button', { name: /Buch erstellen/ }).first().click();
+  await page.waitForURL(/book-builder/);
   await page.waitForTimeout(15000);
   if (tick) { await page.locator('input[type=checkbox]').first().check(); await page.waitForTimeout(500); }
   await page.screenshot({ path: path.join(out, 'full.png'), fullPage: true });
