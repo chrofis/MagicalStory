@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { storyService } from '@/services';
 import type { PrintedPage } from '@/services/storyService';
 import { createLogger } from '@/services/logger';
+import { toImgSrc } from '@/utils/imgSrc';
 
 const log = createLogger('BlankPagesPreview');
 
@@ -24,7 +25,8 @@ interface Props {
   legendBlank: string;
 }
 
-const asSrc = (d?: string) => (d ? (d.startsWith('data:') ? d : `data:image/jpeg;base64,${d}`) : undefined);
+// Stored images are R2 URLs since the R2 migration; toImgSrc passes URLs through (wrapping one as base64 broke every thumbnail).
+const asSrc = (d?: string) => toImgSrc(d) ?? undefined;
 
 /**
  * Compact printed-book strip shown before checkout when the book has blank pages.

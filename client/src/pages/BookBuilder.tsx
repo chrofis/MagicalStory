@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, ArrowUp, ArrowDown, Book, BookOpen, ShoppingCart, AlertTriangle, Info, Printer, Plus, Minus } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -156,6 +156,7 @@ export default function BookBuilder() {
       blankLegendFilled: 'Page with content',
       blankLegendBlank: 'Blank page',
       blankAck: (b: number) => `I understand that my book has ${b} blank ${b === 1 ? 'page' : 'pages'}`,
+      blankAckNeeded: (b: number) => `To order, please confirm the ${b} blank ${b === 1 ? 'page' : 'pages'} above.`,
       processing: 'Processing...',
       printPdf: 'Print PDF (Test)',
       generatingPdf: 'Generating PDF...',
@@ -206,6 +207,7 @@ export default function BookBuilder() {
       blankLegendFilled: 'Seite mit Inhalt',
       blankLegendBlank: 'Leere Seite',
       blankAck: (b: number) => `Ich verstehe, dass mein Buch ${b} leere ${b === 1 ? 'Seite' : 'Seiten'} hat`,
+      blankAckNeeded: (b: number) => `Zum Bestellen bestätige bitte oben die ${b} leeren ${b === 1 ? 'Seite' : 'Seiten'}.`,
       processing: 'Wird verarbeitet...',
       printPdf: 'Druck-PDF (Test)',
       generatingPdf: 'PDF wird erstellt...',
@@ -256,6 +258,7 @@ export default function BookBuilder() {
       blankLegendFilled: 'Page avec contenu',
       blankLegendBlank: 'Page vierge',
       blankAck: (b: number) => `Je comprends que mon livre contient ${b} ${b === 1 ? 'page vierge' : 'pages vierges'}`,
+      blankAckNeeded: (b: number) => `Pour commander, confirmez ci-dessus ${b === 1 ? 'la page vierge' : `les ${b} pages vierges`}.`,
       processing: 'Traitement en cours…',
       printPdf: 'PDF impression (test)',
       generatingPdf: 'Génération du PDF…',
@@ -306,6 +309,7 @@ export default function BookBuilder() {
       blankLegendFilled: 'Pagina con contenuto',
       blankLegendBlank: 'Pagina vuota',
       blankAck: (b: number) => `Ho capito che il mio libro ha ${b} ${b === 1 ? 'pagina vuota' : 'pagine vuote'}`,
+      blankAckNeeded: (b: number) => `Per ordinare, conferma qui sopra ${b === 1 ? 'la pagina vuota' : `le ${b} pagine vuote`}.`,
       processing: 'Elaborazione...',
       printPdf: 'Stampa PDF (Test)',
       generatingPdf: 'Generazione PDF...',
@@ -361,6 +365,10 @@ export default function BookBuilder() {
   const [layoutChoice, setLayoutChoice] = useState<BookLayout | null>(null);
   // Required acknowledgement of the blank pages before checkout is enabled.
   const [blankAck, setBlankAck] = useState(false);
+  // The order button stays off until the box is ticked; the hint under the button jumps to it (owner 2026-11-11:
+  // a customer could not order because nothing next to the grey button said why).
+  const blankAckRef = useRef<HTMLLabelElement>(null);
+  const [blankAckFlash, setBlankAckFlash] = useState(false);
   const storyIdsKey = stories.map(s => s.id).join(',');
   // A square book (layout 'spread') prints square covers; the order button waits until they are made and shown.
   const [squareCoversReady, setSquareCoversReady] = useState(true);
@@ -684,7 +692,11 @@ export default function BookBuilder() {
                     legendFilled={t.blankLegendFilled}
                     legendBlank={t.blankLegendBlank}
                   />
-                  <label className="mt-3 flex items-start gap-2 text-sm font-medium text-gray-800 cursor-pointer">
+                  <label
+                    ref={blankAckRef}
+                    data-testid="blank-ack"
+                    className={`mt-3 flex items-start gap-2 text-sm font-medium text-gray-800 cursor-pointer rounded-md p-1 -m-1 transition-shadow ${blankAckFlash ? 'ring-2 ring-amber-500 bg-amber-100' : ''}`}
+                  >
                     <input
                       type="checkbox"
                       checked={blankAck}
@@ -918,6 +930,23 @@ export default function BookBuilder() {
             {/* Full-book preview in its own tab: the print PDF as page images, before paying */}
             {pageInfo && !isOverLimit && (
               <BookPreviewButton language={language} storyIds={stories.map(st => st.id)} layout={pageInfo.layout} coverType={coverType} />
+            )}
+
+            {/* Why the order button is off: the blank pages are not confirmed yet */}
+            {needsBlankAck && !blankAck && pageInfo && !isOverLimit && (
+              <button
+                type="button"
+                data-testid="blank-ack-needed"
+                onClick={() => {
+                  blankAckRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  setBlankAckFlash(true);
+                  window.setTimeout(() => setBlankAckFlash(false), 2500);
+                }}
+                className="w-full mb-2 flex items-center justify-center gap-1.5 text-sm font-semibold text-amber-700 underline underline-offset-2"
+              >
+                <ArrowUp size={16} />
+                {t.blankAckNeeded(pageInfo.blankPages)}
+              </button>
             )}
 
             {/* Order button */}
