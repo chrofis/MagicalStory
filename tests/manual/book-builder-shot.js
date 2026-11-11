@@ -28,7 +28,7 @@ const tick = process.argv[4] === 'tick';
   await page.getByRole('button', { name: /Buch erstellen/ }).first().click();
   await page.waitForURL(/book-builder/);
   await page.waitForTimeout(15000);
-  if (tick) { await page.locator('input[type=checkbox]').first().check(); await page.waitForTimeout(500); }
+  if (tick) { await page.getByRole('radio', { name: /leeren Seiten drucken|leere Seite drucken/ }).last().click(); await page.waitForTimeout(500); }
   await page.screenshot({ path: path.join(out, 'full.png'), fullPage: true });
   const btn = page.getByRole('button', { name: /Buch bestellen|Bestellen|Order/ }).last();
   await btn.scrollIntoViewIfNeeded().catch(() => {});
