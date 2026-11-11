@@ -93,3 +93,9 @@ describe('preview button placement', () => {
     expect(builder.indexOf('<BookPreviewButton')).toBeLessThan(builder.indexOf('{/* Right: Format & Price */}'));
   });
 });
+
+describe('story row thumbnail', () => {
+  it('loads the cover itself when My Stories had not loaded it yet', () => {
+    expect(builder).toMatch(/filter\(st => !st\.thumbnail\)[\s\S]*?getStoryCover\(st\.id\)/);
+  });
+});

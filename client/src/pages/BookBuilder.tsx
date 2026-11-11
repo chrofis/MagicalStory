@@ -16,6 +16,7 @@ import type { BookLayout } from '@/services/storyService';
 import { getPriceForPages, bookSizeLabel, SQUARE_BOOK_SIZE_LABEL, MAX_BOOK_PAGES, SHIPPING_COST_CHF, type PricingTier } from '@/utils/bookPricing';
 import { createLogger } from '@/services/logger';
 import { localizedApiError } from '@/utils/apiErrors';
+import { toImgSrc } from '@/utils/imgSrc';
 
 const log = createLogger('BookBuilder');
 
@@ -365,6 +366,13 @@ export default function BookBuilder() {
     const state = location.state as { selectedStories?: SelectedStory[] } | null;
     if (state?.selectedStories && state.selectedStories.length > 0) {
       setStories(state.selectedStories);
+      // My Stories loads covers lazily, so a story picked before its cover arrived comes without a thumbnail.
+      state.selectedStories.filter(st => !st.thumbnail).forEach(st => {
+        storyService.getStoryCover(st.id).then(cover => {
+          const src = toImgSrc(cover);
+          if (src) setStories(prev => prev.map(x => (x.id === st.id ? { ...x, thumbnail: src } : x)));
+        });
+      });
       setIsLoading(false);
     } else {
       // No stories in state, redirect back
