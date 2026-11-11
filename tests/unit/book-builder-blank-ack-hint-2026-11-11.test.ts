@@ -4,13 +4,13 @@
  * 3 open-book spreads, preview hint only for A4, square preview prefetch.
  * - one blankAck state, two controls: option card in the warning box + the SAME card above the order button
  * - single story hides note / arrows / badge; spreadNote deleted; dedication not displayed
- * - printed-book strip uses toImgSrc and shows real page text
+ * Round 3 (same day, owner: "page is too long"): the printed-book section is removed, only "Buch ansehen" stays;
+ *   no plus icon on the add-story choice card.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { toImgSrc } from '../../client/src/utils/imgSrc';
-import { spreadPages, SPREAD_PAGES_SHOWN } from '../../client/src/utils/printedSpreads';
 
 const read = (...p: string[]) => fs.readFileSync(path.resolve(__dirname, '../..', ...p), 'utf8');
 const builder = read('client/src/pages/BookBuilder.tsx');
@@ -70,45 +70,19 @@ describe('one blankAck state bound to both controls', () => {
   });
 });
 
-describe('printed book section: covers, then spreads', () => {
-  const sec = read('client/src/components/book/PrintedBookSpreads.tsx');
-  const seq = [
-    { kind: 'cover' }, { kind: 'insideFront' }, { kind: 'dedication' },
-    { kind: 'storyImage', pageNumber: 1 }, { kind: 'storyText', pageNumber: 1, text: 'a' },
-    { kind: 'storyImage', pageNumber: 2 }, { kind: 'storyText', pageNumber: 2, text: 'b' },
-    { kind: 'storyImage', pageNumber: 3 }, { kind: 'storyText', pageNumber: 3, text: 'c' },
-    { kind: 'backCover' },
-  ] as any[];
-  it('drops the cover entry and shows only the first 6 entries as spreads', () => {
-    const { shown, more } = spreadPages(seq);
-    expect(SPREAD_PAGES_SHOWN).toBe(6);
-    expect(shown.map(p => p.kind)).toEqual(['insideFront', 'dedication', 'storyImage', 'storyText', 'storyImage', 'storyText']);
-    expect(shown.some(p => p.kind === 'cover')).toBe(false);
-    expect(more).toBe(2); // storyImage 3 + storyText 3; the back cover is in the cover row
+describe('no printed-book section (owner 2026-11-11: page too long, "Buch ansehen" shows the book)', () => {
+  it('the section and its helpers are deleted', () => {
+    expect(fs.existsSync(path.resolve(__dirname, '../../client/src/components/book/PrintedBookSpreads.tsx'))).toBe(false);
+    expect(fs.existsSync(path.resolve(__dirname, '../../client/src/utils/printedSpreads.ts'))).toBe(false);
+    expect(builder).not.toMatch(/PrintedBookSpreads|blankPreviewTitle|Dein gedrucktes Buch|squareDedications/);
   });
-  it('pairs left | right with a visible gutter and shows the real page text', () => {
-    expect(sec).toMatch(/printed-page-\$\{side\}/);
-    expect(sec).toMatch(/gap-px bg-gray-300/);
-    expect(sec).toMatch(/\{p\.text\}/);
-    expect(sec).not.toMatch(/border-dashed/);
+  it('square covers are still made (order waits) and the preview button is shown', () => {
+    expect(builder).toMatch(/<BookSquareCovers [^>]*onReadyChange=\{setSquareCoversReady\} showImages=\{false\} \/>/);
+    expect(builder).toMatch(/<BookPreviewButton language=\{language\}/);
   });
-  it('covers come first inside the section, then the spreads, then the more note and the children (preview button)', () => {
-    expect(sec.indexOf('printed-book-covers')).toBeLessThan(sec.indexOf('printed-book-spreads'));
-    expect(sec.indexOf('printed-book-spreads')).toBeLessThan(sec.indexOf('printed-book-more'));
-    expect(sec.indexOf('printed-book-more')).toBeLessThan(sec.indexOf('{children &&'));
-  });
-  it('the cover is not repeated among the pages and there is no filled/blank summary or legend', () => {
-    expect(read('client/src/utils/printedSpreads.ts')).toMatch(/p\.kind !== 'cover' && p\.kind !== 'backCover'/);
-    expect(sec).not.toMatch(/legend|summary/i);
-    expect(builder).not.toMatch(/blankLegend|blankPreviewSummary/);
-  });
-  it('the page always shows the section (no blank-pages condition) with the preview button inside it', () => {
-    expect(builder).toMatch(/<PrintedBookSpreads[\s\S]*?squareCovers=\{pageInfo\.layout === 'spread' \? squareCovers : undefined\}[\s\S]*?<BookPreviewButton[\s\S]*?<\/PrintedBookSpreads>/);
-    expect(builder).not.toMatch(/needsBlankAck \? \(\s*<PrintedBookSpreads/);
-  });
-  it('a square book shows its square dedication page', () => {
-    expect(builder).toMatch(/dedicationOverride=\{squareDedications\}/);
-    expect(sec).toMatch(/dedicationOverride\?\.\[storyIds\[si\]\] \?\? set\?\.initialPage/);
+  it('the add-story choice card has no plus icon', () => {
+    const nudge = read('client/src/components/book/AddStoryNudge.tsx');
+    expect(nudge).toMatch(/testId="add-story-nudge">\{text\}<\/ChoiceCard>/);
   });
 });
 

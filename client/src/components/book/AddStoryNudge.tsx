@@ -29,7 +29,7 @@ interface Props {
 export default function AddStoryNudge({ label, language, onAdd, busy = false, asChoice = false }: Props) {
   const text = label ?? ADD[(language as Lang) in ADD ? (language as Lang) : 'en'];
   if (asChoice) {
-    return <ChoiceCard checked={false} onSelect={onAdd} disabled={busy} testId="add-story-nudge"><Plus size={16} />{text}</ChoiceCard>;
+    return <ChoiceCard checked={false} onSelect={onAdd} disabled={busy} testId="add-story-nudge">{text}</ChoiceCard>;
   }
   return (
     <button

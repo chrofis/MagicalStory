@@ -28,8 +28,9 @@ const SQUARE28 = {
   product_name: 'Hardcover square', min_pages: 28, max_pages: 200, available_page_counts: null,
 };
 // SKU28 stands for "the catalogue": the A4 row plus the square row (the format follows the layout).
-const info = (stories: any[], rows: any[] = [SKU28], options: any = {}) =>
-  computeBookPageInfo({ query: async () => ({ rows: [...rows, SQUARE28] }) }, stories, 'hardcover', options);
+// tierTop = top of pricing_tiers (owner 2026-11-11: square not offered above it).
+const info = (stories: any[], rows: any[] = [SKU28], options: any = {}, tierTop = 100) =>
+  computeBookPageInfo({ query: async (sql: string) => ({ rows: /pricing_tiers/.test(sql) ? [{ max_pages: tierTop }] : [...rows, SQUARE28] }) }, stories, 'hardcover', options);
 const { CREDIT_CONFIG } = require('../../server/config/credits.js');
 
 describe('layout availability (customer picks; 28-page minimum, 4-blank rule, 60-scene facing cap)', () => {
@@ -53,18 +54,21 @@ describe('layout availability (customer picks; 28-page minimum, 4-blank rule, 60
     });
   }
 
-  it('60 scenes in 3 books: both available; facing needs 126 pages, the 200-page SKU takes it', async () => {
-    const r = await info([story(25), story(25), story(10)], [SKU28], { layout: 'spread' });
+  it('60 scenes in 3 books: facing needs 126 pages, the 200-page SKU takes it when the price tiers reach that far', async () => {
+    const r = await info([story(25), story(25), story(10)], [SKU28], { layout: 'spread' }, 200);
     expect(FACING_PAGES_MAX_SCENES).toBe(60);
     expect(r.layouts.single.available).toBe(true);
     expect(r.layouts.spread.available).toBe(true);
     expect(r.layout).toBe('spread');
     expect(r.printedPages).toBe(126);   // 1 + 120 + 2x2 (title + dedication of stories 2 and 3) = 125 -> 126
     expect(r.blankPages).toBe(1);
+    const capped = await info([story(25), story(25), story(10)]);
+    expect(capped.layouts.spread.available).toBe(false);
+    expect(capped.layouts.spread.reason).toMatchObject({ code: 'TOO_MANY_PAGES', maxPages: 100 });
   });
   it('61 scenes: facing greyed with the printed-page reason (more than 120), one-page layout still works', async () => {
     const stories = [story(25), story(25), story(11)];
-    const r = await info(stories);
+    const r = await info(stories, [SKU28], {}, 200);
     expect(r.layouts.spread.available).toBe(false);
     expect(r.layouts.spread.reason).toMatchObject({ code: 'TOO_MANY_PAGES', maxPages: 120 });
     expect(r.layouts.spread.reason.printedPages).toBeGreaterThan(120);
@@ -131,7 +135,7 @@ describe('the format follows the layout (never picked by the customer)', () => {
     expect(r.bookFormat).toBe('A4');
   });
   it('a client-sent format is ignored', async () => {
-    const r = await (computeBookPageInfo as any)({ query: async () => ({ rows: [SKU28, SQUARE28] }) }, [story(25)], 'hardcover', 'square');
+    const r = await (computeBookPageInfo as any)({ query: async (sql: string) => ({ rows: /pricing_tiers/.test(sql) ? [{ max_pages: 100 }] : [SKU28, SQUARE28] }) }, [story(25)], 'hardcover', 'square');
     expect(r.bookFormat).toBe('A4');
     expect(r.layout).toBe('single');
   });

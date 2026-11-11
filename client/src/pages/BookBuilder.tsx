@@ -5,7 +5,6 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Navigation, LoadingSpinner } from '@/components/common';
-import PrintedBookSpreads from '@/components/book/PrintedBookSpreads';
 import BlankPagesChoice from '@/components/book/BlankPagesChoice';
 import AddStoryNudge from '@/components/book/AddStoryNudge';
 import BookFormatChoice from '@/components/book/BookFormatChoice';
@@ -151,13 +150,9 @@ export default function BookBuilder() {
       tooManyPages: 'Too many pages',
       tooManyPagesDesc: 'Maximum is 100 pages. Please remove some stories.',
       blankPagesTitle: 'Your book has room for another story',
-      blankPreviewTitle: 'Your printed book',
       miniSentence: (n: number, multi: boolean) => `${multi ? `Your stories have ${n} pages in total.` : `Your story has ${n} pages.`} Short stories are printed as a square book (${SQUARE_BOOK_SIZE_LABEL}), picture on the left, text on the right.`,
       blankLine: (p: number, c: number, b: number, multi: boolean) => `A book has at least ${p} pages. ${multi ? 'Your stories fill' : 'Your story fills'} ${c} of them, ${b} pages stay blank. Another story in the same book fills them, often at no extra cost.`,
       printBlank: (b: number) => `Print with ${b} blank pages`,
-      morePages: (n: number) => `+ ${n} more pages`,
-      printedFront: 'Front cover',
-      printedBack: 'Back cover',
       addStory: "Add another story",
       yourStory: "Your story",
       subtitleSingle: "Check your book and choose the cover",
@@ -204,13 +199,9 @@ export default function BookBuilder() {
       tooManyPages: 'Zu viele Seiten',
       tooManyPagesDesc: 'Maximal 100 Seiten erlaubt. Bitte entferne einige Geschichten.',
       blankPagesTitle: 'In deinem Buch ist Platz für eine weitere Geschichte',
-      blankPreviewTitle: 'Dein gedrucktes Buch',
       miniSentence: (n: number, multi: boolean) => `${multi ? `Deine Geschichten haben zusammen ${n} Seiten.` : `Deine Geschichte hat ${n} Seiten.`} Kurze Geschichten werden als quadratisches Buch gedruckt (${SQUARE_BOOK_SIZE_LABEL}), Bild links, Text rechts.`,
       blankLine: (p: number, c: number, b: number, multi: boolean) => `Ein Buch hat mindestens ${p} Seiten. ${multi ? 'Deine Geschichten füllen' : 'Deine Geschichte füllt'} ${c} davon, ${b} Seiten bleiben leer. Mit einer weiteren Geschichte im gleichen Buch füllst du sie, oft ohne Aufpreis.`,
       printBlank: (b: number) => `Mit ${b} leeren Seiten drucken`,
-      morePages: (n: number) => `+ ${n} weitere Seiten`,
-      printedFront: 'Vorderseite',
-      printedBack: 'Rückseite',
       addStory: "Weitere Geschichte hinzufügen",
       yourStory: "Deine Geschichte",
       subtitleSingle: "Prüfe dein Buch und wähle den Einband",
@@ -257,13 +248,9 @@ export default function BookBuilder() {
       tooManyPages: 'Trop de pages',
       tooManyPagesDesc: 'Maximum 100 pages. Veuillez retirer quelques histoires.',
       blankPagesTitle: 'Votre livre a de la place pour une autre histoire',
-      blankPreviewTitle: 'Votre livre imprimé',
       miniSentence: (n: number, multi: boolean) => `${multi ? `Vos histoires comptent ${n} pages au total.` : `Votre histoire compte ${n} pages.`} Les histoires courtes sont imprimées en livre carré (${SQUARE_BOOK_SIZE_LABEL}), image à gauche, texte à droite.`,
       blankLine: (p: number, c: number, b: number, multi: boolean) => `Un livre compte au moins ${p} pages. ${multi ? 'Vos histoires en remplissent' : 'Votre histoire en remplit'} ${c}, ${b} pages restent vierges. Une autre histoire dans le même livre les remplit, souvent sans supplément.`,
       printBlank: (b: number) => `Imprimer avec ${b} pages vierges`,
-      morePages: (n: number) => `+ ${n} pages supplémentaires`,
-      printedFront: 'Couverture',
-      printedBack: 'Quatrième de couverture',
       addStory: "Ajouter une autre histoire",
       yourStory: "Votre histoire",
       subtitleSingle: "Vérifiez votre livre et choisissez la couverture",
@@ -310,13 +297,9 @@ export default function BookBuilder() {
       tooManyPages: 'Troppe pagine',
       tooManyPagesDesc: 'Massimo 100 pagine. Rimuovi alcune storie.',
       blankPagesTitle: 'Nel tuo libro c’è spazio per un’altra storia',
-      blankPreviewTitle: 'Il tuo libro stampato',
       miniSentence: (n: number, multi: boolean) => `${multi ? `Le tue storie hanno insieme ${n} pagine.` : `La tua storia ha ${n} pagine.`} Le storie brevi vengono stampate come libro quadrato (${SQUARE_BOOK_SIZE_LABEL}), immagine a sinistra, testo a destra.`,
       blankLine: (p: number, c: number, b: number, multi: boolean) => `Un libro ha almeno ${p} pagine. ${multi ? 'Le tue storie ne riempiono' : 'La tua storia ne riempie'} ${c}, ${b} pagine restano vuote. Un’altra storia nello stesso libro le riempie, spesso senza costi aggiuntivi.`,
       printBlank: (b: number) => `Stampa con ${b} pagine vuote`,
-      morePages: (n: number) => `+ ${n} altre pagine`,
-      printedFront: 'Copertina',
-      printedBack: 'Retro di copertina',
       addStory: "Aggiungi un’altra storia",
       yourStory: "La tua storia",
       subtitleSingle: "Controlla il tuo libro e scegli la copertina",
@@ -430,9 +413,6 @@ export default function BookBuilder() {
   const needsBlankAck = !!pageInfo && !isOverLimit && pageInfo.blankPages >= pageInfo.blankAckFrom;
   useEffect(() => { setBlankAck(false); }, [pageInfo?.blankPages, storyIdsKey]);
 
-  // Square dedication pages made by BookSquareCovers (what a square book prints), shown in the printed-book spreads.
-  const [squareCovers, setSquareCovers] = useState<Record<string, Partial<Record<string, string>>>>({});
-  const squareDedications = Object.fromEntries(Object.entries(squareCovers).map(([id, c]) => [id, c.initialPage]));
 
   // A square preview costs nothing (about 13 s cold, cached by the server), so start it in the background and it is
   // ready when the customer clicks "Buch ansehen". Never for A4: its text strips cost about CHF 0.60 (Grok).
@@ -737,25 +717,15 @@ export default function BookBuilder() {
               )}
             </div>
 
-            {/* Printed book, shown the same way in every case (with or without blank pages, one story or several):
-                one front and one back cover of the BOOK, the first 3 spreads, "+ N more pages", the preview button.
-                BookSquareCovers keeps making the square covers (order button waits for them) but draws no images
-                here: the strip shows the book's single cover pair. */}
+            {/* Owner 2026-11-11: the printed-book strip is gone (page too long; "Buch ansehen" shows the book).
+                BookSquareCovers still makes the square covers a square book prints (the order button waits for them)
+                and draws only its progress/error box. */}
             {pageInfo && !isOverLimit && (
               <>
-                <BookSquareCovers language={language} active={pageInfo.layout === 'spread'} stories={stories} onReadyChange={setSquareCoversReady} onCoversChange={setSquareCovers} showImages={false} />
-                <PrintedBookSpreads
-                  sequence={pageInfo.sequence}
-                  storyIds={stories.map(st => st.id)}
-                  square={pageInfo.layout === 'spread'}
-                  dedicationOverride={squareDedications}
-                  squareCovers={pageInfo.layout === 'spread' ? squareCovers : undefined}
-                  coverLabels={{ front: t.printedFront, back: t.printedBack }}
-                  title={t.blankPreviewTitle}
-                  morePages={t.morePages}
-                >
+                <BookSquareCovers language={language} active={pageInfo.layout === 'spread'} stories={stories} onReadyChange={setSquareCoversReady} showImages={false} />
+                <div className="mt-4">
                   <BookPreviewButton language={language} storyIds={stories.map(st => st.id)} layout={pageInfo.layout} coverType={coverType} />
-                </PrintedBookSpreads>
+                </div>
               </>
             )}
           </div>

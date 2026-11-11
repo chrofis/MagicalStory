@@ -767,7 +767,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           // the order row, exits via the idempotency check, and the user
           // never gets the tokens they paid for.
           const stripeMode = fullSession.metadata?.stripeMode === 'test' ? 'test' : 'live';
-          const totalPages = parseInt(fullSession.metadata?.totalPages) || 0;
+          const totalPages = require('./server/lib/gelato').bookRewardPages(fullSession.metadata); // story pages, not the square count
           let tokensToCredit = 0;
           let postTokenBalance = null;
 

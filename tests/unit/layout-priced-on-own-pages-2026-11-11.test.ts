@@ -8,7 +8,6 @@ import { createRequire } from 'node:module';
 import fs from 'fs';
 import path from 'path';
 import { getPriceForPages, fallbackPricingTiers } from '../../client/src/utils/bookPricing';
-import { pickBookCovers } from '../../client/src/utils/printedSpreads';
 
 const require = createRequire(import.meta.url);
 const database = require('../../server/services/database');
@@ -21,7 +20,7 @@ const rows = [
   { product_uid: 'photobooks-softcover_pf_210x280-mm', min_pages: 28, max_pages: 200, available_page_counts: null },
   { product_uid: 'photobooks-softcover_pf_200x200-mm', min_pages: 28, max_pages: 200, available_page_counts: null },
 ];
-const pool = { query: async () => ({ rows }) };
+const pool = { query: async (sql: string) => ({ rows: /pricing_tiers/.test(sql) ? [{ max_pages: 100 }] : rows }) };
 
 describe('each layout is billed on its own content page count', () => {
   it('3 ten-page stories: A4 count 35 (tier 31-40), square count 65 (tier 61-70)', async () => {
@@ -105,23 +104,5 @@ describe('two equal format cards', () => {
   });
 });
 
-describe('Dein gedrucktes Buch: one cover pair in every case', () => {
-  const c = (n: string) => ({ frontCover: `${n}-front`, backCover: `${n}-back` });
-  it('one story', () => { expect(pickBookCovers([c('a')])).toEqual({ front: 'a-front', back: 'a-back' }); });
-  it('several stories: the first story front and back, never per-story pairs', () => {
-    expect(pickBookCovers([c('a'), c('b'), c('c')])).toEqual({ front: 'a-front', back: 'a-back' });
-  });
-  it('first story without a back cover: the last story that has one (pdf.js borrow rule)', () => {
-    expect(pickBookCovers([{ frontCover: 'a-front' }, c('b'), c('c'), { frontCover: 'd-front' }])).toEqual({ front: 'a-front', back: 'c-back' });
-  });
-  it('no covers yet: nothing', () => { expect(pickBookCovers([])).toEqual({ front: undefined, back: undefined }); });
-  it('the strip is shown without blank pages too and carries no per-story cover row', () => {
-    const builder = read('client/src/pages/BookBuilder.tsx');
-    const sec = read('client/src/components/book/PrintedBookSpreads.tsx');
-    expect(builder).not.toMatch(/needsBlankAck \? \(\s*<PrintedBookSpreads/);
-    expect(builder).toMatch(/<BookSquareCovers[^>]*showImages=\{false\}/);
-    expect(sec).toContain('pickBookCovers');
-    expect(sec).not.toMatch(/ownCovers|covers\?: ReactNode/);
-    expect(read('client/src/components/book/BookSquareCovers.tsx')).toMatch(/showImages = true/);
-  });
-});
+// The printed-book strip (and its cover-pair helper) was removed the same day (owner: page too long);
+// book-builder-blank-ack-hint-2026-11-11.test.ts checks it stays gone.

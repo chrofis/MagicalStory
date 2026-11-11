@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { snapToValidPageCount, countBookContentPages, computeBookPageInfo, buildPrintedPageSequence, isBlankPagesAckMissing, BLANK_PAGES_ACK_FROM } = require('./gelato');
+const { snapToValidPageCount, countBookContentPages, computeBookPageInfo, buildPrintedPageSequence, isBlankPagesAckMissing, BLANK_PAGES_ACK_FROM, bookRewardPages } = require('./gelato');
 
 // Discrete page-count list takes priority. Smallest entry >= estimated.
 test('discrete list: snaps up to next entry', () => {
@@ -143,7 +143,7 @@ const storyOf = (n, { backCover = false } = {}) => ({
   storyText: Array.from({ length: n }, (_, i) => `--- Page ${i + 1} ---\nText ${i + 1}`).join('\n'),
   ...(backCover ? { coverImages: { backCover: { imageData: 'x' } } } : {}),
 });
-const poolWith = (rows) => ({ query: async () => ({ rows }) });
+const poolWith = (rows, maxPages = 100) => ({ query: async (sql) => ({ rows: /pricing_tiers/.test(sql) ? [{ max_pages: maxPages }] : rows }) });
 const HARDCOVER_A4 = {
   product_uid: 'photobooks-hardcover_pf_210x280-mm-portrait_pt_170-gsm',
   product_name: 'Hardcover A4',
@@ -307,4 +307,27 @@ test('buildPrintedPageSequence: spread storyText entries carry the real page tex
   const texts = seq.filter(s => s.kind === 'storyText');
   assert.deepStrictEqual(texts.map(s => s.text), ['Text 1', 'Text 2', 'Text 3']);
   assert.ok(seq.filter(s => s.kind === 'storyImage').every(s => s.text === undefined));
+});
+
+// Owner 2026-11-11: "Square not offered above 100" — square needs about twice the pages; above the top price tier it is not offered.
+test('computeBookPageInfo: square unavailable when its pages exceed the top pricing tier', async () => {
+  const ok = await computeBookPageInfo(poolWith(ROWS, 100), [storyOf(30)], 'hardcover');
+  assert.strictEqual(ok.layouts.spread.available, true);
+  const over = await computeBookPageInfo(poolWith(ROWS, 50), [storyOf(30)], 'hardcover');
+  assert.strictEqual(over.layouts.spread.available, false);
+  assert.strictEqual(over.layouts.spread.reason.code, 'TOO_MANY_PAGES');
+  assert.strictEqual(over.layouts.spread.reason.maxPages, 50);
+});
+
+test('computeBookPageInfo: fails loudly without pricing tiers', async () => {
+  const pool = { query: async (sql) => ({ rows: /pricing_tiers/.test(sql) ? [{ max_pages: null }] : ROWS }) };
+  await assert.rejects(computeBookPageInfo(pool, [storyOf(10)], 'hardcover'), /maxPricedPages/);
+});
+
+// Owner 2026-11-11: "Story pages, same for both" — credit reward counts story pages, not the square page count.
+test('bookRewardPages: rewardPages wins, old sessions use totalPages, none gives 0', () => {
+  assert.strictEqual(bookRewardPages({ rewardPages: '11', totalPages: '22' }), 11);
+  assert.strictEqual(bookRewardPages({ totalPages: '13' }), 13);
+  assert.strictEqual(bookRewardPages({}), 0);
+  assert.strictEqual(bookRewardPages(undefined), 0);
 });

@@ -231,9 +231,12 @@ class BookLayoutError extends Error {
  * left, text right; unavailable above FACING_PAGES_MAX_SCENES scenes. When both are available, 'single'
  * is the default and 'spread' the "more options" exception. Reasons are codes plus numbers.
  */
-function describeLayouts(singlePlan, spreadPlan, sceneCount) {
+function describeLayouts(singlePlan, spreadPlan, sceneCount, maxPricedPages) {
+  if (!Number.isFinite(maxPricedPages) || maxPricedPages <= 0) throw new Error('describeLayouts: maxPricedPages (top of pricing_tiers) is required');
   const singleOk = singlePlan.blankPages < BLANK_PAGES_ACK_FROM;
-  const spreadOk = sceneCount <= FACING_PAGES_MAX_SCENES;
+  // A layout is priced from the tiers on its OWN page count (decisions.md 2026-11-11); a square book above the top
+  // tier has no price, so it is not offered (owner 2026-11-11: "Square not offered above 100").
+  const spreadOk = sceneCount <= FACING_PAGES_MAX_SCENES && spreadPlan.contentPages <= maxPricedPages;
   return {
     single: {
       available: singleOk,
@@ -242,10 +245,20 @@ function describeLayouts(singlePlan, spreadPlan, sceneCount) {
     },
     spread: {
       available: spreadOk,
-      reason: spreadOk ? null : { code: 'TOO_MANY_PAGES', printedPages: spreadPlan.printedPages, maxPages: FACING_PAGES_MAX_PAGES },
+      reason: spreadOk ? null : { code: 'TOO_MANY_PAGES', printedPages: spreadPlan.printedPages, maxPages: spreadPlan.contentPages > maxPricedPages ? maxPricedPages : FACING_PAGES_MAX_PAGES },
       printedPages: spreadPlan.printedPages, blankPages: spreadPlan.blankPages, contentPages: spreadPlan.contentPages,
     },
   };
+}
+
+/**
+ * Pages the book-purchase credit reward is counted from (owner 2026-11-11: the story pages, the same for both
+ * formats). Checkout writes `rewardPages`; a session created before that field existed carries only `totalPages`,
+ * which was then the one-page count, i.e. the same quantity. Returns 0 when neither is present.
+ */
+function bookRewardPages(metadata) {
+  const v = metadata && (metadata.rewardPages !== undefined ? metadata.rewardPages : metadata.totalPages);
+  return parseInt(v, 10) || 0;
 }
 
 /**
@@ -302,7 +315,9 @@ async function computeBookPageInfo(dbPool, storyDatas, coverType, { layout: requ
   const rowsFor = (format) => productsResult.rows.filter(r => String(r.product_uid).toLowerCase().includes(BOOK_FORMAT_PATTERN[format]));
   const single = planLayoutPages(rowsFor(bookFormatForLayout('single')), storyDatas, 'single');
   const spread = planLayoutPages(rowsFor(bookFormatForLayout('spread')), storyDatas, 'spread');
-  const layouts = describeLayouts(single, spread, countBookScenes(storyDatas));
+  const tierTop = await dbPool.query('SELECT MAX(max_pages) AS max_pages FROM pricing_tiers');
+  const maxPricedPages = Number(tierTop.rows[0] && tierTop.rows[0].max_pages);
+  const layouts = describeLayouts(single, spread, countBookScenes(storyDatas), maxPricedPages);
   const layout = chooseBookLayout(layouts, requested);
   const plan = layout === 'spread' ? spread : single;
   const info = {
@@ -932,6 +947,7 @@ Status 'processing' with no Gelato order id since ${o.updated_at}. The process l
 }
 
 module.exports = {
+  bookRewardPages,
   shippingFromSession,
   resolveBookOrderInputs,
   resumeBookOrder,

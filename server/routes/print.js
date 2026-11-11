@@ -23,7 +23,7 @@ const { getPool, rehydrateStoryImages, logActivity } = require('../services/data
 
 // Lib modules
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf, pdfContentDisposition } = require('../lib/pdf');
-const { processBookOrder, resumeBookOrder, createGelatoOrder, getCoverDimensions, computeBookPageInfo, isBlankPagesAckMissing, BLANK_PAGES_ACK_FROM, shippingFromSession } = require('../lib/gelato');
+const { processBookOrder, resumeBookOrder, createGelatoOrder, getCoverDimensions, computeBookPageInfo, isBlankPagesAckMissing, BLANK_PAGES_ACK_FROM, shippingFromSession, bookRewardPages } = require('../lib/gelato');
 const { stripDataUriPrefix } = require('../lib/r2');
 const { attachSquareCovers } = require('../lib/squareCovers');
 const email = require('../../email');
@@ -1741,6 +1741,9 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         storyIds: JSON.stringify(allStoryIds),
         storyCount: stories.length.toString(),
         totalPages: totalPages.toString(),
+        // Credits back follow the STORY pages, the same for both formats (owner 2026-11-11), not the square book's
+        // doubled count: the one-page layout's content count, which is what totalPages was before layouts were priced apart.
+        rewardPages: pageInfo.layouts.single.contentPages.toString(),
         // Blank pages the customer acknowledged (0 when none); no orders column needed.
         blankPagesAcknowledged: pageInfo.blankPages.toString(),
         coverType: coverType,
@@ -1942,12 +1945,12 @@ router.get('/stripe/order-status/:sessionId', async (req, res) => {
       const shippingAddress = shippingDetails.address || {};
 
       // Calculate expected tokens (webhook may not have run yet)
-      const totalPages = parseInt(session.metadata?.totalPages) || 0;
+      const rewardPages = bookRewardPages(session.metadata);
       let tokensExpected = 0;
-      if (totalPages > 0) {
+      if (rewardPages > 0) {
         const promoResult = await getDbPool().query("SELECT config_value FROM config WHERE config_key = 'token_promo_multiplier'");
         const multiplier = promoResult.rows[0]?.config_value ? parseInt(promoResult.rows[0].config_value) : 1;
-        tokensExpected = totalPages * 10 * multiplier;
+        tokensExpected = rewardPages * 10 * multiplier;
       }
 
       log.debug(`📦 Constructing order from Stripe session data`);
