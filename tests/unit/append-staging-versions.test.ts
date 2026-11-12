@@ -105,43 +105,38 @@ describe('provenanceProblems', () => {
   });
 });
 
-describe('provenanceProblems after an earlier append', () => {
-  // Production already holds p1 v2 appended from staging: prod-bucket URL, admin-fix marker.
-  const appended = row('scene', 1, 2, PROD);
-  const adminFixData = (marker) => ({ sceneImages: [{ pageNumber: 1, imageVersions: [{ dbVersionIndex: 2, ...(marker ? { source: 'admin-fix', adminFix: { from: 'staging', stagingVersion: 2, appendedAt: 'T' } } : {}) }] }] });
-  const mk = (prodData) => ({ prodData, prodMetadata: { updatedAt: '2026-11-12T09:00:00Z' }, prodRows: [...prodRows, appended], stagingRows, srcSha: P.sha16(prodData), pulledAt: '2026-11-12T11:00:00Z' });
-  it('accepts a row this tool appended (same type/page/index/path, other bucket)', () => {
-    expect(P.provenanceProblems(mk(adminFixData(true)))).toEqual([]);
-  });
-  it('accepts the textless art row of an appended cover (marker is on the cover entry)', () => {
-    const data = { coverImages: { frontCover: { imageVersions: [{ dbVersionIndex: 2, source: 'admin-fix', adminFix: { from: 'staging', stagingVersion: 2, appendedAt: 'T' } }] } } };
-    const art = row('frontCoverArt', null, 2, PROD);
-    expect(P.provenanceProblems({ ...mk(data), prodRows: [...prodRows, art] })).toEqual([]);
-  });
-  it('still reports a row with the same path but no admin-fix marker (a customer row)', () => {
-    expect(P.provenanceProblems(mk(adminFixData(false))).join(' ')).toMatch(/1 production image row.*not in the staging copy/);
-  });
-  it('still reports an admin-fix row the staging copy does not hold at that index', () => {
-    const b = mk(adminFixData(true));
-    const noRow = { ...b, stagingRows: stagingRows.filter((r) => !(r.image_type === 'scene' && r.page_number === 1 && r.version_index === 2)) };
-    expect(P.provenanceProblems(noRow).join(' ')).toMatch(/not in the staging copy/);
-  });
-});
-
-describe('planAppends after an earlier append', () => {
-  // p1 v2 and p2 v1 were appended earlier (prod-bucket URL + marker) and are active on both sides.
-  const mark = (n) => ({ pageNumber: n, imageVersions: [{ dbVersionIndex: n === 1 ? 2 : 1, source: 'admin-fix', adminFix: { from: 'staging', stagingVersion: 0, appendedAt: 'T' } }] });
-  const prodData = { sceneImages: [mark(1), mark(2)] };
-  const pRows = [...prodRows, row('scene', 1, 2, PROD), row('scene', 2, 1, PROD)];
-  const sRows = [...prodRows, row('scene', 1, 2, STG), row('scene', 2, 1, STG), row('scene', 3, 0, PROD)];
+describe('earlier appends (admin-fix copies, N may differ from M)', () => {
+  const fix = (n, m) => ({ dbVersionIndex: n, source: 'admin-fix', adminFix: { from: 'staging', stagingVersion: m, appendedAt: 'T' } });
+  // p1: prod v2 = copy of staging v2 (N=M). p2: prod v1 = copy of staging v3 (N!=M). Prod-bucket URLs.
+  const prodData = { sceneImages: [{ pageNumber: 1, imageVersions: [fix(2, 2)] }, { pageNumber: 2, imageVersions: [fix(1, 3)] }],
+    coverImages: { frontCover: { imageVersions: [fix(2, 1)] } } };
+  const pRows = [row('scene', 1, 0, PROD), row('scene', 1, 2, PROD), row('scene', 2, 0, PROD), row('scene', 2, 1, PROD)];
+  const sRows = [row('scene', 1, 0, PROD), row('scene', 1, 2, STG), row('scene', 2, 0, PROD), row('scene', 2, 1, STG), row('scene', 2, 2, STG), row('scene', 2, 3, STG)];
   const pMeta = { 1: { activeVersion: 2 }, 2: { activeVersion: 1 } };
-  const sMeta = { 1: { activeVersion: 2 }, 2: { activeVersion: 1 } };
-  it('lists nothing for pictures whose active image is the earlier admin-fix copy', () => {
-    expect(P.planAppends({ storyId: ID, stagingMeta: sMeta, stagingRows: sRows.filter((r) => r.page_number !== 3), prodMeta: pMeta, prodRows: pRows, prodData })).toEqual([]);
+  const sMeta = { 1: { activeVersion: 2 }, 2: { activeVersion: 3 } };
+  const planOf = (over = {}) => P.planAppends({ storyId: ID, stagingMeta: sMeta, stagingRows: sRows, prodMeta: pMeta, prodRows: pRows, prodData, ...over });
+  it('plans nothing for a picture whose active prod row is the copy of the staging active version, also when N differs from M', () => {
+    expect(planOf()).toEqual([]);
   });
-  it('without the marker the same-path rows count as different pictures', () => {
-    const p = P.planAppends({ storyId: ID, stagingMeta: sMeta, stagingRows: sRows.filter((r) => r.page_number !== 3), prodMeta: pMeta, prodRows: pRows, prodData: { sceneImages: [] } });
-    expect(p.map((e) => e.key)).toEqual(['1', '2']);
+  it('plans the picture when staging moved on to another version than the one copied', () => {
+    expect(planOf({ stagingMeta: { ...sMeta, 2: { activeVersion: 2 } } }).map((e) => [e.key, e.stagingVersion, e.newIndex])).toEqual([['2', 2, 2]]);
+  });
+  it('without the admin-fix marker the same rows count as different pictures', () => {
+    expect(planOf({ prodData: { sceneImages: [] } }).map((e) => e.key)).toEqual(['1', '2']);
+  });
+  const base = (data) => ({ prodData: data, prodMetadata: { updatedAt: '2026-11-12T09:00:00Z' }, prodRows: pRows, stagingRows: sRows, srcSha: P.sha16(data), pulledAt: '2026-11-12T11:00:00Z' });
+  it('provenance: a marked prod row is held when staging holds its stagingVersion (N != M included)', () => {
+    expect(P.provenanceProblems(base(prodData))).toEqual([]);
+  });
+  it('provenance: a customer row without the marker, or a marked row whose stagingVersion staging lacks, is reported', () => {
+    expect(P.provenanceProblems(base({ sceneImages: [] })).join(' ')).toMatch(/2 production image row.*not in the staging copy/);
+    const noV3 = { ...base(prodData), stagingRows: sRows.filter((r) => !(r.page_number === 2 && r.version_index === 3)) };
+    expect(P.provenanceProblems(noV3).join(' ')).toMatch(/1 production image row.*not in the staging copy/);
+  });
+  it('a cover art row follows its cover entry marker', () => {
+    const art = row('frontCoverArt', null, 2, PROD);
+    const sArt = row('frontCoverArt', null, 1, STG);
+    expect(P.provenanceProblems({ ...base(prodData), prodRows: [...pRows, art], stagingRows: [...sRows, sArt] })).toEqual([]);
   });
 });
 

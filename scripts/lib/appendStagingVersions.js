@@ -35,32 +35,32 @@ function activeIndex(meta, key) {
 }
 
 
-/** URL path after the host ('' for a missing url). */
-function urlPath(url) {
-  return url ? String(url).replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, '') : '';
-}
-
-/** Is the production version entry of this DB row one this tool appended from staging (adminFix.from === 'staging')? */
-function isAdminFixFromStaging(prodData, row) {
-  // A cover's textless art row (<cover>Art) is appended with its cover at the same index and has
-  // no imageVersions entry of its own: the marker is on the cover's entry.
-  const imageType = COVER_TYPES.includes(row.image_type.replace(/Art$/, '')) ? row.image_type.replace(/Art$/, '') : row.image_type;
+/**
+ * The admin-fix-from-staging marker (adminFix) of a production DB row's version entry, or null.
+ * Located by dbVersionIndex = row.version_index. A cover's textless art row (<cover>Art) is
+ * appended with its cover and has no entry of its own: the marker is on the cover's entry.
+ */
+function adminFixOf(prodData, row) {
+  const base = row.image_type.replace(/Art$/, '');
+  const imageType = COVER_TYPES.includes(base) ? base : row.image_type;
   const holder = versionHolder(prodData || {}, { imageType, pageNumber: row.page_number });
   const list = holder && Array.isArray(holder.imageVersions) ? holder.imageVersions : [];
-  return list.some((v) => v && v.dbVersionIndex === row.version_index && v.source === ADMIN_FIX_SOURCE && v.adminFix && v.adminFix.from === 'staging');
+  const v = list.find((e) => e && e.dbVersionIndex === row.version_index && e.source === ADMIN_FIX_SOURCE && e.adminFix && e.adminFix.from === 'staging');
+  return v ? v.adminFix : null;
 }
 
 /**
- * Is production row `pRow` the same picture as staging row `sRow`? Full key match
- * (type, page, index, URL), or: production's version entry for the row is an admin-fix appended
- * from staging AND type/page/index/path-after-host match (that row holds the production-bucket
- * URL of the staging-bucket image it was copied from). Never path-only without the marker.
- * The one rule for provenanceProblems and planAppends.
+ * Is production row `pRow` the same picture as staging row `sRow` (same type and page)? Either the
+ * full key matches (an ordinary pulled row: index and URL), or production's entry for the row is an
+ * admin-fix appended from staging whose stagingVersion is the staging row's index (the append copied
+ * staging vM to production vN, so N and M may differ and the URLs are in different buckets).
+ * Never matched on path or index alone. The one rule for provenanceProblems and planAppends.
  */
 function isSameImageRow(pRow, sRow, prodData) {
-  if (pRow.image_type !== sRow.image_type || pRow.page_number !== sRow.page_number || pRow.version_index !== sRow.version_index) return false;
-  if (pRow.image_url === sRow.image_url) return true;
-  return isAdminFixFromStaging(prodData, pRow) && urlPath(pRow.image_url) !== '' && urlPath(pRow.image_url) === urlPath(sRow.image_url);
+  if (pRow.image_type !== sRow.image_type || pRow.page_number !== sRow.page_number) return false;
+  if (pRow.version_index === sRow.version_index && pRow.image_url === sRow.image_url) return true;
+  const fix = adminFixOf(prodData, pRow);
+  return !!fix && fix.stagingVersion === sRow.version_index;
 }
 
 const sha16 = (obj) => crypto.createHash('sha256').update(JSON.stringify(obj ?? null)).digest('hex').slice(0, 16);
