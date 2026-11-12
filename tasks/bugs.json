@@ -4828,6 +4828,15 @@
       "rootCause": "visualBible.filterMainCharactersFromVisualBible matches sc.name.toLowerCase() against the roster name field exactly, so a roster name carrying relationship text after a comma never matches the short name the story uses. Same class as charfix-misses-cast-named-with-relationship (e8344de85), which fixed the repair lookups but not this filter.",
       "status": "fixed",
       "fixedIn": "ee949be47"
+    },
+    {
+      "id": "append-staging-versions-reappend-duplicates",
+      "title": "A second append of the same story planned 23 duplicate pictures and tripped its own provenance guard: rows the tool had appended earlier were not recognised as the staging pictures they came from",
+      "reportedAt": "2026-11-12",
+      "source": "Dry run on production job_1794506785522_17d2hnvd9, 2026-11-12 ~23:30 CH: plan listed 23 pictures (expected 5) and refused with \"23 production image row(s) not in the staging copy\". Caught before --yes; nothing written.",
+      "rootCause": "provenanceProblems and planAppends compared full image URLs (production bucket vs staging bucket) and the same version index, but an appended row lives at a new production index with adminFix.stagingVersion pointing at its staging source. Fixed with one helper isSameImageRow that matches by adminFix.stagingVersion.",
+      "status": "fixed",
+      "fixedIn": "f4fdbec4e"
     }
   ]
 }
