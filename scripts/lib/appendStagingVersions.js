@@ -35,6 +35,21 @@ function activeIndex(meta, key) {
 }
 
 
+/** URL path after the host ('' for a missing url). */
+function urlPath(url) {
+  return url ? String(url).replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, '') : '';
+}
+
+/** Is the production version entry of this DB row one this tool appended from staging (adminFix.from === 'staging')? */
+function isAdminFixFromStaging(prodData, row) {
+  // A cover's textless art row (<cover>Art) is appended with its cover at the same index and has
+  // no imageVersions entry of its own: the marker is on the cover's entry.
+  const imageType = COVER_TYPES.includes(row.image_type.replace(/Art$/, '')) ? row.image_type.replace(/Art$/, '') : row.image_type;
+  const holder = versionHolder(prodData || {}, { imageType, pageNumber: row.page_number });
+  const list = holder && Array.isArray(holder.imageVersions) ? holder.imageVersions : [];
+  return list.some((v) => v && v.dbVersionIndex === row.version_index && v.source === ADMIN_FIX_SOURCE && v.adminFix && v.adminFix.from === 'staging');
+}
+
 const sha16 = (obj) => crypto.createHash('sha256').update(JSON.stringify(obj ?? null)).digest('hex').slice(0, 16);
 
 /**
@@ -59,7 +74,13 @@ function provenanceProblems({ prodData, prodMetadata, prodRows, stagingRows, src
   const upd = prodMetadata && prodMetadata.updatedAt ? Date.parse(prodMetadata.updatedAt) : NaN;
   if (Number.isFinite(upd) && upd > pulled) problems.push(`production metadata.updatedAt ${prodMetadata.updatedAt} is after the pull (a version pick?)`);
   const held = new Set(stagingRows.map((r) => `${r.image_type}|${r.page_number}|${r.version_index}|${r.image_url}`));
-  const missing = prodRows.filter((r) => !held.has(`${r.image_type}|${r.page_number}|${r.version_index}|${r.image_url}`));
+  // A row THIS tool appended earlier holds the production-bucket URL, the staging copy the
+  // staging-bucket URL of the same path. It counts as held only with the admin-fix marker on
+  // its production version entry AND an identical type/page/index/path in the staging copy.
+  const heldByPath = new Set(stagingRows.map((r) => `${r.image_type}|${r.page_number}|${r.version_index}|${urlPath(r.image_url)}`));
+  const isHeld = (r) => held.has(`${r.image_type}|${r.page_number}|${r.version_index}|${r.image_url}`)
+    || (isAdminFixFromStaging(prodData, r) && heldByPath.has(`${r.image_type}|${r.page_number}|${r.version_index}|${urlPath(r.image_url)}`));
+  const missing = prodRows.filter((r) => !isHeld(r));
   if (missing.length) problems.push(`${missing.length} production image row(s) not in the staging copy, e.g. ${metaKeyOf(missing[0])} v${missing[0].version_index}`);
   return problems;
 }

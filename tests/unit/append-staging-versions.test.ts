@@ -105,6 +105,29 @@ describe('provenanceProblems', () => {
   });
 });
 
+describe('provenanceProblems after an earlier append', () => {
+  // Production already holds p1 v2 appended from staging: prod-bucket URL, admin-fix marker.
+  const appended = row('scene', 1, 2, PROD);
+  const adminFixData = (marker) => ({ sceneImages: [{ pageNumber: 1, imageVersions: [{ dbVersionIndex: 2, ...(marker ? { source: 'admin-fix', adminFix: { from: 'staging', stagingVersion: 2, appendedAt: 'T' } } : {}) }] }] });
+  const mk = (prodData) => ({ prodData, prodMetadata: { updatedAt: '2026-11-12T09:00:00Z' }, prodRows: [...prodRows, appended], stagingRows, srcSha: P.sha16(prodData), pulledAt: '2026-11-12T11:00:00Z' });
+  it('accepts a row this tool appended (same type/page/index/path, other bucket)', () => {
+    expect(P.provenanceProblems(mk(adminFixData(true)))).toEqual([]);
+  });
+  it('accepts the textless art row of an appended cover (marker is on the cover entry)', () => {
+    const data = { coverImages: { frontCover: { imageVersions: [{ dbVersionIndex: 2, source: 'admin-fix', adminFix: { from: 'staging', stagingVersion: 2, appendedAt: 'T' } }] } } };
+    const art = row('frontCoverArt', null, 2, PROD);
+    expect(P.provenanceProblems({ ...mk(data), prodRows: [...prodRows, art] })).toEqual([]);
+  });
+  it('still reports a row with the same path but no admin-fix marker (a customer row)', () => {
+    expect(P.provenanceProblems(mk(adminFixData(false))).join(' ')).toMatch(/1 production image row.*not in the staging copy/);
+  });
+  it('still reports an admin-fix row the staging copy does not hold at that index', () => {
+    const b = mk(adminFixData(true));
+    const noRow = { ...b, stagingRows: stagingRows.filter((r) => !(r.image_type === 'scene' && r.page_number === 1 && r.version_index === 2)) };
+    expect(P.provenanceProblems(noRow).join(' ')).toMatch(/not in the staging copy/);
+  });
+});
+
 describe('noWordTraits', () => {
   it("replaces only glasses/other values that are exactly a stored 'no' word, anywhere in the snapshot", () => {
     const data = {
