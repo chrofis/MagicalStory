@@ -3,11 +3,10 @@
  * One-off data repair (2026-11-12, bug glasses-nein-read-as-glasses): stored characters whose
  * physical.glasses / physical.other is a typed "no" instead of the canonical sentinel 'none'.
  *
- * The list of no-words below is the ONLY place such a list is allowed. Production code never
- * reads free text (docs/decisions.md 2026-11-12); this script repairs data written before the
- * character form became a yes/no switch. The values are the distinct stored values found in
- * production (characters table, 2026-11-12) that mean "no": only 'nein' (3x glasses, 4x other
- * in characters; 'Brille', 'schwarze Brille', 'wears glasses' etc. mean YES and are left alone).
+ * The list of no-words lives in scripts/lib/noWordTraits.js, the ONLY place such a list is
+ * allowed. Production code never reads free text (docs/decisions.md 2026-11-12); this script
+ * repairs data written before the character form became a yes/no switch (production characters
+ * table, 2026-11-12: 3x glasses, 4x other).
  *
  * Default is --dry-run (lists). --write backs up every changed row to tasks/customer-*.json (gitignored: customer data) first, then
  * updates `characters`. Uses DATABASE_URL (production) unless --staging.
@@ -18,9 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
 
-const NO_VALUES = ['nein'];          // exact stored values meaning "no"
-const FIELDS = ['glasses', 'other'];
-const SENTINEL = 'none';
+const { NO_VALUES, FIELDS, SENTINEL } = require('../lib/noWordTraits');
 
 const write = process.argv.includes('--write');
 const url = process.argv.includes('--staging') ? process.env.STAGING_DATABASE_URL : process.env.DATABASE_URL;
