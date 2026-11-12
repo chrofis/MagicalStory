@@ -4774,6 +4774,14 @@
       "rootCause": "BookBuilder disables the button while needsBlankAck && !blankAck and says nothing near it. BlankPagesPreview wrapped R2 image URLs as data:image/jpeg;base64,https://… (the shape toImgSrc in client/src/utils/imgSrc.ts already handles).",
       "status": "fixed",
       "fixedIn": "0f401a31b"
+    },
+    {
+      "id": "book-blank-cover-without-back-cover",
+      "title": "Printed book: a single-story book whose story has no back cover prints a completely blank cover (no front picture either); an unreadable cover picture only logs a warning",
+      "reportedAt": "2026-11-12",
+      "source": "Review 2026-11-12. Reproduced on staging: generate-book-pdf for story job_1787693271900_cyc9lol5y (front cover, no back cover) gave a 31-page PDF whose cover page holds 0 images. Production: 32 stories have a front cover but no back cover (newest 2026-08-16); ordered alone, each prints a white cover.",
+      "rootCause": "server/lib/pdf.js generatePrintPdf draws the cover spread only when BOTH back and front exist (line ~318) and silently skips otherwise; an unreadable buffer only log.warns (~322). generateCombinedBookPdf borrows a back cover from another story, the single-story path has nothing to borrow; its draw failures are also caught and warned (~1253).",
+      "status": "open"
     }
   ]
 }

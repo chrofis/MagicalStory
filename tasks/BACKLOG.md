@@ -2496,3 +2496,5 @@ three below are prompt/classification questions and are the owner's call.
 - [ ] SEO: Marketing request items 3 (Christmas content), 4 (reviews/outreach texts), 5 (comparison pages), 7 (parenting guides), /vergleich structured data, GBP question → inbox/2026-11-09-marketing-seo-organic-traffic.md
 
 - [ ] **Several different books in one order (cart), one shipping** — a new customer ordered 3 books in 3 orders on 2026-11-11 and paid shipping 3 times; merged by hand (tasks/customer-combined-parcel-2026-11-11.md, local). Phase 2 of the plan is not built → docs/plans/2026-03-31-multi-book-orders.md:19
+- [ ] **Printed dedication page is white for stories without a dedication picture** — review 2026-11-12: 28 production stories have front + back cover but no `initialPage` (newest 2026-11-11); pdf.js draws page 3 empty. Unknown whether by design (owner to say) → server/lib/pdf.js:355
+- [ ] **Admin "Druck-PDF (Test)" is a second copy of buildBookPrintPdf** — POST /api/generate-book-pdf repeats the order's page-info / cover-size / square-cover / PDF steps instead of calling `buildBookPrintPdf` (drift risk; refusals return 500 not 400) → server/routes/print.js:1104
