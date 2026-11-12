@@ -4809,7 +4809,7 @@
       "source": "Production job_1794498448758_ryuv0q8lb finalChecksReport.repairRounds: p16 (Noah drawn as an adult) and p3 (Tobias) char-fix failed with the no-roster-entry message; p14 \"no bbox for Noah\". Reproduced: charFixReferenceGap({characters:[{name:\"Noah, Freund von Louis und Tobias, Bruder von Tilo\"}],characterName:\"Noah\"}) returns no-roster-entry. 3 of 58 production stories in 60 days have comma names (all three from 2026-11-12).",
       "rootCause": "The repair lookups (charFixReferenceGap, resolveCharBbox, charFixCall, manual endpoint, router, entity-check cast) compared the raw roster name field, and castResolver itself did not know that the name field carries relationship text after a comma, so neither the short name the story uses nor the full field resolved (and \"Louis\" resolved to Noah's entry through his relationship text). Fixed in castResolver (shortName, one place) and the repair lookups now resolve through it.",
       "status": "fixed",
-      "fixedIn": "PENDING"
+      "fixedIn": "e8344de85"
     }
   ]
 }
