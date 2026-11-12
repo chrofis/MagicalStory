@@ -4791,7 +4791,7 @@
       "source": "Paid staging test 2026-11-12 (USD 0.245, 4 production stories copied to staging): job_1782291146740_4txcgqfdd (tom, age 4, physical.apparentAge middle-aged -> brief \"a middle-aged man\"), job_1784309543785_xunnxuagh (age 5, apparentAge young-adult -> \"a young adult woman\"; render prompt REQUIRED OBJECTS lists **Spielzeugwaffe**, the VB artifact type, name Holzschwert). Eval scored them 100 and 70. 9xigyv8u6 and 8l1dv50lk came out right.",
       "rootCause": "(1) Characters made before avatar-time clamping (avatars.js ~2265 clampApparentAge) keep the raw photo apparentAge; the maker feeds them to the brief unclamped. (2) The required-objects line of the render prompt (promptBuilders.js ~5309) labels an object with the brief-cited word, here the old VB entry type, which the render model paints.",
       "status": "fixed",
-      "fixedIn": "see git log: Back-cover maker age clamp and English labels"
+      "fixedIn": "76698096d"
     }
   ]
 }
