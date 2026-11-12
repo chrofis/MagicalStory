@@ -486,7 +486,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
 
       {/* Glasses for females (after Other which is inline with skin tone) */}
       {character.gender === 'female' && (
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <YesNoTraitField
             label={language === 'de' ? 'Brille' : language === 'fr' ? 'Lunettes' : language === 'it' ? 'Occhiali' : 'Glasses'}
             value={character.physical?.glasses || ''}
@@ -502,7 +502,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
       )}
 
       {/* Face: anatomical shape (jawline, nose, cheeks, lips) — age-neutral. Full-width row. */}
-      <div className="col-span-2">
+      <div className="sm:col-span-2">
         <InlineEditField
           label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : language === 'it' ? 'Viso' : 'Face'}
           value={character.physical?.face || ''}
