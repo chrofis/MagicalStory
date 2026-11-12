@@ -35,4 +35,4 @@ About USD 0.15-0.30 per made cover (brief gemini-3.1-pro, plate + render Grok, e
 Built and unit-tested with stand-ins (USD 0). Free replay over the 32 production stories: 13 build a brief prompt, 19 stop loudly (13 no avatar and no character of today, 6 only a costumed avatar). The paid staging run stays open (needs the owner's cap).
 
 ## Paid test result (2026-11-12)
-Stories with stored avatars only (4txcgqfdd, xunnxuagh, 9xigyv8u6, 8l1dv50lk); the "today's character" path is unit-tested only. First run 2/4 (photo age, painted German type label), fixed in 76698096d, rerun 4/4. About 2-3 minutes per cover. 19 of the 32 stories still cannot get one (13 no avatar at all, 6 costumed avatar only): owner decision pending.
+Stories with stored avatars only (4txcgqfdd, xunnxuagh, 9xigyv8u6, 8l1dv50lk); the "today's character" path is unit-tested only. First run 2/4 (photo age, painted German type label), fixed in 76698096d, rerun 4/4. About 2-3 minutes per cover. 19 of the 32 stories still cannot get one (13 no avatar at all, 6 costumed avatar only): owner 2026-11-12: leave the error (old stories, none ordered; the customer can add a story that has a back cover).
