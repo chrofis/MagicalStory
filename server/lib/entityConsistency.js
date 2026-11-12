@@ -3473,7 +3473,8 @@ function buildPhysicalTraitsDescription(character) {
   if (facialHair && facialHair !== 'none') parts.push(facialHair);
 
   // Other distinctive features
-  if (p.other) parts.push(p.other);
+  // 'none' is the form's "no other features" sentinel (decisions 2026-11-12)
+  if (!require('./promptBuilders').isNone(p.other)) parts.push(p.other);
 
   return parts.length > 0 ? parts.join(', ') : 'See reference image for physical traits';
 }

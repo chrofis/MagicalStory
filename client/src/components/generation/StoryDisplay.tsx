@@ -3563,7 +3563,7 @@ export function StoryDisplay({
                               <span className="font-medium text-gray-600">Physical:</span>
                               <span className="text-gray-700 ml-1">
                                 {char.physical?.skinTone || 'N/A'} | {char.physical?.hair || 'N/A'} | {char.physical?.build || 'N/A'}
-                                {char.physical?.other && ` | ${char.physical.other}`}
+                                {char.physical?.other && char.physical.other !== 'none' && ` | ${char.physical.other}`}
                               </span>
                             </div>
                             {/* Generated Outfits */}

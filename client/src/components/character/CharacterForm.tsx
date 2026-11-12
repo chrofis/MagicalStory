@@ -10,6 +10,7 @@ import CharacterRelationships from './CharacterRelationships';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
 import { useAvatarCooldown } from '@/hooks/useAvatarCooldown';
 import { getAgeCategory, characterService } from '@/services/characterService';
+import { traitSwitchIsYes, traitSwitchText, traitSwitchValue, GLASSES_YES_DEFAULT } from '@/utils/traitSwitch';
 import type { Character, PhysicalTraits, PhysicalTraitsSource, AgeCategory, ChangedTraits, RelationshipMap, RelationshipTextMap } from '@/types/character';
 import { getDisplayPhoto, getFaceThumb, getStandardAvatar, getAvatarInputPhoto } from '@/utils/characterPhotos';
 import type { CustomRelationshipPair } from '@/constants/relationships';
@@ -149,9 +150,11 @@ function InlineEditField({ label, value, placeholder, onChange, isChanged, isAiE
 
   return (
     <div className="flex items-center gap-2">
-      <span className={`font-medium text-xs whitespace-nowrap ${isAiExtracted ? 'text-gray-400' : 'text-gray-600'}`}>
-        {label}:
-      </span>
+      {label && (
+        <span className={`font-medium text-xs whitespace-nowrap ${isAiExtracted ? 'text-gray-400' : 'text-gray-600'}`}>
+          {label}:
+        </span>
+      )}
       <input
         type="text"
         value={value}
@@ -172,6 +175,65 @@ function InlineEditField({ label, value, placeholder, onChange, isChanged, isAiE
       )}
       {isChanged && !isUserEdited && (
         <span className="text-amber-500 text-xs" title="Changed from previous photo">●</span>
+      )}
+    </div>
+  );
+}
+
+// Yes/no switch + description for glasses and "other". The switch decides "none"
+// (stored as the sentinel 'none'); code never reads typed words. See utils/traitSwitch.ts.
+interface YesNoTraitFieldProps {
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange: (value: string) => void;
+  emptyYesValue?: string;  // stored when "yes" but no description typed
+  isChanged?: boolean;
+  isAiExtracted?: boolean;
+  isUserEdited?: boolean;
+  language?: string;
+}
+
+function YesNoTraitField({ label, value, placeholder, onChange, emptyYesValue = '', isChanged, isAiExtracted, isUserEdited, language }: YesNoTraitFieldProps) {
+  // Local state: "yes" with a still-empty description must stay "yes" while the user types.
+  const [yes, setYes] = useState(traitSwitchIsYes(value));
+  useEffect(() => {
+    // A new stored value from outside (photo analysis, other character) re-syncs the switch.
+    if (traitSwitchIsYes(value)) setYes(true);
+    else if (value.trim() !== '') setYes(false);  // 'none'
+  }, [value]);
+  const yesLabel = language === 'de' ? 'ja' : language === 'fr' ? 'oui' : language === 'it' ? 'sì' : 'yes';
+  const noLabel = language === 'de' ? 'nein' : language === 'fr' ? 'non' : language === 'it' ? 'no' : 'no';
+  const setSwitch = (next: boolean) => {
+    setYes(next);
+    onChange(traitSwitchValue(next, '', emptyYesValue));
+  };
+  const btn = (active: boolean) =>
+    `px-2 py-0.5 text-xs border first:rounded-l last:rounded-r ${active ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`;
+  // Leaving the description empty while "yes" must still state the trait (glasses).
+  const onBlurFill = () => {
+    if (yes && emptyYesValue && value.trim() === '') onChange(emptyYesValue);
+  };
+  return (
+    <div className="flex items-center gap-2" onBlur={onBlurFill}>
+      <span className={`font-medium text-xs whitespace-nowrap ${isAiExtracted ? 'text-gray-400' : 'text-gray-600'}`}>
+        {label}:
+      </span>
+      <div className="inline-flex" role="group" aria-label={label}>
+        <button type="button" aria-pressed={yes} className={btn(yes)} onClick={() => setSwitch(true)}>{yesLabel}</button>
+        <button type="button" aria-pressed={!yes} className={btn(!yes)} onClick={() => setSwitch(false)}>{noLabel}</button>
+      </div>
+      {yes && (
+        <InlineEditField
+          label=""
+          value={traitSwitchText(value)}
+          placeholder={placeholder}
+          onChange={(v) => onChange(v)}
+          isAiExtracted={isAiExtracted}
+          isChanged={isChanged}
+          isUserEdited={isUserEdited}
+          language={language}
+        />
       )}
     </div>
   );
@@ -383,7 +445,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
           {changedTraits?.facialHair && !isUserEdited('facialHair') && <span className="text-amber-500 text-xs" title="Changed">●</span>}
         </div>
       ) : (
-        <InlineEditField
+        <YesNoTraitField
           label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other'}
           value={character.physical?.other || ''}
           placeholder={language === 'de' ? 'z.B. Narben, Muttermale' : language === 'fr' ? 'p. ex. cicatrices, grains de beauté' : language === 'it' ? 'es. cicatrici, nei' : 'e.g. scars, birthmarks'}
@@ -398,17 +460,18 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
       {/* Row 5: Glasses + Other (for non-females) */}
       {character.gender !== 'female' && (
         <>
-          <InlineEditField
+          <YesNoTraitField
             label={language === 'de' ? 'Brille' : language === 'fr' ? 'Lunettes' : language === 'it' ? 'Occhiali' : 'Glasses'}
             value={character.physical?.glasses || ''}
             placeholder={language === 'de' ? 'z.B. runde schwarze Brille' : language === 'fr' ? 'p. ex. monture ronde noire' : language === 'it' ? 'es. montatura nera rotonda' : 'e.g. round black-framed'}
+            emptyYesValue={GLASSES_YES_DEFAULT}
             onChange={(v) => updatePhysical('glasses', v)}
             isAiExtracted={isAiExtracted}
             isChanged={false}
             isUserEdited={isUserEdited('glasses')}
             language={language}
           />
-          <InlineEditField
+          <YesNoTraitField
             label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other'}
             value={character.physical?.other || ''}
             placeholder={language === 'de' ? 'z.B. Narben, Muttermale' : language === 'fr' ? 'p. ex. cicatrices, grains de beauté' : language === 'it' ? 'es. cicatrici, nei' : 'e.g. scars, birthmarks'}
@@ -424,10 +487,11 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
       {/* Glasses for females (after Other which is inline with skin tone) */}
       {character.gender === 'female' && (
         <div className="col-span-2">
-          <InlineEditField
+          <YesNoTraitField
             label={language === 'de' ? 'Brille' : language === 'fr' ? 'Lunettes' : language === 'it' ? 'Occhiali' : 'Glasses'}
             value={character.physical?.glasses || ''}
             placeholder={language === 'de' ? 'z.B. runde schwarze Brille' : language === 'fr' ? 'p. ex. monture ronde noire' : language === 'it' ? 'es. montatura nera rotonda' : 'e.g. round black-framed'}
+            emptyYesValue={GLASSES_YES_DEFAULT}
             onChange={(v) => updatePhysical('glasses', v)}
             isAiExtracted={isAiExtracted}
             isChanged={false}
