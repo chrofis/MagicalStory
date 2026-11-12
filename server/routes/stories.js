@@ -2860,6 +2860,31 @@ router.post('/:id/square-covers', authenticateToken, async (req, res) => {
   }
 });
 
+// POST /api/stories/:id/ensure-back-cover - a PRINTED book has a back cover; a story made before full stories drew one
+// gets it made (about USD 0.15-0.30, paid by us, no credits) before the customer orders. Body { bookStoryIds }: the
+// stories of the book, in order (default: just :id). backCoverTarget (server/lib/backCoverMaker.js) is the ONE rule for
+// which story needs one; the endpoint answers { made: false } when none does, so the pages never decide it themselves.
+router.post('/:id/ensure-back-cover', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ids = Array.isArray(req.body && req.body.bookStoryIds) && req.body.bookStoryIds.length ? req.body.bookStoryIds.map(String) : [id];
+    if (!ids.includes(id)) return res.status(400).json({ error: 'bookStoryIds must include the story' });
+    // Owner only (it spends money): a write endpoint, so no read-any-story admin path.
+    const rows = await dbQuery('SELECT id, data FROM stories WHERE id = ANY($1::text[]) AND user_id = $2', [ids, req.user.id]);
+    if (rows.length !== new Set(ids).size) return res.status(404).json({ error: 'Story not found' });
+    const byId = new Map(rows.map(r => [r.id, { id: r.id, data: typeof r.data === 'string' ? JSON.parse(r.data) : r.data }]));
+    const stories = ids.map(i => byId.get(i));
+    const { backCoverTarget, makeMissingBackCover } = require('../lib/backCoverMaker');
+    const target = backCoverTarget(stories);
+    if (!target) return res.json({ success: true, made: false });
+    const out = await makeMissingBackCover(target.id, target.data);
+    res.json({ success: true, made: out.made, storyId: target.id, score: out.score ?? null, costUsd: out.costUsd ?? 0 });
+  } catch (err) {
+    log.error(`[BACK COVER] ${req.params.id}: ${err.message}`);
+    res.status(500).json({ error: 'Failed to make the back cover: ' + err.message });
+  }
+});
+
 // GET /api/stories/:id/title-paint — developer-mode evidence for the painted
 // cover title: the WHITE PLATE that was sent to the model, the model's RAW
 // output, and the outcome (ok / reason / metrics). Without this a flat title is

@@ -394,10 +394,17 @@ async function getCoverDimensions(productUid, pageCount) {
  * @param {string[]} allStoryIds   in book order
  * @param {'softcover'|'hardcover'} coverType
  * @param {'single'|'spread'|undefined} layout  the layout the customer chose (throws when unavailable)
- * @param {{fillMethod: 'mirror'|'grok', fillStats?: Object, onStage?: Function}} options  fillStats is filled in by pdf.js
+ * @param {{fillMethod: 'mirror'|'grok', fillStats?: Object, onStage?: Function, deps?: Object}} options  fillStats is filled in by pdf.js;
+ *   deps is a test seam (rehydrateStoryImages, computeBookPageInfo, getCoverDimensions, backCoverTarget, makeMissingBackCover, attachSquareCovers, generatePrintPdf, generateCombinedBookPdf)
  * @returns {Promise<{pdfBuffer: Buffer, targetPageCount: number, estimatedPageCount: number, printProductUid: string, pageInfo: Object, stories: Object[]}>}
  */
-async function buildBookPrintPdf(dbPool, allStoryIds, coverType, layout, { fillMethod, fillStats = { grokCalls: 0 }, onStage = () => {} }) {
+async function buildBookPrintPdf(dbPool, allStoryIds, coverType, layout, { fillMethod, fillStats = { grokCalls: 0 }, onStage = () => {}, deps = {} }) {
+  const d = {
+    computeBookPageInfo, getCoverDimensions, attachSquareCovers, generatePrintPdf, generateCombinedBookPdf, rehydrateStoryImages,
+    backCoverTarget: (stories) => require('./backCoverMaker').backCoverTarget(stories),
+    makeMissingBackCover: (id, data) => require('./backCoverMaker').makeMissingBackCover(id, data),
+    ...deps,
+  };
   // Step 2: Fetch all stories from database (batch query for performance)
   const storyResult = await dbPool.query(
     'SELECT id, data FROM stories WHERE id = ANY($1::text[])',
@@ -419,7 +426,7 @@ async function buildBookPrintPdf(dbPool, allStoryIds, coverType, layout, { fillM
       storyData = JSON.parse(storyData);
     }
     // Rehydrate images from story_images table (images stripped from data blob)
-    storyData = await rehydrateStoryImages(row.id, storyData);
+    storyData = await d.rehydrateStoryImages(row.id, storyData);
     storiesMap.set(row.id, { id: row.id, data: storyData });
   }
   const stories = allStoryIds.map(id => storiesMap.get(id));
@@ -437,7 +444,7 @@ async function buildBookPrintPdf(dbPool, allStoryIds, coverType, layout, { fillM
   // Page count + SKU come from computeBookPageInfo — the same function the
   // checkout preview (POST /api/book-page-info) uses, so the number shown
   // to the customer before payment is the number the PDF is padded to.
-  const pageInfo = await computeBookPageInfo(dbPool, stories.map(s => s.data), coverType, { layout });
+  const pageInfo = await d.computeBookPageInfo(dbPool, stories.map(s => s.data), coverType, { layout });
   const { estimatedPageCount, printedPages: snappedPageCount, bookFormat } = pageInfo; // format derived from the layout, never from the session
   log.debug(`📊 [BACKGROUND] Estimated Gelato page count: ${estimatedPageCount} (${pageInfo.contentPages} content pages incl. dedication)`);
   let printProductUid = pageInfo.productUid;
@@ -452,14 +459,23 @@ async function buildBookPrintPdf(dbPool, allStoryIds, coverType, layout, { fillM
 
   // Step 3b: Get cover dimensions from Gelato API
   if (!printProductUid) throw new Error(`No Gelato product for format=${bookFormat}, coverType=${coverType}: cannot size the cover`);
-  const coverDims = await getCoverDimensions(printProductUid, snappedPageCount);
+  const coverDims = await d.getCoverDimensions(printProductUid, snappedPageCount);
   log.debug(`📏 [BACKGROUND] Gelato cover: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
+
+  // Step 3b1: a PRINTED book has a back cover. A story made before full stories drew one gets it made here, before the
+  // square covers (a square book's back cover is made from it). backCoverTarget is the one rule, shared with the order
+  // page's endpoint; the PDF functions below throw when no back cover exists (requireBackCover).
+  const backCoverTarget = d.backCoverTarget(stories);
+  if (backCoverTarget) {
+    onStage('covers');
+    await d.makeMissingBackCover(backCoverTarget.id, backCoverTarget.data);
+  }
 
   // Step 3b2: a SQUARE book prints square covers (made once per cover, normally already made while the customer
   // looked at them in the book builder; the stored ones are reused). Throws rather than print a crop.
   if (bookFormat === 'square') {
     onStage('covers');
-    await Promise.all(stories.map(s => attachSquareCovers(s.id, s.data)));
+    await Promise.all(stories.map(s => d.attachSquareCovers(s.id, s.data)));
   }
 
   // Step 3c: Generate PDF with actual cover dimensions
@@ -468,24 +484,26 @@ async function buildBookPrintPdf(dbPool, allStoryIds, coverType, layout, { fillM
 
   if (stories.length === 1) {
     log.debug(`📄 [BACKGROUND] Generating single-story PDF (format: ${bookFormat})...`);
-    const result = await generatePrintPdf(stories[0].data, bookFormat, {
+    const result = await d.generatePrintPdf(stories[0].data, bookFormat, {
       gelatoCoverDims: coverDims,
       targetGelatoPageCount: snappedPageCount,
       layout: pageInfo.layout,
       fillMethod,
       fillStats,
+      requireBackCover: true,
     });
     pdfBuffer = result.pdfBuffer;
     targetPageCount = result.pageCount;
   } else {
     // Multiple stories - generate combined book PDF
     log.debug(`📄 [BACKGROUND] Generating combined multi-story PDF...`);
-    const result = await generateCombinedBookPdf(stories, bookFormat, {
+    const result = await d.generateCombinedBookPdf(stories, bookFormat, {
       gelatoCoverDims: coverDims,
       targetGelatoPageCount: snappedPageCount,
       layout: pageInfo.layout,
       fillMethod,
       fillStats,
+      requireBackCover: true,
     });
     pdfBuffer = result.pdfBuffer;
     targetPageCount = result.pageCount;

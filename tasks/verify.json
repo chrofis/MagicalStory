@@ -11575,6 +11575,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "back-cover-maker",
+      "title": "A printed book whose story has no back cover gets one made before the order",
+      "commits": [],
+      "addedAt": "2026-11-12",
+      "claim": "On staging, ordering or previewing a book of a production story that has a front cover and no back cover makes a back cover first (outfit read from the avatar, Art Director brief, render, text stamp), the print PDF opens with the front cover and the made back cover on the cover spread, and a story with a stored back cover makes nothing.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Copy a production story with a front cover and no back cover (plan: job_1780438044462_oolwasq34, job_1786888522777_8l1dv50lk, job_1773093284773_isudrmgrj, job_1773170696610_cdwuw7kui) to staging, open its order page (the back-cover box shows, then clears), open Buch ansehen and look at the cover spread: front and back drawn, the back cover shows the story characters in their day outfit looking at the viewer, with the magicalstory.ch line. Staging job_1787693271900_cyc9lol5y (no front cover) must fail loudly. Cap USD 1.20 (tasks/back-cover-maker-2026-11-12.md)."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

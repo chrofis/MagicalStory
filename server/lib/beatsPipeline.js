@@ -1693,6 +1693,71 @@ async function finalizePlanShotsJev({ approvedArc, beats, check, gl, callImpl })
 }
 
 /**
+ * ONE PAGE'S BRIEF, from its plan line, in ONE Art Director call (the per-page path). Two uses: the fallback for pages
+ * the all-pages call omitted (runArtDirector), and the back-cover maker (backCoverMaker.js), which has no all-pages
+ * call to belong to. The PLAN line stands in for page.text (the text does not exist yet), with the page's FIXED block
+ * under it exactly as in the all-pages plan block (promptBuilders.planBlocks).
+ *
+ * @param {{pageNumber:number, planLine:string, jevFixed?:Object}} b
+ * @param {{inputData:Object, visualBible:Object|null, clothingRequirements:Object|null, availableAvatars:string,
+ *   maxCharactersPerScene:number, imageBackend?:string, sceneModel:string, jevBackup:boolean, onChunk?:Function,
+ *   gl?:Object, onCall?:Function, labCallOptions?:Object}} c
+ * @returns {Promise<{pageNumber:number, brief:string, prompt:string, modelId:string}>}
+ */
+async function expandBriefPerPage(b, c) {
+  const { inputData, visualBible, clothingRequirements, availableAvatars, maxCharactersPerScene, imageBackend, sceneModel, jevBackup, onChunk = null, gl = NOOP_LOG, onCall = null, labCallOptions = {} } = c;
+  const lang = inputData.language || 'en';
+  const pageContent = [`PLAN: ${b.planLine || ''}`, jevDecisions.fixedBlock(b)].filter(Boolean).join(String.fromCharCode(10));
+  const prompt = buildSceneExpansionPrompt(
+    b.pageNumber, pageContent, inputData.characters || [], lang,
+    visualBible, availableAvatars, null,
+    {
+      maxCharactersPerScene,
+      artStyleId: inputData.artStyle,
+      imageBackend,
+      // No referencePhotos exist at this stage, so the contract is the only
+      // outfit source — same reason the all-pages builder needs it.
+      clothingRequirements,
+      // Decides whether the text-zone rule family is asked for at all.
+      story: inputData,
+      jevBackup,
+    }
+  );
+  let lastErr = null;
+  // The best incomplete brief seen, kept as the last resort. A page with half
+  // a spec still beats a page with none: this fallback's throw ABORTS the run
+  // (Promise.all over the missing pages), and a contract miss must never end a
+  // paid run (docs/SETTLED.md, gates are guidelines).
+  let salvage = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await askArtDirector(prompt, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion_fallback', ...adBriefsCallOptions(), ...labCallOptions });
+      if (onCall) onCall(res);
+      if (!res || !res.text || !res.text.trim()) throw new Error('empty scene brief');
+      const { assessSceneBrief, describeSceneBrief } = require('./iterateBriefGuard');
+      const verdict = assessSceneBrief(res.text);
+      if (!verdict.usable) {
+        if (!salvage) salvage = { pageNumber: b.pageNumber, brief: res.text, prompt, modelId: res.modelId || sceneModel, verdict };
+        throw new Error(`incomplete scene brief — ${describeSceneBrief(verdict)}`);
+      }
+      return { pageNumber: b.pageNumber, brief: res.text, prompt, modelId: res.modelId || sceneModel };
+    } catch (err) {
+      if (err instanceof ArtDirectorRefusedError) throw err;
+      lastErr = err;
+      log.warn(`⚠️ [BEATS] Scene expansion page ${b.pageNumber} attempt ${attempt} failed: ${err.message}`);
+    }
+  }
+  if (salvage) {
+    const { describeSceneBrief } = require('./iterateBriefGuard');
+    const why = describeSceneBrief(salvage.verdict);
+    log.error(`🚨 [BEATS] Page ${b.pageNumber}: both per-page attempts returned an incomplete brief (${why}) — SHIPPING IT ANYWAY; every metadata-driven supervisor runs blind on this page`);
+    gl.warn('beats_scene_brief_incomplete', `Page ${b.pageNumber} ships with an incomplete brief after two per-page attempts — ${why}`, null, { pages: [b.pageNumber] });
+    return { pageNumber: salvage.pageNumber, brief: salvage.brief, prompt: salvage.prompt, modelId: salvage.modelId };
+  }
+  throw new Error(`Scene expansion failed for page ${b.pageNumber}: ${lastErr?.message || 'unknown error'}`);
+}
+
+/**
  * The reasoning option of the Art Director's page-brief calls (all-pages call and
  * its per-page fallback): runtime `adBriefsReasoningEffort`, null = the model's
  * default. The Lab's `labCallOptions` spreads after it and wins.
@@ -1749,61 +1814,13 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
   const maxCharactersPerScene = imgModelConfig?.maxCharactersPerScene || 3;
 
   /**
-   * Per-page expansion — the fallback for pages the page-brief call omitted.
-   * The PLAN line stands in for page.text (the text does not exist yet), with
-   * the page's FIXED block under it exactly as in the all-pages plan block
-   * (promptBuilders.planBlocks).
+   * Per-page expansion — the fallback for pages the page-brief call omitted (expandBriefPerPage).
    */
-  async function expandOnePage(b) {
-    const pageContent = [`PLAN: ${b.planLine || ''}`, jevDecisions.fixedBlock(b)].filter(Boolean).join(String.fromCharCode(10));
-    const prompt = buildSceneExpansionPrompt(
-      b.pageNumber, pageContent, inputData.characters || [], lang,
-      visualBible, availableAvatars, null,
-      {
-        maxCharactersPerScene,
-        artStyleId: inputData.artStyle,
-        imageBackend: imgModelConfig?.backend,
-        // No referencePhotos exist at this stage, so the contract is the only
-        // outfit source — same reason the all-pages builder needs it.
-        clothingRequirements,
-        // Decides whether the text-zone rule family is asked for at all.
-        story: inputData,
-        jevBackup: !jevActive(jevReport),
-      }
-    );
-    let lastErr = null;
-    // The best incomplete brief seen, kept as the last resort. A page with half
-    // a spec still beats a page with none: this fallback's throw ABORTS the run
-    // (Promise.all over the missing pages), and a contract miss must never end a
-    // paid run (docs/SETTLED.md, gates are guidelines).
-    let salvage = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const res = await askArtDirector(prompt, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion_fallback', ...adBriefsCallOptions(), ...labCallOptions });
-        if (onCall) onCall(res);
-        if (!res || !res.text || !res.text.trim()) throw new Error('empty scene brief');
-        const { assessSceneBrief, describeSceneBrief } = require('./iterateBriefGuard');
-        const verdict = assessSceneBrief(res.text);
-        if (!verdict.usable) {
-          if (!salvage) salvage = { pageNumber: b.pageNumber, brief: res.text, prompt, modelId: res.modelId || sceneModel, verdict };
-          throw new Error(`incomplete scene brief — ${describeSceneBrief(verdict)}`);
-        }
-        return { pageNumber: b.pageNumber, brief: res.text, prompt, modelId: res.modelId || sceneModel };
-      } catch (err) {
-        if (err instanceof ArtDirectorRefusedError) throw err;
-        lastErr = err;
-        log.warn(`⚠️ [BEATS] Scene expansion page ${b.pageNumber} attempt ${attempt} failed: ${err.message}`);
-      }
-    }
-    if (salvage) {
-      const { describeSceneBrief } = require('./iterateBriefGuard');
-      const why = describeSceneBrief(salvage.verdict);
-      log.error(`🚨 [BEATS] Page ${b.pageNumber}: both per-page attempts returned an incomplete brief (${why}) — SHIPPING IT ANYWAY; every metadata-driven supervisor runs blind on this page`);
-      gl.warn('beats_scene_brief_incomplete', `Page ${b.pageNumber} ships with an incomplete brief after two per-page attempts — ${why}`, null, { pages: [b.pageNumber] });
-      return { pageNumber: salvage.pageNumber, brief: salvage.brief, prompt: salvage.prompt, modelId: salvage.modelId };
-    }
-    throw new Error(`Scene expansion failed for page ${b.pageNumber}: ${lastErr?.message || 'unknown error'}`);
-  }
+  const expandOnePage = (b) => expandBriefPerPage(b, {
+    inputData, visualBible, clothingRequirements, availableAvatars, maxCharactersPerScene,
+    imageBackend: imgModelConfig?.backend, sceneModel, jevBackup: !jevActive(jevReport),
+    onChunk, gl, onCall, labCallOptions,
+  });
 
   let t = Date.now();
   // THE LIGHT IS DECIDED BEFORE THE ART DIRECTOR WRITES (owner, 2026-09-27,
@@ -3867,4 +3884,4 @@ async function applyTitleProofread(inputData, parsed, gl, deps = {}) {
   };
 }
 
-module.exports = { adStageModels, generateStoryViaBeats, applyTitleProofread, reportChallengeMemoryBreach, finalizePlanShots, presentOf, decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf, runArtDirector, decideAndApplyStorySeason, arcTempFor, makeArcCreatorCall, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { expandBriefPerPage, adStageModels, generateStoryViaBeats, applyTitleProofread, reportChallengeMemoryBreach, finalizePlanShots, presentOf, decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf, runArtDirector, decideAndApplyStorySeason, arcTempFor, makeArcCreatorCall, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

@@ -11,6 +11,7 @@ import type { BookLayout } from '@/services/storyService';
 import { bookSizeLabel, A4_BOOK_SIZE_LABEL } from '@/utils/bookPricing';
 import BookFormatChoice from '@/components/book/BookFormatChoice';
 import BookSquareCovers from '@/components/book/BookSquareCovers';
+import BookBackCover from '@/components/book/BookBackCover';
 import BookPreviewButton from '@/components/book/BookPreviewButton';
 import { storyService } from '@/services';
 import type { BookPageInfo, VoucherBookCredit } from '@/services/storyService';
@@ -173,6 +174,8 @@ export default function VoucherBookCheckout() {
   const [pageInfo, setPageInfo] = useState<BookPageInfo | null>(null);
   // A square book (layout 'spread') prints square covers; ordering waits until they are made and shown.
   const [squareCoversReady, setSquareCoversReady] = useState(true);
+  // A printed book has a back cover: one a story lacks is made before the order (BookBackCover); the square covers follow it.
+  const [backCoverReady, setBackCoverReady] = useState(false);
   // The customer's layout pick; null = the server default (text in the picture when available, else facing pages).
   const [layoutChoice, setLayoutChoice] = useState<BookLayout | null>(null);
   const [blankAck, setBlankAck] = useState(false);
@@ -258,7 +261,7 @@ export default function VoucherBookCheckout() {
 
   // Due now: the hardcover surcharge only; the voucher covers the rest of the list price (server: vouchers.bookCouponCents).
   const amountDue = coverType === 'hardcover' ? Number(surchargeChf) : 0;
-  const canOrder = selected.length > 0 && !!pageInfo && !isTooLong && !busy && (!needsBlankAck || blankAck) && squareCoversReady;
+  const canOrder = selected.length > 0 && !!pageInfo && !isTooLong && !busy && (!needsBlankAck || blankAck) && squareCoversReady && backCoverReady;
 
   const handleOrder = async () => {
     if (!canOrder) return;
@@ -378,7 +381,10 @@ export default function VoucherBookCheckout() {
                 <BookFormatChoice language={language} layouts={pageInfo.layouts} selected={pageInfo.layout} onSelect={setLayoutChoice} />
               )}
               {pageInfo && !isTooLong && (
-                <BookSquareCovers language={language} active={pageInfo.layout === 'spread'} stories={stories.filter(s => selected.includes(s.id))} onReadyChange={setSquareCoversReady} />
+                <>
+                  <BookBackCover language={language} stories={stories.filter(s => selected.includes(s.id))} onReadyChange={setBackCoverReady} />
+                  <BookSquareCovers language={language} active={pageInfo.layout === 'spread' && backCoverReady} stories={stories.filter(s => selected.includes(s.id))} onReadyChange={setSquareCoversReady} />
+                </>
               )}
               {needsBlankAck && pageInfo && (
                 <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">

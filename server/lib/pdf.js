@@ -248,6 +248,16 @@ function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHe
 }
 
 /**
+ * Resolve a cover picture to bytes. A cover that is stored but unreadable is a failure, never a blank page
+ * (bug book-blank-cover-without-back-cover).
+ */
+async function requireCoverBuffer(imageData, label) {
+  const buffer = await resolveImageBuffer(imageData);
+  if (!buffer) throw new Error(`PDF: the ${label} picture could not be read`);
+  return buffer;
+}
+
+/**
  * Generate print-ready PDF for a single story
  * Layout: Back+Front cover spread → Initial page → Story pages
  *
@@ -315,38 +325,25 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   const backCoverImageData = printCoverSource(storyData, 'backCover', bookFormat);
   const frontCoverImageData = printCoverSource(storyData, 'frontCover', bookFormat);
 
-  if (backCoverImageData && frontCoverImageData) {
-    const backCoverBuffer = await resolveImageBuffer(backCoverImageData);
-    const frontCoverBuffer = await resolveImageBuffer(frontCoverImageData);
-    if (!backCoverBuffer || !frontCoverBuffer) {
-      log.warn(`⚠️ [PRINT PDF] Missing cover image buffer (back=${!!backCoverBuffer}, front=${!!frontCoverBuffer}); skipping cover spread`);
-    } else {
+  // A printed book has a back cover; a PDF download does not (owner 2026-11-12: "Books have a back cover. PDFs do not.").
+  // requireBackCover is set by the print build only. A cover that exists but cannot be read always throws.
+  if (options.requireBackCover && !backCoverImageData) {
+    throw new Error('Print PDF: the story has no back cover (make it before building the print file)');
+  }
+  const backCoverBuffer = backCoverImageData ? await requireCoverBuffer(backCoverImageData, 'back cover') : null;
+  const frontCoverBuffer = frontCoverImageData ? await requireCoverBuffer(frontCoverImageData, 'front cover') : null;
 
-    // Extend cover images into the bleed area (outer edge + top + bottom).
-    // Stop at the spine edge so back/front don't bleed into each other.
-    // Gelato content rectangles already exclude bleed; we add it back on the
-    // outer side and on top/bottom to fill the trim-safe margin.
-    const backLeft = 0;
-    const backRight = mmToPoints(contentBack.left + contentBack.width); // up to spine edge
-    const backImgX = backLeft;
-    const backImgY = 0;
-    const backImgW = backRight - backLeft;
-    const backImgH = coverSpreadHeight;
-
+  // Extend cover images into the bleed area (outer edge + top + bottom).
+  // Stop at the spine edge so back/front don't bleed into each other.
+  // Gelato content rectangles already exclude bleed; we add it back on the
+  // outer side and on top/bottom to fill the trim-safe margin.
+  // Cover images use scale-to-fill: they reach the page edges, a small symmetric crop is acceptable.
+  if (backCoverBuffer) {
+    await drawImageCovering(doc, backCoverBuffer, 0, 0, mmToPoints(contentBack.left + contentBack.width), coverSpreadHeight);
+  }
+  if (frontCoverBuffer) {
     const frontLeft = mmToPoints(contentFront.left); // start at spine edge
-    const frontRight = coverSpreadWidth;             // up to right page edge (incl. bleed)
-    const frontImgX = frontLeft;
-    const frontImgY = 0;
-    const frontImgW = frontRight - frontLeft;
-    const frontImgH = coverSpreadHeight;
-
-    // Cover images use scale-to-fill — they're meant to reach the page edges,
-    // a small symmetric crop is acceptable. The previous `fit:` mode produced
-    // visible white bars whenever the image's aspect didn't exactly match the
-    // page area (always true after bleed math).
-      await drawImageCovering(doc, backCoverBuffer, backImgX, backImgY, backImgW, backImgH);
-      await drawImageCovering(doc, frontCoverBuffer, frontImgX, frontImgY, frontImgW, frontImgH);
-    }
+    await drawImageCovering(doc, frontCoverBuffer, frontLeft, 0, coverSpreadWidth - frontLeft, coverSpreadHeight);
   }
 
   // Page 2: Blank left page (required by Gelato - left side of first spread)
@@ -1233,31 +1230,20 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       }
       const frontCoverImageData = printCoverSource(storyData, 'frontCover', bookFormat);
 
-      if (backCoverImageData && frontCoverImageData) {
-        const backCoverBuffer = await resolveImageBuffer(backCoverImageData);
-        const frontCoverBuffer = await resolveImageBuffer(frontCoverImageData);
+      if (options.requireBackCover && !backCoverImageData) {
+        throw new Error('Print PDF: no story in the book has a back cover (make one before building the print file)');
+      }
+      const backCoverBuffer = backCoverImageData ? await requireCoverBuffer(backCoverImageData, 'story 1 back cover') : null;
+      const frontCoverBuffer = frontCoverImageData ? await requireCoverBuffer(frontCoverImageData, 'story 1 front cover') : null;
 
-        // Extend cover images into outer + top + bottom bleed; stop at the spine edge
-        const backImgX = 0;
-        const backImgY = 0;
-        const backImgW = mmToPoints(contentBack.left + contentBack.width); // up to spine edge
-        const backImgH = coverSpreadHeight;
-
+      // Extend cover images into outer + top + bottom bleed; stop at the spine edge.
+      // Scale-to-fill so covers reach the page edges (no white bars); the small symmetric crop is acceptable.
+      if (backCoverBuffer) {
+        await drawImageCovering(doc, backCoverBuffer, 0, 0, mmToPoints(contentBack.left + contentBack.width), coverSpreadHeight);
+      }
+      if (frontCoverBuffer) {
         const frontImgX = mmToPoints(contentFront.left); // start at spine edge
-        const frontImgY = 0;
-        const frontImgW = coverSpreadWidth - frontImgX;  // up to right page edge incl. bleed
-        const frontImgH = coverSpreadHeight;
-
-        // Scale-to-fill so covers reach the page edges (no white bars). The
-        // small symmetric crop on the long axis is acceptable for cover art.
-        if (backCoverBuffer) {
-          try { await drawImageCovering(doc, backCoverBuffer, backImgX, backImgY, backImgW, backImgH); }
-          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story 1 back cover render failed: ${err.message}`); }
-        }
-        if (frontCoverBuffer) {
-          try { await drawImageCovering(doc, frontCoverBuffer, frontImgX, frontImgY, frontImgW, frontImgH); }
-          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story 1 front cover render failed: ${err.message}`); }
-        }
+        await drawImageCovering(doc, frontCoverBuffer, frontImgX, 0, coverSpreadWidth - frontImgX, coverSpreadHeight);
       }
 
       // Blank left page (required by Gelato - left side of first spread)
@@ -1290,11 +1276,8 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       totalStoryPages++;
       const frontCoverImageData = printCoverSource(storyData, 'frontCover', bookFormat);
       if (frontCoverImageData) {
-        const frontCoverBuffer = await resolveImageBuffer(frontCoverImageData);
-        if (frontCoverBuffer) {
-          try { await drawImageCovering(doc, frontCoverBuffer, 0, 0, interiorPageWidth, interiorPageHeight); }
-          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story ${storyIndex + 1} front cover render failed: ${err.message}`); }
-        }
+        const frontCoverBuffer = await requireCoverBuffer(frontCoverImageData, `story ${storyIndex + 1} front cover`);
+        await drawImageCovering(doc, frontCoverBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
       }
 
       // Dedication/initial page (RIGHT) — same side as story 1's dedication
@@ -1318,11 +1301,8 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
       if (backCoverImageData) {
         doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         totalStoryPages++;
-        const backCoverBuffer = await resolveImageBuffer(backCoverImageData);
-        if (backCoverBuffer) {
-          try { await drawImageCovering(doc, backCoverBuffer, 0, 0, interiorPageWidth, interiorPageHeight); }
-          catch (err) { log.warn(`⚠️ [COMBINED PDF] Story ${storyIndex + 1} back cover render failed: ${err.message}`); }
-        }
+        const backCoverBuffer = await requireCoverBuffer(backCoverImageData, `story ${storyIndex + 1} back cover`);
+        await drawImageCovering(doc, backCoverBuffer, 0, 0, interiorPageWidth, interiorPageHeight);
 
         // Blank separator after back cover (if not last story)
         if (storyIndex < stories.length - 1) {

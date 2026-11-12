@@ -632,6 +632,22 @@ async function readAvatarHair(avatarImageData, { model = MODEL_DEFAULTS.sheetEva
 }
 
 /**
+ * THE DAY OUTFIT OF AN AVATAR, read from the picture (owner, 2026-11-12). One vision call (prompts/avatar-outfit-read.txt),
+ * same judge model and echo guard as readAvatarHair. A story made before the wardrobe step wrote outfit text has none
+ * to give the cover beat; the avatar every page was drawn from is the one picture that shows it.
+ *
+ * @returns {Promise<{outfit: string, seen: string|null}>} throws when the call gives no outfit text
+ */
+async function readAvatarOutfit(avatarImageData, { model = MODEL_DEFAULTS.sheetEvalModel, usageTracker = null, apiKey = null } = {}) {
+  const prompt = PROMPT_TEMPLATES.avatarOutfitRead;
+  if (!prompt) throw new Error('avatarOutfitRead prompt template not loaded');
+  const report = await askSheetJudge({ model, parts: [inlinePartOf(avatarImageData), { text: prompt }], prompt, label: 'avatar outfit read', usageTracker, usageFn: 'avatar_outfit_read', apiKey: apiKey || process.env.GEMINI_API_KEY });
+  const outfit = typeof report?.outfit === 'string' ? report.outfit.trim() : '';
+  if (!outfit) throw new Error('avatar outfit read returned no outfit text');
+  return { outfit, seen: report?.seen || null };
+}
+
+/**
  * IS ONE TAKEN-OFF GARMENT STILL ON THE SHEET? One question, one garment, the
  * variant image ALONE (owner, 2026-10-04). Inside the style judge the same
  * question was read as an exemption: Image 2 still wears the garment, so "TASK 9
@@ -1017,5 +1033,6 @@ module.exports = {
   buildSkinToneBlock,
   resolveFacePhoto,
   readAvatarHair,
+  readAvatarOutfit,
   _internal: { askSheetJudge, inlinePartOf, hairRequest, parseJudgeJson, isEchoedJudgeVerdict, resolveStyleLineForSheet, REAR_TURN_POSE, SHEET_GROUND_RULE, CELL_NAMES_NOT_DRAWN, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildUnnamedTrimRule, resolveBodyReference },
 };

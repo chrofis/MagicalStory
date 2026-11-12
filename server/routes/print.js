@@ -22,8 +22,8 @@ const { log } = require('../utils/logger');
 const { getPool, rehydrateStoryImages, logActivity } = require('../services/database');
 
 // Lib modules
-const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf, pdfContentDisposition } = require('../lib/pdf');
-const { processBookOrder, resumeBookOrder, createGelatoOrder, getCoverDimensions, computeBookPageInfo, isBlankPagesAckMissing, BLANK_PAGES_ACK_FROM, shippingFromSession, bookRewardPages } = require('../lib/gelato');
+const { generatePrintPdf, generateViewPdf, pdfContentDisposition } = require('../lib/pdf');
+const { processBookOrder, resumeBookOrder, createGelatoOrder, computeBookPageInfo, buildBookPrintPdf, isBlankPagesAckMissing, BLANK_PAGES_ACK_FROM, shippingFromSession, bookRewardPages } = require('../lib/gelato');
 const { stripDataUriPrefix } = require('../lib/r2');
 const { attachSquareCovers } = require('../lib/squareCovers');
 const email = require('../../email');
@@ -1098,8 +1098,8 @@ router.post('/generate-pdf', authenticateToken, async (req, res) => {
   }
 });
 
-// Generate print-ready book PDF - uses the same generatePrintPdf/generateCombinedBookPdf
-// as the Gelato order flow (layout, sizes, page count). It uses the free mirror strip fill, so it
+// Generate print-ready book PDF - buildBookPrintPdf, the same function as the Gelato order flow
+// (layout, sizes, page count). It uses the free mirror strip fill, so it
 // differs from the real order PDF only in the Grok-outpainted strip (decisions.md 2026-10-26).
 router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
   try {
@@ -1112,64 +1112,22 @@ router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
 
     console.log(`📚 [BOOK PDF] Generating book with ${storyIds.length} stories, cover: ${coverType}`);
 
-    // Fetch all stories from database
-    const stories = [];
+    // The book's owner only (this route can spend money: a missing back cover is made for the book).
     for (const storyId of storyIds) {
-      const storyResult = await getDbPool().query(
-        'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
-        [storyId, userId]
-      );
-
-      if (storyResult.rows.length === 0) {
+      const owned = await getDbPool().query('SELECT 1 FROM stories WHERE id = $1 AND user_id = $2', [storyId, userId]);
+      if (owned.rows.length === 0) {
         log.debug(`📚 [BOOK PDF] Story not found: ${storyId}`);
         return res.status(404).json({ error: `Story not found: ${storyId}` });
       }
-
-      let storyData = typeof storyResult.rows[0].data === 'string'
-        ? JSON.parse(storyResult.rows[0].data)
-        : storyResult.rows[0].data;
-
-      // Rehydrate images from story_images table (images stripped from data blob)
-      storyData = await rehydrateStoryImages(storyId, storyData);
-      stories.push({ id: storyId, data: storyData });
     }
 
+    // ONE function builds the book PDF: this route, the paid order and the book preview all call buildBookPrintPdf
+    // (layout, SKU, cover size, back cover, square covers, page count). The free mirror strip fill makes this file differ
+    // from the real order PDF only in the Grok-outpainted strip (decisions.md 2026-10-26).
+    const built = await buildBookPrintPdf(getDbPool(), storyIds, coverType, req.body.layout, { fillMethod: 'mirror' });
+    const { pdfBuffer, stories } = built;
+    const pageCount = built.targetPageCount;
     log.debug(`📚 [BOOK PDF] Loaded ${stories.length} stories: ${stories.map(s => s.data.title).join(', ')}`);
-
-    // Page count + SKU come from computeBookPageInfo — the same function the
-    // checkout preview (POST /api/book-page-info) and the order flow
-    // (processBookOrder) use, so this test PDF is padded to the page count
-    // Gelato receives. No product → no SKU to size a cover for: fail loudly.
-    const pageInfo = await computeBookPageInfo(getDbPool(), stories.map(s => s.data), coverType, { layout: req.body.layout });
-    const { estimatedPageCount, printedPages: snappedPageCount, productUid: printProductUid, bookFormat } = pageInfo;
-    console.log(`📊 [BOOK PDF] Estimated Gelato pageCount: ${estimatedPageCount} (${pageInfo.contentPages} content pages incl. dedication)`);
-    if (!pageInfo.product) {
-      return res.status(500).json({ error: `No active gelato_products row matches coverType=${coverType}, format=${bookFormat}` });
-    }
-    if (snappedPageCount !== estimatedPageCount) {
-      log.info(`📐 [BOOK PDF] Snapping ${estimatedPageCount} → ${snappedPageCount} pages for ${pageInfo.product.product_name} (${pageInfo.blankPages} blank of ${snappedPageCount})`);
-    }
-    console.log(`📚 [BOOK PDF] Product: ${printProductUid} (${pageInfo.product.product_name}, coverType=${coverType}, format=${bookFormat})`);
-
-    // Fetch cover dimensions from Gelato API
-    const coverDims = await getCoverDimensions(printProductUid, snappedPageCount);
-    console.log(`📚 [BOOK PDF] Gelato cover dims: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
-
-    // A square book prints square covers, made once per cover and reused afterwards (squareCovers.js)
-    if (bookFormat === 'square') await Promise.all(stories.map(s => attachSquareCovers(s.id, s.data)));
-
-    // Use the SAME PDF generation functions as the Gelato order flow
-    let pdfBuffer, pageCount;
-
-    if (stories.length === 1) {
-      const result = await generatePrintPdf(stories[0].data, bookFormat, { gelatoCoverDims: coverDims, targetGelatoPageCount: snappedPageCount, layout: pageInfo.layout, fillMethod: 'mirror' });
-      pdfBuffer = result.pdfBuffer;
-      pageCount = result.pageCount;
-    } else {
-      const result = await generateCombinedBookPdf(stories, bookFormat, { gelatoCoverDims: coverDims, targetGelatoPageCount: snappedPageCount, layout: pageInfo.layout, fillMethod: 'mirror' });
-      pdfBuffer = result.pdfBuffer;
-      pageCount = result.pageCount;
-    }
 
     console.log(`✅ [BOOK PDF] Generated book PDF (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB) with ${pageCount} pages`);
 

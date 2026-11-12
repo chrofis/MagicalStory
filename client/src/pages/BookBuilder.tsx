@@ -9,6 +9,7 @@ import BlankPagesChoice from '@/components/book/BlankPagesChoice';
 import AddStoryNudge from '@/components/book/AddStoryNudge';
 import BookFormatChoice from '@/components/book/BookFormatChoice';
 import BookSquareCovers from '@/components/book/BookSquareCovers';
+import BookBackCover from '@/components/book/BookBackCover';
 import BookPreviewButton from '@/components/book/BookPreviewButton';
 import type { BookPageInfo } from '@/services/storyService';
 import { storyService } from '@/services';
@@ -371,6 +372,8 @@ export default function BookBuilder() {
   const storyIdsKey = stories.map(s => s.id).join(',');
   // A square book (layout 'spread') prints square covers; the order button waits until they are made and shown.
   const [squareCoversReady, setSquareCoversReady] = useState(true);
+  // A printed book has a back cover: one a story lacks is made before the order (BookBackCover); the square covers follow it.
+  const [backCoverReady, setBackCoverReady] = useState(false);
   useEffect(() => {
     if (!storyIdsKey || isOverLimit) { setPageInfo(null); return; }
     let cancelled = false;
@@ -453,7 +456,7 @@ export default function BookBuilder() {
 
   // Handle checkout
   const handleCheckout = async () => {
-    if (isOverLimit || !price || (needsBlankAck && !blankAck) || !squareCoversReady) return;
+    if (isOverLimit || !price || (needsBlankAck && !blankAck) || !squareCoversReady || !backCoverReady) return;
 
     setIsCheckingOut(true);
     try {
@@ -722,7 +725,8 @@ export default function BookBuilder() {
                 and draws only its progress/error box. */}
             {pageInfo && !isOverLimit && (
               <>
-                <BookSquareCovers language={language} active={pageInfo.layout === 'spread'} stories={stories} onReadyChange={setSquareCoversReady} showImages={false} />
+                <BookBackCover language={language} stories={stories} onReadyChange={setBackCoverReady} />
+                <BookSquareCovers language={language} active={pageInfo.layout === 'spread' && backCoverReady} stories={stories} onReadyChange={setSquareCoversReady} showImages={false} />
                 <div className="mt-4">
                   <BookPreviewButton language={language} storyIds={stories.map(st => st.id)} layout={pageInfo.layout} coverType={coverType} />
                 </div>
@@ -951,7 +955,7 @@ export default function BookBuilder() {
             {/* Order button */}
             <button
               onClick={handleCheckout}
-              disabled={isOverLimit || isCheckingOut || (needsBlankAck && !blankAck) || !squareCoversReady}
+              disabled={isOverLimit || isCheckingOut || (needsBlankAck && !blankAck) || !squareCoversReady || !backCoverReady}
               className="w-full py-4 bg-gradient-to-r from-indigo-600 to-indigo-600 text-white rounded-xl font-bold text-lg hover:from-indigo-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isCheckingOut ? (

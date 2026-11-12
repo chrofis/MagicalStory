@@ -1,0 +1,9 @@
+You see a character picture of ONE person, standing or in several views. Describe the clothes this person wears, exactly as drawn, so that an illustrator can dress the same person in the same clothes in a new picture.
+
+Name each garment with its colour and, where drawn, its pattern or a distinctive detail: top, bottom or dress, shoes, and any outer layer, hat, scarf, belt or bag. Say only what the picture shows: do not invent a garment you cannot see, do not describe the face, hair, pose or background, and do not guess at brand names.
+
+Return EXACTLY this JSON, every value from this picture:
+{
+  "outfit": "<one line, the garments separated by commas, e.g. a colour and garment, a colour and garment, shoes>",
+  "seen": "<one sentence: which view you read the garments from>"
+}

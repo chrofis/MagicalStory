@@ -5366,6 +5366,68 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     log.warn(`⚠️ [VB-CITATION] Page ${pageNumber}: citation-drop check could not run — ${e.message}`);
   }
 
+  // THE RENDER HALF is renderPageFromBrief: the ONE place a brief becomes a picture (clothing, references, plate,
+  // prompt, generation, detection, eval). The back-cover maker (backCoverMaker.js) calls it with a brief it just had
+  // the Art Director write; this function calls it with a brief it just had the rewriter write.
+  return renderPageFromBrief({
+    pageNumber, storyData, coverKey, coverRecord, imageData, sceneCharacters, lockedTextPosition, sceneAspect,
+    newSceneDescription, newSceneMetadata, parentSceneMetadata,
+    referencePages, referencePageNumbers, effectiveReferenceMode, effectiveSinglePass,
+    iterateExtras: { previewMismatches, checksRun, compositionAnalysis: previewFeedback.composition },
+    options: {
+      modelOverrides, usageTracker, useOriginalAsReference, evaluationFeedback, sceneBackgroundIn, iterativePlacement,
+      blackoutIssues, optionFixTargets, previewOnly, customImagePrompt, emptySceneCallbacks, backgroundPin,
+      useStorySheetCells, skipEval,
+    },
+  });
+}
+
+/**
+ * The render half of an iterate, split out so a brief that did not come from the rewriter renders through the very
+ * same code (back-cover maker, 2026-11-12): resolves the page's clothing, references, plate and Visual Bible grid,
+ * builds the image prompt, generates, then detects and scores. `previewOnly` returns the prompt without generating.
+ *
+ * @param {Object} c
+ * @param {number} c.pageNumber
+ * @param {Object} c.storyData
+ * @param {string|null} c.coverKey  set for a cover page (coverRecord is then storyData.coverImages[coverKey])
+ * @param {string|null} c.imageData  the current picture (only read for blackout / useOriginalAsReference)
+ * @param {Array} c.sceneCharacters  roster entries drawn on the page
+ * @param {string} c.newSceneDescription  the brief (prose + ---METADATA--- block)
+ * @param {Object} c.newSceneMetadata  its parsed metadata
+ * @param {Object} c.parentSceneMetadata  the page's stored metadata ({} when there is none; the brief's own for a first render)
+ * @param {Object} c.iterateExtras  fields the iterate adds to its result (previewMismatches, checksRun, compositionAnalysis)
+ * @param {Object} c.options  the iterate options that reach the render (see the destructure below)
+ */
+async function renderPageFromBrief(c) {
+  const {
+    pageNumber, storyData, coverKey, coverRecord = null, imageData = null, sceneCharacters,
+    parentSceneMetadata = {}, referencePages = [], referencePageNumbers = [], iterateExtras = {},
+  } = c;
+  // Defaults a caller that is not an iterate leaves to the render: the settings an iterate resolves from its options.
+  const effectiveReferenceMode = c.effectiveReferenceMode || CONFIG_DEFAULTS.referenceMode || 'strict';
+  const effectiveSinglePass = typeof c.effectiveSinglePass === 'boolean' ? c.effectiveSinglePass : CONFIG_DEFAULTS.singlePassScene === true;
+  const sceneAspect = c.sceneAspect || (coverKey ? CONFIG_DEFAULTS.coverAspect : require('./layout').resolveStoryPageAspect(storyData));
+  // A cover's copy space is fixed by its beat (the title / dedication zone); a page's was locked at its first render.
+  const lockedTextPosition = c.lockedTextPosition !== undefined ? c.lockedTextPosition
+    : (coverKey ? require('./coverBeats').COVER_TEXT_POSITION[coverKey] : null);
+  let { newSceneDescription, newSceneMetadata } = c;
+  const {
+    modelOverrides = {}, usageTracker = null, useOriginalAsReference = false, evaluationFeedback = null,
+    sceneBackgroundIn = null, iterativePlacement = false, blackoutIssues = false, optionFixTargets = null,
+    previewOnly = false, customImagePrompt = null, emptySceneCallbacks = null, backgroundPin = null,
+    useStorySheetCells = true, skipEval = false,
+  } = c.options || {};
+  const {
+    getCharacterPhotoDetails, convertClothingToCurrentFormat, parseClothingCategory, getLandmarkPhotosForScene,
+  } = getStoryHelpers();
+  const { applyStyledAvatars } = require('./styledAvatars');
+  const visualBible = storyData.visualBible || null;
+  const clothingRequirements = storyData.clothingRequirements || null;
+  const pageClothingData = storyData.pageClothing || null;
+  const artStyle = storyData.artStyle || 'pixar';
+
+
 // Resolve clothing. The stored pageClothing was set by the unified Sonnet
   // call at generation time and reflects the canonical per-page costume
   // decision — if it says costumed:mittelalterlich for this page, the Haiku
@@ -5624,9 +5686,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       imagePrompt,
       newScene: newSceneDescription,
       newSceneMetadata,
-      compositionAnalysis: previewFeedback.composition,
-      previewMismatches,
-      checksRun,
+      ...iterateExtras,
       method: 'iterate'
     };
   }
@@ -5866,9 +5926,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     newSceneCharacters: sceneCharacters,
     // A plate painted for this redraw (none stored, or a background redo): the caller stores it as the page's plate.
     freshPlate: freshPlate || null,
-    previewMismatches,
-    checksRun,
-    compositionAnalysis: previewFeedback.composition,
+    ...iterateExtras,
     score: imageResult.score,
     reasoning: imageResult.reasoning,
     qualityModelId: imageResult.qualityModelId || null,
@@ -6634,6 +6692,7 @@ module.exports = {
 
   // Active repair primitives
   iteratePageCore,
+  renderPageFromBrief,
   callIterateBrief,
   pageTextInImage,
   resolveIterateScene,

@@ -2385,6 +2385,12 @@ export const storyService = {
     return api.post(`/api/stories/${encodeURIComponent(storyId)}/square-covers`, {});
   },
 
+  // A printed book has a back cover. Makes the one a story made before full stories drew it (the server decides whether this
+  // book needs one: server/lib/backCoverMaker.js backCoverTarget), about 1 minute the first time. { made: false } when none is needed.
+  async ensureBackCover(storyId: string, bookStoryIds: string[]): Promise<{ made: boolean }> {
+    return api.post(`/api/stories/${encodeURIComponent(storyId)}/ensure-back-cover`, { bookStoryIds });
+  },
+
   // Full-book preview: the print PDF as page images (server/lib/bookPreview.js). Idempotent start-or-status: poll it
   // until state is 'ready' (pages in PDF order) or 'error'. The first call paints the A4 text strips (about CHF 0.60).
   async requestBookPreview(storyIds: string[], layout: BookLayout, coverType: 'softcover' | 'hardcover', retry = false): Promise<BookPreviewState> {

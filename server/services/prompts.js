@@ -268,6 +268,8 @@ async function loadPromptTemplates() {
     ['rewriteBlockedScene', 'rewrite-blocked-scene.txt'],
     ['characterAnalysis', 'character-analysis.txt'],
     ['avatarHairRead', 'avatar-hair-read.txt'],
+    // The day outfit read off a character's avatar (backCoverMaker.fillStandardOutfits).
+    ['avatarOutfitRead', 'avatar-outfit-read.txt'],
     ['imageSystemInstruction', 'image-system-instruction.txt'],
     ['avatarSystemInstruction', 'avatar-system-instruction.txt'],
     ['avatarMainPrompt', 'avatar-main-prompt.txt'],
