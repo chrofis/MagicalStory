@@ -4792,6 +4792,15 @@
       "rootCause": "(1) Characters made before avatar-time clamping (avatars.js ~2265 clampApparentAge) keep the raw photo apparentAge; the maker feeds them to the brief unclamped. (2) The required-objects line of the render prompt (promptBuilders.js ~5309) labels an object with the brief-cited word, here the old VB entry type, which the render model paints.",
       "status": "fixed",
       "fixedIn": "76698096d"
+    },
+    {
+      "id": "glasses-nein-read-as-glasses",
+      "title": "A customer typing \"nein\" (no) in the free-text glasses field gets glasses drawn: the avatar sheet prompt says \"Glasses: nein — worn on the face in EVERY cell\"",
+      "reportedAt": "2026-11-12",
+      "source": "Production job_1794479943880_pvykbjtwx (Aria und das leise Summen, 2026-11-12 11:39 CH): Amalia and Aurelia physical.glasses=\"nein\" (source user); stored sheet prompts carry \"Glasses: nein — worn on the face in EVERY cell\"; 3 of 4 girls have glasses on the avatars; the customer then made about 50 manual edits 13:19-14:44 CH. 5 of 240 stored story characters carry glasses=\"nein\". physical.other=\"nein\" passes through the same way.",
+      "rootCause": "Glasses is a free-text field (CharacterForm.tsx ~405/431); the \"no glasses\" check compares the text to the English word none only (avatarOverrides.js:39 isNone, styledAvatars.js:268). A typed yes/no field is missing, so code ends up reading prose.",
+      "status": "fixed",
+      "fixedIn": "265060f68"
     }
   ]
 }
