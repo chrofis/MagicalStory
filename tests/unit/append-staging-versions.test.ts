@@ -128,6 +128,23 @@ describe('provenanceProblems after an earlier append', () => {
   });
 });
 
+describe('planAppends after an earlier append', () => {
+  // p1 v2 and p2 v1 were appended earlier (prod-bucket URL + marker) and are active on both sides.
+  const mark = (n) => ({ pageNumber: n, imageVersions: [{ dbVersionIndex: n === 1 ? 2 : 1, source: 'admin-fix', adminFix: { from: 'staging', stagingVersion: 0, appendedAt: 'T' } }] });
+  const prodData = { sceneImages: [mark(1), mark(2)] };
+  const pRows = [...prodRows, row('scene', 1, 2, PROD), row('scene', 2, 1, PROD)];
+  const sRows = [...prodRows, row('scene', 1, 2, STG), row('scene', 2, 1, STG), row('scene', 3, 0, PROD)];
+  const pMeta = { 1: { activeVersion: 2 }, 2: { activeVersion: 1 } };
+  const sMeta = { 1: { activeVersion: 2 }, 2: { activeVersion: 1 } };
+  it('lists nothing for pictures whose active image is the earlier admin-fix copy', () => {
+    expect(P.planAppends({ storyId: ID, stagingMeta: sMeta, stagingRows: sRows.filter((r) => r.page_number !== 3), prodMeta: pMeta, prodRows: pRows, prodData })).toEqual([]);
+  });
+  it('without the marker the same-path rows count as different pictures', () => {
+    const p = P.planAppends({ storyId: ID, stagingMeta: sMeta, stagingRows: sRows.filter((r) => r.page_number !== 3), prodMeta: pMeta, prodRows: pRows, prodData: { sceneImages: [] } });
+    expect(p.map((e) => e.key)).toEqual(['1', '2']);
+  });
+});
+
 describe('noWordTraits', () => {
   it("replaces only glasses/other values that are exactly a stored 'no' word, anywhere in the snapshot", () => {
     const data = {

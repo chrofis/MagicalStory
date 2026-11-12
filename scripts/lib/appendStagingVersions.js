@@ -50,6 +50,19 @@ function isAdminFixFromStaging(prodData, row) {
   return list.some((v) => v && v.dbVersionIndex === row.version_index && v.source === ADMIN_FIX_SOURCE && v.adminFix && v.adminFix.from === 'staging');
 }
 
+/**
+ * Is production row `pRow` the same picture as staging row `sRow`? Full key match
+ * (type, page, index, URL), or: production's version entry for the row is an admin-fix appended
+ * from staging AND type/page/index/path-after-host match (that row holds the production-bucket
+ * URL of the staging-bucket image it was copied from). Never path-only without the marker.
+ * The one rule for provenanceProblems and planAppends.
+ */
+function isSameImageRow(pRow, sRow, prodData) {
+  if (pRow.image_type !== sRow.image_type || pRow.page_number !== sRow.page_number || pRow.version_index !== sRow.version_index) return false;
+  if (pRow.image_url === sRow.image_url) return true;
+  return isAdminFixFromStaging(prodData, pRow) && urlPath(pRow.image_url) !== '' && urlPath(pRow.image_url) === urlPath(sRow.image_url);
+}
+
 const sha16 = (obj) => crypto.createHash('sha256').update(JSON.stringify(obj ?? null)).digest('hex').slice(0, 16);
 
 /**
@@ -73,14 +86,7 @@ function provenanceProblems({ prodData, prodMetadata, prodRows, stagingRows, src
   if (newer.length) problems.push(`${newer.length} production image row(s) created after the pull, e.g. ${metaKeyOf(newer[0])} v${newer[0].version_index}`);
   const upd = prodMetadata && prodMetadata.updatedAt ? Date.parse(prodMetadata.updatedAt) : NaN;
   if (Number.isFinite(upd) && upd > pulled) problems.push(`production metadata.updatedAt ${prodMetadata.updatedAt} is after the pull (a version pick?)`);
-  const held = new Set(stagingRows.map((r) => `${r.image_type}|${r.page_number}|${r.version_index}|${r.image_url}`));
-  // A row THIS tool appended earlier holds the production-bucket URL, the staging copy the
-  // staging-bucket URL of the same path. It counts as held only with the admin-fix marker on
-  // its production version entry AND an identical type/page/index/path in the staging copy.
-  const heldByPath = new Set(stagingRows.map((r) => `${r.image_type}|${r.page_number}|${r.version_index}|${urlPath(r.image_url)}`));
-  const isHeld = (r) => held.has(`${r.image_type}|${r.page_number}|${r.version_index}|${r.image_url}`)
-    || (isAdminFixFromStaging(prodData, r) && heldByPath.has(`${r.image_type}|${r.page_number}|${r.version_index}|${urlPath(r.image_url)}`));
-  const missing = prodRows.filter((r) => !isHeld(r));
+  const missing = prodRows.filter((r) => !stagingRows.some((sr) => isSameImageRow(r, sr, prodData)));
   if (missing.length) problems.push(`${missing.length} production image row(s) not in the staging copy, e.g. ${metaKeyOf(missing[0])} v${missing[0].version_index}`);
   return problems;
 }
@@ -94,9 +100,10 @@ function provenanceProblems({ prodData, prodMetadata, prodRows, stagingRows, src
  * @param {Array}  p.stagingRows  staging story_images rows (non-test): image_type, page_number, version_index, image_url
  * @param {object} p.prodMeta     production image_version_meta
  * @param {Array}  p.prodRows     production story_images rows (non-test), same columns
+ * @param {object} [p.prodData]   production story data (for the admin-fix marker of earlier appends)
  * @returns {Array<object>} plan entries
  */
-function planAppends({ storyId, stagingMeta, stagingRows, prodMeta, prodRows }) {
+function planAppends({ storyId, stagingMeta, stagingRows, prodMeta, prodRows, prodData = null }) {
   const byKey = (rows) => {
     const m = new Map();
     for (const r of rows) {
@@ -121,11 +128,11 @@ function planAppends({ storyId, stagingMeta, stagingRows, prodMeta, prodRows }) 
     if (!sRow.image_url) throw new Error(`${key}: staging v${sActive} has no image_url (inline bytes are not copied)`);
     const pActive = activeIndex(prodMeta, key);
     const pRow = pRows.find((r) => r.version_index === pActive) || null;
-    if (pRow && pRow.image_url === sRow.image_url) continue;   // same picture already active
+    if (pRow && isSameImageRow(pRow, sRow, prodData)) continue;   // same picture already active
 
     const { image_type: imageType, page_number: pageNumber } = sRow;
     const newIndex = pRows.reduce((m, r) => Math.max(m, r.version_index), -1) + 1;
-    const sameAsProd = pRows.find((r) => r.image_url === sRow.image_url);
+    const sameAsProd = pRows.find((r) => r.image_url === sRow.image_url || isSameImageRow(r, sRow, prodData));
     const entry = {
       key, imageType, pageNumber,
       stagingVersion: sActive,

@@ -227,7 +227,7 @@ async function sheetMode(prod) {
 
   // ── Plan ──────────────────────────────────────────────────────────────────
   const entries = plan.planAppends({
-    storyId, stagingMeta: staged.image_version_meta, stagingRows: sImgs.rows, prodMeta: live.image_version_meta, prodRows: pImgs.rows,
+    storyId, stagingMeta: staged.image_version_meta, stagingRows: sImgs.rows, prodMeta: live.image_version_meta, prodRows: pImgs.rows, prodData: live.data,
   });
   const appendedAt = new Date().toISOString();
   // Staging-bucket URLs inside a version entry (reference images made on staging) move too.
