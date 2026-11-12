@@ -1739,14 +1739,20 @@ function filterMainCharactersFromVisualBible(visualBible, mainCharacters) {
     return visualBible;
   }
 
-  // Build set of main character names (lowercase for case-insensitive matching)
-  const mainNames = new Set(mainCharacters.map(c => c.name?.toLowerCase()).filter(Boolean));
+  // ONE name resolver (castResolver): the roster's name field may carry the
+  // customer's relationship text ("Noah, Freund von Louis ..."), the writer names
+  // the secondary "Noah" or "Aurelia Schwester von Aria". EXACT canonical match
+  // only (index.byCanon), never the whole-word subset rule: a secondary
+  // "Mia's mother" must survive a roster "Mia".
+  // bugs.json vb-secondary-duplicates-cast-named-with-relationship.
+  const { buildCastIndex, canonicalName } = require('./castResolver');
+  const castIndex = buildCastIndex({ characters: mainCharacters }, null);
 
   if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
     const originalCount = visualBible.secondaryCharacters.length;
     visualBible.secondaryCharacters = visualBible.secondaryCharacters.filter(sc => {
-      const scName = sc.name?.toLowerCase();
-      const isMainChar = mainNames.has(scName);
+      const hit = castIndex.byCanon.get(canonicalName(sc.name));
+      const isMainChar = !!hit && hit.kind === 'cast';
       if (isMainChar) {
         log.debug(`[VISUAL BIBLE] Filtering out "${sc.name}" - matches main character`);
       }

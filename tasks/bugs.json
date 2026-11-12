@@ -4819,6 +4819,14 @@
       "rootCause": "charRepairTarget.briefNamesForPage put raw strings in a Set: sceneCharacters carries the roster name field, sceneMetadata the short name the story uses. Missed by e8344de85, which moved the other repair lookups onto castResolver. Fixed by keying the brief on castResolver.canonicalName.",
       "status": "fixed",
       "fixedIn": "3696198bf"
+    },
+    {
+      "id": "vb-secondary-duplicates-cast-named-with-relationship",
+      "title": "Visual Bible keeps an invented secondary that is really a roster child (\"Noah\", \"Tobias\", \"Aurelia Schwester von Aria\") because the main-cast filter compares the raw name field",
+      "reportedAt": "2026-11-12",
+      "source": "Production job_1794479943880_pvykbjtwx CHR002 \"Aurelia Schwester von Aria\" (a young woman in her early twenties, pages 7,9,10,16,18,25) vs roster \"Aurelia, Schwester von Aria\"; job_1794498448758_ryuv0q8lb CHR002 Noah + CHR003 Tobias; job_1794506785522_17d2hnvd9 CHR001 Noah + CHR002 Tobias. Char-fix failures Aria p10/p16 traced to it.",
+      "rootCause": "visualBible.filterMainCharactersFromVisualBible matches sc.name.toLowerCase() against the roster name field exactly, so a roster name carrying relationship text after a comma never matches the short name the story uses. Same class as charfix-misses-cast-named-with-relationship (e8344de85), which fixed the repair lookups but not this filter.",
+      "status": "fixed"
     }
   ]
 }

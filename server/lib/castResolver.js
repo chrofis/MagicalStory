@@ -145,12 +145,18 @@ function buildCastIndex(storyData, visualBible) {
       const name = typeof raw.name === 'string' ? raw.name.trim() : '';
       if (!name) continue;                       // an unnamed entry is unreferenceable
       const canon = canonicalName(name);
+      // The roster's whole name field with the comma dropped: the writer often
+      // copies "Aurelia, Schwester von Aria" as "Aurelia Schwester von Aria"
+      // (production job_1794479943880_pvykbjtwx, 2026-11-12). Same field,
+      // structured, no prose reading.
+      const fullCanon = name.includes(',') ? canonicalName(name.replace(/,/g, ' ')) : '';
       entries.push({
         kind,
         id: raw.id === null || raw.id === undefined ? '' : String(raw.id),
         name,
         entry: raw,
         canon,
+        fullCanon,
         words: canon ? canon.split(' ') : [],
       });
     }
@@ -163,6 +169,9 @@ function buildCastIndex(storyData, visualBible) {
       if (!byId.has(k)) byId.set(k, e);
     }
     if (e.canon && !byCanon.has(e.canon)) byCanon.set(e.canon, e);
+    // Pool order (cast first) decides a clash: the roster's comma-less spelling
+    // resolves to the roster entry, not to a secondary the writer spelled so.
+    if (e.fullCanon && !byCanon.has(e.fullCanon)) byCanon.set(e.fullCanon, e);
   }
   return { entries, byId, byCanon, stats: { refs: 0, unresolved: [], ambiguous: [] } };
 }
