@@ -31,6 +31,17 @@
  *   node scripts/admin/append-staging-versions-to-prod.js <storyId> [--src-sha=.. --pulled-at=..]            (dry run)
  *   node scripts/admin/append-staging-versions-to-prod.js <storyId> [--src-sha=.. --pulled-at=..] --yes      (write)
  *
+ * SHEET MODE (--sheet=<characterId>:<file>, repeatable): replace a character's styled 2x4 reference
+ * sheet in the story with a regenerated one (2026-11-12: the sheets of a 'nein' character showed
+ * glasses, so every redraw and char-fix painted them back). Each file is uploaded under a NEW
+ * content-named key stories/<storyId>/sheets/... (never an existing key) and the story's LIVE
+ * references point at it (appendStagingVersions.applySheetSwap: characters[] styled avatar and
+ * characterAvatars); per-picture snapshots stay as the record of what made each picture. Provenance:
+ * the dry run prints production's data sha, and --yes needs it back as --expect-sha=<sha> (checked
+ * again under the row lock). Backup: tasks/customer-<storyId>-before-sheets-<ts>.json.
+ *   node scripts/admin/append-staging-versions-to-prod.js <storyId> --sheet=<id>:<file> [...]                          (dry run)
+ *   node scripts/admin/append-staging-versions-to-prod.js <storyId> --sheet=<id>:<file> [...] --expect-sha=<sha> --yes  (write)
+ *
  * --dry-run is the default and opens production READ ONLY. --yes first writes a JSON backup of
  * the production row and its image rows to tasks/customer-<storyId>-before-append-<ts>.json
  * (gitignored: customer data), uploads the bytes, then does every DB write in one transaction
@@ -54,8 +65,14 @@ const storyId = args.find((a) => !a.startsWith('--'));
 const flag = (name) => (args.find((a) => a.startsWith(`${name}=`)) || '').slice(name.length + 1);
 const YES = args.includes('--yes');
 const FORCE = args.includes('--force');
+const SHEETS = args.filter((a) => a.startsWith('--sheet=')).map((a) => {
+  const v = a.slice('--sheet='.length); const i = v.indexOf(':');
+  if (i <= 0) { console.error(`bad ${a}: expected --sheet=<characterId>:<file>`); process.exit(1); }
+  return { characterId: v.slice(0, i), file: path.resolve(v.slice(i + 1)) };
+});
 if (!storyId || (args.includes('--dry-run') && YES)) {
   console.error('Usage: node scripts/admin/append-staging-versions-to-prod.js <storyId> [--src-sha=<sha> --pulled-at=<ISO>] [--dry-run | --yes] [--force]');
+  console.error('       node scripts/admin/append-staging-versions-to-prod.js <storyId> --sheet=<characterId>:<file> [...] [--expect-sha=<sha> --yes]');
   process.exit(1);
 }
 
@@ -85,12 +102,78 @@ async function headStatus(u) {
   try { return (await fetch(u, { method: 'HEAD', signal: AbortSignal.timeout(30000) })).status; } catch (e) { return e.message; }
 }
 
+/** The cache-busting existence check (a bare-URL HEAD of a not-yet-uploaded key makes the CDN cache the 404). */
+async function keyTaken(key) {
+  return (await headStatus(`${urls.PROD_BASE}/${key}?precheck=${Date.now()}`)) === 200;
+}
+
+function backupPath(id, what, ts) {
+  return path.resolve(__dirname, '..', '..', 'tasks', `customer-${id}-${what}-${ts.replace(/[:.]/g, '-')}.json`);
+}
+
+/** --sheet mode: see the header. */
+async function sheetMode(prod) {
+  const { rows } = await prod.query('SELECT * FROM stories WHERE id = $1', [storyId]);
+  if (!rows.length) { console.error(`Story ${storyId} not found in PRODUCTION.`); process.exit(1); }
+  const live = rows[0];
+  const liveSha = plan.sha16(live.data);
+  const r2 = require('../../server/lib/r2');
+  console.log(`Story   : ${storyId}  (prod owner ${live.user_id}, kept), artStyle ${live.data.artStyle}`);
+  console.log(`Prod sha: ${liveSha}${YES ? '' : '   <- pass as --expect-sha with --yes'}`);
+  if (YES && flag('--expect-sha') !== liveSha) {
+    console.error(`REFUSED: production data sha is ${liveSha}, --expect-sha says ${flag('--expect-sha') || '(missing)'}; re-run the dry run.`); process.exit(1);
+  }
+  const job = await prod.query('SELECT status FROM story_jobs WHERE id = $1', [storyId]);
+  if (['processing', 'pending', 'running'].includes(job.rows[0] && job.rows[0].status)) { console.error('REFUSED: production job is running.'); process.exit(1); }
+
+  const sheets = SHEETS.map((s) => {
+    const buf = fs.readFileSync(s.file);
+    if (buf.length < 1000 || buf[0] !== 0xff || buf[1] !== 0xd8) throw new Error(`${s.file} is not a JPEG`);
+    const key = r2.contentKey(`stories/${storyId}/sheets`, `styled-${s.characterId}-standard`, buf);
+    return { ...s, buf, key, newUrl: `${urls.PROD_BASE}/${key}` };
+  });
+  const { data: newData, changes } = plan.applySheetSwap(live.data, sheets);
+  console.log(`Sheets  : ${sheets.length} new sheet(s), ${changes.length} live reference(s) repointed (per-picture snapshots kept)`);
+  for (const c of changes) console.log(`   ${c.name.split(',')[0].padEnd(8)} ${c.field}\n            ${c.from}\n         -> ${c.to}`);
+  const taken = [];
+  for (const s of sheets) if (await keyTaken(s.key)) taken.push(s.key);
+  console.log(`R2      : ${sheets.length} upload(s) under stories/${storyId}/sheets/; target keys already taken: ${taken.length}`);
+  if (taken.length) { console.error(`REFUSED: production key(s) already exist: ${taken.join(' | ')}`); process.exit(1); }
+  console.log(`Data    : production data sha ${liveSha} -> ${plan.sha16(newData)}`);
+  if (!YES) { console.log('\n--dry-run: production opened read-only; no uploads, no writes.'); return; }
+
+  const ts = new Date().toISOString();
+  const backupFile = backupPath(storyId, 'before-sheets', ts);
+  fs.writeFileSync(backupFile, JSON.stringify({ takenAt: ts, storyId, story: live }, null, 2));
+  console.log(`Backup  : ${backupFile}`);
+  loadProdR2Env();
+  if (!r2.isConfigured()) throw new Error('R2 not configured after loading production variables');
+  for (const s of sheets) { if (!(await r2.uploadImage(s.buf, s.key, 'image/jpeg'))) throw new Error(`upload failed: ${s.key}`); }
+  console.log(`R2      : uploaded ${sheets.length} sheet(s)`);
+  const client = await prod.connect();
+  try {
+    await client.query('BEGIN');
+    const locked = (await client.query('SELECT data FROM stories WHERE id = $1 FOR UPDATE', [storyId])).rows[0];
+    if (plan.sha16(locked.data) !== liveSha) throw new Error('production data changed during the run');
+    await client.query(
+      `UPDATE stories SET data = $2, metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{updatedAt}', to_jsonb($3::text)) WHERE id = $1`,
+      [storyId, JSON.stringify(newData), ts]);
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    console.error(`FAILED, rolled back: ${e.message}. Production row untouched (uploaded sheets are unreferenced). Backup: ${backupFile}`);
+    process.exit(1);
+  } finally { client.release(); }
+  console.log(`\nRepointed ${changes.length} reference(s) to ${sheets.length} new sheet(s) in production story ${storyId}.`);
+}
+
 (async () => {
   const stg = new Pool({ connectionString: stagingUrl, ssl: { rejectUnauthorized: false } });
   const prod = new Pool({ connectionString: prodUrl, ssl: { rejectUnauthorized: false } });
   // A dry run cannot write: every production session is read-only.
   if (!YES) prod.on('connect', (c) => { c.query('SET default_transaction_read_only = on'); });
   const end = async () => { await stg.end(); await prod.end(); };
+  if (SHEETS.length) { await sheetMode(prod); await end(); return; }
 
   const [sRes, pRes] = await Promise.all([
     stg.query('SELECT id, data, metadata, image_version_meta FROM stories WHERE id = $1', [storyId]),
@@ -188,7 +271,7 @@ async function headStatus(u) {
     // Cache-busting query: a HEAD on the bare public URL of a not-yet-uploaded key makes the CDN
     // cache that 404, and the customer then sees broken pictures for minutes after the upload
     // (2026-11-12: 21 pictures per story for about 6 minutes).
-    const t = await headStatus(`${urls.PROD_BASE}/${c.key}?precheck=${Date.now()}`); if (t === 200) taken.push(c.key);
+    if (await keyTaken(c.key)) taken.push(c.key);
   }
   console.log(`          sources reachable: ${copies.length - badSrc.length}/${copies.length}; target keys already taken: ${taken.length}`);
   if (badSrc.length) { console.error(`REFUSED: unreachable source(s): ${badSrc.slice(0, 3).join(' | ')}`); process.exit(1); }
@@ -199,7 +282,7 @@ async function headStatus(u) {
   if (!YES) { console.log('\n--dry-run: production opened read-only; no uploads, no writes. Re-run with --yes to append.'); await end(); return; }
 
   // ── Write ─────────────────────────────────────────────────────────────────
-  const backupFile = path.resolve(__dirname, '..', '..', 'tasks', `customer-${storyId}-before-append-${appendedAt.replace(/[:.]/g, '-')}.json`);
+  const backupFile = backupPath(storyId, 'before-append', appendedAt);
   fs.writeFileSync(backupFile, JSON.stringify({ takenAt: appendedAt, storyId, story: live,
     story_images: (await prod.query('SELECT * FROM story_images WHERE story_id = $1', [storyId])).rows }, null, 2));
   console.log(`Backup  : ${backupFile}`);

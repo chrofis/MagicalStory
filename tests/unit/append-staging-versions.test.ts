@@ -119,3 +119,32 @@ describe('noWordTraits', () => {
     expect(data.note).toBe('nein');
   });
 });
+
+describe('applySheetSwap', () => {
+  const OLD = `${PROD}/characters/u/row/inline/styledAvatars-0-standard-aaa.jpg`;
+  const COPY = `${PROD}/stories/${ID}/debug/p1/ref-photo-0-orig.jpg`;
+  const NEW = `${PROD}/stories/${ID}/sheets/styled-7-standard-bbb.jpg`;
+  const data = () => ({
+    artStyle: 'realistic',
+    characters: [{ id: 7, name: 'Kim, Freund von Lea', avatars: { styledAvatars: { realistic: { standard: OLD } } } }, { id: 8, name: 'Lea', avatars: { styledAvatars: { realistic: { standard: 'x' } } } }],
+    characterAvatars: { 'Kim, Freund von Lea': { 'styled-standard': COPY }, Lea: { 'styled-standard': 'y' } },
+    sceneImages: [{ pageNumber: 1, sceneCharacters: [{ id: 7, avatars: { styledAvatars: { realistic: { standard: OLD } } } }] }],
+  });
+  it('repoints both live references of that character only; snapshots and prodData stay', () => {
+    const d = data(); const before = JSON.stringify(d);
+    const { data: out, changes } = P.applySheetSwap(d, [{ characterId: '7', newUrl: NEW }]);
+    expect(JSON.stringify(d)).toBe(before);
+    expect(out.characters[0].avatars.styledAvatars.realistic.standard).toBe(NEW);
+    expect(out.characterAvatars['Kim, Freund von Lea']['styled-standard']).toBe(NEW);
+    expect(out.characters[1]).toEqual(d.characters[1]);
+    expect(out.characterAvatars.Lea).toEqual(d.characterAvatars.Lea);
+    expect(out.sceneImages[0].sceneCharacters[0].avatars.styledAvatars.realistic.standard).toBe(OLD);
+    expect(changes.map((c) => c.from)).toEqual([OLD, COPY]);
+  });
+  it('refuses an unknown character, a missing reference, and a no-op', () => {
+    expect(() => P.applySheetSwap(data(), [{ characterId: 99, newUrl: NEW }])).toThrow(/not in this story/);
+    const noSlot = data(); delete noSlot.characterAvatars['Kim, Freund von Lea'];
+    expect(() => P.applySheetSwap(noSlot, [{ characterId: 7, newUrl: NEW }])).toThrow(/characterAvatars/);
+    expect(() => P.applySheetSwap(data(), [{ characterId: 7, newUrl: OLD }])).toThrow(/already referenced/);
+  });
+});

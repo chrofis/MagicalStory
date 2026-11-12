@@ -193,8 +193,41 @@ function applyPlanToMeta(prodMeta, plan) {
   return out;
 }
 
+/**
+ * Point a story's LIVE references of a character's styled 2x4 sheet at a new sheet:
+ * `characters[].avatars.styledAvatars[artStyle].standard` (what char-fix and the entity check
+ * read, entityConsistency.getStyledAvatarForClothing) and `characterAvatars[name]['styled-standard']`
+ * (what redraws and cover iterations crop their cell references from, storyAvatars.applyStoryCellRefs).
+ * The per-page `sceneCharacters` / `imageVersions` snapshots are records of what made each existing
+ * picture and stay as they are. prodData is not mutated.
+ *
+ * @param {object} prodData
+ * @param {Array<{characterId:(string|number), newUrl:string}>} sheets
+ * @returns {{data:object, changes:Array<{name:string, field:string, from:string, to:string}>}}
+ */
+function applySheetSwap(prodData, sheets) {
+  const data = JSON.parse(JSON.stringify(prodData));
+  const artStyle = data.artStyle;
+  if (!artStyle) throw new Error('story data has no artStyle');
+  const changes = [];
+  for (const { characterId, newUrl } of sheets) {
+    const ch = (data.characters || []).find((c) => c && String(c.id) === String(characterId));
+    if (!ch) throw new Error(`character ${characterId} is not in this story`);
+    const perStyle = ch.avatars && ch.avatars.styledAvatars && ch.avatars.styledAvatars[artStyle];
+    if (!perStyle || typeof perStyle.standard !== 'string') throw new Error(`${ch.name}: no stored ${artStyle} standard sheet to replace`);
+    const slot = data.characterAvatars && data.characterAvatars[ch.name];
+    if (!slot || typeof slot['styled-standard'] !== 'string') throw new Error(`${ch.name}: no characterAvatars styled-standard entry to replace`);
+    if (perStyle.standard === newUrl) throw new Error(`${ch.name}: the new sheet is already referenced`);
+    changes.push({ name: ch.name, field: `characters[].avatars.styledAvatars.${artStyle}.standard`, from: perStyle.standard, to: newUrl });
+    perStyle.standard = newUrl;
+    changes.push({ name: ch.name, field: "characterAvatars[name]['styled-standard']", from: slot['styled-standard'], to: newUrl });
+    slot['styled-standard'] = newUrl;
+  }
+  return { data, changes };
+}
+
 module.exports = {
   COVER_TYPES, DISPLAY_TYPES, ADMIN_FIX_SOURCE,
   metaKeyOf, activeIndex, sha16,
-  provenanceProblems, planAppends, applyPlanToData, applyPlanToMeta, stagingVersionEntry,
+  provenanceProblems, planAppends, applyPlanToData, applyPlanToMeta, stagingVersionEntry, applySheetSwap,
 };
