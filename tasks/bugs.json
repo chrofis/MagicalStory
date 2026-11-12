@@ -4818,7 +4818,7 @@
       "source": "Staging copy of production job_1794506785522_17d2hnvd9 p7 (Noah + Tilo drawn), manual char-fix for Tilo 2026-11-12 21:4x CH: refused \"The page was written for 3 characters but only 2 were drawn\", briefNames [\"Noah, Freund von Louis und Tobias, Bruder von Tilo\", \"Noah\", \"Tilo\"]. Free replay over 908 stored pages of the last 80 production stories: 40 pages counted one person twice (34 comma-name pages, 6 LUNA/Luna case pages); 0 false merges after the fix.",
       "rootCause": "charRepairTarget.briefNamesForPage put raw strings in a Set: sceneCharacters carries the roster name field, sceneMetadata the short name the story uses. Missed by e8344de85, which moved the other repair lookups onto castResolver. Fixed by keying the brief on castResolver.canonicalName.",
       "status": "fixed",
-      "fixedIn": "pending"
+      "fixedIn": "3696198bf"
     }
   ]
 }
