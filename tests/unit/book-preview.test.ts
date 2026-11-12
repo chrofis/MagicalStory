@@ -169,6 +169,16 @@ describe('requestPreview', () => {
     await expect(BP.requestPreview({ ...base, storyIds: [] }, deps)).rejects.toMatchObject({ status: 400 });
   });
 
+  // Owner 2026-11-12 "Preview any book": the order page orders books of 9+ short stories, so the preview must show them too.
+  it('accepts a book of more than 8 stories', async () => {
+    const { deps } = setup();
+    const many = Array.from({ length: 12 }, (_, i) => `s${i + 1}`);
+    deps.dbPool.query = vi.fn(async (sql: string) => (sql.includes('FROM stories')
+      ? { rows: many.map(id => ({ id, user_id: 'u1', data: { title: id } })) }
+      : { rows: [] }));
+    await expect(BP.requestPreview({ ...base, storyIds: many }, deps)).resolves.toMatchObject({ state: 'running' });
+  });
+
   it('a failed build is an error (no fallback), kept for polling, and retry starts again', async () => {
     const { deps, buildBookPrintPdf, release } = setup({ failBuild: true });
     await BP.requestPreview(base, deps);

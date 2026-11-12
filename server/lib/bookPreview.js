@@ -22,7 +22,6 @@ const COVER_TYPES = ['softcover', 'hardcover'];
 const PREFIX = 'bookPreview';
 const MAX_RUNNING = 2;               // each job holds a ~20 MB PDF plus image buffers; more would risk the 3 GB heap
 const ERROR_TTL_MS = 10 * 60 * 1000;
-const MAX_STORIES = 8;
 
 class PreviewError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -47,8 +46,10 @@ function defaultDeps() {
 }
 
 function validateInput({ storyIds, layout, coverType }) {
-  if (!Array.isArray(storyIds) || !storyIds.length || storyIds.length > MAX_STORIES || storyIds.some(id => typeof id !== 'string' || !id)) {
-    throw new PreviewError(400, 'storyIds must be 1 to ' + MAX_STORIES + ' story ids');
+  // No story-count cap: the preview shows any book the order page can order (owner 2026-11-12, "Preview any book").
+  // Memory is bounded by MAX_RUNNING and by the book itself (largest print SKU).
+  if (!Array.isArray(storyIds) || !storyIds.length || storyIds.some(id => typeof id !== 'string' || !id)) {
+    throw new PreviewError(400, 'storyIds must be a non-empty list of story ids');
   }
   if (!LAYOUTS.includes(layout)) throw new PreviewError(400, `layout must be one of ${LAYOUTS.join('|')}`);
   if (!COVER_TYPES.includes(coverType)) throw new PreviewError(400, `coverType must be one of ${COVER_TYPES.join('|')}`);
