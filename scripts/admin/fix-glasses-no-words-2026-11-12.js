@@ -9,7 +9,7 @@
  * production (characters table, 2026-11-12) that mean "no": only 'nein' (3x glasses, 4x other
  * in characters; 'Brille', 'schwarze Brille', 'wears glasses' etc. mean YES and are left alone).
  *
- * Default is --dry-run (lists). --write backs up every changed row to backups/ first, then
+ * Default is --dry-run (lists). --write backs up every changed row to tasks/customer-*.json (gitignored: customer data) first, then
  * updates `characters`. Uses DATABASE_URL (production) unless --staging.
  *   node scripts/admin/fix-glasses-no-words-2026-11-12.js [--write] [--staging]
  */
@@ -45,9 +45,9 @@ if (!url) throw new Error('database URL env var not set');
   for (const c of changes) for (const h of c.hits) console.log(`  ${c.row.id} [${h.i}] ${h.name}: physical.${h.field} "${h.from}" -> "${SENTINEL}"`);
   if (!write || !changes.length) { await pool.end(); return; }
 
-  const dir = path.join(__dirname, '..', '..', 'backups');
+  const dir = path.join(__dirname, '..', '..', 'tasks');
   fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, 'glasses-no-words-2026-11-12-characters-before.json');
+  const file = path.join(dir, 'customer-glasses-no-words-2026-11-12-characters-before.json');
   fs.writeFileSync(file, JSON.stringify(changes.map((c) => c.row), null, 2));
   console.log(`backup written: ${file}`);
   for (const c of changes) {
