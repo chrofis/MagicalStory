@@ -4781,7 +4781,8 @@
       "reportedAt": "2026-11-12",
       "source": "Review 2026-11-12. Reproduced on staging: generate-book-pdf for story job_1787693271900_cyc9lol5y (front cover, no back cover) gave a 31-page PDF whose cover page holds 0 images. Production: 32 stories have a front cover but no back cover (newest 2026-08-16); ordered alone, each prints a white cover.",
       "rootCause": "server/lib/pdf.js generatePrintPdf draws the cover spread only when BOTH back and front exist (line ~318) and silently skips otherwise; an unreadable buffer only log.warns (~322). generateCombinedBookPdf borrows a back cover from another story, the single-story path has nothing to borrow; its draw failures are also caught and warned (~1253).",
-      "status": "open"
+      "status": "fixed",
+      "fixedIn": "b720cb11e"
     }
   ]
 }
