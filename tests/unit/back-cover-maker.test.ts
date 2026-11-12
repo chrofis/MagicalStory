@@ -208,6 +208,7 @@ describe('backCoverMaker', () => {
     loadFreshCharacters: vi.fn(async () => []),
     writeBrief: vi.fn(async (beat: any) => ({ pageNumber: beat.pageNumber, brief: BRIEF, prompt: 'p', modelId: 'm' })),
     checkBriefs: vi.fn(async () => ({})),
+    labelRound: vi.fn(async () => ({ round: 0, findings: 0 })),
     render: vi.fn(async () => ({ imageData: 'data:image/jpeg;base64,AAAA', score: 82, promptSent: 'sent' })),
     stamp: vi.fn(async () => ({ servedImageData: 'data:image/jpeg;base64,BBBB', artImageData: 'data:image/jpeg;base64,CCCC', typographySpec: { fontId: 'f' } })),
     save: vi.fn(async () => {}),
@@ -253,6 +254,26 @@ describe('backCoverMaker', () => {
     const d = deps();
     expect(await maker.makeMissingBackCover('job_z', has, d)).toEqual({ made: false });
     expect(d.writeBrief).not.toHaveBeenCalled();
+  }, 30000);
+
+  it('element labels are authored BEFORE the brief and the render, on the working copy bible (bug back-cover-maker-wrong-age-and-object-label)', async () => {
+    const story = await makeStory();
+    const order: string[] = [];
+    const d = deps({
+      labelRound: vi.fn(async (vb: any) => { order.push('labels'); expect(vb).toBe(story.visualBible); return { round: 1, findings: 2 }; }),
+      writeBrief: vi.fn(async (beat: any) => { order.push('brief'); return { pageNumber: beat.pageNumber, brief: BRIEF, prompt: 'p', modelId: 'm' }; }),
+    });
+    await maker.makeMissingBackCover('job_x', story, d);
+    expect(order).toEqual(['labels', 'brief']);
+    expect(d.labelRound.mock.calls[0][1].language).toBe('de');
+  }, 30000);
+
+  it('a label round that did not run throws: the code repair would name the element by its old-language type', async () => {
+    const story = await makeStory();
+    const d = deps({ labelRound: vi.fn(async () => ({ round: 0, findings: 3 })) });
+    await expect(maker.makeMissingBackCover('job_lbl', story, d)).rejects.toThrow(/labels could not be authored/);
+    expect(d.render).not.toHaveBeenCalled();
+    expect(d.save).not.toHaveBeenCalled();
   }, 30000);
 
   it('two requests for one story make one cover', async () => {

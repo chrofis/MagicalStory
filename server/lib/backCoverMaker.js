@@ -164,6 +164,26 @@ async function writeBackCoverBrief(storyData, gl, { writeBrief = null, checkBrie
   return { brief: expansions[0].brief, beat, expansion: expansions[0] };
 }
 
+/**
+ * Every Visual Bible element needs its ONE authored English `label` before the cover is drawn: it is the bold name on the
+ * page prompt's REQUIRED OBJECTS line, which the picture model paints into the picture when it is a word of the story
+ * language. A bible stored before labels existed (every story the maker serves) has none, and the prompt builder then
+ * names the element by its `type`, which old bibles wrote in the story language ("Spielzeugwaffe" was painted onto a
+ * cover, 2026-11-12). The same fed-back label round a new story runs authors them (one small model call); a round that
+ * did not run throws, because the code repair would fall back to that same `type`. Working copy only: nothing is stored.
+ */
+async function ensureElementLabels(storyData, gl, deps = {}) {
+  const visualBible = storyData.visualBible;
+  if (!visualBible) return;
+  const { MODEL_DEFAULTS } = require('../config/models');
+  const round = await (deps.labelRound || require('./beatsPipeline').runVisualBibleLabelRound)(visualBible, {
+    model: MODEL_DEFAULTS.sceneDescription, language: storyData.language, gl,
+  });
+  if (round.findings > 0 && round.round !== 1) {
+    throw new Error('Back cover: the Visual Bible element labels could not be authored in English, so an old-language word could reach the picture');
+  }
+}
+
 /** The cover/page repair threshold: a picture scoring below it, or not scored, is weak. */
 function isWeak(score) {
   const { REPAIR_DEFAULTS } = require('../config/models');
@@ -217,6 +237,7 @@ async function buildBackCover(storyId, storyData, deps) {
   const castNames = coverCasts(storyData).backCover;
   storyData.characters = await charactersForCover(storyId, storyData, castNames, deps);
   await fillStandardOutfits(storyData, castNames, { readOutfit: deps.readOutfit, usageTracker });
+  await ensureElementLabels(storyData, gl, deps);
 
   const { brief, beat } = await writeBackCoverBrief(storyData, gl, deps);
 
@@ -311,6 +332,7 @@ module.exports = {
   backCoverTarget,
   makeMissingBackCover,
   fillStandardOutfits,
+  ensureElementLabels,
   charactersForCover,
   writeBackCoverBrief,
   renderBetterOfTwo,

@@ -2066,7 +2066,13 @@ function extractCharacterVisualProfile(char, options = {}) {
   // because clampApparentAge() already bounded it to ONE bucket from the stated
   // age when the photo was analysed (routes/avatars.js) — the same tolerance
   // image-evaluation.txt applies ("a 7-year-old reading as 6 → NO deduction").
-  const ageCategory = physical.apparentAge || char.ageCategory ||
+  // The clamp is applied HERE too (idempotent on an already-bounded value), because characters made before the
+  // write-time clamp keep the raw photo read: a declared 4 with "middle-aged" was drawn and briefed as a middle-aged man
+  // (back-cover maker, 2026-11-12). One reader, so no path can hand a prompt an unbounded photo age.
+  const clampedApparent = physical.apparentAge
+    ? clampApparentAge(physical.apparentAge, resolvedAge).category
+    : null;
+  const ageCategory = clampedApparent || char.ageCategory ||
     (resolvedAge != null ? getAgeCategory(resolvedAge) : null);
 
   return {
