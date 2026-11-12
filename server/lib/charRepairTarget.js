@@ -20,7 +20,7 @@
 'use strict';
 
 const { log } = require('../utils/logger');
-const { buildCastIndex, sameEntity, canonicalName } = require('./castResolver');
+const { buildCastIndex, resolveEntity, sameEntity, lookupByName, canonicalName } = require('./castResolver');
 
 const getStoryHelpers = () => require('./storyHelpers');
 const images = () => require('./images');
@@ -192,16 +192,34 @@ function findBorrowedLabel({ figures, sceneCharacters = [], sceneMetadata = {}, 
  * @param {string} args.characterName
  * @returns {{reason:string, message:string}|null} null when the figure is repairable
  */
-function charFixReferenceGap({ characters = [], characterName = '' } = {}) {
+function charFixReferenceGap({ characters = [], characterName = '', visualBible = null } = {}) {
   const name = String(characterName || '').trim();
   if (!name) return { reason: 'no-name', message: 'char fix was given no character name' };
-  const canon = canonicalName(name);
-  const found = (characters || []).some(c => c && c.name && canonicalName(c.name) === canon);
-  if (found) return null;
+  if (findRosterCharacter(characters, name, visualBible)) return null;
   return {
     reason: 'no-roster-entry',
     message: `${name} has no uploaded character entry, so there is no avatar or face photo to repaint from — a figure the story invented cannot be char-fixed`,
   };
+}
+
+/**
+ * The uploaded roster entry a repair name refers to, through the ONE cast
+ * resolver (castResolver.resolveEntity). The name a finding, a brief or a
+ * detector label carries ("Noah") is not always the roster's raw `name` string
+ * ("Noah, Freund von Louis und Tobias, Bruder von Tilo": the customer typed the
+ * relationship into the name box) — a raw `c.name ===` or canonical-equality
+ * test on the roster refused such a customer's own character as "invented"
+ * (prod job_1794498448758_ryuv0q8lb p3, p8, p16). Only a photo-cast entry
+ * counts: a Visual Bible secondary or animal with the same name has no avatar.
+ * Pass `visualBible` so a name shared with an invented figure stays ambiguous
+ * rather than silently picking the roster girl.
+ *
+ * @returns {Object|null} the `characters[]` entry, or null
+ */
+function findRosterCharacter(characters, name, visualBible = null) {
+  const idx = buildCastIndex({ characters: characters || [] }, visualBible);
+  const hit = resolveEntity(name, idx);
+  return hit && hit.kind === 'cast' ? hit.entry : null;
 }
 
 /**
@@ -238,14 +256,17 @@ function resolveFigureBbox(figureId, { bestEval } = {}) {
   return { faceBbox, bodyBbox, source: `eval-figure-${id}` };
 }
 
-function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageData = null } = {}) {
+function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageData = null, castIndex = null } = {}) {
   if (!charName || charName === 'UNKNOWN') {
     return { faceBbox: null, bodyBbox: null, source: null };
   }
   const pairs = (det) => !imageData || images().bboxPairsWith(det, imageData);
-  // COMPARE: a stored figure name against a stored roster name from the same
-  // run — canonical equality only, no resolution ladder.
-  const canonName = canonicalName(charName);
+  // COMPARE a detector figure label / eval match name with the target name. With
+  // the story's cast index (`castIndex`) both go through castResolver, so
+  // "Noah" finds the figure the detector labelled with the roster's full name
+  // "Noah, Freund von ..." (prod job_1794498448758_ryuv0q8lb p14: "no bbox for
+  // Noah"). Without an index: canonical equality, as before.
+  const same = (a) => (castIndex ? sameEntity(a, charName, castIndex) : canonicalName(a) === canonicalName(charName));
   const toRect = (b) => {
     if (!b) return null;
     if (Array.isArray(b)) return b;
@@ -256,7 +277,9 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
   };
 
   // Tier 1: entity report (cascade-improved faces when available)
-  const charEntity = entityReport?.characters?.[charName];
+  const charEntity = castIndex
+    ? lookupByName(entityReport?.characters, charName, castIndex)?.value
+    : entityReport?.characters?.[charName];
   if (charEntity?.byClothing) {
     for (const clothingData of Object.values(charEntity.byClothing)) {
       const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
@@ -287,7 +310,7 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
           // [] as "No figures were detected at all" and refuses the repair
           // (prod 7f2t99tk6 p4/p5, Lab 1694 after a garment-recolour override).
           const figs = paired ? (paired.figures || []) : null;
-          const selfIdx = (figs || []).findIndex(f => f?.name && canonicalName(f.name) === canonName);
+          const selfIdx = (figs || []).findIndex(f => f?.name && same(f.name));
           return {
             faceBbox,
             bodyBbox,
@@ -315,7 +338,7 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
     // The `f.label.includes(name)` branch that used to sit here is the
     // whited-out-head bug (job_1787514666616_yw9qsv1vf p15): a label merely
     // CONTAINING the target name selected a different person's figure.
-    return canonicalName(f.name) === canonName;
+    return same(f.name);
   });
   if (figure && (figure.faceBox || figure.bodyBox)) {
     // Reuse the detection SAM silhouette (page-res PNG, _gdinoMasks index-
@@ -340,8 +363,7 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
   // Tier 3: quality eval matches (face only)
   const matches = bestEval?.matches || [];
   const match = matches.find(m =>
-    canonicalName(m.name) === canonName ||
-    canonicalName(m.character) === canonName
+    (m.name && same(m.name)) || (m.character && same(m.character))
   );
   if (match && (match.face_bbox || match.bbox)) {
     return {
@@ -372,7 +394,7 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
  *
  * @returns {Promise<Buffer|string|null>} PNG silhouette, or null to re-segment.
  */
-async function resolveFigureMask(charName, resolved, { storyId, pageNumber } = {}) {
+async function resolveFigureMask(charName, resolved, { storyId, pageNumber, castIndex = null } = {}) {
   if (resolved?.bodyMask) return resolved.bodyMask;
   // Every null says WHY. A silent null here is indistinguishable from "no mask
   // exists", which is what sent the last diagnosis down the wrong path.
@@ -382,8 +404,9 @@ async function resolveFigureMask(charName, resolved, { storyId, pageNumber } = {
   }
   const figures = Array.isArray(resolved?.figures) ? resolved.figures : [];
   // COMPARE: stored figure name vs the stored target name.
-  const canon = canonicalName(charName);
-  const idx = figures.findIndex(f => f?.name && canonicalName(f.name) === canon);
+  const idx = figures.findIndex(f => f?.name && (castIndex
+    ? sameEntity(f.name, charName, castIndex)
+    : canonicalName(f.name) === canonicalName(charName)));
   if (idx < 0) {
     log.warn(`[FIGURE-MASK] ${charName}: not in the resolved cast (${figures.length} figure(s): ${figures.map(f => f?.name).join(', ') || 'none'}) — cannot map to a stored mask`);
     return null;
@@ -439,6 +462,7 @@ module.exports = {
   briefNamesForPage,
   findBorrowedLabel,
   charFixReferenceGap,
+  findRosterCharacter,
   resolveCharBbox,
   resolveFigureBbox,
   resolveFigureMask,

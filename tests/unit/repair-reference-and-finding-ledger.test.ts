@@ -108,7 +108,7 @@ describe('the repair router declines a char fix it cannot execute', () => {
 describe('every char-repair entry point reports the same reason', () => {
   it('the pipeline round and the manual endpoint both ask charFixReferenceGap', () => {
     // The repair round's call is built by charFixCall.js (shared with the Lab char_repair stage).
-    expect(read('server/lib/charFixCall.js')).toMatch(/charFixReferenceGap\(\{ characters, characterName: charName \}\)/);
+    expect(read('server/lib/charFixCall.js')).toMatch(/charFixReferenceGap\(\{ characters, characterName: charName, visualBible/);
     expect(read('server/routes/regeneration.js')).toMatch(/charFixReferenceGap\(\{ characters: storyData\.characters/);
   });
 

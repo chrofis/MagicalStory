@@ -41,6 +41,11 @@ async function buildCharFixCall({ storyData, characters, artStyle, img, decision
   const { resolveCharBbox } = require('./charRepairTarget');
   const { getStyledAvatarForClothing } = require('./entityConsistency');
   const { getFacePhoto } = require('./characterPhotos');
+  // ONE name resolver for every lookup below: the repair name, the roster entry
+  // and the detector labels may each be the short name or the roster's full
+  // name field (castResolver.shortName).
+  const { buildCastIndex, sameEntity } = require('./castResolver');
+  const castIndex = buildCastIndex({ characters }, storyData?.visualBible || null);
 
   // A decision carrying `targetFigure` (the presence model's MIXED case)
   // paints THAT figure into `charName`; the name is on no figure yet.
@@ -48,7 +53,7 @@ async function buildCharFixCall({ storyData, characters, artStyle, img, decision
   const targetResolved = byFigure
     ? require('./charRepairTarget').resolveFigureBbox(decision.targetFigure, { bestEval })
     : resolveCharBbox(charName, {
-      bestEval, entityReport, pageNumber, imageData: currentImageData,
+      bestEval, entityReport, pageNumber, imageData: currentImageData, castIndex,
     });
   const faceBbox = targetResolved.faceBbox;
   const bodyBbox = targetResolved.bodyBbox;
@@ -82,17 +87,14 @@ async function buildCharFixCall({ storyData, characters, artStyle, img, decision
   // repaint needs. charFixReferenceGap says which — one answer shared with
   // the router (which now declines earlier) and the manual endpoint.
   const { charFixReferenceGap } = require('./charRepairTarget');
-  const refGap = charFixReferenceGap({ characters, characterName: charName });
+  const refGap = charFixReferenceGap({ characters, characterName: charName, visualBible: storyData?.visualBible || null });
   if (refGap) {
     require('./runMetrics').forJob(jobKey).count('char_repair_skip_no_reference');
     log.warn(`🚫 [CHAR-FIX] p${pageNumber}: ${refGap.message}`);
     return { failure: { error: `char-fix skipped: ${refGap.message}`, referenceGap: refGap.reason } };
   }
-  // Same comparison the gap check just made, so the two can never disagree:
-  // a canonical match that passed the gap must resolve to a character here.
-  const { canonicalName } = require('./castResolver');
-  const character = characters.find(c => c && c.name === charName)
-    || characters.find(c => c && c.name && canonicalName(c.name) === canonicalName(charName));
+  // Same resolver the gap check just used, so the two can never disagree.
+  const character = require('./charRepairTarget').findRosterCharacter(characters, charName, storyData?.visualBible || null);
 
   // The outfit the character was RENDERED in: the page's own per-character
   // clothing, else the cover brief / cover hint / pageClothing. One resolver
@@ -152,7 +154,7 @@ async function buildCharFixCall({ storyData, characters, artStyle, img, decision
   // every generation path uses). Which cell — face alone for a face repair,
   // body alone for a body repair — is decided inside the repair spine by
   // charRepairReference.js, after face vs body is final.
-  const referencePose = require('./charRepairReference').referencePoseFor(img, charName);
+  const referencePose = require('./charRepairReference').referencePoseFor(img, charName, castIndex);
 
   // Protection list: same helper, iterated over sceneCharacters so
   // protection draws from the same source as the target lookup. If a
@@ -162,11 +164,11 @@ async function buildCharFixCall({ storyData, characters, artStyle, img, decision
   const protectedBodies = [];
   const protectedNames = [];
   const otherChars = (img.sceneCharacters || []).filter(c =>
-    c?.name && c.name.toLowerCase() !== charName.toLowerCase()
+    c?.name && !sameEntity(c.name, charName, castIndex)
   );
   for (const otherChar of otherChars) {
     const r = resolveCharBbox(otherChar.name, {
-      bestEval, entityReport, pageNumber, imageData: currentImageData,
+      bestEval, entityReport, pageNumber, imageData: currentImageData, castIndex,
     });
     if (r.faceBbox) protectedFaces.push(r.faceBbox);
     if (r.bodyBbox) protectedBodies.push(r.bodyBbox);
@@ -178,14 +180,14 @@ async function buildCharFixCall({ storyData, characters, artStyle, img, decision
   // the silhouette to the DINO face box, so the stored full-figure mask yields
   // the head mask.
   const figureMaskPng = await require('./charRepairTarget')
-    .resolveFigureMask(charName, targetResolved, { storyId: storyData?.id || jobKey || null, pageNumber });
+    .resolveFigureMask(charName, targetResolved, { storyId: storyData?.id || jobKey || null, pageNumber, castIndex });
 
   // Per-story clothingRequirements is the source of truth (correct for THIS
   // story); avatars.clothing is character-level metadata that persists
   // across stories and can carry stale colours from a previous run. Same
   // priority as storyHelpers.resolveClothingDescription.
   const clothingDesc = (() => {
-    const reqs = require('./clothingCategories').resolveCharacterReqs(storyData?.clothingRequirements, charName);
+    const reqs = require('./clothingCategories').resolveCharacterReqs(storyData?.clothingRequirements, charName, castIndex);
     if (reqs && reqs[clothingCategory]) {
       const cat = reqs[clothingCategory];
       if (cat.signature && cat.signature !== 'none') return cat.signature;
@@ -202,8 +204,10 @@ async function buildCharFixCall({ storyData, characters, artStyle, img, decision
   const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition || null;
   // Appearance text for the repair prompt (face/hair/build).
   const charDescForPrompt = (() => {
-    const d = img.bboxDetection?.characterDescriptions?.[charName]
-      ?? (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.bboxDetection?.characterDescriptions?.[charName];
+    const { lookupByName } = require('./castResolver');
+    const descs = img.bboxDetection?.characterDescriptions
+      || (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.bboxDetection?.characterDescriptions;
+    const d = lookupByName(descs, charName, castIndex)?.value;
     const txt = (typeof d === 'string' ? d : d?.richDescription) || '';
     return txt || (character?.description || '');
   })();

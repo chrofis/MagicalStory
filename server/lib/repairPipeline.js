@@ -2626,6 +2626,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // this very version stop a failed char-fix from being repeated on it.
       const decision = decideRepairMethod(img.pageNumber, latestEval, currentEntityReport, {
         characters,
+        visualBible: visualBible || null,
         expectedCast: resolveDeclaredCast(bestSoFar?.sceneCharacters, img.sceneCharacters),
         failedMethods: (bestSoFar?.failedRepairs || []).map(f => f.method),
       });

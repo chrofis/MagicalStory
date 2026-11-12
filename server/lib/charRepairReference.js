@@ -150,13 +150,16 @@ async function fitReferenceToAspect(buf, aspectStr) {
  * (fullData.characters, else characters, else sceneCharacters) through the one
  * resolver, storyAvatars.resolveCellPose.
  */
-function referencePoseFor(scene, charName) {
+function referencePoseFor(scene, charName, castIndex = null) {
   const { resolveCellPose } = require('./storyAvatars');
   const metaChars = scene?.sceneMetadata?.fullData?.characters
     || scene?.sceneMetadata?.characters || scene?.sceneCharacters || [];
   const want = String(charName || '').toLowerCase();
-  const sc = (Array.isArray(metaChars) ? metaChars : []).find(c =>
-    ((typeof c === 'string' ? c : c?.name) || '').toLowerCase() === want);
+  const { sameEntity } = require('./castResolver');
+  const sc = (Array.isArray(metaChars) ? metaChars : []).find(c => {
+    const n = (typeof c === 'string' ? c : c?.name) || '';
+    return castIndex ? sameEntity(n, charName, castIndex) : n.toLowerCase() === want;
+  });
   return resolveCellPose(typeof sc === 'object' && sc ? sc : {}).pose;
 }
 

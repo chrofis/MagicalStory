@@ -66,7 +66,7 @@ function singularLast(word) {
  */
 function canonicalName(s) {
   if (s === null || s === undefined) return '';
-  const base = String(s)
+  const base = shortName(s)
     .replace(/\s*\([^)]*\)\s*$/, '')
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
@@ -99,6 +99,27 @@ function figurePhrase(fig) {
   const count = Number(fig && fig.count);
   if (Number.isInteger(count) && count >= 2) out += ` (${count} of them, all alike)`;
   return out;
+}
+
+/**
+ * The NAME in a name field that also carries the customer's relationship text
+ * ("Noah, Freund von Louis und Tobias, Bruder von Tilo" -> "Noah"). The wizard's
+ * name box is free text and customers write who the person is after a comma;
+ * the story, the briefs and every eval label use the part before it, so that is
+ * the name the resolver compares. A name with no comma, or nothing before the
+ * comma, is returned unchanged. Structured split of one field, not prose
+ * reading (job_1794498448758_ryuv0q8lb, 2026-11-12: char-fix refused "Noah" as
+ * having no roster entry; decisions.md 2026-11-12).
+ *
+ * @param {*} name
+ * @returns {string}
+ */
+function shortName(name) {
+  const text = name === null || name === undefined ? '' : String(name).trim();
+  const cut = text.indexOf(',');
+  if (cut <= 0) return text;
+  const head = text.slice(0, cut).trim();
+  return head || text;
 }
 
 /**
@@ -372,7 +393,7 @@ function entriesMentioned(text, index, opts = {}) {
   const hits = [];
   for (const e of index.entries) {
     if (kinds && !kinds.includes(e.kind)) continue;
-    const full = String(e.name).replace(/\s*\([^)]*\)\s*$/, '').trim();
+    const full = shortName(e.name).replace(/\s*\([^)]*\)\s*$/, '').trim();
     if (full && nameRegExp(full, regexOpts).test(t)) { hits.push(e); continue; }
     if (!firstToken || e.words.length < 2) continue;
     const token = e.words[0];
@@ -447,6 +468,7 @@ function charactersByIds(characters, ids) {
 
 module.exports = {
   canonicalName,
+  shortName,
   figurePhrase,
   buildCastIndex,
   resolveEntity,

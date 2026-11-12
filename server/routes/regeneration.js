@@ -6,7 +6,7 @@
  */
 
 const express = require('express');
-const { buildCastIndex, resolveEntity, canonicalName, charactersByIds } = require('../lib/castResolver');
+const { buildCastIndex, resolveEntity, sameEntity, canonicalName, charactersByIds } = require('../lib/castResolver');
 const router = express.Router();
 const crypto = require('crypto');
 const { getPlausiblePhysical } = require('../lib/characterPhysical');
@@ -5673,14 +5673,17 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     const repairTasks = [];
     for (const repair of repairs) {
       const { character: characterName, pages } = repair;
-      let character = storyData.characters?.find(c => c.name === characterName);
+      // RESOLVE through castResolver: the request name may be the short name
+      // ("Noah") of a roster entry whose name field also holds the customer's
+      // relationship text, or that full field.
+      let character = require('../lib/charRepairTarget').findRosterCharacter(storyData.characters || [], characterName, storyData.visualBible || null);
       if (!character) {
         // THE SAME ANSWER THE PIPELINE GIVES (charRepairTarget.charFixReferenceGap).
         // A figure the story invented is drawn, detected and gradeable, and has
         // no avatar to repaint from — "not found" read as a typo or a detection
         // miss and sent two diagnoses down the wrong path.
         const { charFixReferenceGap } = require('../lib/charRepairTarget');
-        const gap = charFixReferenceGap({ characters: storyData.characters || [], characterName });
+        const gap = charFixReferenceGap({ characters: storyData.characters || [], characterName, visualBible: storyData.visualBible || null });
         results.push({ character: characterName, pagesRepaired: [], error: gap ? gap.message : `Character "${characterName}" not found` });
         continue;
       }
@@ -5960,11 +5963,13 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           const { findBorrowedLabel, resolveCharBbox } = require('../lib/charRepairTarget');
           const { buildCharRepairRequest } = require('../lib/charRepairRequest');
 
+          const repairCastIndex = buildCastIndex(storyData, storyData.visualBible || null);
           let resolved = resolveCharBbox(characterName, {
             bestEval: { bboxDetection: sceneImage.bboxDetection, matches: sceneImage.matches },
             entityReport: storyData.finalChecksReport?.entity,
             pageNumber,
             imageData: sceneImage.imageData,
+            castIndex: repairCastIndex,
           });
           if (resolved.source) {
             boxDiag.boxSource = resolved.source === 'entity' ? 'entity-report'
@@ -5992,6 +5997,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             resolved = resolveCharBbox(characterName, {
               bestEval: { bboxDetection: detection },
               pageNumber,
+              castIndex: repairCastIndex,
             });
           }
 
@@ -6158,7 +6164,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           if (protectionSource?.figures) {
             for (const fig of protectionSource.figures) {
               if (!fig.name || fig.name === 'UNKNOWN') continue;
-              if (canonicalName(fig.name) === canonicalName(characterName)) continue;  // COMPARE
+              if (sameEntity(fig.name, characterName, repairCastIndex)) continue;  // RESOLVE
               if (fig.faceBox) {
                 const fb = toRect(fig.faceBox);
                 protectedFaces.push(fb);
@@ -6176,7 +6182,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // that is what the clip is for. Withholding it for faceOnly forced a
           // re-segmentation on every face repair and defeated the reuse.
           const figureMaskPng = await require('../lib/charRepairTarget')
-            .resolveFigureMask(characterName, resolved, { storyId: id, pageNumber });
+            .resolveFigureMask(characterName, resolved, { storyId: id, pageNumber, castIndex: repairCastIndex });
 
           const grokResult = await repairCharacterMismatch(
             sceneImage.imageData,

@@ -856,6 +856,7 @@ function selectCharRepairTasks(entityReport, options = {}) {
  * @param {Array} [options.characters] - the uploaded roster. Present, the two char-fix
  *        gates decline a figure with no roster entry (charFixReferenceGap) instead of
  *        routing a repaint that has no reference to paint from. Absent, no opinion.
+ * @param {Object|null} [options.visualBible] - with `characters`, the cast index the names resolve through
  * @param {Array|null} [options.expectedCast] - the DECLARED cast of the version being
  *        repaired (resolveDeclaredCast). A name outside it is never char-fixed — the
  *        figure is not that character. null/absent = not declared, no opinion.
@@ -1073,17 +1074,22 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // went to char-fixes that repainted nothing. Structured data only: the
   // declared cast, compared by canonical name, never a finding's prose.
   // `expectedCast` not an array ⇒ undeclared, no opinion.
-  const { canonicalName: canonName } = require('./castResolver');
+  // RESOLVE both sides through castResolver: the declared cast carries the
+  // names the page was written with ("Noah"), a finding may carry the roster's
+  // raw name field ("Noah, Freund von ...") or the reverse.
+  const { canonicalName: canonName, buildCastIndex, sameEntity } = require('./castResolver');
+  const castIdx = buildCastIndex({ characters: options.characters || [] }, options.visualBible || null);
   const pageCast = Array.isArray(options.expectedCast)
     ? new Set(options.expectedCast.map(c => canonName(typeof c === 'string' ? c : c?.name || '')).filter(Boolean))
     : null;
+  const inPageCast = (name) => options.expectedCast.some(c => sameEntity(typeof c === 'string' ? c : c?.name || '', name || '', castIdx));
   const charFixImpossible = (name) => {
-    if (pageCast && !pageCast.has(canonName(name || ''))) {
+    if (pageCast && !inPageCast(name)) {
       return { reason: 'not-in-page-cast', message: `${name || 'the figure'} is not in this page's declared cast (${pageCast.size ? [...pageCast].join(', ') : 'nobody'}), so the figure is not that character — there is nobody to char-fix` };
     }
     if (!Array.isArray(options.characters)) return null;
     const { charFixReferenceGap } = require('./charRepairTarget');
-    return charFixReferenceGap({ characters: options.characters, characterName: name });
+    return charFixReferenceGap({ characters: options.characters, characterName: name, visualBible: options.visualBible || null });
   };
   // A CHAR-FIX THAT FAILED ON THESE PIXELS IS NOT REPEATED (2026-09-23). A failed
   // char-fix produces no version, so the same version stays best and the next

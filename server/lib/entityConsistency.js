@@ -2037,8 +2037,12 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
         const charClothing = sceneMetadata?.characterClothing || {};
 
         const vb = visualBible || null;
+        // RESOLVE the page's name ("Noah") to the roster entry whose name field
+        // may also hold the customer's relationship text; a raw `c.name ===`
+        // left that character undescribed and unclothed in the detector's cast.
+        const rosterIdx = buildCastIndex({ characters: storyCharacters }, vb);
         const expectedChars = pageCharNames.map(name => {
-          const fullChar = storyCharacters.find(c => c.name === name);
+          const fullChar = require('./charRepairTarget').findRosterCharacter(storyCharacters, name, vb);
 
           // Check VB for non-main characters (animals, secondary chars)
           if (!fullChar && vb) {
@@ -2068,8 +2072,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           // exact-key miss silently degraded the eval to the fallback category.
           // COMPARE: one normaliser (canonicalName) instead of a local
           // lowercase rule that missed diacritics and trailing parentheticals.
-          const charClothingKey = Object.keys(charClothing)
-            .find(k => canonicalName(k) === canonicalName(name));
+          const charClothingKey = require('./castResolver').lookupByName(charClothing, name, rosterIdx)?.key;
           const clothingCategory = (charClothingKey && charClothing[charClothingKey]) || fallbackCategory;
           // Resolve category to actual clothing description.
           // buildClothingDescription prefers this story's clothingRequirements

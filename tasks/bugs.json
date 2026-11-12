@@ -4801,6 +4801,15 @@
       "rootCause": "Glasses is a free-text field (CharacterForm.tsx ~405/431); the \"no glasses\" check compares the text to the English word none only (avatarOverrides.js:39 isNone, styledAvatars.js:268). A typed yes/no field is missing, so code ends up reading prose.",
       "status": "fixed",
       "fixedIn": "265060f68"
+    },
+    {
+      "id": "charfix-misses-cast-named-with-relationship",
+      "title": "Character repair refuses the customer's own characters when their name field holds more than the name (\"Noah, Freund von Louis und Tobias, Bruder von Tilo\"): \"Noah has no uploaded character entry ... cannot be char-fixed\"",
+      "reportedAt": "2026-11-12",
+      "source": "Production job_1794498448758_ryuv0q8lb finalChecksReport.repairRounds: p16 (Noah drawn as an adult) and p3 (Tobias) char-fix failed with the no-roster-entry message; p14 \"no bbox for Noah\". Reproduced: charFixReferenceGap({characters:[{name:\"Noah, Freund von Louis und Tobias, Bruder von Tilo\"}],characterName:\"Noah\"}) returns no-roster-entry. 3 of 58 production stories in 60 days have comma names (all three from 2026-11-12).",
+      "rootCause": "The repair lookups (charFixReferenceGap, resolveCharBbox, charFixCall, manual endpoint, router, entity-check cast) compared the raw roster name field, and castResolver itself did not know that the name field carries relationship text after a comma, so neither the short name the story uses nor the full field resolved (and \"Louis\" resolved to Noah's entry through his relationship text). Fixed in castResolver (shortName, one place) and the repair lookups now resolve through it.",
+      "status": "fixed",
+      "fixedIn": "PENDING"
     }
   ]
 }
