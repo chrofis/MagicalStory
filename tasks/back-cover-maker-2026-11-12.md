@@ -24,7 +24,7 @@ white cover spread (pdf.js generatePrintPdf ~318); an unreadable cover only warn
       story 1 when no story has one. print.js generate-book-pdf calls buildBookPrintPdf instead of its copy.
 - [x] Order page + voucher page: POST /api/stories/:id/ensure-back-cover; BookBackCover gating like BookSquareCovers.
 - [x] Tests (fail before fix) + decisions.md entry (print pays for the cover; page-path brief for pre-brief covers).
-- [ ] Paid test: 4 production stories copied to staging (trial job_1780438044462_oolwasq34, job_1786888522777_8l1dv50lk;
+- [x] Paid test (2026-11-12, USD 0.46 reported): first build 2/4, after 76698096d 4/4 right; negative fails loudly. 4 production stories copied to staging (trial job_1780438044462_oolwasq34, job_1786888522777_8l1dv50lk;
       full job_1773093284773_isudrmgrj, job_1773170696610_cdwuw7kui), cap USD 1.20. Negative: staging
       job_1787693271900_cyc9lol5y (no front cover) must fail loudly.
 
@@ -33,3 +33,6 @@ About USD 0.15-0.30 per made cover (brief gemini-3.1-pro, plate + render Grok, e
 
 ## Build review (2026-11-12, agent)
 Built and unit-tested with stand-ins (USD 0). Free replay over the 32 production stories: 13 build a brief prompt, 19 stop loudly (13 no avatar and no character of today, 6 only a costumed avatar). The paid staging run stays open (needs the owner's cap).
+
+## Paid test result (2026-11-12)
+Stories with stored avatars only (4txcgqfdd, xunnxuagh, 9xigyv8u6, 8l1dv50lk); the "today's character" path is unit-tested only. First run 2/4 (photo age, painted German type label), fixed in 76698096d, rerun 4/4. About 2-3 minutes per cover. 19 of the 32 stories still cannot get one (13 no avatar at all, 6 costumed avatar only): owner decision pending.
