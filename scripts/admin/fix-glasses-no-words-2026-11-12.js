@@ -44,7 +44,7 @@ if (!url) throw new Error('database URL env var not set');
 
   const dir = path.join(__dirname, '..', '..', 'tasks');
   fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, 'customer-glasses-no-words-2026-11-12-characters-before.json');
+  const file = path.join(dir, `customer-glasses-no-words-characters-before-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
   fs.writeFileSync(file, JSON.stringify(changes.map((c) => c.row), null, 2));
   console.log(`backup written: ${file}`);
   for (const c of changes) {
