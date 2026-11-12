@@ -69,8 +69,10 @@ const IMG_COLS = 'image_type, page_number, version_index, image_url, quality_sco
 
 /** Production R2 settings from Railway into process.env, never printed. */
 function loadProdR2Env() {
-  const out = execFileSync('railway', ['variables', '--service', 'MagicalStory', '--environment', 'production', '--json'],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  // Windows installs the CLI as railway.cmd, which execFileSync cannot start without the extension.
+  const out = execFileSync(process.platform === 'win32' ? 'railway.cmd' : 'railway', ['variables', '--service', 'MagicalStory', '--environment', 'production', '--json'],
+    // Node refuses to start a .cmd without a shell (EINVAL); the arguments are constants.
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' });
   const vars = JSON.parse(out);
   for (const k of ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET', 'R2_PUBLIC_URL']) {
     if (!vars[k]) throw new Error(`production Railway variables have no ${k}`);
@@ -183,7 +185,10 @@ async function headStatus(u) {
   const badSrc = []; const taken = [];
   for (const c of copies) {
     const s = await headStatus(c.from); if (s !== 200) badSrc.push(`${s} ${c.from}`);
-    const t = await headStatus(`${urls.PROD_BASE}/${c.key}`); if (t === 200) taken.push(c.key);
+    // Cache-busting query: a HEAD on the bare public URL of a not-yet-uploaded key makes the CDN
+    // cache that 404, and the customer then sees broken pictures for minutes after the upload
+    // (2026-11-12: 21 pictures per story for about 6 minutes).
+    const t = await headStatus(`${urls.PROD_BASE}/${c.key}?precheck=${Date.now()}`); if (t === 200) taken.push(c.key);
   }
   console.log(`          sources reachable: ${copies.length - badSrc.length}/${copies.length}; target keys already taken: ${taken.length}`);
   if (badSrc.length) { console.error(`REFUSED: unreachable source(s): ${badSrc.slice(0, 3).join(' | ')}`); process.exit(1); }
