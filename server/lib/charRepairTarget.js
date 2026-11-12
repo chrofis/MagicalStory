@@ -113,15 +113,27 @@ function buildPageCast({
 
 /**
  * Every name the page was WRITTEN for — the brief, not the render.
+ *
+ * One person counts once: sceneCharacters carries the roster entry's full name
+ * field ("Noah, Freund von Louis und Tobias, Bruder von Tilo") while
+ * sceneMetadata carries the short name the story uses ("Noah"), so names are
+ * keyed by castResolver.canonicalName (which takes the short name). Counted
+ * raw, the guard below read "3 written, 2 drawn" on a page that drew both
+ * (bugs.json charfix-brief-counts-relationship-name-twice).
  */
 function briefNamesForPage({ sceneCharacters = [], sceneMetadata = {} } = {}) {
   const names = new Set();
-  for (const c of (sceneCharacters || [])) {
-    const n = typeof c === 'string' ? c : c?.name;
-    if (n) names.add(n);
-  }
-  for (const n of Object.keys(sceneMetadata?.characterPositions || {})) if (n) names.add(n);
-  for (const n of (sceneMetadata?.characters || [])) if (typeof n === 'string' && n) names.add(n);
+  const seen = new Set();
+  const add = (n) => {
+    if (typeof n !== 'string' || !n) return;
+    const key = canonicalName(n);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    names.add(n);
+  };
+  for (const c of (sceneCharacters || [])) add(typeof c === 'string' ? c : c?.name);
+  for (const n of Object.keys(sceneMetadata?.characterPositions || {})) add(n);
+  for (const n of (sceneMetadata?.characters || [])) add(n);
   return names;
 }
 

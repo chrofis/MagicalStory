@@ -6,7 +6,7 @@
 // job_1794479943880_pvykbjtwx (2026-11-12). bugs.json charfix-misses-cast-named-with-relationship.
 import { describe, it, expect } from 'vitest';
 import {
-  charFixReferenceGap, findRosterCharacter, resolveCharBbox,
+  charFixReferenceGap, findRosterCharacter, resolveCharBbox, briefNamesForPage, findBorrowedLabel,
 } from '../../server/lib/charRepairTarget.js';
 import { buildCastIndex, resolveEntity, shortName, sameEntity } from '../../server/lib/castResolver.js';
 
@@ -66,5 +66,26 @@ describe('resolveCharBbox — both directions of the name mismatch', () => {
   it('does not pick a different person', () => {
     const r = resolveCharBbox('Noah', { bestEval: { bboxDetection: { figures: [fig('Louis')] } }, pageNumber: 8, castIndex: idx });
     expect(r.source).toBeNull();
+  });
+});
+
+// The page brief stores the roster entry (full field) in sceneCharacters and the
+// short name in sceneMetadata. Counted as two people, the borrowed-label guard
+// read "3 written, 2 drawn" and refused a page that drew exactly Noah and Tilo
+// (staging copy of job_1794506785522_17d2hnvd9 p7, 2026-11-12).
+// bugs.json charfix-brief-counts-relationship-name-twice.
+describe('briefNamesForPage / findBorrowedLabel', () => {
+  const sceneCharacters = [{ name: NOAH }, { name: 'Tilo, jüngerer Bruder von Noah' }];
+  const sceneMetadata = { characters: ['Noah', 'Tilo'], characterPositions: { Noah: 'left', Tilo: 'right' } };
+  it('counts one person once, whichever form of the name each field carries', () => {
+    expect(briefNamesForPage({ sceneCharacters, sceneMetadata }).size).toBe(2);
+  });
+  it('trusts the labels when the page drew everyone it was written for', () => {
+    const figures = [{ name: NOAH }, { name: 'Tilo' }];
+    expect(findBorrowedLabel({ figures, sceneCharacters, sceneMetadata, characterName: 'Tilo', pageNumber: 7 })).toBeNull();
+  });
+  it('still refuses when a written character is missing', () => {
+    const figures = [{ name: 'Tilo' }];
+    expect(findBorrowedLabel({ figures, sceneCharacters, sceneMetadata, characterName: 'Tilo', pageNumber: 7 })).not.toBeNull();
   });
 });
