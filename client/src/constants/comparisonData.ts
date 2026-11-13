@@ -84,13 +84,13 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Art styles', de: 'Kunststile', fr: 'Styles artistiques', it: 'Stili artistici' },
-        us: { en: '8 per story', de: '8 pro Geschichte', fr: '8 par histoire', it: '8 per storia' },
+        us: { en: '14 to choose from per story', de: '14 zur Auswahl pro Geschichte', fr: '14 au choix par histoire', it: '14 tra cui scegliere per storia' },
         them: { en: '1 per book title', de: '1 pro Buchtitel', fr: '1 par titre de livre', it: '1 per titolo' },
         winner: 'us',
       },
       {
         label: { en: 'Languages', de: 'Sprachen', fr: 'Langues', it: 'Lingue' },
-        us: { en: 'DE, EN, FR (incl. Swiss German)', de: 'DE, EN, FR (inkl. Schweizerdeutsch)', fr: 'DE, EN, FR (dont suisse allemand)', it: 'DE, EN, FR (incluso lo svizzero tedesco)' },
+        us: { en: 'DE, EN, FR, IT (incl. Swiss German)', de: 'DE, EN, FR, IT (inkl. Schweizerdeutsch)', fr: 'DE, EN, FR, IT (dont suisse allemand)', it: 'DE, EN, FR, IT (incluso lo svizzero tedesco)' },
         them: { en: '15+', de: '15+', fr: '15+', it: '15+' },
         winner: 'them',
       },
@@ -237,10 +237,10 @@ export const comparisons: ComparisonData[] = [
       {
         q: { en: 'How does print quality compare?', de: 'Wie vergleicht sich die Druckqualität?', fr: 'Comment se compare la qualité d\'impression ?', it: 'Come si confronta la qualità di stampa?' },
         a: {
-          en: 'Both use professional print-on-demand. Magical Story prints A4 hardcover books via Gelato (European printers). Wonderbly has its own established printing infrastructure. Both deliver high-quality results.',
-          de: 'Beide nutzen professionellen Print-on-Demand. Magical Story druckt A4-Hardcover-Bücher über Gelato (europäische Druckereien). Wonderbly hat eine eigene etablierte Druckinfrastruktur. Beide liefern hochwertige Ergebnisse.',
-          fr: 'Les deux utilisent l\'impression à la demande professionnelle. Magical Story imprime des livres à couverture rigide 20 × 20 cm via Gelato (imprimeurs européens). Wonderbly dispose de sa propre infrastructure d\'impression. Les deux offrent des résultats de qualité.',
-          it: 'Entrambi usano la stampa su richiesta professionale. Magical Story stampa libri rilegati in formato A4 tramite Gelato (stampatori europei). Wonderbly ha una propria infrastruttura di stampa consolidata. Entrambi offrono risultati di alta qualità.',
+          en: 'Both use professional print-on-demand. Magical Story prints hardcover books in A4 or square format via Gelato (European printers). Wonderbly has its own established printing infrastructure. Both deliver high-quality results.',
+          de: 'Beide nutzen professionellen Print-on-Demand. Magical Story druckt Hardcover-Bücher im A4- oder Quadratformat über Gelato (europäische Druckereien). Wonderbly hat eine eigene etablierte Druckinfrastruktur. Beide liefern hochwertige Ergebnisse.',
+          fr: 'Les deux utilisent l\'impression à la demande professionnelle. Magical Story imprime des livres à couverture rigide au format A4 ou carré (20 × 20 cm) via Gelato (imprimeurs européens). Wonderbly dispose de sa propre infrastructure d\'impression. Les deux offrent des résultats de qualité.',
+          it: 'Entrambi usano la stampa su richiesta professionale. Magical Story stampa libri rilegati in formato A4 o quadrato (20 × 20 cm) tramite Gelato (stampatori europei). Wonderbly ha una propria infrastruttura di stampa consolidata. Entrambi offrono risultati di alta qualità.',
         },
       },
     ],
@@ -296,7 +296,7 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Art styles', de: 'Kunststile', fr: 'Styles artistiques', it: 'Stili artistici' },
-        us: { en: '8 per story', de: '8 pro Geschichte', fr: '8 par histoire', it: '8 per storia' },
+        us: { en: '14 to choose from per story', de: '14 zur Auswahl pro Geschichte', fr: '14 au choix par histoire', it: '14 tra cui scegliere per storia' },
         them: { en: '1 per book', de: '1 pro Buch', fr: '1 par livre', it: '1 per libro' },
         winner: 'us',
       },
@@ -308,7 +308,7 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Markets', de: 'Märkte', fr: 'Marchés', it: 'Mercati' },
-        us: { en: 'Switzerland (DE, EN, FR)', de: 'Schweiz (DE, EN, FR)', fr: 'Suisse (DE, EN, FR)', it: 'Svizzera (DE, EN, FR)' },
+        us: { en: 'Switzerland (DE, EN, FR, IT)', de: 'Schweiz (DE, EN, FR, IT)', fr: 'Suisse (DE, EN, FR, IT)', it: 'Svizzera (DE, EN, FR, IT)' },
         them: { en: '19 markets worldwide', de: '19 Märkte weltweit', fr: '19 marchés dans le monde', it: '19 mercati in tutto il mondo' },
         winner: 'them',
       },
@@ -492,7 +492,7 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Languages', de: 'Sprachen', fr: 'Langues', it: 'Lingue' },
-        us: { en: 'DE, EN, FR (incl. Swiss German)', de: 'DE, EN, FR (inkl. Schweizerdeutsch)', fr: 'DE, EN, FR (dont suisse allemand)', it: 'DE, EN, FR (incluso lo svizzero tedesco)' },
+        us: { en: 'DE, EN, FR, IT (incl. Swiss German)', de: 'DE, EN, FR, IT (inkl. Schweizerdeutsch)', fr: 'DE, EN, FR, IT (dont suisse allemand)', it: 'DE, EN, FR, IT (incluso lo svizzero tedesco)' },
         them: { en: '20+ including Romansh', de: '20+ inkl. Rätoromanisch', fr: '20+ dont le romanche', it: '20+ incluso il romancio' },
         winner: 'them',
       },
@@ -510,7 +510,7 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Art styles', de: 'Kunststile', fr: 'Styles artistiques', it: 'Stili artistici' },
-        us: { en: '8 per story', de: '8 pro Geschichte', fr: '8 par histoire', it: '8 per storia' },
+        us: { en: '14 to choose from per story', de: '14 zur Auswahl pro Geschichte', fr: '14 au choix par histoire', it: '14 tra cui scegliere per storia' },
         them: { en: 'Fixed per book', de: 'Pro Buch fest', fr: 'Fixe pour chaque livre', it: 'Fisso per ogni libro' },
         winner: 'us',
       },
@@ -716,13 +716,13 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Art styles', de: 'Kunststile', fr: 'Styles artistiques', it: 'Stili artistici' },
-        us: { en: '8 per story', de: '8 pro Geschichte', fr: '8 par histoire', it: '8 per storia' },
+        us: { en: '14 to choose from per story', de: '14 zur Auswahl pro Geschichte', fr: '14 au choix par histoire', it: '14 tra cui scegliere per storia' },
         them: { en: 'Fixed per license', de: 'Je Lizenz fest', fr: 'Fixe selon la licence', it: 'Fisso per ogni licenza' },
         winner: 'us',
       },
       {
         label: { en: 'DACH market', de: 'DACH-Markt', fr: 'Marché DACH', it: 'Mercato DACH' },
-        us: { en: 'Switzerland focused (DE, EN, FR)', de: 'Auf die Schweiz ausgerichtet (DE, EN, FR)', fr: 'Axé sur la Suisse (DE, EN, FR)', it: 'Focalizzato sulla Svizzera (DE, EN, FR)' },
+        us: { en: 'Switzerland focused (DE, EN, FR, IT)', de: 'Auf die Schweiz ausgerichtet (DE, EN, FR, IT)', fr: 'Axé sur la Suisse (DE, EN, FR, IT)', it: 'Focalizzato sulla Svizzera (DE, EN, FR, IT)' },
         them: { en: '.de, .ch, .at, .fr, .it domains', de: 'Domains .de, .ch, .at, .fr, .it', fr: 'Domaines .de, .ch, .at, .fr, .it', it: 'Domini .de, .ch, .at, .fr, .it' },
         winner: 'them',
       },
@@ -899,9 +899,9 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Art styles', de: 'Kunststile', fr: 'Styles artistiques', it: 'Stili artistici' },
-        us: { en: '8', de: '8', fr: '8', it: '8' },
+        us: { en: '14', de: '14', fr: '14', it: '14' },
         them: { en: '7', de: '7', fr: '7', it: '7' },
-        winner: 'tie',
+        winner: 'us',
       },
       {
         label: { en: 'Character consistency', de: 'Figurenkonsistenz', fr: 'Cohérence des personnages', it: 'Coerenza dei personaggi' },
@@ -923,7 +923,7 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Languages', de: 'Sprachen', fr: 'Langues', it: 'Lingue' },
-        us: { en: 'DE, EN, FR (incl. Swiss German)', de: 'DE, EN, FR (inkl. Schweizerdeutsch)', fr: 'DE, EN, FR (dont suisse allemand)', it: 'DE, EN, FR (incluso lo svizzero tedesco)' },
+        us: { en: 'DE, EN, FR, IT (incl. Swiss German)', de: 'DE, EN, FR, IT (inkl. Schweizerdeutsch)', fr: 'DE, EN, FR, IT (dont suisse allemand)', it: 'DE, EN, FR, IT (incluso lo svizzero tedesco)' },
         them: { en: 'English-focused', de: 'Auf Englisch ausgerichtet', fr: 'Axé sur l\'anglais', it: 'Incentrato sull\'inglese' },
         winner: 'us',
       },
@@ -1041,7 +1041,7 @@ export const comparisons: ComparisonData[] = [
         a: {
           en: 'Magical Story uses a multi-pass entity repair workflow that verifies and fixes character appearances across all pages. This is the most sophisticated consistency system in the AI storybook market. Lullaby.ink uses standard AI generation without a dedicated consistency check.',
           de: 'Magical Story nutzt einen Multi-Pass-Reparatur-Workflow, der Figurenaussehen über alle Seiten verifiziert und korrigiert. Dies ist das ausgereifteste Konsistenzsystem im KI-Bilderbuch-Markt. Lullaby.ink verwendet Standard-KI-Generierung ohne dedizierten Konsistenz-Check.',
-          fr: 'Magical Story utilise un processus de réparation multi-passes qui vérifie et corrige l\'apparence des personnages sur toutes les pages. C\'est le système de cohérence le plus sophistiqué du marché. Lullaby.ink utilise la génération IA standard sans vérification dédiée.',
+          fr: 'Magical Story utilise un processus de réparation multi-passes qui vérifie et corrige l\'apparence des personnages sur toutes les pages. C\'est le système de cohérence le plus sophistiqué du marché des livres illustrés par IA. Lullaby.ink utilise la génération IA standard sans vérification dédiée.',
           it: 'Magical Story usa una procedura di riparazione in più passaggi che verifica e corregge l\'aspetto dei personaggi su tutte le pagine. È il sistema di coerenza più sofisticato oggi disponibile nel mercato dei libri IA. Lullaby.ink usa la generazione IA standard senza un controllo di coerenza dedicato.',
         },
       },
@@ -1098,7 +1098,7 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Languages', de: 'Sprachen', fr: 'Langues', it: 'Lingue' },
-        us: { en: 'DE, EN, FR (incl. Swiss German)', de: 'DE, EN, FR (inkl. Schweizerdeutsch)', fr: 'DE, EN, FR (dont suisse allemand)', it: 'DE, EN, FR (incluso lo svizzero tedesco)' },
+        us: { en: 'DE, EN, FR, IT (incl. Swiss German)', de: 'DE, EN, FR, IT (inkl. Schweizerdeutsch)', fr: 'DE, EN, FR, IT (dont suisse allemand)', it: 'DE, EN, FR, IT (incluso lo svizzero tedesco)' },
         them: { en: 'English only', de: 'Nur Englisch', fr: 'Anglais uniquement', it: 'Solo inglese' },
         winner: 'us',
       },
@@ -1116,7 +1116,7 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Art styles', de: 'Kunststile', fr: 'Styles artistiques', it: 'Stili artistici' },
-        us: { en: '8', de: '8', fr: '8', it: '8' },
+        us: { en: '14', de: '14', fr: '14', it: '14' },
         them: { en: 'Limited', de: 'Begrenzt', fr: 'Limité', it: 'Limitato' },
         winner: 'us',
       },
@@ -1159,28 +1159,28 @@ export const comparisons: ComparisonData[] = [
     ],
     ourStrengths: {
       en: [
-        'Multilingual: DE, EN, FR including Swiss German dialects',
+        'Multilingual: DE, EN, FR, IT including Swiss German dialects',
         'Simple per-story pricing — no confusing credits',
         'Full free story (not limited credits requiring signup)',
         'Town-specific stories with local landmarks',
         'Character consistency with multi-pass entity repair',
       ],
       de: [
-        'Mehrsprachig: DE, EN, FR inkl. Schweizerdeutsch',
+        'Mehrsprachig: DE, EN, FR, IT inkl. Schweizerdeutsch',
         'Einfache Preise pro Geschichte — keine verwirrenden Credits',
         'Ganze Geschichte gratis (keine limitierten Credits)',
         'Ortsgeschichten mit lokalen Wahrzeichen',
         'Figurenkonsistenz mit Multi-Pass-Reparatur',
       ],
       fr: [
-        'Multilingue : DE, EN, FR dont le suisse allemand',
+        'Multilingue : DE, EN, FR, IT dont le suisse allemand',
         'Prix simple par histoire — pas de crédits confus',
         'Histoire complète gratuite (pas de crédits limités)',
         'Histoires locales avec des monuments locaux',
         'Cohérence des personnages avec réparation multi-passes',
       ],
       it: [
-        'Multilingue: DE, EN, FR inclusi i dialetti svizzero tedeschi',
+        'Multilingue: DE, EN, FR, IT inclusi i dialetti svizzero tedeschi',
         'Prezzo semplice per storia — niente crediti confusi',
         'Storia completa gratuita (non crediti limitati che richiedono registrazione)',
         'Storie ambientate in città specifiche con monumenti locali',
@@ -1308,9 +1308,9 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Art styles', de: 'Kunststile', fr: 'Styles artistiques', it: 'Stili artistici' },
-        us: { en: '8', de: '8', fr: '8', it: '8' },
+        us: { en: '14', de: '14', fr: '14', it: '14' },
         them: { en: '10', de: '10', fr: '10', it: '10' },
-        winner: 'them',
+        winner: 'us',
       },
       {
         label: { en: 'Edit text / regenerate pages', de: 'Text bearbeiten / Seiten neu generieren', fr: 'Modifier / régénérer', it: 'Modificare il testo / rigenerare le pagine' },
@@ -1689,10 +1689,10 @@ export const comparisons: ComparisonData[] = [
           it: 'Pieno controllo sulla tua storia: cambia il testo, rifai ogni immagine, tieni la versione che ti piace',
         },
         features: {
-          en: ['DE, EN, FR including Swiss German', 'Town-specific stories', '170+ themes, 14 art styles', 'Child\'s real face in illustrations', 'Free first story'],
-          de: ['DE, EN, FR inkl. Schweizerdeutsch', 'Ortsgeschichten', '170+ Themen, 14 Kunststile', 'Echtes Gesicht des Kindes', 'Erste Geschichte gratis'],
-          fr: ['DE, EN, FR dont suisse allemand', 'Histoires locales', '170+ thèmes, 14 styles', 'Vrai visage de l\'enfant', 'Première histoire gratuite'],
-          it: ['DE, EN, FR incluso lo svizzero tedesco', 'Storie ambientate in città specifiche', '170+ temi, 14 stili artistici', 'Vero volto del bambino nelle illustrazioni', 'Prima storia gratuita'],
+          en: ['DE, EN, FR, IT including Swiss German', 'Town-specific stories', '170+ themes, 14 art styles', 'Child\'s real face in illustrations', 'Free first story'],
+          de: ['DE, EN, FR, IT inkl. Schweizerdeutsch', 'Ortsgeschichten', '170+ Themen, 14 Kunststile', 'Echtes Gesicht des Kindes', 'Erste Geschichte gratis'],
+          fr: ['DE, EN, FR, IT dont suisse allemand', 'Histoires locales', '170+ thèmes, 14 styles', 'Vrai visage de l\'enfant', 'Première histoire gratuite'],
+          it: ['DE, EN, FR, IT incluso lo svizzero tedesco', 'Storie ambientate in città specifiche', '170+ temi, 14 stili artistici', 'Vero volto del bambino nelle illustrazioni', 'Prima storia gratuita'],
         },
       },
       {
@@ -2088,7 +2088,7 @@ export const comparisons: ComparisonData[] = [
         highlight: {
           en: 'Covers 26 languages and undercuts almost everyone on price. Also generates an audiobook read-aloud and printable coloring pages from the illustrations.',
           de: 'Deckt 26 Sprachen ab und ist preislich kaum zu unterbieten. Erzeugt zusätzlich eine Hörbuch-Vorlesefunktion und Ausmalbilder aus den Illustrationen.',
-          fr: 'Couvre 26 langues au prix le plus bas. Génère aussi un livre audio et des coloriages à partir des illustrations.',
+          fr: 'Couvre 26 langues à un prix parmi les plus bas. Génère aussi un livre audio et des coloriages à partir des illustrations.',
           it: 'Copre 26 lingue e batte quasi tutti sul prezzo. Genera anche un audiolibro con lettura ad alta voce e pagine da colorare stampabili dalle illustrazioni.',
         },
         features: {

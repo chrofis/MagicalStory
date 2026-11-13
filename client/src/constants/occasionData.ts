@@ -40,7 +40,7 @@ export const occasions: OccasionData[] = [
         'Choose a theme that matches your child\'s current passion (dinosaurs, unicorns, space...)',
         'Order the printed book version for a gift that feels truly special to unwrap',
         'Add siblings or friends as secondary characters for extra fun',
-        'Create the story two weeks before the party — you can read it together on the big day',
+        'Create the story a week before the party — you can read it together on the big day',
       ],
       de: [
         'Wähle ein Thema, das zur aktuellen Leidenschaft deines Kindes passt (Dinosaurier, Einhörner, Weltraum...)',
@@ -326,20 +326,20 @@ export const occasions: OccasionData[] = [
       it: 'Libro personalizzato per bambini per il primo giorno di scuola',
     },
     description: {
-      en: 'Make the first day of school unforgettable with a story where your child bravely starts their school adventure. The perfect school cone (Schultüte) filling!',
+      en: 'Make the first day of school unforgettable with a story where your child bravely starts their school adventure. The perfect addition to a gift for the first day of school!',
       de: 'Mache den ersten Schultag unvergesslich mit einer Geschichte, in der dein Kind mutig sein Schulabenteuer startet. Die perfekte Füllung für die Schultüte!',
       fr: 'Rendez le premier jour d\'école inoubliable avec une histoire où votre enfant commence courageusement son aventure scolaire.',
       it: 'Rendi indimenticabile il primo giorno di scuola con una storia in cui tuo figlio inizia coraggiosamente la sua avventura scolastica. Il regalo perfetto per il primo giorno!',
     },
     intro: {
-      en: 'Starting school is a huge milestone — exciting and a little scary at the same time. A personalized story about the first day of school helps your child feel prepared and confident. They\'ll see themselves as the brave hero who makes new friends and discovers exciting things. It\'s also a wonderful addition to the traditional Schultüte (school cone) in Swiss and German culture.',
+      en: 'Starting school is a huge milestone — exciting and a little scary at the same time. A personalized story about the first day of school helps your child feel prepared and confident. They\'ll see themselves as the brave hero who makes new friends and discovers exciting things. It\'s also a wonderful addition to the traditional Schultüte (school cone) in German-speaking countries.',
       de: 'Die Einschulung ist ein riesiger Meilenstein — aufregend und ein bisschen beängstigend zugleich. Eine personalisierte Geschichte über den ersten Schultag hilft deinem Kind, sich vorbereitet und selbstbewusst zu fühlen. Es sieht sich selbst als mutigen Helden, der neue Freunde findet und spannende Dinge entdeckt. Und es ist eine wunderbare Ergänzung zur traditionellen Schultüte.',
       fr: 'La rentrée scolaire est une étape majeure — excitante et un peu effrayante à la fois. Une histoire personnalisée sur le premier jour d\'école aide votre enfant à se sentir préparé et confiant. Il se verra comme le héros courageux qui se fait de nouveaux amis et découvre des choses passionnantes.',
-      it: 'Iniziare la scuola è una tappa enorme — emozionante e un po\' spaventosa allo stesso tempo. Una storia personalizzata sul primo giorno di scuola aiuta tuo figlio a sentirsi preparato e sicuro di sé. Si vedrà come il coraggioso eroe che fa nuove amicizie e scopre cose entusiasmanti. È anche un\'aggiunta meravigliosa al tradizionale Schultüte (il cono di dolci) della cultura svizzero-tedesca.',
+      it: 'Iniziare la scuola è una tappa enorme — emozionante e un po\' spaventosa allo stesso tempo. Una storia personalizzata sul primo giorno di scuola aiuta tuo figlio a sentirsi preparato e sicuro di sé. Si vedrà come il coraggioso eroe che fa nuove amicizie e scopre cose entusiasmanti. È anche un\'aggiunta meravigliosa alla Schultüte (il cono di dolci) tradizionale nei paesi di lingua tedesca.',
     },
     tips: {
       en: [
-        'Put the book in the Schultüte (school cone) alongside the treats',
+        'Put the book in the Schultüte (the school cone of German-speaking countries) alongside the treats, or in the school bag',
         'Read the story together the night before the big day',
         'Choose the "First Day of School" life skills theme for a story that addresses school nerves',
         'The "Alphabet" or "Numbers" educational themes also make great school-start gifts',
@@ -357,7 +357,7 @@ export const occasions: OccasionData[] = [
         'Les thèmes éducatifs « Alphabet » ou « Nombres » sont aussi de super cadeaux de rentrée',
       ],
       it: [
-        'Metti il libro nello Schultüte (cono di dolci) insieme alle golosità',
+        'Metti il libro nella Schultüte (il cono di dolci della tradizione tedesca) insieme alle golosità, oppure nello zaino',
         'Leggi la storia insieme la sera prima del grande giorno',
         'Scegli il tema "Primo giorno di scuola" per una storia che affronta l\'ansia scolastica',
         'Anche i temi educativi "Alfabeto" o "Numeri" sono ottimi regali per l\'inizio della scuola',
@@ -372,10 +372,10 @@ export const occasions: OccasionData[] = [
       { id: 'detective', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Order 1-2 weeks before the first day of school. The school cone (Schultüte) surprise is worth the planning!',
+      en: 'Order 1-2 weeks before the first day of school. The first-day surprise is worth the planning!',
       de: 'Bestelle 1-2 Wochen vor dem ersten Schultag. Die Schultüten-Überraschung ist die Planung wert!',
       fr: 'Commandez 1 à 2 semaines avant la rentrée. La surprise en vaut la planification !',
-      it: 'Ordina 1-2 settimane prima del primo giorno di scuola. La sorpresa dello Schultüte vale la pianificazione!',
+      it: 'Ordina 1-2 settimane prima del primo giorno di scuola. La sorpresa vale la pianificazione!',
     },
     faq: [
       {
@@ -706,33 +706,33 @@ export const occasions: OccasionData[] = [
       it: 'Rendi il periodo dell\'Avvento ancora più speciale con una storia personalizzata. Un\'aggiunta meravigliosa a qualsiasi calendario dell\'Avvento o un regalo di dicembre a sé stante.',
     },
     intro: {
-      en: 'The Advent season is all about anticipation, cozy evenings, and the magic of counting down to Christmas. A personalized story book is a perfect companion for this special time. Use it as the highlight gift in a DIY Advent calendar, or read one chapter each evening in the weeks before Christmas. It turns December into a month of storytelling magic for your family.',
-      de: 'Die Adventszeit dreht sich um Vorfreude, gemütliche Abende und den Zauber des Countdowns bis Weihnachten. Ein personalisiertes Geschichtenbuch ist der perfekte Begleiter für diese besondere Zeit. Nutze es als Highlight-Geschenk im DIY-Adventskalender oder lest jeden Abend ein Kapitel in den Wochen vor Weihnachten. So wird der Dezember zu einem Monat voller Geschichten-Magie für die ganze Familie.',
-      fr: 'La période de l\'Avent est synonyme d\'anticipation, de soirées cosy et de la magie du compte à rebours jusqu\'à Noël. Un livre personnalisé est le compagnon parfait pour cette période spéciale. Utilisez-le comme cadeau phare dans un calendrier de l\'Avent fait maison ou lisez un chapitre chaque soir.',
-      it: 'Il periodo dell\'Avvento è fatto di attesa, serate accoglienti e la magia del conto alla rovescia verso Natale. Un libro di storie personalizzato è il compagno perfetto per questo momento speciale. Usalo come regalo clou in un calendario dell\'Avvento fai-da-te, oppure leggi un capitolo ogni sera nelle settimane prima di Natale. Trasforma dicembre in un mese di magia narrativa per tutta la famiglia.',
+      en: 'The Advent season is all about anticipation, cozy evenings, and the magic of counting down to Christmas. A personalized story book is a perfect companion for this special time. Use it as the highlight gift in a DIY Advent calendar, or read a few pages each evening in the weeks before Christmas. It turns December into a month of storytelling magic for your family.',
+      de: 'Die Adventszeit dreht sich um Vorfreude, gemütliche Abende und den Zauber des Countdowns bis Weihnachten. Ein personalisiertes Geschichtenbuch ist der perfekte Begleiter für diese besondere Zeit. Nutze es als Highlight-Geschenk im DIY-Adventskalender oder lest in den Wochen vor Weihnachten jeden Abend ein paar Seiten. So wird der Dezember zu einem Monat voller Geschichten-Magie für die ganze Familie.',
+      fr: 'La période de l\'Avent est synonyme d\'anticipation, de soirées cosy et de la magie du compte à rebours jusqu\'à Noël. Un livre personnalisé est le compagnon parfait pour cette période spéciale. Utilisez-le comme cadeau phare dans un calendrier de l\'Avent fait maison ou lisez quelques pages chaque soir pendant les semaines avant Noël.',
+      it: 'Il periodo dell\'Avvento è fatto di attesa, serate accoglienti e la magia del conto alla rovescia verso Natale. Un libro di storie personalizzato è il compagno perfetto per questo momento speciale. Usalo come regalo clou in un calendario dell\'Avvento fai-da-te, oppure leggi qualche pagina ogni sera nelle settimane prima di Natale. Trasforma dicembre in un mese di magia narrativa per tutta la famiglia.',
     },
     tips: {
       en: [
         'Use the book as a special door in a DIY Advent calendar (e.g., door 24)',
-        'Read one page each evening during Advent for a nightly ritual',
+        'Read a few pages each evening during Advent for a nightly ritual',
         'Combine with a Christmas theme for maximum festive spirit',
         'Perfect as an early December gift to kick off the holiday season',
       ],
       de: [
         'Nutze das Buch als besonderes Türchen im DIY-Adventskalender (z.B. Türchen 24)',
-        'Lest jeden Abend im Advent eine Seite als abendliches Ritual',
+        'Lest im Advent jeden Abend ein paar Seiten als abendliches Ritual',
         'Kombiniere mit einem Weihnachtsthema für maximale Festtagsstimmung',
         'Perfekt als frühes Dezember-Geschenk zum Einstieg in die Weihnachtszeit',
       ],
       fr: [
         'Utilisez le livre comme case spéciale d\'un calendrier de l\'Avent fait maison (ex. case 24)',
-        'Lisez une page chaque soir pendant l\'Avent comme rituel du soir',
+        'Lisez quelques pages chaque soir pendant l\'Avent comme rituel du soir',
         'Combinez avec un thème de Noël pour un esprit festif maximum',
         'Parfait comme cadeau de début décembre pour lancer la saison des fêtes',
       ],
       it: [
         'Usa il libro come casella speciale in un calendario dell\'Avvento fai-da-te (es. casella 24)',
-        'Leggi una pagina ogni sera durante l\'Avvento come rituale serale',
+        'Leggi qualche pagina ogni sera durante l\'Avvento come rituale serale',
         'Abbinalo al tema Natale per il massimo spirito festivo',
         'Perfetto come regalo di inizio dicembre per dare il via alla stagione delle feste',
       ],
@@ -753,7 +753,7 @@ export const occasions: OccasionData[] = [
     faq: [
       {
         q: { en: 'How many pages does the story have?', de: 'Wie viele Seiten hat die Geschichte?', fr: 'Combien de pages compte l\'histoire ?', it: 'Quante pagine ha la storia?' },
-        a: { en: 'Stories typically have 10-16 illustrated pages — perfect for reading one page per Advent evening.', de: 'Geschichten haben typischerweise 10-16 illustrierte Seiten — perfekt, um jeden Adventabend eine Seite zu lesen.', fr: 'Les histoires comptent généralement 10 à 16 pages illustrées — parfait pour lire une page chaque soir de l\'Avent.', it: 'Le storie hanno tipicamente 10-16 pagine illustrate — perfette per leggerne una ogni sera d\'Avvento.' },
+        a: { en: 'Stories have 10-25 illustrated pages (15 by default) — perfect for reading a few pages each Advent evening.', de: 'Geschichten haben 10-25 illustrierte Seiten (standardmässig 15) — perfekt, um an jedem Adventsabend ein paar Seiten zu lesen.', fr: 'Les histoires comptent de 10 à 25 pages illustrées (15 par défaut) — parfait pour lire quelques pages chaque soir de l\'Avent.', it: 'Le storie hanno da 10 a 25 pagine illustrate (15 di default) — perfette per leggerne qualcuna ogni sera d\'Avvento.' },
       },
       {
         q: { en: 'Can I use this in an Advent calendar?', de: 'Kann ich das in einem Adventskalender verwenden?', fr: 'Puis-je l\'utiliser dans un calendrier de l\'Avent ?', it: 'Posso usarlo in un calendario dell\'Avvento?' },

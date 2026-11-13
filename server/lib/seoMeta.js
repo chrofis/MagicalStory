@@ -719,7 +719,7 @@ const ORGANIZATION_JSON_LD = {
   name: 'Magical Story',
   url: BASE_URL,
   logo: `${BASE_URL}/images/logo.png`,
-  description: 'AI-powered personalized children\'s storybooks made in Switzerland. 170+ themes, 8 art styles, 4 languages.',
+  description: 'AI-powered personalized children\'s storybooks made in Switzerland. 170+ themes, 14 art styles, 4 languages.',
   foundingLocation: { '@type': 'Place', name: 'Switzerland' },
   sameAs: [],
   contactPoint: {
@@ -733,19 +733,19 @@ const ORGANIZATION_JSON_LD = {
 const PRODUCT_JSON_LD_BY_LANG = {
   de: {
     name: 'Personalisiertes Kinderbuch',
-    description: 'KI-illustriertes Kinderbuch mit deinem Kind als Held. 170+ Themen, 8 Kunststile, 4 Sprachen.',
+    description: 'KI-illustriertes Kinderbuch mit deinem Kind als Held. 170+ Themen, 14 Kunststile, 4 Sprachen.',
   },
   en: {
     name: "Personalized children's book",
-    description: "AI-illustrated children's book with your child as the hero. 170+ themes, 8 art styles, 4 languages.",
+    description: "AI-illustrated children's book with your child as the hero. 170+ themes, 14 art styles, 4 languages.",
   },
   fr: {
     name: 'Livre pour enfants personnalisé',
-    description: "Livre illustré par IA avec votre enfant comme héros. Plus de 170 thèmes, 8 styles, 4 langues.",
+    description: "Livre illustré par IA avec votre enfant comme héros. Plus de 170 thèmes, 14 styles, 4 langues.",
   },
   it: {
     name: 'Libro per bambini personalizzato',
-    description: "Libro illustrato con l'IA e tuo figlio come protagonista. Oltre 170 temi, 8 stili, 4 lingue.",
+    description: "Libro illustrato con l'IA e tuo figlio come protagonista. Oltre 170 temi, 14 stili, 4 lingue.",
   },
 };
 
