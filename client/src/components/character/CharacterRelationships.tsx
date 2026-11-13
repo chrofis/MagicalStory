@@ -1,6 +1,6 @@
 import { ArrowLeftRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import { relationshipTypes, getNotSetRelationship, isNotSetRelationship, findInverseRelationship, type CustomRelationshipPair } from '@/constants/relationships';
+import { relationshipTypes, getNotSetRelationship, isNotSetRelationship, findInverseRelationship, relationshipAgeConflict, relationshipAgeConflictText, type CustomRelationshipPair } from '@/constants/relationships';
 import type { Character, RelationshipMap, RelationshipTextMap } from '@/types/character';
 import { getDisplayPhoto } from '@/utils/characterPhotos';
 import type { Language } from '@/types/story';
@@ -183,6 +183,10 @@ export function CharacterRelationships({
                       <span className="font-medium text-blue-600">{expectedInverse}</span>
                       <span>{character.name}</span>
                     </div>
+                  )}
+
+                  {relationshipAgeConflict(forwardRelationship, character.age, otherChar.age) && (
+                    <p className="text-xs text-amber-700 text-center">{relationshipAgeConflictText(lang)}</p>
                   )}
 
                   {/* Details input below dropdown - textarea for better mobile editing */}

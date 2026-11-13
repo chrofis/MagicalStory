@@ -43,9 +43,9 @@ const inputData = {
   characters,
   mainCharacters: [1, 2],
   relationships: {
-    '1-2': 'Brother of',
-    '2-1': 'Sister of',
-    '1-3': 'Grandson of',
+    '1-2': 'Older Sibling of',
+    '2-1': 'Younger Sibling of',
+    '1-3': 'Grandchild of',
     '9-4': 'Friend of',          // stale: neither id resolves
     '2-3': 'Not Known to',       // explicitly unknown
   },
@@ -60,12 +60,12 @@ const inputData = {
 describe('buildRelationshipLines', () => {
   it('renders names and the relationship type, with the note appended', () => {
     const lines = buildRelationshipLines(inputData);
-    expect(lines).toContain('Leo is Brother of Mia. They share a room.');
-    expect(lines).toContain('Leo is Grandson of Oma Ruth. He visits every summer.');
+    expect(lines).toContain('Leo is the older sibling of Mia. They share a room.');
+    expect(lines).toContain('Leo is a grandchild of Oma Ruth. He visits every summer.');
   });
 
   it('renders both directions of a reciprocal pair — they are different facts', () => {
-    expect(buildRelationshipLines(inputData)).toContain('Mia is Sister of Leo');
+    expect(buildRelationshipLines(inputData)).toContain('Mia is the younger sibling of Leo');
   });
 
   it('drops a pair whose ids do not resolve to a character', () => {
@@ -104,8 +104,8 @@ describe('the beats STORY_BRIEF', () => {
   const brief = buildStoryContextFields(inputData).STORY_BRIEF;
 
   it('names the characters and states the relationship type', () => {
-    expect(brief).toContain('Leo is Brother of Mia. They share a room.');
-    expect(brief).toContain('Leo is Grandson of Oma Ruth. He visits every summer.');
+    expect(brief).toContain('Leo is the older sibling of Mia. They share a room.');
+    expect(brief).toContain('Leo is a grandchild of Oma Ruth. He visits every summer.');
   });
 
   it('never emits a raw id-pair key', () => {
@@ -224,9 +224,9 @@ describe('the deliberate strangers choice IS a fact and reaches the writer', () 
     it(`puts the ${lang} strangers sentence in the brief alongside real relationships`, () => {
       const brief = buildStoryContextFields({
         title: 'T', language: lang, characters,
-        relationships: { '1-2': 'Brother of', '1-3': strangers, '2-3': getNotSetRelationship(lang) },
+        relationships: { '1-2': 'Older Sibling of', '1-3': strangers, '2-3': getNotSetRelationship(lang) },
       }).STORY_BRIEF;
-      expect(brief).toContain('Leo is Brother of Mia');
+      expect(brief).toContain('Leo is the older sibling of Mia');
       expect(brief).toContain('Leo and Oma Ruth do not know each other');
       expect(brief).not.toContain(getNotSetRelationship(lang));
     });
@@ -234,11 +234,11 @@ describe('the deliberate strangers choice IS a fact and reaches the writer', () 
 });
 
 describe('a real relationship is untouched by the split', () => {
-  it('renders a localized type verbatim — only the sentinels are special', () => {
+  it('a custom label reads as one full sentence; only the sentinels are special', () => {
     expect(buildRelationshipLines({
       characters,
       relationships: { '1-2': 'Bruder von', '2-1': 'Schwester von' },
-    })).toEqual(['Leo is Bruder von Mia', 'Mia is Schwester von Leo']);
+    })).toEqual(["Leo is Mia's Bruder von", "Mia is Leo's Schwester von"]);
   });
 
   it('a note on a filled pair still appends, as before', () => {
@@ -246,7 +246,7 @@ describe('a real relationship is untouched by the split', () => {
       characters,
       relationships: { '1-2': 'Freunde mit' },
       relationshipTexts: { '1-2': 'Sie teilen ein Zimmer.' },
-    })).toEqual(['Leo is Freunde mit Mia. Sie teilen ein Zimmer.']);
+    })).toEqual(['Leo and Mia are friends. Sie teilen ein Zimmer.']);
   });
 });
 
@@ -349,7 +349,7 @@ describe('the story-idea prompt makes the same two distinctions', () => {
   }
 
   it('renders a real relationship unchanged', async () => {
-    expect(await render('Freunde mit')).toBe('- Leo Freunde mit Mia');
+    expect(await render('Freunde mit')).toBe('- Leo and Mia are friends');
   });
 });
 

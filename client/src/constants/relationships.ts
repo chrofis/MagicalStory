@@ -97,3 +97,54 @@ export function findInverseRelationship(
   }
   return value;
 }
+
+// A label in the shared table -> its typed key. A custom or sentinel label is absent: never guessed.
+const KEY_BY_LABEL = new Map<string, string>();
+for (const t of SHARED_TYPES) for (const label of labelsOf(t.labels)) KEY_BY_LABEL.set(label, t.key);
+
+/** The typed key of a stored matrix label in any UI language, or null (custom label, sentinel, empty). */
+export function relationshipKeyOf(label: string | undefined | null): string | null {
+  if (!label) return null;
+  return KEY_BY_LABEL.get(label.trim()) || null;
+}
+
+// Which way the ages must run for a type to make sense: 'older' = the first character (the cell's
+// subject) must be the older one, 'younger' = the younger one.
+const AGE_DIRECTION_BY_KEY: Record<string, 'older' | 'younger'> = {
+  parentOf: 'older', grandparentOf: 'older', parentInLawOf: 'older',
+  childOf: 'younger', grandchildOf: 'younger', childInLawOf: 'younger',
+};
+
+/**
+ * True when the typed relationship cannot hold with the structured ages: the subject is the
+ * parent/grandparent/parent-in-law of someone OLDER, or the child/grandchild/child-in-law of
+ * someone YOUNGER. Decided from the age fields and the typed key only; a custom label never
+ * warns (code does not read label text). Equal ages do not warn; a missing age never warns.
+ */
+export function relationshipAgeConflict(
+  label: string | undefined | null,
+  subjectAge: string | number | undefined | null,
+  otherAge: string | number | undefined | null,
+): boolean {
+  const dir = AGE_DIRECTION_BY_KEY[relationshipKeyOf(label) || ''];
+  if (!dir) return false;
+  const parse = (v: string | number | undefined | null) => {
+    const s = String(v ?? '').trim();
+    return s === '' ? NaN : Number(s);
+  };
+  const a = parse(subjectAge);
+  const b = parse(otherAge);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+  return dir === 'older' ? a < b : a > b;
+}
+
+const AGE_CONFLICT_TEXT: Record<Language, string> = {
+  de: 'Bitte prüfen: Nach den Altersangaben passt diese Beziehung nicht (ein jüngerer Mensch kann nicht Elternteil oder Grosselternteil eines älteren sein). Sie können trotzdem weitermachen.',
+  fr: 'À vérifier : d’après les âges indiqués, cette relation ne convient pas (une personne plus jeune ne peut pas être le parent ou le grand-parent d’une plus âgée). Vous pouvez quand même continuer.',
+  it: 'Da controllare: secondo le età indicate questa relazione non torna (una persona più giovane non può essere genitore o nonno/a di una più anziana). Puoi comunque continuare.',
+  en: 'Please check: going by the ages entered, this relationship does not fit (a younger person cannot be the parent or grandparent of an older one). You can still continue.',
+};
+
+export function relationshipAgeConflictText(lang: Language): string {
+  return AGE_CONFLICT_TEXT[lang] || AGE_CONFLICT_TEXT.en;
+}

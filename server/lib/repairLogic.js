@@ -2037,7 +2037,8 @@ function describeVbFigure(entry, pool) {
     return `the ${kind}${coloring ? ` with ${coloring}` : ''}${features.length ? ` (${features.join(', ')})` : ''}`;
   }
   // Secondary character: age + label, and the garment that sets them apart.
-  const age = /^\d{1,3}$/.test(String(entry.age ?? '').trim()) ? `${String(entry.age).trim()}-year-old` : null;
+  const ageText = String(entry.age ?? '').trim();
+  const age = /^\d{1,3}$/.test(ageText) ? (Number(ageText) === 0 ? 'baby' : `${ageText}-year-old`) : null;
   const noun = [age, label || 'figure'].filter(Boolean).join(' ');
   const garment = clauseRef(entry.clothing, { minWords: 1 });
   return garment ? `the ${noun} in ${garment}` : `the ${noun}`;

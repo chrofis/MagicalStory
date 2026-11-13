@@ -43,7 +43,7 @@ const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForP
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction, SEASON_NO_SKY_RULE } = require('./season');
 const { gazeTokenRow, GAZE_TOKEN_LIST } = require('./gazeTargets');
 const { SCENE_LIGHT_FIELD_RULE, SCENE_WEATHER_FIELD_RULE, buildLightLine, declaredLight, isSkylessLight, TIME_OF_DAY_ENUM, WEATHER_ENUM } = require('./sceneLight');
-const { isNotSetRelationship, isStrangersRelationship } = require('./relationships');
+const { isNotSetRelationship, isStrangersRelationship, relationshipSentence } = require('./relationships');
 const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
 
 /**
@@ -961,6 +961,19 @@ function buildLandmarkFidelityBlock(landmark, opts = {}) {
 **CONDITIONS (from the scene):** Camera angle, distance and framing, season, time of day, weather and light all come from the scene description — repaint the structure into them. The landmark still reads at page size: never a tiny speck against a wide cityscape.
 
 **EXCLUDE:** ${eraClause}Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure.${eraClause ? ' Keep the landmark itself unchanged; only remove the modern surroundings.' : ''}`;
+}
+
+/**
+ * A character's stored age as it reads in a prompt. Age 0 is a real age (the
+ * form's "under 1 year", decided 2026-11-13); a bare "0" reads as a missing
+ * value, so it is written as a baby. ONE wording, every prompt that prints the
+ * stored age goes through it. Returns '' when no age is stored.
+ */
+function ageForPrompt(age) {
+  if (age === undefined || age === null || String(age).trim() === '') return '';
+  const n = parseInt(age, 10);
+  if (Number.isFinite(n) && n === 0) return 'under 1 year old (a baby)';
+  return String(age);
 }
 
 /**
@@ -6528,7 +6541,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     };
     return [
       `**${char.name}**${mainIds.includes(char.id) ? ' (main character)' : ''}:`,
-      line('Age', char.age),
+      line('Age', ageForPrompt(char.age)),
       line('Gender', char.gender),
       line('Personality', char.personality),
       line('Strengths', t.strengths),
@@ -7314,7 +7327,7 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false, challengeLi
   // EVERY main character is named (owner, 2026-10-30: two mains are equal stars); the band itself still
   // keys off the oldest (resolveAgeBand, focus).
   const starList = mains.length ? mains : (focus ? [focus] : []);
-  const mainName = starList.length ? starList.map(c => `${c.name}${c.age ? ` (${c.age})` : ''}`).join(' and ') : 'the main character';
+  const mainName = starList.length ? starList.map(c => `${c.name}${ageForPrompt(c.age) ? ` (${ageForPrompt(c.age)})` : ''}`).join(' and ') : 'the main character';
   const mainLabel = starList.length >= 2 ? 'Main characters' : 'Main character';
   const equalStars = starList.length >= 2 ? ' Both are equal stars.' : '';
   const othersNames = others.map(c => c.name).join(', ');
@@ -7428,7 +7441,7 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false, challengeLi
   const level = String(inputData.languageLevel || 'standard').toLowerCase();
   const simplest = level.includes('1st') || level.includes('early') || pages <= 10;
   const mainLine = mains.length >= 2
-    ? `Main characters: ${mains.map(c => `${c.name}${c.age ? ` (${c.age})` : ''}`).join(' and ')}. They share the challenges, the ending belongs to them, and ONE of them carries the visible change.`
+    ? `Main characters: ${mains.map(c => `${c.name}${ageForPrompt(c.age) ? ` (${ageForPrompt(c.age)})` : ''}`).join(' and ')}. They share the challenges, the ending belongs to them, and ONE of them carries the visible change.`
     : `Main character: ${mainName} — carries the challenges and the one visible change; the ending belongs to them.`;
   const levelDifficulty = simplest
     // NO PERIL CLAUSE HERE. This line said "Nothing frightening beyond a moment"
@@ -7620,7 +7633,7 @@ function buildRelationshipLines(inputData) {
       lines.push(text ? `${base}. ${text}` : base);
       continue;
     }
-    const base = `${pair[0].name} is ${type} ${pair[1].name}`;
+    const base = relationshipSentence(pair[0].name, pair[1].name, type);
     lines.push(text ? `${base}. ${text}` : base);
   }
 
@@ -7781,7 +7794,7 @@ function storyCharacterDetails(inputData) {
     };
     return [
       `**${char.name}**${mainIds.includes(char.id) ? ' (main character)' : ''}:`,
-      line('Age', char.age),
+      line('Age', ageForPrompt(char.age)),
       line('Gender', char.gender),
       line('Personality', char.personality),
       line('Strengths', t.strengths),
@@ -13114,7 +13127,7 @@ function wardrobeCharacterDetails(inputData) {
     const line = (label, v) => (v ? `- ${label}: ${v}` : null);
     return [
       `**${char.name}**${mainIds.includes(char.id) ? ' (main character)' : ''}:`,
-      line('Age', char.age),
+      line('Age', ageForPrompt(char.age)),
       line('Gender', char.gender),
       line('Special details', t.specialDetails),
     ].filter(Boolean).join('\n');
@@ -13649,7 +13662,7 @@ function trialFillValues(inputData, sceneCount = null) {
 
   const characterDesc = (inputData.characters || []).map(char => {
     const parts = [char.name];
-    if (char.age) parts.push(`age ${char.age}`);
+    if (ageForPrompt(char.age)) parts.push(`age ${ageForPrompt(char.age)}`);
     if (char.gender) parts.push(char.gender);
     // Physical traits: Gemini extracts hair/eyes/skin from the uploaded photo
     // (trial.js stamps them on character.physical). Without surfacing them here
@@ -14559,6 +14572,7 @@ module.exports = {
   landmarkPhotoListLines,
   landmarkPhotoText,
   getAgeCategory,
+  ageForPrompt,
   getAgeCategoryLabel,
   AGE_CATEGORY_ORDER,
   getAgeCategoryIndex,

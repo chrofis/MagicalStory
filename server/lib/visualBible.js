@@ -1886,7 +1886,7 @@ function initializeVisualBibleMainCharacters(visualBible, characters) {
     return {
       id: char.id,
       name: char.name,
-      age: char.age || 'Unknown',
+      age: (char.age ?? '') !== '' ? char.age : 'Unknown',
       gender: char.gender || 'Unknown',
       physical,
       referenceOutfit: char.referenceOutfit || null,

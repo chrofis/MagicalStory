@@ -1,6 +1,6 @@
 import { Heart } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import { relationshipTypes, getNotSetRelationship, isNotSetRelationship } from '@/constants/relationships';
+import { relationshipTypes, getNotSetRelationship, isNotSetRelationship, relationshipAgeConflict, relationshipAgeConflictText } from '@/constants/relationships';
 import type { Character, RelationshipMap, RelationshipTextMap } from '@/types/character';
 import { getDisplayPhoto } from '@/utils/characterPhotos';
 import type { Language } from '@/types/story';
@@ -124,6 +124,10 @@ export function RelationshipEditor({
                         </option>
                       ))}
                     </select>
+
+                    {relationshipAgeConflict(currentRelationship, char1.age, char2.age) && (
+                      <p className="text-xs text-amber-700 text-center">{relationshipAgeConflictText(lang)}</p>
+                    )}
 
                     {/* Details input below dropdown */}
                     {!isNotSet && (

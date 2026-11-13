@@ -16,6 +16,7 @@ import { getDisplayPhoto, getFaceThumb, getStandardAvatar, getAvatarInputPhoto }
 import type { CustomRelationshipPair } from '@/constants/relationships';
 import { uiLabel } from '@/utils/uiLabels';
 import { characterNameProblem, characterNameHint } from '@/utils/characterName';
+import { heightProblem, heightHint, ageLabel } from '@/utils/characterVitals';
 
 // Age category options for the dropdown (no age numbers - we already have real age field)
 const AGE_CATEGORY_OPTIONS: { value: AgeCategory; label: string; labelDe: string; labelFr: string; labelIt: string }[] = [
@@ -753,7 +754,7 @@ export function CharacterForm({
   };
 
   const nameProblem = characterNameProblem(character.name || '');
-  const canSaveName = character.name && character.name.trim().length >= 2 && !nameProblem && character.gender && character.age;
+  const canSaveName = character.name && character.name.trim().length >= 2 && !nameProblem && character.gender && String(character.age ?? '') !== '' && !heightProblem(character.physical?.height);
 
   const canSaveCharacter =
     character.name &&
@@ -872,8 +873,8 @@ export function CharacterForm({
                   type="number"
                   value={character.age}
                   onChange={(e) => updateField('age', e.target.value)}
-                  className={`w-full px-2 py-1.5 border rounded text-base focus:border-indigo-500 focus:outline-none ${!character.age ? 'border-red-300' : 'border-gray-300'}`}
-                  min="1"
+                  className={`w-full px-2 py-1.5 border rounded text-base focus:border-indigo-500 focus:outline-none ${String(character.age ?? '') === '' ? 'border-red-300' : 'border-gray-300'}`}
+                  min="0"
                   max="120"
                 />
               </div>
@@ -882,14 +883,16 @@ export function CharacterForm({
                   {language === 'de' ? 'Grösse (cm)' : language === 'fr' ? 'Taille (cm)' : language === 'it' ? 'Altezza (cm)' : 'Height (cm)'}
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                inputMode="numeric"
                   value={character.physical?.height || ''}
                   onChange={(e) => updatePhysical('height', e.target.value)}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-base focus:border-indigo-500 focus:outline-none"
+                  className={`w-full px-2 py-1.5 border rounded text-base focus:border-indigo-500 focus:outline-none ${heightProblem(character.physical?.height) ? 'border-red-300' : 'border-gray-300'}`}
                   placeholder="170"
-                  min="50"
-                  max="250"
                 />
+                {heightProblem(character.physical?.height) && (
+                  <p className="text-[10px] text-red-500 mt-0.5">{heightHint(language)}</p>
+                )}
               </div>
             </div>
           </div>
@@ -951,7 +954,7 @@ export function CharacterForm({
             <p className="text-sm text-gray-500">
               {character.gender === 'male' ? (language === 'de' ? 'Männlich' : language === 'fr' ? 'Masculin' : language === 'it' ? 'Maschio' : 'Male') :
                character.gender === 'female' ? (language === 'de' ? 'Weiblich' : language === 'fr' ? 'Féminin' : language === 'it' ? 'Femmina' : 'Female') :
-               (language === 'de' ? 'Andere' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other')}, {character.age} {language === 'de' ? 'Jahre' : language === 'fr' ? 'ans' : language === 'it' ? 'anni' : 'years'}
+               (language === 'de' ? 'Andere' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other')}, {ageLabel(character.age, language)}
             </p>
           </div>
         </div>
@@ -1040,7 +1043,7 @@ export function CharacterForm({
             <p className="text-sm text-gray-500">
               {character.gender === 'male' ? (language === 'de' ? 'Männlich' : language === 'fr' ? 'Masculin' : language === 'it' ? 'Maschio' : 'Male') :
                character.gender === 'female' ? (language === 'de' ? 'Weiblich' : language === 'fr' ? 'Féminin' : language === 'it' ? 'Femmina' : 'Female') :
-               (language === 'de' ? 'Andere' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other')}, {character.age} {language === 'de' ? 'Jahre' : language === 'fr' ? 'ans' : language === 'it' ? 'anni' : 'years'}
+               (language === 'de' ? 'Andere' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other')}, {ageLabel(character.age, language)}
             </p>
           </div>
         </div>
@@ -1109,7 +1112,7 @@ export function CharacterForm({
             <p className="text-sm text-gray-500">
               {character.gender === 'male' ? (language === 'de' ? 'Männlich' : language === 'fr' ? 'Masculin' : language === 'it' ? 'Maschio' : 'Male') :
                character.gender === 'female' ? (language === 'de' ? 'Weiblich' : language === 'fr' ? 'Féminin' : language === 'it' ? 'Femmina' : 'Female') :
-               (language === 'de' ? 'Andere' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other')}, {character.age} {language === 'de' ? 'Jahre' : language === 'fr' ? 'ans' : language === 'it' ? 'anni' : 'years'}
+               (language === 'de' ? 'Andere' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other')}, {ageLabel(character.age, language)}
             </p>
           </div>
         </div>
@@ -1444,7 +1447,7 @@ export function CharacterForm({
                 value={character.age}
                 onChange={(e) => updateField('age', e.target.value)}
                 className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs focus:border-indigo-500 focus:outline-none"
-                min="1"
+                min="0"
                 max="120"
               />
             </div>
@@ -1453,14 +1456,16 @@ export function CharacterForm({
                 {language === 'de' ? 'Grösse' : language === 'fr' ? 'Taille' : language === 'it' ? 'Altezza' : 'Height'}
               </label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={character.physical?.height || ''}
                 onChange={(e) => updatePhysical('height', e.target.value)}
-                className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs focus:border-indigo-500 focus:outline-none"
+                className={`w-full px-1.5 py-1 border rounded text-xs focus:border-indigo-500 focus:outline-none ${heightProblem(character.physical?.height) ? 'border-red-300' : 'border-gray-300'}`}
                 placeholder="cm"
-                min="50"
-                max="250"
               />
+              {heightProblem(character.physical?.height) && (
+                <p className="text-[10px] text-red-500 mt-0.5">{heightHint(language)}</p>
+              )}
             </div>
           </div>
 

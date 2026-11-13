@@ -1,4 +1,5 @@
 import api from './api';
+import { agedNoun } from '@/utils/characterVitals';
 import type { Character, CharacterAvatars, GeneratedOutfit, AgeCategory, StructuredClothing, PhysicalTraitsSource } from '@/types/character';
 import { createLogger } from './logger';
 import { getAvatarInputPhoto } from '@/utils/characterPhotos';
@@ -535,7 +536,8 @@ export const characterService = {
       }
 
       // Build physical description from character data
-      const age = parseInt(character.age) || 10;
+      const parsedAge = parseInt(character.age);
+      const age = Number.isNaN(parsedAge) ? 10 : parsedAge;
       const gender = character.gender || 'child';
       let genderLabel;
       if (gender === 'male') {
@@ -548,7 +550,7 @@ export const characterService = {
 
       // Use name if available, otherwise generic description
       const nameOrGeneric = character.name?.trim() || `This ${genderLabel}`;
-      let physicalDescription = `${nameOrGeneric} is a ${age}-year-old ${genderLabel}`;
+      let physicalDescription = `${nameOrGeneric} is ${agedNoun(age, genderLabel)}`;
       if (character.physical) {
         if (character.physical.hair) physicalDescription += `, ${character.physical.hair}`;
         if (character.physical.face) physicalDescription += `, ${character.physical.face}`;
@@ -706,7 +708,8 @@ export const characterService = {
       }
 
       // Build physical description from character data
-      const age = parseInt(character.age) || 10;
+      const parsedAge = parseInt(character.age);
+      const age = Number.isNaN(parsedAge) ? 10 : parsedAge;
       const gender = character.gender || 'child';
       let genderLabel;
       if (gender === 'male') {
@@ -719,7 +722,7 @@ export const characterService = {
 
       // Use name if available, otherwise generic description
       const nameOrGeneric = character.name?.trim() || `This ${genderLabel}`;
-      let physicalDescription = `${nameOrGeneric} is a ${age}-year-old ${genderLabel}`;
+      let physicalDescription = `${nameOrGeneric} is ${agedNoun(age, genderLabel)}`;
       if (character.physical) {
         if (character.physical.hair) physicalDescription += `, ${character.physical.hair}`;
         if (character.physical.face) physicalDescription += `, ${character.physical.face}`;

@@ -83,6 +83,21 @@ function inverseRelationshipKey(key) {
   return t ? t.inverse : null;
 }
 
+const SENTENCE_BY_KEY = new Map(RELATIONSHIP_TYPES.map(t => [t.key, t.sentence]));
+
+/**
+ * ONE full sentence for matrix cell "A-B" holding `label` (A is what the label says, to B), for
+ * every prompt that states a relationship (owner 2026-11-13: "A is Grossmutter B" read either way).
+ * A built-in type is stated from its typed key ("A is a parent of B"); a custom label, which code
+ * must not read, is stated as "A is B's <label>". Sentinels are not relationships: the caller
+ * filters them first.
+ */
+function relationshipSentence(nameA, nameB, label) {
+  const template = SENTENCE_BY_KEY.get(relationshipKeyOf(label));
+  if (template) return template.replace('{A}', nameA).replace('{B}', nameB);
+  return `${nameA} is ${nameB}'s ${String(label).trim()}`;
+}
+
 // How close a family tie is for choosing who stands on a cover when the cast is
 // larger than the cover cap (owner 2026-11-01 "Rank by role", docs/decisions.md).
 // Direction is ignored on purpose: customers fill the matrix backwards ("Ludovica
@@ -113,6 +128,7 @@ function familyTierBetween(relationships, idA, idB) {
 }
 
 module.exports = {
+  relationshipSentence,
   familyTierBetween,
   NO_FAMILY_TIER,
   relationshipKeyOf,

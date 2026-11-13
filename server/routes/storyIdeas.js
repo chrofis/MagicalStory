@@ -195,6 +195,7 @@ async function buildIdeasPromptContext({
   const sceneCount = pages;
 
   // Build character descriptions
+  const { ageForPrompt } = require('../lib/promptBuilders');
   const characterDescriptions = characters.map(c => {
     const role = c.isMain ? 'main character' : 'side character';
     const traits = [];
@@ -204,7 +205,8 @@ async function buildIdeasPromptContext({
     const specialDetails = c.traits?.specialDetails || c.specialDetails || c.special_details;
     if (specialDetails) traits.push(`special: ${specialDetails}`);
     const traitsStr = traits.length ? ` (${traits.join('; ')})` : '';
-    return `- ${c.name}: ${c.age} years old, ${c.gender}, ${role}${traitsStr}`;
+    const ageText = ageForPrompt(c.age);
+    return `- ${c.name}: ${/^\d+(\.\d+)?$/.test(ageText) ? `${ageText} years old` : ageText}, ${c.gender}, ${role}${traitsStr}`;
   }).join('\n');
 
   // Build relationship descriptions.
@@ -214,12 +216,12 @@ async function buildIdeasPromptContext({
   // strangers choice is a fact about the cast and is stated as a sentence, never
   // as the ungrammatical "X <sentinel> Y". Before the split this site emitted
   // the sentinel verbatim in EVERY language, English included.
-  const { isNotSetRelationship, isStrangersRelationship } = require('../lib/relationships');
+  const { isNotSetRelationship, isStrangersRelationship, relationshipSentence } = require('../lib/relationships');
   const relationshipDescriptions = (relationships || [])
     .filter(r => !isNotSetRelationship(r.relationship))
     .map(r => isStrangersRelationship(r.relationship)
       ? `- ${r.character1} and ${r.character2} do not know each other`
-      : `- ${r.character1} ${r.relationship} ${r.character2}`)
+      : `- ${relationshipSentence(r.character1, r.character2, r.relationship)}`)
     .join('\n');
 
   // Determine reading level description

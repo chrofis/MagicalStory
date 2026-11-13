@@ -10,6 +10,7 @@ const router = express.Router();
 const { dbQuery, withTransaction, isDatabaseMode, logActivity, uploadCharacterPhotosToR2, offloadCharacterImages } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { normalizeCharacterEntry } = require('../lib/characterName');
+const { findVitalsProblem } = require('../lib/characterVitals');
 const { normalizePhotos, stripLegacyPhotoFields, normalizeAvatarsForResponse, normalizeCharacterAvatars } = require('../lib/characterPhotos');
 const { expandUserHairOverrideForDisplay } = require('../lib/characterPhysical');
 const { findExistingCharacter, mergePhysicalAndTraitsOnSave } = require('../lib/characterMerge');
@@ -449,6 +450,16 @@ router.post('/', authenticateToken, async (req, res) => {
     const emptyNamed = (characters || []).find(c => c && typeof c.name === 'string' && c.name.trim() && !normalizeCharacterEntry(c).name);
     if (emptyNamed) {
       return res.status(400).json({ error: 'A character needs a name', code: 'CHARACTER_NAME_REQUIRED' });
+    }
+    // Age 0 is an age; a height is whole cm 40-250 (a typed "1.10" was read as 1 cm). Refused, never converted;
+    // a value already stored for that character passes. docs/decisions.md 2026-11-13.
+    if (isDatabaseMode()) {
+      const stored = (await dbQuery('SELECT data FROM characters WHERE id = $1', [`characters_${req.user.id}`]))[0]?.data?.characters || [];
+      const bad = findVitalsProblem(characters, stored);
+      if (bad) {
+        const what = bad.code === 'CHARACTER_HEIGHT_INVALID' ? 'height must be whole centimetres between 40 and 250' : 'age must be a number between 0 and 120';
+        return res.status(400).json({ error: `${bad.name || 'Character'}: ${what}`, code: bad.code, characterId: bad.characterId });
+      }
     }
     const charactersWithoutAvatars = await Promise.all((characters || []).map(async char => {
       const { avatars, ...charWithoutAvatars } = normalizeCharacterEntry(char);
