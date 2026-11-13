@@ -26,9 +26,11 @@ function ageProblem(raw) {
   return Number.isFinite(n) && n >= 0 && n <= AGE_MAX ? null : 'CHARACTER_AGE_INVALID';
 }
 
-// The values the form offers. A draft may have none yet. Stored production rows hold only these (counted
-// 2026-11-13: male 136, female 128, empty 8), so no legacy value needs to pass.
-const GENDERS = ['male', 'female', 'other'];
+// The values the form offers: the customer picks male or female (owner, 2026-11-13: "Customer must choose
+// gender"; there is no third choice). A draft saved before the pick may have none yet; the form will not save
+// a finished character without one. Stored production rows hold only male 136, female 128, empty 8 (counted
+// 2026-11-13), so no legacy value needs to pass.
+const GENDERS = ['male', 'female'];
 
 function genderProblem(raw) {
   if (blank(raw)) return null;

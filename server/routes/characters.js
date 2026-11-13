@@ -458,7 +458,7 @@ router.post('/', authenticateToken, async (req, res) => {
       const bad = findVitalsProblem(characters, stored);
       if (bad) {
         const what = bad.code === 'CHARACTER_HEIGHT_INVALID' ? 'height must be whole centimetres between 40 and 250'
-          : bad.code === 'CHARACTER_GENDER_INVALID' ? 'gender must be male, female or other'
+          : bad.code === 'CHARACTER_GENDER_INVALID' ? 'gender must be male or female'
           : 'age must be a number between 0 and 120';
         return res.status(400).json({ error: `${bad.name || 'Character'}: ${what}`, code: bad.code, characterId: bad.characterId });
       }

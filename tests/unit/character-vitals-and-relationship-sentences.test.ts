@@ -113,13 +113,23 @@ describe('warning when a younger character is parent/grandparent of an older one
 });
 
 describe('gender is checked on save (decisions 2026-11-13)', () => {
-  it('accepts the form values and empty, refuses anything else', () => {
-    for (const ok of ['male', 'female', 'other', '', undefined, null]) expect(genderProblem(ok as any), String(ok)).toBeNull();
-    for (const bad of ['boy', 'girl', 'männlich', 'Male', 5, {}]) expect(genderProblem(bad as any), String(bad)).toBe('CHARACTER_GENDER_INVALID');
+  it('accepts male, female and an unpicked draft, refuses anything else (no third choice)', () => {
+    for (const ok of ['male', 'female', '', undefined, null]) expect(genderProblem(ok as any), String(ok)).toBeNull();
+    for (const bad of ['other', 'boy', 'girl', 'männlich', 'Male', 5, {}]) expect(genderProblem(bad as any), String(bad)).toBe('CHARACTER_GENDER_INVALID');
   });
   it('findVitalsProblem reports it with the character, even if the same value is stored', () => {
     const r = findVitalsProblem([{ id: 1, name: 'Ana', gender: 'boy' }], [{ id: 1, gender: 'boy' }]);
     expect(r).toEqual({ code: 'CHARACTER_GENDER_INVALID', characterId: 1, name: 'Ana' });
     expect(findVitalsProblem([{ id: 1, name: 'Ana', gender: 'female', age: '0' }], [])).toBeNull();
+  });
+});
+
+describe('the forms offer male and female only (owner 2026-11-13)', () => {
+  const fs = require_('fs'); const path = require_('path');
+  const read = (f: string) => fs.readFileSync(path.join(__dirname, '../../client/src', f), 'utf8');
+  it('the character form has no third gender option, and the trial picks boy or girl', () => {
+    expect(read('components/character/CharacterForm.tsx')).not.toMatch(/<option value="other"/);
+    expect(read('types/character.ts')).toMatch(/gender: 'male' \| 'female';/);
+    expect(read('pages/trial/TrialCharacterStep.tsx')).not.toMatch(/value: 'other'/);
   });
 });

@@ -756,7 +756,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     gender: 'Genere',
     male: 'Maschio',
     female: 'Femmina',
-    other: 'Altro',
+    other: 'Sconosciuto',
     age: 'Età',
     strengths: 'Punti di forza',
     weaknesses: 'Punti deboli',

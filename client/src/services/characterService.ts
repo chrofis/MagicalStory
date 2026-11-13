@@ -175,7 +175,7 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
   return {
     id: api.id,
     name: api.name,
-    gender: api.gender as 'male' | 'female' | 'other',
+    gender: api.gender as 'male' | 'female',
     age: api.age,
     ageCategory,
 

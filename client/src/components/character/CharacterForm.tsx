@@ -856,13 +856,12 @@ export function CharacterForm({
                 </label>
                 <select
                   value={character.gender || ''}
-                  onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
+                  onChange={(e) => updateField('gender', e.target.value as 'male' | 'female')}
                   className={`w-full px-2 py-1.5 border rounded text-base focus:border-indigo-500 focus:outline-none ${!character.gender ? 'border-red-300' : 'border-gray-300'}`}
                 >
                   <option value="">{language === 'de' ? '— Bitte wählen —' : language === 'fr' ? '— Veuillez choisir —' : language === 'it' ? '— Seleziona —' : '— Please select —'}</option>
                   <option value="male">{t.male}</option>
                   <option value="female">{t.female}</option>
-                  <option value="other">{t.other}</option>
                 </select>
               </div>
               <div>
@@ -1434,13 +1433,12 @@ export function CharacterForm({
               <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t.gender}</label>
               <select
                 value={character.gender || ''}
-                onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
-                className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs bg-white focus:border-indigo-500 focus:outline-none"
+                onChange={(e) => updateField('gender', e.target.value as 'male' | 'female')}
+                className={`w-full px-1.5 py-1 border rounded text-xs bg-white focus:border-indigo-500 focus:outline-none ${!character.gender ? 'border-red-300' : 'border-gray-300'}`}
               >
-                <option value="">{language === 'de' ? '— Unbekannt —' : language === 'fr' ? '— Inconnu —' : language === 'it' ? '— Sconosciuto —' : '— Unknown —'}</option>
+                <option value="">{language === 'de' ? '— Bitte wählen —' : language === 'fr' ? '— Veuillez choisir —' : language === 'it' ? '— Seleziona —' : '— Please select —'}</option>
                 <option value="male">{t.male}</option>
                 <option value="female">{t.female}</option>
-                <option value="other">{t.other}</option>
               </select>
             </div>
             <div>

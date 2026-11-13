@@ -222,7 +222,7 @@ export interface Character {
   // Identity
   id: number;
   name: string;
-  gender: 'male' | 'female' | 'other';
+  gender: 'male' | 'female';
   age: string;
   ageCategory?: AgeCategory; // Auto-filled from age, used for image generation
 

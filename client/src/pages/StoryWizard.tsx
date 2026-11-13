@@ -2265,7 +2265,7 @@ export default function StoryWizard() {
     setCurrentCharacter({
       id: Date.now(),
       name: '',
-      gender: undefined as unknown as 'male' | 'female' | 'other',  // Blank - let photo analysis fill
+      gender: undefined as unknown as 'male' | 'female',  // Blank: the customer picks male or female in the form
       age: '',  // Blank - let photo analysis fill
       traits: {
         strengths: [],
