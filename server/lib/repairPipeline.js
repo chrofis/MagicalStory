@@ -3270,7 +3270,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       }
       if (auditPages.length === 0) return null;
       return auditStoryBook(
-        { id: consolidatorStoryId, visualBible: storyData?.visualBible || visualBible || null, characters: storyData?.characters || [], sceneImages: auditPages },
+        { id: consolidatorStoryId, visualBible: storyData?.visualBible || visualBible || null, characters: storyData?.characters || [], artStyle, clothingRequirements: storyData?.clothingRequirements || null, sceneImages: auditPages },
         { usageTracker, modelId: MODEL_DEFAULTS.bookReviewModel, bookReview: { title: bookTitle } });
     };
     // maxRegenAttempts 0 = an evaluate-only run: the book is reviewed and nothing is repaired.

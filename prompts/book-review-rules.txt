@@ -7,7 +7,7 @@ This book is reviewed once as a whole and every picture fault is also routed to 
 Every NEW line also ends with the decision about the picture's background, written after the sentence as {BACKGROUND_TAG}. `background: keep` — the place, its light and its colours are right and fit the book; only what is drawn in front of them is wrong, so the picture is drawn again on the same background. `background: redo — <what to change>` — the background itself is wrong or does not belong to the book (the wrong place, a palette or lighting unlike the other pages, the wrong time of day, a missing or misplaced landmark); say in a few words what the new background must show or change. A NEW line with neither is not used. TOUCHUP and CHAR lines carry no background decision.
 The sentence after the dash is the instruction for that fix, written as an order to the painter ("Remove the second hat", "Draw the hero looking at the door"), with the cause left out. A cover is routed the same way. A TEXT line carries no route. A `height_order` fault is always routed NEW: no local edit re-sizes a figure.
 
-No reference pictures of the characters are given to you. Never judge whether a figure looks like a particular person or like an earlier picture of them; judge what each picture shows against its page's words and brief.
+{CAST_REFERENCE_RULES}
 
 The book's title is "{BOOK_TITLE}". The front cover (page -1) has this title painted into its picture. A title on the front cover that is misspelled, garbled or missing is a fault: write it as FAULT[IMG][CRITICAL][required_text][NEW]: p-1 — and say what is wrong with the lettering, then the background decision.
 

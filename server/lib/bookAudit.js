@@ -406,6 +406,8 @@ async function judgeParts(parts, modelId, thinkingLevel) {
 async function judgeChunk(template, chunk, modelId, thinkingLevel = null, review = null, storyFill = null) {
   const { instructions, pageHeading } = buildChunkInstructions(template, chunk, review, storyFill);
   const parts = [{ text: instructions }];
+  // The cast's reference pictures come after the instructions and before the book, once per call.
+  if (review?.castParts?.length) parts.push(...review.castParts);
   appendChunkPages(parts, chunk, pageHeading);
   assertPromptFilled(parts, 'bookAudit.judgeChunk');
   return judgeParts(parts, modelId, thinkingLevel);
@@ -503,7 +505,37 @@ function reviewRulesText(review, templates, fillTemplate) {
   if (review.hasRepairedPages && !rereview) throw new Error('bookReviewRereview template not loaded');
   // The cover outfit sentence is the one the brief check `cover_outfit_not_stated` sends back: one text for both readers.
   const { COVER_OUTFIT_RULE } = require('./clothingCategories');
-  return fillTemplate(rules, { BOOK_TITLE: title, RE_REVIEW_RULES: rereview || '', COVER_OUTFIT_RULE, BACKGROUND_TAG: BACKGROUND_TAG_FORMS });
+  const castRules = review.castParts?.length ? templates.bookReviewCastRefs : templates.bookReviewNoCastRefs;
+  if (!castRules) throw new Error('bookReviewCastRefs / bookReviewNoCastRefs template not loaded');
+  return fillTemplate(rules, { BOOK_TITLE: title, CAST_REFERENCE_RULES: castRules, RE_REVIEW_RULES: rereview || '', COVER_OUTFIT_RULE, BACKGROUND_TAG: BACKGROUND_TAG_FORMS });
+}
+
+/**
+ * The cast's reference pictures for the book review: ONE compact picture per cast member (the standard-clothing
+ * reference sheet the page judges also use, built by the same resolver), each preceded by its name. Sent once per
+ * review call so the reviewer can tell two copies of one cast member apart (docs/decisions.md 2026-11-13).
+ * A cast member with no picture is left out; one whose picture cannot be read fails the review loudly.
+ */
+async function buildCastReferenceParts(storyData) {
+  const characters = storyData?.characters || [];
+  if (!characters.length) return [];
+  const { buildWholeCastReferencePhotos } = require('./clothingResolve');
+  const photos = buildWholeCastReferencePhotos(characters, storyData.artStyle || null, storyData.clothingRequirements || null);
+  const images = require('./images');
+  const parts = [];
+  for (const ph of photos) {
+    if (!ph?.photoUrl || !ph?.name) continue;
+    let dataUri = ph.photoUrl;
+    if (!String(dataUri).startsWith('data:image')) {
+      const buf = await r2Lib.bytesFromAnyImage(dataUri);
+      if (!buf) throw new Error(`book review: the reference picture of "${ph.name}" could not be read`);
+      dataUri = `data:image/jpeg;base64,${buf.toString('base64')}`;
+    }
+    const part = inlinePart(await images.compressImageToJPEG(dataUri, 85, 768));
+    if (!part) throw new Error(`book review: the reference picture of "${ph.name}" is empty`);
+    parts.push({ text: `CAST REFERENCE: ${ph.name}` }, part);
+  }
+  return parts;
 }
 
 /** The native-Google call. Same body production has always sent. */
@@ -800,7 +832,9 @@ async function auditStoryBook(storyData, opts = {}) {
     }
 
     const storyFill = bookAuditStoryFill(storyData);
-    const review = bookReview ? { title: bookReview.title, hasRepairedPages: prepared.some(p => p.previousPart) } : null;
+    const review = bookReview
+      ? { title: bookReview.title, hasRepairedPages: prepared.some(p => p.previousPart), castParts: await buildCastReferenceParts(storyData) }
+      : null;
     const chunks = [];
     for (let i = 0; i < prepared.length; i += MAX_PAGES_PER_CALL) {
       chunks.push(prepared.slice(i, i + MAX_PAGES_PER_CALL));

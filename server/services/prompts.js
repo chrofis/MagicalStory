@@ -378,6 +378,8 @@ async function loadPromptTemplates() {
     // IMG fault, the cover-title check, and (re-review rounds) the previous/new comparison.
     ['bookReviewRules', 'book-review-rules.txt'],
     ['bookReviewRereview', 'book-review-rereview.txt'],
+    ['bookReviewCastRefs', 'book-review-cast-refs.txt'],
+    ['bookReviewNoCastRefs', 'book-review-no-cast-refs.txt'],
     // The other half of the arc audit: a listener, not an editor. Runs in
     // parallel with storyArcAudit and its faults join the same review ledger.
     ['storyChildCritic', 'story-child-critic.txt'],
