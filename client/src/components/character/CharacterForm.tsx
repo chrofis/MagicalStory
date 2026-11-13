@@ -16,7 +16,7 @@ import { getDisplayPhoto, getFaceThumb, getStandardAvatar, getAvatarInputPhoto }
 import type { CustomRelationshipPair } from '@/constants/relationships';
 import { uiLabel } from '@/utils/uiLabels';
 import { characterNameProblem, characterNameHint } from '@/utils/characterName';
-import { heightProblem, heightHint, ageLabel } from '@/utils/characterVitals';
+import { heightProblem, heightHint, ageLabel, genderLabel } from '@/utils/characterVitals';
 
 // Age category options for the dropdown (no age numbers - we already have real age field)
 const AGE_CATEGORY_OPTIONS: { value: AgeCategory; label: string; labelDe: string; labelFr: string; labelIt: string }[] = [
@@ -512,7 +512,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
             language === 'de'
               ? 'z.B. eckiges Kinn, markante Nase, hohe Wangenknochen'
               : language === 'fr'
-                ? 'ex. mâchoire carrée, nez proéminent, pommettes hautes'
+                ? 'p. ex. mâchoire carrée, nez proéminent, pommettes hautes'
                 : language === 'it'
                   ? 'es. mascella squadrata, naso pronunciato, zigomi alti'
                   : 'e.g. square jawline, prominent nose, high cheekbones'
@@ -904,8 +904,8 @@ export function CharacterForm({
         {!canSaveName && !nameProblem && (character.name?.trim().length >= 2) && (
           <p className="text-sm text-red-500 text-center">
             {language === 'de' ? 'Bitte Geschlecht und Alter eingeben' :
-             language === 'fr' ? 'Veuillez entrer le sexe et l\'âge' :
-             language === 'it' ? 'Inserisci sesso ed età' :
+             language === 'fr' ? 'Veuillez saisir le genre et l\'âge' :
+             language === 'it' ? 'Inserisci genere ed età' :
              'Please enter gender and age'}
           </p>
         )}
@@ -954,9 +954,7 @@ export function CharacterForm({
           <div>
             <h3 className="text-2xl font-bold text-gray-800">{character.name}</h3>
             <p className="text-sm text-gray-500">
-              {character.gender === 'male' ? (language === 'de' ? 'Männlich' : language === 'fr' ? 'Masculin' : language === 'it' ? 'Maschio' : 'Male') :
-               character.gender === 'female' ? (language === 'de' ? 'Weiblich' : language === 'fr' ? 'Féminin' : language === 'it' ? 'Femmina' : 'Female') :
-               (language === 'de' ? 'Andere' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other')}, {ageLabel(character.age, language)}
+              {genderLabel(character.gender, language)}, {ageLabel(character.age, language)}
             </p>
           </div>
         </div>
@@ -974,7 +972,7 @@ export function CharacterForm({
           />
 
           <TraitSelector
-            label={language === 'de' ? 'Schwächen' : language === 'fr' ? 'Défauts' : language === 'it' ? 'Difetti' : 'Flaws'}
+            label={language === 'de' ? 'Schwächen' : language === 'fr' ? 'Faiblesses' : language === 'it' ? 'Punti deboli' : 'Flaws'}
             traits={localizedFlaws}
             selectedTraits={character.traits?.flaws || []}
             onSelect={(traits) => updateTraits('flaws', traits)}
@@ -1043,9 +1041,7 @@ export function CharacterForm({
           <div>
             <h3 className="text-2xl font-bold text-gray-800">{character.name}</h3>
             <p className="text-sm text-gray-500">
-              {character.gender === 'male' ? (language === 'de' ? 'Männlich' : language === 'fr' ? 'Masculin' : language === 'it' ? 'Maschio' : 'Male') :
-               character.gender === 'female' ? (language === 'de' ? 'Weiblich' : language === 'fr' ? 'Féminin' : language === 'it' ? 'Femmina' : 'Female') :
-               (language === 'de' ? 'Andere' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other')}, {ageLabel(character.age, language)}
+              {genderLabel(character.gender, language)}, {ageLabel(character.age, language)}
             </p>
           </div>
         </div>
@@ -1112,9 +1108,7 @@ export function CharacterForm({
           <div>
             <h3 className="text-2xl font-bold text-gray-800">{character.name}</h3>
             <p className="text-sm text-gray-500">
-              {character.gender === 'male' ? (language === 'de' ? 'Männlich' : language === 'fr' ? 'Masculin' : language === 'it' ? 'Maschio' : 'Male') :
-               character.gender === 'female' ? (language === 'de' ? 'Weiblich' : language === 'fr' ? 'Féminin' : language === 'it' ? 'Femmina' : 'Female') :
-               (language === 'de' ? 'Andere' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other')}, {ageLabel(character.age, language)}
+              {genderLabel(character.gender, language)}, {ageLabel(character.age, language)}
             </p>
           </div>
         </div>
@@ -1228,7 +1222,7 @@ export function CharacterForm({
               <div className="w-10 h-10 border-[3px] border-indigo-500 border-t-transparent rounded-full animate-spin my-4" />
               <span className="text-indigo-500 text-sm">
                 {language === 'de'
-                  ? 'Du kannst warten oder direkt weiterfahren'
+                  ? 'Du kannst warten oder direkt weitermachen'
                   : language === 'fr'
                   ? 'Vous pouvez attendre ou continuer'
                   : language === 'it'
@@ -1241,7 +1235,7 @@ export function CharacterForm({
             <div className="w-64 h-80 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex flex-col items-center justify-center">
               <span className="text-gray-400">
                 {hasFailed
-                  ? (language === 'de' ? 'Erstellung fehlgeschlagen' : language === 'fr' ? 'Échec de génération' : language === 'it' ? 'Creazione fallita' : 'Creation failed')
+                  ? (language === 'de' ? 'Erstellung fehlgeschlagen' : language === 'fr' ? 'Échec de la création' : language === 'it' ? 'Creazione fallita' : 'Creation failed')
                   : (language === 'de' ? 'Kein Bild' : language === 'fr' ? 'Pas d\'image' : language === 'it' ? 'Nessuna immagine' : 'No image')
                 }
               </span>
@@ -1698,7 +1692,7 @@ export function CharacterForm({
           />
 
           <TraitSelector
-            label={language === 'de' ? 'Schwächen' : language === 'fr' ? 'Défauts' : language === 'it' ? 'Difetti' : 'Flaws'}
+            label={language === 'de' ? 'Schwächen' : language === 'fr' ? 'Faiblesses' : language === 'it' ? 'Punti deboli' : 'Flaws'}
             traits={localizedFlaws}
             selectedTraits={character.traits?.flaws || []}
             onSelect={(traits) => updateTraits('flaws', traits)}
@@ -2516,7 +2510,7 @@ export function CharacterForm({
                                 ...(e.target.value ? { upperBody: undefined, lowerBody: undefined } : {}),
                               },
                             })}
-                            placeholder={language === 'de' ? 'z.B. rotes Sommerkleid' : language === 'fr' ? 'ex. robe d\'été rouge' : language === 'it' ? 'es. vestito estivo rosso' : 'e.g. red summer dress'}
+                            placeholder={language === 'de' ? 'z.B. rotes Sommerkleid' : language === 'fr' ? 'p. ex. robe d\'été rouge' : language === 'it' ? 'es. vestito estivo rosso' : 'e.g. red summer dress'}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none"
                           />
                         </div>
@@ -2546,7 +2540,7 @@ export function CharacterForm({
                             },
                           })}
                           disabled={!!character.clothing?.structured?.fullBody}
-                          placeholder={language === 'de' ? 'z.B. blaues T-Shirt' : language === 'fr' ? 'ex. t-shirt bleu' : language === 'it' ? 'es. maglietta blu' : 'e.g. blue t-shirt'}
+                          placeholder={language === 'de' ? 'z.B. blaues T-Shirt' : language === 'fr' ? 'p. ex. t-shirt bleu' : language === 'it' ? 'es. maglietta blu' : 'e.g. blue t-shirt'}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                         />
                       </div>
@@ -2575,7 +2569,7 @@ export function CharacterForm({
                             },
                           })}
                           disabled={!!character.clothing?.structured?.fullBody}
-                          placeholder={language === 'de' ? 'z.B. dunkle Jeans' : language === 'fr' ? 'ex. jeans foncé' : language === 'it' ? 'es. jeans scuri' : 'e.g. dark jeans'}
+                          placeholder={language === 'de' ? 'z.B. dunkle Jeans' : language === 'fr' ? 'p. ex. jeans foncé' : language === 'it' ? 'es. jeans scuri' : 'e.g. dark jeans'}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                         />
                       </div>
@@ -2603,7 +2597,7 @@ export function CharacterForm({
                               shoes: 'user' as const,
                             },
                           })}
-                          placeholder={language === 'de' ? 'z.B. weisse Turnschuhe' : language === 'fr' ? 'ex. baskets blanches' : language === 'it' ? 'es. scarpe da ginnastica bianche' : 'e.g. white sneakers'}
+                          placeholder={language === 'de' ? 'z.B. weisse Turnschuhe' : language === 'fr' ? 'p. ex. baskets blanches' : language === 'it' ? 'es. scarpe da ginnastica bianche' : 'e.g. white sneakers'}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none"
                         />
                       </div>

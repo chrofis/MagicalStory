@@ -176,7 +176,7 @@ export function StoryCategorySelector({
     de: {
       storyType: 'Geschichte',
       outsideAgeWindow: 'Meist gewählt für Alter',
-      theme: 'Thema',
+      theme: 'Abenteuer-Thema',
       topic: 'Thema',
       setting: 'Schauplatz',
       optionalTheme: 'Optional: Abenteuer-Thema hinzufügen',

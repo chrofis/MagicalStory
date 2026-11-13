@@ -353,7 +353,7 @@ export function StorySettings({
                   ))}
                   {/* German Separator */}
                   <div className="px-3 py-1.5 text-xs text-gray-400 font-medium border-t border-gray-100">
-                    {language === 'de' ? 'Deutsch Varianten' : language === 'fr' ? 'Variantes allemandes' : language === 'it' ? 'Varianti tedesche' : 'German Variants'}
+                    {language === 'de' ? 'Deutsche Varianten' : language === 'fr' ? 'Variantes allemandes' : language === 'it' ? 'Varianti tedesche' : 'German Variants'}
                   </div>
                   {/* German regional variants */}
                   {GERMAN_VARIANTS.map((langOption) => (
@@ -370,7 +370,7 @@ export function StorySettings({
                   ))}
                   {/* French Separator */}
                   <div className="px-3 py-1.5 text-xs text-gray-400 font-medium border-t border-gray-100">
-                    {language === 'de' ? 'Französisch Varianten' : language === 'fr' ? 'Variantes françaises' : language === 'it' ? 'Varianti francesi' : 'French Variants'}
+                    {language === 'de' ? 'Französische Varianten' : language === 'fr' ? 'Variantes françaises' : language === 'it' ? 'Varianti francesi' : 'French Variants'}
                   </div>
                   {/* French regional variants */}
                   {FRENCH_VARIANTS.map((langOption) => (
@@ -387,7 +387,7 @@ export function StorySettings({
                   ))}
                   {/* Italian Separator */}
                   <div className="px-3 py-1.5 text-xs text-gray-400 font-medium border-t border-gray-100">
-                    {language === 'de' ? 'Italienisch Varianten' : language === 'fr' ? 'Variantes italiennes' : language === 'it' ? 'Varianti italiane' : 'Italian Variants'}
+                    {language === 'de' ? 'Italienische Varianten' : language === 'fr' ? 'Variantes italiennes' : language === 'it' ? 'Varianti italiane' : 'Italian Variants'}
                   </div>
                   {/* Italian regional variants */}
                   {ITALIAN_VARIANTS.map((langOption, idx) => (
@@ -434,7 +434,7 @@ export function StorySettings({
               {getSupportingCharacterNames() && (
                 <div>
                   <span className="text-gray-500">
-                    {language === 'de' ? 'Nebenfiguren' : language === 'fr' ? 'Personnages secondaires' : language === 'it' ? 'Anche nella storia' : 'Also in story'}:
+                    {language === 'de' ? 'Nebenfiguren' : language === 'fr' ? 'Personnages secondaires' : language === 'it' ? 'Personaggi secondari' : 'Also in story'}:
                   </span>{' '}
                   <span className="font-medium">{getSupportingCharacterNames()}</span>
                 </div>

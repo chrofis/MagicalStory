@@ -1566,7 +1566,7 @@ export default function StoryWizard() {
         await refreshUser();
         const titles = {
           en: 'Credits Added!',
-          de: 'Credits hinzugefuegt!',
+          de: 'Credits hinzugefügt!',
           fr: 'Crédits ajoutés !',
           it: 'Crediti aggiunti!',
         };
@@ -1593,13 +1593,13 @@ export default function StoryWizard() {
         log.info('Credits payment cancelled by user');
         const messages = {
           en: 'Credits purchase was cancelled.',
-          de: 'Kreditkauf wurde abgebrochen.',
+          de: 'Der Kauf von Credits wurde abgebrochen.',
           fr: 'L\'achat de crédits a été annulé.',
           it: "L'acquisto di crediti è stato annullato.",
         };
         showInfo(
           messages[language as keyof typeof messages] || messages.en,
-          language === 'de' ? 'Abgebrochen' : language === 'fr' ? 'Annule' : language === 'it' ? 'Annullato' : 'Cancelled'
+          language === 'de' ? 'Abgebrochen' : language === 'fr' ? 'Annulé' : language === 'it' ? 'Annullato' : 'Cancelled'
         );
 
         // Clean up URL parameters
@@ -2076,7 +2076,7 @@ export default function StoryWizard() {
       showError(language === 'de'
         ? 'Zeitüberschreitung bei der Ideengenerierung. Bitte versuche es erneut.'
         : language === 'fr'
-        ? 'Délai d\'attente de génération d\'idées. Veuillez réessayer.'
+        ? 'Délai dépassé lors de la génération des idées. Veuillez réessayer.'
         : language === 'it' ? 'Timeout nella generazione delle idee. Riprova.' : 'Idea generation timed out. Please try again.');
     }, SAFETY_TIMEOUT_MS);
 
@@ -5119,10 +5119,10 @@ export default function StoryWizard() {
                   log.error('Image regeneration failed:', error);
                   const errorMsg = localizedApiError(error, language);
                   showError(language === 'de'
-                    ? `Bildgenerierung fehlgeschlagen: ${errorMsg}`
+                    ? `Das Bild konnte nicht neu erstellt werden: ${errorMsg}`
                     : language === 'fr'
                     ? `Échec de la régénération : ${errorMsg}`
-                    : language === 'it' ? `Generazione dell'immagine non riuscita: ${errorMsg}` : `Image regeneration failed: ${errorMsg}`);
+                    : language === 'it' ? `Rigenerazione dell'immagine non riuscita: ${errorMsg}` : `Image regeneration failed: ${errorMsg}`);
                 }
               } : undefined}
               onDownloadTxt={() => {
@@ -5185,10 +5185,10 @@ export default function StoryWizard() {
                   // No saved address, ask user to enter one
                   const address = prompt(
                     language === 'de'
-                      ? 'Keine Adresse gespeichert. Bitte eingeben (Format: Vorname, Nachname, Strasse, PLZ, Ort, Land, Email):'
+                      ? 'Keine Adresse gespeichert. Bitte eingeben (Format: Vorname, Nachname, Strasse, PLZ, Ort, Land, E-Mail):'
                       : language === 'fr'
-                      ? 'Aucune adresse enregistrée. Veuillez entrer (Format : Prénom, Nom, Rue, CP, Ville, Pays, e-mail) :'
-                      : language === 'it' ? 'Nessun indirizzo salvato. Inseriscilo (formato: Nome, Cognome, Via, NPA, Città, Paese, Email):' : 'No saved address. Please enter (Format: FirstName, LastName, Street, PostCode, City, Country, Email):'
+                      ? 'Aucune adresse enregistrée. Veuillez saisir (Format : Prénom, Nom, Rue, NPA, Ville, Pays, e-mail) :'
+                      : language === 'it' ? 'Nessun indirizzo salvato. Inseriscilo (formato: Nome, Cognome, Via, NPA, Città, Paese, e-mail):' : 'No saved address. Please enter (Format: FirstName, LastName, Street, PostCode, City, Country, Email):'
                   );
                   if (!address) return;
 
@@ -5236,19 +5236,19 @@ export default function StoryWizard() {
                   });
                   // Show success message with option to open Gelato dashboard
                   const successMsg = language === 'de'
-                    ? `✅ Druckauftrag erfolgreich erstellt!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Entwurf – muss in Gelato bestätigt werden)' : ''}\n\nMöchtest du das Gelato Dashboard öffnen, um den Auftrag zu verfolgen?`
+                    ? `✅ Druckauftrag erfolgreich erstellt!\n\nBestellnummer: ${result.orderId}\n${result.isDraft ? '(Entwurf – muss in Gelato bestätigt werden)' : ''}\n\nMöchtest du das Gelato Dashboard öffnen, um den Auftrag zu verfolgen?`
                     : language === 'fr'
-                    ? `✅ Commande d'impression créée avec succès !\n\nID de commande : ${result.orderId}\n${result.isDraft ? '(Brouillon - doit être confirmé dans Gelato)' : ''}\n\nVoulez-vous ouvrir le tableau de bord Gelato pour suivre la commande ?`
-                    : language === 'it' ? `✅ Ordine di stampa creato con successo!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Bozza - da confermare in Gelato)' : ''}\n\nVuoi aprire la dashboard Gelato per seguire l'ordine?` : `✅ Print order created successfully!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Draft - must be confirmed in Gelato)' : ''}\n\nWould you like to open the Gelato dashboard to track your order?`;
+                    ? `✅ Commande d'impression créée avec succès !\n\nNuméro de commande : ${result.orderId}\n${result.isDraft ? '(Brouillon – doit être confirmé dans Gelato)' : ''}\n\nVoulez-vous ouvrir le tableau de bord Gelato pour suivre la commande ?`
+                    : language === 'it' ? `✅ Ordine di stampa creato con successo!\n\nNumero d\'ordine: ${result.orderId}\n${result.isDraft ? '(Bozza – da confermare in Gelato)' : ''}\n\nVuoi aprire la dashboard Gelato per seguire l'ordine?` : `✅ Print order created successfully!\n\nOrder number: ${result.orderId}\n${result.isDraft ? '(Draft - must be confirmed in Gelato)' : ''}\n\nWould you like to open the Gelato dashboard to track your order?`;
 
                   if (result.dashboardUrl && confirm(successMsg)) {
                     window.open(result.dashboardUrl, '_blank');
                   } else if (!result.dashboardUrl) {
                     showSuccess(language === 'de'
-                      ? `Druckauftrag erstellt! Order ID: ${result.orderId}`
+                      ? `Druckauftrag erstellt! Bestellnummer: ${result.orderId}`
                       : language === 'fr'
-                      ? `Commande créée ! ID : ${result.orderId}`
-                      : language === 'it' ? `Ordine di stampa creato! Order ID: ${result.orderId}` : `Print order created! Order ID: ${result.orderId}`);
+                      ? `Commande créée ! Numéro de commande : ${result.orderId}`
+                      : language === 'it' ? `Ordine di stampa creato! Numero d'ordine: ${result.orderId}` : `Print order created! Order number: ${result.orderId}`);
                   }
                 } catch (error) {
                   log.error('Print order failed:', error);
@@ -5349,10 +5349,10 @@ export default function StoryWizard() {
                   log.error('Cover regeneration failed:', error);
                   const errorMsg = localizedApiError(error, language);
                   showError(language === 'de'
-                    ? `Cover-Generierung fehlgeschlagen: ${errorMsg}`
+                    ? `Das Cover konnte nicht neu erstellt werden: ${errorMsg}`
                     : language === 'fr'
                     ? `Échec de la régénération : ${errorMsg}`
-                    : language === 'it' ? `Generazione della copertina non riuscita: ${errorMsg}` : `Cover regeneration failed: ${errorMsg}`);
+                    : language === 'it' ? `Rigenerazione della copertina non riuscita: ${errorMsg}` : `Cover regeneration failed: ${errorMsg}`);
                 } finally {
                   setRegeneratingCovers(prev => {
                     const next = new Set(prev);
@@ -5870,7 +5870,7 @@ export default function StoryWizard() {
                 <Sparkles className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">{t.generateStory}</h2>
                 <p className="text-gray-600 mb-6">
-                  {language === 'de' ? 'Bereit, deine Geschichte zu erstellen!' : language === 'fr' ? 'Prêt à créer votre histoire !' : language === 'it' ? 'Pronti a creare la tua storia!' : 'Ready to create your story!'}
+                  {language === 'de' ? 'Bereit, deine Geschichte zu erstellen!' : language === 'fr' ? 'Prêt à créer votre histoire !' : language === 'it' ? 'Pronto a creare la tua storia!' : 'Ready to create your story!'}
                 </p>
                 <Button onClick={() => generateStory()} size="lg" icon={Sparkles}>
                   {t.generateStory} ({pages * 10} Credits)
@@ -5900,7 +5900,7 @@ export default function StoryWizard() {
                 <Lock className="w-6 h-6 text-amber-600" />
               </div>
               <h2 className="text-xl font-bold text-gray-900">
-                {language === 'de' ? 'Konto sichern' : language === 'fr' ? 'Sécuriser le compte' : language === 'it' ? 'Proteggi il tuo account' : 'Secure Your Account'}
+                {language === 'de' ? 'Konto sichern' : language === 'fr' ? 'Sécuriser votre compte' : language === 'it' ? 'Proteggi il tuo account' : 'Secure Your Account'}
               </h2>
             </div>
             <p className="text-gray-600 mb-2">
@@ -6293,7 +6293,7 @@ export default function StoryWizard() {
                 }}
                 className="w-full py-3 px-4 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-colors font-medium"
               >
-                {language === 'de' ? 'Neue Geschichte erstellen' : language === 'fr' ? 'Créer une autre histoire' : language === 'it' ? 'Creare un\'altra storia' : 'Create another story'}
+                {language === 'de' ? 'Neue Geschichte erstellen' : language === 'fr' ? 'Créer une autre histoire' : language === 'it' ? 'Crea un\'altra storia' : 'Create another story'}
               </button>
 
               {userHasStories && (
@@ -6306,7 +6306,7 @@ export default function StoryWizard() {
                   }}
                   className="w-full py-3 px-4 bg-gray-100 text-gray-800 rounded-xl hover:bg-gray-200 transition-colors font-medium"
                 >
-                  {language === 'de' ? 'Meine Geschichten lesen' : language === 'fr' ? 'Lire mes histoires' : language === 'it' ? 'Leggere le mie storie' : 'Read my stories'}
+                  {language === 'de' ? 'Meine Geschichten lesen' : language === 'fr' ? 'Lire mes histoires' : language === 'it' ? 'Leggi le mie storie' : 'Read my stories'}
                 </button>
               )}
             </div>
@@ -6367,10 +6367,10 @@ export default function StoryWizard() {
               {editTarget.type === 'image'
                 ? (language === 'de' ? `Seite ${editTarget.pageNumber}` : language === 'fr' ? `Page ${editTarget.pageNumber}` : language === 'it' ? `Pagina ${editTarget.pageNumber}` : `Page ${editTarget.pageNumber}`)
                 : (language === 'de'
-                    ? (editTarget.coverType === 'front' ? 'Titelseite' : editTarget.coverType === 'back' ? 'Rückseite' : 'Einleitungsseite')
+                    ? (editTarget.coverType === 'front' ? 'Titelseite' : editTarget.coverType === 'back' ? 'Rückseite' : 'Widmungsseite')
                     : language === 'fr'
-                    ? (editTarget.coverType === 'front' ? 'Couverture' : editTarget.coverType === 'back' ? 'Dos' : 'Page de dédicace')
-                    : language === 'it' ? (editTarget.coverType === 'front' ? 'Copertina' : editTarget.coverType === 'back' ? 'Retro' : 'Pagina di dedica') : (editTarget.coverType === 'front' ? 'Front Cover' : editTarget.coverType === 'back' ? 'Back Cover' : 'Dedication Page')
+                    ? (editTarget.coverType === 'front' ? 'Couverture' : editTarget.coverType === 'back' ? 'Quatrième de couverture' : 'Page de dédicace')
+                    : language === 'it' ? (editTarget.coverType === 'front' ? 'Copertina' : editTarget.coverType === 'back' ? 'Retro di copertina' : 'Pagina di dedica') : (editTarget.coverType === 'front' ? 'Front Cover' : editTarget.coverType === 'back' ? 'Back Cover' : 'Dedication Page')
                   )
               }
             </p>

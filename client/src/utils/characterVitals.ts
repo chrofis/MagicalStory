@@ -43,6 +43,19 @@ export function ageLabel(age: string | number | undefined | null, language: stri
   return `${s} ${unit}`;
 }
 
+const GENDER_LABELS: Record<string, { male: string; female: string; missing: string }> = {
+  de: { male: 'Männlich', female: 'Weiblich', missing: 'Geschlecht fehlt' },
+  fr: { male: 'Masculin', female: 'Féminin', missing: 'Genre manquant' },
+  it: { male: 'Maschile', female: 'Femminile', missing: 'Genere mancante' },
+  en: { male: 'Male', female: 'Female', missing: 'Gender missing' },
+};
+
+/** The gender as the customer reads it. Gender is male or female only; an unset one reads "not chosen yet", never "Other". */
+export function genderLabel(gender: string | undefined | null, language: string): string {
+  const l = GENDER_LABELS[language] || GENDER_LABELS.en;
+  return gender === 'male' ? l.male : gender === 'female' ? l.female : l.missing;
+}
+
 /** "a 7-year-old boy"; age 0 is "a baby boy" (never "a 0-year-old"). */
 export function agedNoun(age: number, genderLabel: string): string {
   return age === 0 ? `a baby ${genderLabel}` : `a ${age}-year-old ${genderLabel}`;

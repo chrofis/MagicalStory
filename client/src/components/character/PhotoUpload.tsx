@@ -21,7 +21,7 @@ const consentTexts = {
     pleaseAccept: 'Please accept the terms above to upload a photo',
   },
   de: {
-    consent1: 'Ich bestätige, dass ich das Recht habe, die hochgeladenen Fotos zu verwenden, und bei Fotos von Minderjährigen bin ich der Elternteil/Vormund oder habe deren Zustimmung eingeholt.',
+    consent1: 'Ich bestätige, dass ich das Recht habe, die hochgeladenen Fotos zu verwenden, und dass ich bei Fotos von Minderjährigen Elternteil oder Vormund bin oder deren Zustimmung eingeholt habe.',
     consent2: 'Ich stimme den',
     termsLink: 'Nutzungsbedingungen',
     and: 'und der',

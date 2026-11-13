@@ -113,7 +113,7 @@ export function TraitSelector({
               )}
               {selectedTraits.length > 0 && (
                 <span className={`text-sm font-normal ml-1 ${toneClass}`}>
-                  - {selectedTraits.length} {language === 'de' ? 'gewählt' : language === 'fr' ? 'sélectionné' : language === 'it' ? 'selezionato' : 'selected'}
+                  - {selectedTraits.length} {language === 'de' ? 'gewählt' : language === 'fr' ? (selectedTraits.length > 1 ? 'sélectionnés' : 'sélectionné') : language === 'it' ? (selectedTraits.length > 1 ? 'selezionati' : 'selezionato') : 'selected'}
                 </span>
               )}
             </>
