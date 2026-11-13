@@ -12,7 +12,8 @@
 
 const crypto = require('crypto');
 const { log } = require('./server/lib/serverLog');
-const { settleJobWithRefund, JOB_SAVING_PROGRESS } = require('./server/lib/jobCredits');
+const { settleJobWithRefund } = require('./server/lib/jobCredits');
+const { markJobSavingOrThrow } = require('./server/lib/jobSaveGate');
 const pLimit = require('p-limit');
 const { buildCastIndex, resolveEntity, entriesMentioned, lookupByName } = require('./server/lib/castResolver');
 const email = require('./email');
@@ -6832,14 +6833,10 @@ ${trialWriter.pagesPrompt}`;
 
     // Saving marker: from here a user cancel is refused (server/routes/jobs.js guards on
     // progress < JOB_SAVING_PROGRESS), so a story is never both saved and refunded. The
-    // write is guarded on status='processing': if the cancel won the race, abort before
-    // the story row is written instead of saving a story for a refunded job.
-    const savingMark = await dbPool.query(
-      `UPDATE story_jobs SET progress = $2, progress_message = 'Saving story...', updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1 AND status = 'processing' RETURNING id`,
-      [jobId, JOB_SAVING_PROGRESS]
-    );
-    if (savingMark.rowCount === 0) await checkCancellation();
+    // write is guarded on status='processing': if a cancel OR the watchdog (which fails
+    // and refunds a job it thinks is stuck) won the race, abort before the story row is
+    // written instead of saving a story for a refunded job (server/lib/jobSaveGate.js).
+    await markJobSavingOrThrow(dbPool, jobId);
 
     log.debug(`💾 [UNIFIED] Saving story to database... (generationLog has ${storyData.generationLog?.length || 0} entries)`);
     await upsertStory(storyId, userId, storyData, { adminDraft: inputData?.adminDraft === true });
@@ -7263,6 +7260,13 @@ ${trialWriter.pagesPrompt}`;
     if (error.name === 'JobCancelledError') {
       log.info(`🛑 [UNIFIED] Pipeline aborted for cancelled job ${jobId}`);
       // Credits already refunded by the cancel endpoint — just stop
+      return null;
+    }
+    // The watchdog or stale sweep already failed AND refunded this job (and saved a
+    // partial story from the checkpoints). Settling again would overwrite its error
+    // message; the save gate stopped the full story, so just stop.
+    if (error.name === 'JobNoLongerLiveError') {
+      log.warn(`🛑 [UNIFIED] ${error.message}`);
       return null;
     }
 
