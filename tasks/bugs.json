@@ -4855,6 +4855,24 @@
       "rootCause": "Merge treats an empty value sent by the form as \"missing\"; only keys absent from the payload should be preserved.",
       "status": "fixed",
       "fixedIn": "fd17296f8"
+    },
+    {
+      "id": "phantom-patch-after-main-cast-filter",
+      "title": "The phantom patch invented Visual Bible copies of main-cast children (Noah, Tobias) with invented looks",
+      "reportedAt": "2026-11-13",
+      "source": "Production stories job_1794498448758_ryuv0q8lb, job_1794506785522_17d2hnvd9, job_1794512968910_272bco1s8 (one customer): each logged one phantom_patch call and its visualBible.secondaryCharacters held Noah/Tobias copies; the roster name fields read like \"Tobias, Freund von Noah\".",
+      "rootCause": "The main-cast filter runs BEFORE the phantom patch, so anything the patch added that is a main-cast person was never removed, and the patch itself had no guard: a name the resolver could not pick one entity for (ambiguous) was treated as unknown and got an invented entry. Fixed in the patch (classifyUnknownNames): a name resolving to any declared entity, cast included, is never patched; an ambiguous name is logged as an error and skipped. Test: tests/unit/phantom-patch-refuses-cast-names.test.ts; replay over 59 stories of the last 60 days: 0 cast names reach the patch.",
+      "status": "fixed",
+      "fixedIn": "941857c9c"
+    },
+    {
+      "id": "none-value-rules-disagree",
+      "title": "Four server readers disagree whether a stored glasses/other/facialHair value says none: a stored glasses \"nein\" still prints \"Glasses: nein, ALWAYS visible\" on regenerated sheets",
+      "reportedAt": "2026-11-13",
+      "source": "Review of 265060f68 (form-only fix): promptBuilders word list vs avatarOverrides 'none' only vs raw !== 'none' in styledAvatars and routes/avatars; stored production snapshots still hold \"nein\" (12 stories, 89 fields on 2026-11-13).",
+      "rootCause": "Each reader grew its own none-rule. One closed rule now (server/lib/traitNone.js isNone) used by all physical-trait consumers; decisions.md 2026-11-13. Stored values are NOT migrated: scripts/admin/fix-glasses-no-words-2026-11-12.js (dry-run default, --write needs owner approval) lists them. Test: tests/unit/none-value-one-rule.test.ts.",
+      "status": "fixed",
+      "fixedIn": "04e29a6b0"
     }
   ]
 }
