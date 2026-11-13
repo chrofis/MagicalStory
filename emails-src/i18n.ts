@@ -259,7 +259,7 @@ export const trialStoryComplete: Record<Lang, {
       'Più personaggi in una sola storia',
       'Storie più lunghe',
       'Diversi stili di disegno',
-      "Qualità d'immagine superiore e copertina con titolo",
+      "Qualità d'immagine superiore e pagina del titolo",
       'Disponibile come libro stampato',
     ],
     signoff: 'Grazie per aver provato Magical Story!',
@@ -291,7 +291,7 @@ export const trialReminder: Record<Lang, {
       'Available as a printed book',
     ],
     signoff: 'Thank you for trying Magical Story!',
-    unsubscribeNote: 'You receive this reminder because you tried Magical Story. No more reminders?',
+    unsubscribeNote: "You receive this reminder because you tried Magical Story. Don't want more reminders?",
     unsubscribe: 'Unsubscribe',
   },
   de: {
@@ -305,7 +305,7 @@ export const trialReminder: Record<Lang, {
       'Bestellbar als gedrucktes Buch',
     ],
     signoff: 'Vielen Dank, dass du Magical Story ausprobiert hast!',
-    unsubscribeNote: 'Du erhältst diese Erinnerung, weil du Magical Story ausprobiert hast. Keine weiteren Erinnerungen?',
+    unsubscribeNote: 'Du erhältst diese Erinnerung, weil du Magical Story ausprobiert hast. Möchtest du keine weiteren Erinnerungen?',
     unsubscribe: 'Abmelden',
   },
   fr: {
@@ -319,7 +319,7 @@ export const trialReminder: Record<Lang, {
       'Disponible en livre imprimé',
     ],
     signoff: "Merci d'avoir essayé Magical Story !",
-    unsubscribeNote: 'Vous recevez ce rappel parce que vous avez essayé Magical Story. Plus de rappels ?',
+    unsubscribeNote: 'Vous recevez ce rappel parce que vous avez essayé Magical Story. Ne plus recevoir de rappels ?',
     unsubscribe: 'Se désabonner',
   },
   it: {
@@ -329,11 +329,11 @@ export const trialReminder: Record<Lang, {
       'Più personaggi in una sola storia',
       'Storie più lunghe',
       'Diversi stili di disegno',
-      "Qualità d'immagine superiore e copertina con titolo",
+      "Qualità d'immagine superiore e pagina del titolo",
       'Disponibile come libro stampato',
     ],
     signoff: 'Grazie per aver provato Magical Story!',
-    unsubscribeNote: 'Ricevi questo promemoria perché hai provato Magical Story. Non vuoi più promemoria?',
+    unsubscribeNote: 'Ricevi questo promemoria perché hai provato Magical Story. Non vuoi più ricevere promemoria?',
     unsubscribe: 'Disiscriviti',
   },
 };
@@ -365,7 +365,7 @@ export const orderConfirmation: Record<Lang, {
     signoff: 'Thank you for choosing Magical Story!',
   },
   de: {
-    subject: 'Bestellung bestätigt: dein Magical Story Buch wird gedruckt!',
+    subject: 'Bestellung bestätigt: dein Magical-Story-Buch wird gedruckt!',
     preview: 'Deine Bestellung ist bestätigt. Wir melden uns wieder, sobald sie versandt wird.',
     headline: 'Dein Buch wird gedruckt',
     coverAlt: 'Das Cover deines Buches',
@@ -437,7 +437,7 @@ export const orderShipped: Record<Lang, {
     signoff: 'Thank you for choosing Magical Story!',
   },
   de: {
-    subject: 'Dein Magical Story Buch ist unterwegs!',
+    subject: 'Dein Magical-Story-Buch ist unterwegs!',
     preview: 'Dein personalisiertes Geschichtenbuch ist auf dem Weg. Sendung verfolgen.',
     headline: 'Dein Buch ist unterwegs',
     coverAlt: 'Das Cover deines Buches',
@@ -547,7 +547,7 @@ export const emailVerification: Record<Lang, {
     ignoreLine: "If you didn't create a Magical Story account, you can safely ignore this email.",
   },
   de: {
-    subject: 'Bestätige deine Magical Story E-Mail-Adresse',
+    subject: 'Bestätige deine E-Mail-Adresse für Magical Story',
     preview: 'Bestätige deine E-Mail-Adresse, um die Einrichtung deines Kontos abzuschliessen.',
     headline: 'Bestätige deine E-Mail-Adresse',
     body: 'Bitte bestätige deine E-Mail-Adresse, indem du auf den Button unten klickst.',
@@ -565,7 +565,7 @@ export const emailVerification: Record<Lang, {
     ignoreLine: "Si vous n'avez pas créé de compte Magical Story, vous pouvez ignorer cet e-mail.",
   },
   it: {
-    subject: 'Verifica il tuo indirizzo e-mail Magical Story',
+    subject: 'Verifica il tuo indirizzo e-mail per Magical Story',
     preview: 'Conferma il tuo indirizzo e-mail per completare la creazione del tuo account.',
     headline: 'Verifica il tuo indirizzo e-mail',
     body: 'Verifica il tuo indirizzo e-mail cliccando sul pulsante qui sotto.',

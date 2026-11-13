@@ -221,29 +221,29 @@ async function voidVoucher(db, id) {
 
 const PDF_STRINGS = {
   de: {
-    title: 'Geschenkgutschein', subtitle: 'Gift voucher',
-    contains: (c, p) => `${c} Credits für bis zu ${c / 10} Geschichtenseiten und ein Buch bis ${p} Seiten inkl. Versand (CH): Softcover gratis, Hardcover gegen CHF 10 Aufpreis.`,
+    title: 'Geschenkgutschein', subtitle: 'Personalisierte Geschichten und gedrucktes Buch',
+    contains: (c, p) => `${c} Credits für bis zu ${c / 10} Geschichtenseiten und ein Buch mit bis zu ${p} Seiten inklusive Versand (CH): Softcover gratis, Hardcover gegen CHF 10 Aufpreis.`,
     expiry: d => `Gültig bis ${d}`, noExpiry: 'Unbefristet gültig',
     steps: ['QR-Code scannen oder Link öffnen', 'Konto erstellen oder anmelden und den Gutschein einlösen', 'Geschichte erstellen und das Buch bestellen'],
     code: 'Dein Code',
   },
   en: {
-    title: 'Gift voucher', subtitle: 'Geschenkgutschein',
+    title: 'Gift voucher', subtitle: 'Personalized stories and a printed book',
     contains: (c, p) => `${c} credits for up to ${c / 10} story pages and a book of up to ${p} pages incl. shipping (CH): softcover free, hardcover for CHF 10 extra.`,
     expiry: d => `Valid until ${d}`, noExpiry: 'No expiry date',
     steps: ['Scan the QR code or open the link', 'Create an account or log in and redeem the voucher', 'Create a story and order the book'],
     code: 'Your code',
   },
   fr: {
-    title: 'Bon cadeau', subtitle: 'Gift voucher',
-    contains: (c, p) => `${c} crédits pour jusqu'à ${c / 10} pages d'histoire et un livre jusqu'à ${p} pages, livraison (CH) incluse : couverture souple offerte, couverture rigide avec supplément de CHF 10.`,
+    title: 'Bon cadeau', subtitle: 'Histoires personnalisées et livre imprimé',
+    contains: (c, p) => `${c} crédits pour ${c / 10} pages d'histoire au maximum et un livre de ${p} pages maximum, livraison (CH) incluse : couverture souple offerte, couverture rigide avec supplément de CHF 10.`,
     expiry: d => `Valable jusqu'au ${d}`, noExpiry: 'Sans date limite',
     steps: ['Scanner le code QR ou ouvrir le lien', 'Créer un compte ou se connecter et utiliser le bon', 'Créer une histoire et commander le livre'],
     code: 'Votre code',
   },
   it: {
-    title: 'Buono regalo', subtitle: 'Gift voucher',
-    contains: (c, p) => `${c} crediti per fino a ${c / 10} pagine di storia e un libro fino a ${p} pagine, spedizione (CH) inclusa: copertina morbida gratis, copertina rigida con supplemento di CHF 10.`,
+    title: 'Buono regalo', subtitle: 'Storie personalizzate e libro stampato',
+    contains: (c, p) => `${c} crediti per un massimo di ${c / 10} pagine di storia e un libro di massimo ${p} pagine, spedizione (CH) inclusa: copertina morbida gratis, copertina rigida con supplemento di CHF 10.`,
     expiry: d => `Valido fino al ${d}`, noExpiry: 'Senza scadenza',
     steps: ['Scansiona il codice QR o apri il link', 'Crea un account o accedi e riscatta il buono', 'Crea una storia e ordina il libro'],
     code: 'Il tuo codice',
