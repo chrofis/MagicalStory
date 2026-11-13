@@ -60,7 +60,7 @@ function isKnownName(norm, known, index = null) {
 }
 
 /**
- * Find names that appear in scene hints but aren't declared anywhere.
+ * Classify the names that appear in scene hints but are not declared anywhere.
  *
  * Checks every named-entity list in the Visual Bible — not just secondary
  * characters. Animals (e.g. a dragon companion), vehicles, artifacts, and
@@ -68,12 +68,21 @@ function isKnownName(norm, known, index = null) {
  * characters in the metadata. Without checking these lists we duplicate
  * a known animal as a phantom secondary character.
  *
+ * Three outcomes per name: known (resolves to ONE declared entity, a main
+ * cast member included: never patched), phantom (resolves to nothing: the
+ * patch invents an entry), ambiguous (the resolver finds several candidate
+ * entities and cannot pick one). An ambiguous name is a reference to a person
+ * who already exists, so inventing a new look for it is a duplicate: it is
+ * returned apart and the caller refuses it (bugs.json
+ * phantom-patch-after-main-cast-filter; production job_1794498448758_ryuv0q8lb:
+ * the patch wrote invented copies of cast children "Noah" and "Tobias").
+ *
  * @param {Array} storyPages - Pages from the parser, each with `characterClothing`
  * @param {Object} visualBible - VB object with named-entity lists
  * @param {Array} inputCharacters - User-provided main + primary characters
- * @returns {string[]} array of phantom names (original casing)
+ * @returns {{phantoms: string[], ambiguous: Array<{name: string, candidates: string[]}>}}
  */
-function findPhantomNames(storyPages, visualBible, inputCharacters) {
+function classifyUnknownNames(storyPages, visualBible, inputCharacters) {
   const known = new Set();
   for (const c of (inputCharacters || [])) {
     if (c.name) known.add(normalizeName(c.name));
@@ -99,15 +108,28 @@ function findPhantomNames(storyPages, visualBible, inputCharacters) {
   const index = buildCastIndex({ characters: inputCharacters || [] }, visualBible || null);
 
   const phantoms = new Map(); // normalizedName -> originalName
+  const ambiguous = new Map(); // normalizedName -> {name, candidates}
   for (const page of (storyPages || [])) {
     const names = Object.keys(page.characterClothing || {});
     for (const name of names) {
       const norm = normalizeName(name);
+      const ambiguousBefore = index.stats.ambiguous.length;
       if (isKnownName(norm, known, index)) continue;
+      if (index.stats.ambiguous.length > ambiguousBefore) {
+        if (!ambiguous.has(norm)) {
+          ambiguous.set(norm, { name: name.trim(), candidates: index.stats.ambiguous[ambiguousBefore].candidates });
+        }
+        continue;
+      }
       if (!phantoms.has(norm)) phantoms.set(norm, name.trim());
     }
   }
-  return [...phantoms.values()];
+  return { phantoms: [...phantoms.values()], ambiguous: [...ambiguous.values()] };
+}
+
+/** The names the patch call may invent entries for (ambiguous ones excluded). */
+function findPhantomNames(storyPages, visualBible, inputCharacters) {
+  return classifyUnknownNames(storyPages, visualBible, inputCharacters).phantoms;
 }
 
 /**
@@ -225,7 +247,12 @@ async function detectAndPatchPhantomCharacters({ storyPages, visualBible, inputC
   // phantoms and must not get duplicate invented entries.
   resolveVbIdCharacterKeys(storyPages, visualBible);
 
-  const phantoms = findPhantomNames(storyPages, visualBible, inputCharacters);
+  const { phantoms, ambiguous } = classifyUnknownNames(storyPages, visualBible, inputCharacters);
+  for (const a of ambiguous) {
+    // NO FALLBACK: an invented look for a name that already denotes an existing
+    // person (cast member or declared entry) is a duplicate person.
+    log.error(`👻 [PHANTOM] "${a.name}" is ambiguous between ${a.candidates.join(', ')} - NOT patched (no invented entry)`);
+  }
   if (phantoms.length === 0) return null;
 
   log.warn(`👻 [PHANTOM] Detected ${phantoms.length} character(s) missing from Visual Bible: ${phantoms.join(', ')}`);
@@ -484,6 +511,7 @@ module.exports = {
   normalizeName,
   isKnownName,
   findPhantomNames,
+  classifyUnknownNames,
   resolveVbIdCharacterKeys,
   detectAndPatchPhantomCharacters,
   detectAndPatchOrphanObjectIds,
