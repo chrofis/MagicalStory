@@ -15,6 +15,7 @@
  * back only its yes/no/unclear.
  */
 const { log } = require('../utils/logger');
+const { DUPLICATE_NAME_MARKER } = require('./figureGuard');
 const { PROMPT_TEMPLATES, fillTemplate, assertPromptFilled } = require('../services/prompts');
 
 // A finding at or above this severity may take a repair slot and must be
@@ -42,6 +43,9 @@ function capDuplicatesByDetector(issues, { detectedPeopleCount, castPeopleCount 
   let n = 0;
   for (const i of Array.isArray(issues) ? issues : []) {
     if (String(i?.type || '').toLowerCase() !== 'duplicate_character') continue;
+    // Made by figureGuard.duplicateNames from two NAMED figures: the detector count cannot overrule it (two
+    // copies of one child plus another child missing fits inside the cast count).
+    if (i.derivedBy === DUPLICATE_NAME_MARKER) continue;
     const sev = String(i.severity || '').toUpperCase();
     if (sev === ADVISORY) continue;
     i.severityBeforeCap = sev;

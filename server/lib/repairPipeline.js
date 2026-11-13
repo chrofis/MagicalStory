@@ -1780,6 +1780,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // paths cannot drift apart again. Builds the SAME dressed identity lines the
   // first detection gets (buildIdentityClothingText -- covers included), plus
   // the Visual-Bible secondaries.
+  // Counted groups (roster `count` N) of one detection's expected characters: N figures for one name are by design.
+  const groupSizesOfDetection = (detection) => {
+    const { buildCastIndex, resolveEntity } = require('./castResolver');
+    const idx = buildCastIndex(storyData || null, visualBible || null);
+    const sizes = new Map();
+    for (const c of Array.isArray(detection?.expectedCharacters) ? detection.expectedCharacters : []) {
+      const hit = resolveEntity(c.name, idx);
+      const n = hit && hit.entry && Number.isInteger(hit.entry.count) && hit.entry.count >= 2 ? hit.entry.count : 0;
+      if (n) sizes.set(c.name, n);
+    }
+    return sizes;
+  };
+
   const redetectVersionImage = async (r, roundLabel) => {
     const orig = rawImages.find(i => i.pageNumber === r.pageNumber);
     const sceneChars = resolveDeclaredCast(r.sceneCharacters, orig?.sceneCharacters) || [];
@@ -2963,6 +2976,30 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
       })));
 
+      // REPAIR FIGURE GUARD (owner, 2026-11-13, docs/decisions.md; same check as the book review's): a repaired
+      // picture with fewer cast-labelled figures than the version it was repaired from is not a candidate.
+      {
+        const { repairFigureVerdict } = require('./figureGuard');
+        for (let i = roundSuccess.length - 1; i >= 0; i--) {
+          const r = roundSuccess[i];
+          const parent = roundParent.get(r.pageNumber);
+          const verdict = repairFigureVerdict(parent ? images().detectionForVersion(parent) : null, r.bboxDetection);
+          if (!verdict.decided) {
+            log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round} P${r.pageNumber}: figure guard could not compare the repair with its parent — ${verdict.reason}`);
+            continue;
+          }
+          if (!verdict.refuse) continue;
+          log.error(`🚫 [UNIFIED PIPELINE] Round ${round} P${r.pageNumber}: ${r.method} repair REFUSED by the figure guard — ${verdict.reason}`);
+          const img = rawImages.find(x => x.pageNumber === r.pageNumber);
+          if (img) {
+            img.retryHistory = img.retryHistory || [];
+            img.retryHistory.push({ attempt: img.retryHistory.length + 1, type: 'repair_refused_figures', round, method: r.method || null, parentFigures: verdict.parent, repairFigures: verdict.child, error: verdict.reason, timestamp: new Date().toISOString() });
+          }
+          if (parent) parent.failedRepairs = [...(parent.failedRepairs || []), { method: require('./repairLogic').baseRepairMethod(r.method), round, error: `refused: ${verdict.reason}` }];
+          roundSuccess.splice(i, 1);
+        }
+      }
+
       // Entity check ONLY the round's repaired images (owner, 2026-08-09):
       // a version's entity punishment is computed ONCE, on its own bytes, at
       // creation — judged against the character reference sheet (the
@@ -3259,6 +3296,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         pageNumber: img.pageNumber,
         artStyle,
       }),
+      groupSizesFor: (img, version) => groupSizesOfDetection(images().detectionForVersion(version)),
       inheritSceneContract,
       auditRecord,
       onProgress: (round, pages) => updateProgress(68 + Math.floor((round - 1) * 10), `Book review round ${round}: repairing ${pages} page(s)...`),

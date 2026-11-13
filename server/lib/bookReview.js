@@ -35,6 +35,7 @@
 const { log } = require('../utils/logger');
 const { runtime } = require('../config/runtime');
 const { FINDING_SOURCES } = require('./findingSources');
+const { repairFigureVerdict, duplicateNames, DUPLICATE_NAME_MARKER } = require('./figureGuard');
 
 /** Is this environment running the book review instead of the per-page judges? */
 function bookReviewActive() {
@@ -311,7 +312,29 @@ async function runBookReviewRounds(d) {
     return null;
   };
 
+  // DUPLICATE-NAME CHECK (owner, 2026-11-13): two figures the detector matched to ONE cast name, on boxes that
+  // do not overlap, become a duplicate_character fault routed NEW, in the review's own fault list, so the one
+  // scoring and repair path takes it. Typed detector output only; a counted group's N figures are by design.
+  const addDuplicateFaults = (audit, shown) => {
+    const images = require('./images');
+    for (const [page, version] of shown) {
+      const img = d.rawImages.find(i => i.pageNumber === page);
+      const dups = duplicateNames(images.detectionForVersion(version), d.groupSizesFor ? d.groupSizesFor(img, version) : new Map());
+      for (const dup of dups) {
+        log.warn(`👥 [BOOK-REVIEW] p${page}: the detector matched ${dup.figures} separate figures to "${dup.name}" (cast entry holds ${dup.allowed}) — duplicate_character fault added`);
+        audit.byRoute.IMG.push({
+          page, severity: 'MAJOR', type: 'duplicate_character',
+          route: { kind: 'NEW', background: { keep: true } },
+          derivedBy: DUPLICATE_NAME_MARKER,
+          line: `FAULT[IMG][MAJOR][duplicate_character][NEW]: p${page} ${dup.name} is drawn ${dup.figures} times`,
+          detail: `${dup.name} appears ${dup.figures} times in the picture; the character is in it once. Draw ${dup.name} once and leave the other figure(s) as the other cast members and background people the scene calls for.`,
+        });
+      }
+    }
+  };
+
   const applyReview = (audit, round, shown, parentByPage) => {
+    addDuplicateFaults(audit, shown);
     const { byPage, pageless } = groupFaultsByPage(audit.byRoute.IMG);
     for (const f of pageless) log.warn(`📖 [BOOK-REVIEW] Round ${round}: a fault carries no page number and belongs to no picture — ${f.line}`);
     for (const page of byPage.keys()) {
@@ -430,7 +453,7 @@ async function runBookReviewRounds(d) {
       }
     })));
 
-    const successes = results.filter(r => r && r.imageData);
+    let successes = results.filter(r => r && r.imageData);
     for (const r of results.filter(r => r && !r.imageData)) {
       const img = d.rawImages.find(i => i.pageNumber === r.pageNumber);
       const parent = parentOf.get(r.pageNumber);
@@ -465,6 +488,36 @@ async function runBookReviewRounds(d) {
         r.bboxDetection = null;
       }
     })));
+
+    // REPAIR FIGURE GUARD (owner, 2026-11-13, docs/decisions.md): a repaired picture with fewer cast-labelled
+    // figures than the version it was repaired from is refused, however the review would rank the two. Free:
+    // the two detections already exist.
+    {
+      const images = require('./images');
+      const refusedNow = [];
+      successes = successes.filter(r => {
+        const parent = parentOf.get(r.pageNumber);
+        const verdict = repairFigureVerdict(images.detectionForVersion(parent), r.bboxDetection);
+        if (!verdict.decided) {
+          log.warn(`⚠️ [BOOK-REVIEW] Round ${round} p${r.pageNumber}: figure guard could not compare the repair with its parent — ${verdict.reason}; the repair goes to the review unchecked`);
+          return true;
+        }
+        if (!verdict.refuse) return true;
+        log.error(`🚫 [BOOK-REVIEW] Round ${round} p${r.pageNumber}: ${r.method} repair REFUSED by the figure guard — ${verdict.reason}`);
+        if (parent) parent.failedRepairs = [...(parent.failedRepairs || []), { method: baseRepairMethod(r.method), round, error: `refused: ${verdict.reason}` }];
+        const img = d.rawImages.find(i => i.pageNumber === r.pageNumber);
+        if (img) {
+          img.retryHistory = img.retryHistory || [];
+          img.retryHistory.push({ attempt: img.retryHistory.length + 1, type: 'repair_refused_figures', round, method: r.method || null, parentFigures: verdict.parent, repairFigures: verdict.child, error: verdict.reason, timestamp: new Date().toISOString() });
+        }
+        refusedNow.push(r.pageNumber);
+        return false;
+      });
+      if (refusedNow.length && successes.length === 0) {
+        repairRounds.push(summarizeRepairRound({ round, attempts: results.filter(Boolean).map(repairAttemptFromResult), beforeScores, afterScores: {}, criticalCleared: {} }));
+        break;
+      }
+    }
 
     const shown = pickedByPage();
     const previous = new Map();
