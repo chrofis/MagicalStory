@@ -91,7 +91,7 @@ export const adventureThemeGroups: AdventureThemeGroup[] = [
   { id: 'fantasy', name: { en: 'Fantasy & Magic', de: 'Fantasie & Magie', fr: 'Fantaisie & magie', it: 'Fantasia e Magia' } },
   { id: 'locations', name: { en: 'Exploration', de: 'Entdeckung', fr: 'Exploration', it: 'Esplorazione' } },
   { id: 'professions', name: { en: 'Heroes & Helpers', de: 'Helden & Helfer', fr: 'Héros & aides', it: 'Eroi e Aiutanti' } },
-  { id: 'seasonal', name: { en: 'Seasonal', de: 'Jahreszeiten', fr: 'Saisonnier', it: 'Stagionale' } },
+  { id: 'seasonal', name: { en: 'Seasonal', de: 'Feste & Feiertage', fr: 'Saisonnier', it: 'Stagionale' } },
   { id: 'custom', name: { en: 'Custom', de: 'Eigenes Thema', fr: 'Personnalisé', it: 'Personalizzato' } },
 ];
 
@@ -183,7 +183,7 @@ const lifeChallengeCatalogue: Omit<LifeChallenge, 'suitableAges'>[] = [
   { id: 'brushing-teeth', name: { en: 'Brushing Teeth', de: 'Zähne putzen', fr: 'Se brosser les dents', it: 'Lavarsi i denti' }, emoji: '🪥', ageGroup: 'toddler', liveness: 5, pole: 'friction', family: 'hygiene' },
   { id: 'eating-vegetables', name: { en: 'Eating Vegetables', de: 'Gemüse essen', fr: 'Manger des légumes', it: 'Mangiare verdure' }, emoji: '🥦', ageGroup: 'toddler', liveness: 5, pole: 'friction', family: 'eating' },
   { id: 'going-to-bed', name: { en: 'Going to Bed', de: 'Ins Bett gehen', fr: 'Aller au lit', it: 'Andare a letto' }, emoji: '🛏️', ageGroup: 'toddler', liveness: 5, pole: 'friction' },
-  { id: 'saying-goodbye', name: { en: 'Saying Goodbye', de: 'Abschied nehmen', fr: 'Dire au revoir', it: 'Dire addio' }, emoji: '👋', ageGroup: 'toddler', liveness: 4, pole: 'friction' },
+  { id: 'saying-goodbye', name: { en: 'Saying Goodbye', de: 'Abschied nehmen', fr: 'Dire au revoir', it: 'Salutarsi' }, emoji: '👋', ageGroup: 'toddler', liveness: 4, pole: 'friction' },
   { id: 'no-pacifier', name: { en: 'No More Pacifier', de: 'Ohne Schnuller', fr: 'Plus de tétine', it: 'Senza ciuccio' }, emoji: '🍼', ageGroup: 'toddler', liveness: 5, pole: 'both' },
   { id: 'getting-dressed', name: { en: 'Getting Dressed by Myself', de: 'Sich alleine anziehen', fr: 'S\'habiller tout seul', it: 'Vestirsi da solo' }, emoji: '👕', ageGroup: 'toddler', liveness: 4, pole: 'both' },
   // Preschool (4-6 years)
@@ -228,7 +228,7 @@ const lifeChallengeCatalogue: Omit<LifeChallenge, 'suitableAges'>[] = [
   { id: 'visiting-doctor', name: { en: 'Going to the Doctor', de: 'Arztbesuch', fr: 'Visite chez le médecin', it: 'Andare dal dottore' }, emoji: '🏥', ageGroup: 'family', liveness: 1, pole: 'friction' },
   { id: 'staying-hospital', name: { en: 'Staying in the Hospital', de: 'Im Spital', fr: 'Séjour à l\'hôpital', it: 'In ospedale' }, emoji: '🩺', ageGroup: 'family', liveness: 3, pole: 'both' },
   { id: 'death-pet', name: { en: 'Losing a Pet', de: 'Haustier verlieren', fr: 'Perte d\'un animal', it: 'Perdere un animale' }, emoji: '🌈', ageGroup: 'family', liveness: 3, pole: 'friction' },
-  { id: 'grandparent-sick', name: { en: 'Grandparent is Sick', de: 'Grosseltern sind krank', fr: 'Grand-parent malade', it: 'I nonni sono malati' }, emoji: '❤️', ageGroup: 'family', liveness: 3, pole: 'friction' },
+  { id: 'grandparent-sick', name: { en: 'Grandparent is Sick', de: 'Oma oder Opa ist krank', fr: 'Grand-parent malade', it: 'Nonno o nonna malati' }, emoji: '❤️', ageGroup: 'family', liveness: 3, pole: 'friction' },
   // Pre-Teen (9-12 years)
   { id: 'money-saving', name: { en: 'Saving Money', de: 'Geld sparen', fr: 'Économiser de l\'argent', it: 'Risparmiare denaro' }, emoji: '💰', ageGroup: 'preteen', liveness: 3, pole: 'milestone' },
   { id: 'spending-wisely', name: { en: 'Spending Wisely', de: 'Klug ausgeben', fr: 'Dépenser intelligemment', it: 'Spendere con saggezza' }, emoji: '🛒', ageGroup: 'preteen', liveness: 2, pole: 'milestone' },
@@ -435,7 +435,7 @@ export const historicalEvents: HistoricalEvent[] = [
   { id: 'telephone-invention', name: { en: 'First Telephone Call', de: 'Erster Telefonanruf', fr: 'Premier appel téléphonique', it: 'Prima chiamata telefonica' }, shortName: { en: 'Telephone', de: 'Telefon', fr: 'Téléphone', it: 'Telefono' }, emoji: '📞', year: 1876, category: 'invention', mainPerson: 'Alexander Graham Bell' },
   { id: 'light-bulb', name: { en: 'Edison\'s Light Bulb', de: 'Edisons Glühbirne', fr: 'Ampoule d\'Edison', it: 'La lampadina di Edison' }, shortName: { en: 'Light Bulb', de: 'Glühbirne', fr: 'Ampoule', it: 'Lampadina' }, emoji: '💡', year: 1879, category: 'invention', mainPerson: 'Thomas Edison' },
   { id: 'printing-press', name: { en: 'Gutenberg Invents the Printing Press', de: 'Gutenberg erfindet den Buchdruck', fr: 'Gutenberg invente l\'imprimerie', it: 'Gutenberg inventa la stampa a caratteri mobili' }, shortName: { en: 'Printing Press', de: 'Buchdruck', fr: 'Imprimerie', it: 'Stampa' }, emoji: '📖', year: 1440, category: 'invention', mainPerson: 'Johannes Gutenberg' },
-  { id: 'internet-creation', name: { en: 'Birth of the World Wide Web', de: 'Geburt des World Wide Web', fr: 'Naissance du Web', it: 'Nascita del World Wide Web' }, shortName: { en: 'The Web', de: 'Das Internet', fr: 'Le Web', it: 'Il Web' }, emoji: '🌐', year: 1991, category: 'invention', mainPerson: 'Tim Berners-Lee' },
+  { id: 'internet-creation', name: { en: 'Birth of the World Wide Web', de: 'Geburt des World Wide Web', fr: 'Naissance du Web', it: 'Nascita del World Wide Web' }, shortName: { en: 'The Web', de: 'Das Web', fr: 'Le Web', it: 'Il Web' }, emoji: '🌐', year: 1991, category: 'invention', mainPerson: 'Tim Berners-Lee' },
 
   // Human Rights & Freedom
   { id: 'emancipation', name: { en: 'Abolition of Slavery', de: 'Abschaffung der Sklaverei', fr: 'Abolition de l\'esclavage', it: 'Abolizione della schiavitù' }, shortName: { en: 'End of Slavery', de: 'Ende der Sklaverei', fr: 'Fin de l\'esclavage', it: 'Fine della schiavitù' }, emoji: '⛓️', year: 1865, category: 'rights', mainPerson: 'Abraham Lincoln' },

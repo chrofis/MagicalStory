@@ -115,7 +115,7 @@ export const guides: GuideArticle[] = [
           fr: [
             'C\'est le plus grand écart de qualité entre un livre fait avec un générateur d\'images généraliste et un service dédié — à comprendre avant d\'y passer une soirée.',
             'Les modèles d\'images génèrent chaque illustration indépendamment. Demandez douze fois « une fille de sept ans aux boucles brunes » et vous obtenez douze filles différentes — visage, longueur de cheveux, couleur des yeux. Un enfant le remarque immédiatement, et l\'illusion que le livre parle de lui disparaît.',
-            'La solution est une référence : la même description de personnage, idéalement la même image de référence, pour chaque page, plus une vérification qui compare chaque figure au référentiel et régénère celles qui dérivent. En autonomie, attendez-vous à régénérer beaucoup de pages. Pour choisir un service, c\'est la question à poser.',
+            'La solution est une référence : la même description de personnage, idéalement la même image de référence, pour chaque page, plus une vérification qui compare chaque figure au référentiel et régénère celles qui dérivent. Si vous procédez seul, attendez-vous à régénérer beaucoup de pages. Pour choisir un service, c\'est la question à poser.',
           ],
           it: [
             'Questo è il divario di qualità più grande tra un libro fatto con un generatore di immagini generico e uno fatto con un servizio dedicato, e vale la pena capirlo prima di dedicarci una serata.',
@@ -414,7 +414,7 @@ export const guides: GuideArticle[] = [
     intro: {
       en: 'Most advice about sibling fighting assumes the fight is about the thing being fought over. It almost never is. Once you see what the argument is actually about, the useful responses change — and the exhausting job of working out who started it turns out to be the part you can drop.',
       de: 'Die meisten Ratschläge zu Geschwisterstreit gehen davon aus, dass es um den Gegenstand geht, um den gestritten wird. Das ist fast nie so. Wenn du siehst, worum es wirklich geht, ändern sich die hilfreichen Reaktionen — und die anstrengende Aufgabe herauszufinden, wer angefangen hat, ist genau der Teil, den du weglassen kannst.',
-      fr: 'La plupart des conseils sur les disputes entre frères et sœurs supposent que le conflit porte sur l\'objet disputé. C\'est presque jamais le cas. Quand on voit de quoi il retourne vraiment, les réponses utiles changent — et la tâche épuisante de déterminer qui a commencé est justement celle qu\'on peut abandonner.',
+      fr: 'La plupart des conseils sur les disputes entre frères et sœurs supposent que le conflit porte sur l\'objet disputé. Ce n\'est presque jamais le cas. Quand on voit de quoi il retourne vraiment, les réponses utiles changent — et la tâche épuisante de déterminer qui a commencé est justement celle qu\'on peut abandonner.',
       it: 'La maggior parte dei consigli sui litigi tra fratelli presume che la lite riguardi l\'oggetto conteso. Quasi mai è così. Una volta capito di cosa si tratta davvero, le risposte utili cambiano — e il lavoro estenuante di scoprire chi ha iniziato risulta essere proprio la parte che puoi lasciar perdere.',
     },
     sections: [
@@ -462,7 +462,7 @@ export const guides: GuideArticle[] = [
             'The alternative is to describe instead of decide. “Two kids, one scooter, and you are both furious.” You have said nothing about who is right, but you have shown that you saw it — which is most of what the shouting was for. Then hand the problem back: tell me when you have worked out what to do. Small children need more scaffolding than that, but the direction is the same: narrate the situation, name both feelings, leave ownership of the solution with them.',
           ],
           de: [
-            'Der Reflex ist, festzustellen was passiert ist, und darüber zu urteilen. Das funktioniert selten, aus einem strukturellen Grund: Du hast den Anfang nicht gesehen, beide Darstellungen sind ehrlich gemeint und unvereinbar, und was immer du entscheidest, lehrt den Verlierer, dass man das nächste Mal mit der besseren, schneller erzählten Geschichte gewinnt.',
+            'Der Reflex ist, festzustellen, was passiert ist, und darüber zu urteilen. Das funktioniert selten, aus einem strukturellen Grund: Du hast den Anfang nicht gesehen, beide Darstellungen sind ehrlich gemeint und unvereinbar, und was immer du entscheidest, lehrt den Verlierer, dass man das nächste Mal mit der besseren, schneller erzählten Geschichte gewinnt.',
             'Urteilen macht dich ausserdem zum Preis. Wenn Streit ein Urteil von dir hervorbringt, dann ist Streit der Weg, dich zu erreichen.',
             'Die Alternative ist beschreiben statt entscheiden. «Zwei Kinder, ein Trottinett, und ihr seid beide wütend.» Du hast nichts darüber gesagt, wer recht hat, aber gezeigt, dass du es gesehen hast — und das war das meiste, wofür geschrien wurde. Dann gib das Problem zurück: «Sagt mir Bescheid, wenn ihr eine Lösung habt.» Kleine Kinder brauchen mehr Begleitung, aber die Richtung bleibt: Situation schildern, beide Gefühle benennen, die Lösung bei ihnen lassen.',
           ],
@@ -722,7 +722,7 @@ export const guides: GuideArticle[] = [
           ],
           fr: [
             'Un déménagement est quelque chose qui arrive à l\'enfant. Presque rien n\'est de son ressort, et cette impuissance fait une grande part de la détresse. Le remède n\'est pas un faux choix — les enfants les détectent aussitôt — mais un vrai, même minuscule.',
-            'Contre quel mur va le lit. Dans quel carton voyagent ses affaires, rempli par lui et ouvert en premier. Quels deux amis viennent pour l\'après-midi d\'adieu. Si les vieux rideaux suivent. La décision doit être réelle : vous vous y tiendrez même si vous auriez choisi autrement.',
+            'Contre quel mur va le lit. Dans quel carton voyagent ses affaires, rempli par lui et ouvert en premier. Quels deux amis viennent pour l\'après-midi d\'adieu. Si les vieux rideaux suivent. La décision doit être réelle : vous vous y tiendrez même si vous aviez choisi autrement.',
             'Un carton rempli par l\'enfant et ouvert le premier soir vaut mieux qu\'une chambre parfaitement décorée à l\'avance. Des objets familiers dans une pièce étrangère transforment un lieu où il loge en un lieu qui est le sien.',
           ],
           it: [
@@ -892,7 +892,7 @@ export const guides: GuideArticle[] = [
           ],
           it: [
             '«Avrai qualcuno con cui giocare» è la preparazione più comune ed è quella più affidabilmente seguita da delusione. Ciò che arriva non sa giocare, non sa parlare, e assorbe completamente gli adulti. Un bambino a cui è stato promesso un amico conclude o che gli hanno mentito, o che il bebè è difettoso.',
-            'La versione onesta funziona meglio e i bambini la reggono bene: all\'inizio il bebè per lo più dormirà, piangerà e verrà portato in braccio, non potrà giocare per molto tempo, e avrà bisogno di moltissima attenzione che prima era tua. Dì questa parte ad alta voce. Essere avvisati di qualcosa di difficile è molto più facile che scoprirlo mentre ti raccontano quanto sia meraviglioso.',
+            'La versione onesta funziona meglio e i bambini la reggono bene: all\'inizio il bebè per lo più dormirà, piangerà e verrà portato in braccio, non potrà giocare per molto tempo, e avrà bisogno di moltissima attenzione che prima era tua. Di\' questa parte ad alta voce. Essere avvisati di qualcosa di difficile è molto più facile che scoprirlo mentre ti raccontano quanto sia meraviglioso.',
             'Aiuta anche essere chiari su cosa non cambierà. Chi lo va a prendere all\'asilo, dove si siede a tavola, cosa succede all\'ora di andare a letto, quale pomeriggio è suo. La continuità rassicura più di qualsiasi promessa sul bebè.',
           ],
         },
@@ -1028,7 +1028,7 @@ export const guides: GuideArticle[] = [
         },
         a: {
           en: 'Later than you tell adults, for a practical reason: small children have little grasp of months, and a long wait mostly produces repeated questions about whether it is today. Telling them once it is visible and once other people might mention it in front of them is usually about right.',
-          de: 'Später als den Erwachsenen, aus einem praktischen Grund: Kleine Kinder haben wenig Gefühl für Monate, und eine lange Wartezeit erzeugt vor allem wiederholte Fragen, ob es heute soweit ist. Es zu sagen, sobald es sichtbar ist und sobald andere es in ihrer Gegenwart erwähnen könnten, trifft es meist gut.',
+          de: 'Später als den Erwachsenen, aus einem praktischen Grund: Kleine Kinder haben wenig Gefühl für Monate, und eine lange Wartezeit erzeugt vor allem wiederholte Fragen, ob es heute so weit ist. Es zu sagen, sobald es sichtbar ist und sobald andere es in ihrer Gegenwart erwähnen könnten, trifft es meist gut.',
           fr: 'Plus tard qu\'aux adultes, pour une raison pratique : les jeunes enfants saisissent mal les mois, et une longue attente produit surtout des questions répétées. L\'annoncer quand cela devient visible, et quand d\'autres pourraient en parler devant eux, tombe généralement juste.',
           it: 'Più tardi rispetto agli adulti, per una ragione pratica: i bambini piccoli hanno poca cognizione dei mesi, e un\'attesa lunga produce soprattutto domande ripetute su se è già oggi. Dirlo quando diventa visibile e quando altre persone potrebbero menzionarlo davanti a loro è di solito il momento giusto.',
         },

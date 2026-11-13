@@ -178,7 +178,7 @@ export const occasions: OccasionData[] = [
     },
     description: {
       en: 'An egg-citing Easter adventure with your child as the hero. The perfect surprise for the Easter basket — more memorable than chocolate!',
-      de: 'Ein eifriges Oster-Abenteuer mit deinem Kind als Held. Die perfekte Überraschung fürs Osternest — unvergesslicher als Schokolade!',
+      de: 'Ein spannendes Oster-Abenteuer mit deinem Kind als Held. Die perfekte Überraschung fürs Osternest — unvergesslicher als Schokolade!',
       fr: 'Une aventure de Pâques passionnante avec votre enfant comme héros. La surprise parfaite pour le panier de Pâques — plus mémorable que le chocolat !',
       it: 'Un\'avventura di Pasqua uovo-sionante con tuo figlio come eroe. La sorpresa perfetta per il cestino di Pasqua — più indimenticabile del cioccolato!',
     },
@@ -305,7 +305,7 @@ export const occasions: OccasionData[] = [
     faq: [
       {
         q: { en: 'Is this suitable for a baby?', de: 'Ist das für ein Baby geeignet?', fr: 'Est-ce adapté pour un bébé ?', it: 'È adatto per un neonato?' },
-        a: { en: 'Yes! While the baby won\'t read it themselves yet, parents can read it aloud. The printed book becomes a cherished keepsake as the child grows.', de: 'Ja! Das Baby wird es zwar noch nicht selbst lesen, aber die Eltern können es vorlesen. Das gedruckte Buch wird zu einem wertvollen Andenken, wenn das Kind grösser wird.', fr: 'Oui ! Bien que le bébé ne le lira pas encore lui-même, les parents peuvent le lire à voix haute. Le livre imprimé devient un souvenir précieux quand l\'enfant grandit.', it: 'Sì! Anche se il neonato non potrà ancora leggerlo da solo, i genitori possono leggerlo ad alta voce. Il libro stampato diventa un ricordo prezioso man mano che il bambino cresce.' },
+        a: { en: 'Yes! While the baby won\'t read it themselves yet, parents can read it aloud. The printed book becomes a cherished keepsake as the child grows.', de: 'Ja! Das Baby wird es zwar noch nicht selbst lesen, aber die Eltern können es vorlesen. Das gedruckte Buch wird zu einem wertvollen Andenken, wenn das Kind grösser wird.', fr: 'Oui ! Bien que le bébé ne puisse pas encore le lire lui-même, les parents peuvent le lire à voix haute. Le livre imprimé devient un souvenir précieux quand l\'enfant grandit.', it: 'Sì! Anche se il neonato non potrà ancora leggerlo da solo, i genitori possono leggerlo ad alta voce. Il libro stampato diventa un ricordo prezioso man mano che il bambino cresce.' },
       },
       {
         q: { en: 'Can I include a dedication message?', de: 'Kann ich eine Widmung hinzufügen?', fr: 'Puis-je inclure un message de dédicace ?', it: 'Posso includere una dedica?' },
@@ -422,7 +422,7 @@ export const occasions: OccasionData[] = [
       de: [
         'Erstelle die Geschichte vor der Geburt — sie ist ein tolles Vorbereitungswerkzeug',
         'Wähle das Thema «Neues Geschwisterchen» für eine Geschichte über Geschwistergefühle',
-        'Verschenke das Buch als spezielles Geschenk vom neuen Baby an das grosse Geschwisterchen',
+        'Verschenke das Buch als spezielles Geschenk vom neuen Baby an das grössere Geschwisterchen',
         'Füge beide Kinder in die Geschichte ein, wenn das Baby bereits einen Namen hat',
       ],
       fr: [
@@ -497,7 +497,7 @@ export const occasions: OccasionData[] = [
         'Papa oder Grosseltern können dem Kind helfen, die Geschichte als Überraschung zu erstellen',
         'Füge Mama als Charakter in die Geschichte ein für extra Magie',
         'Wähle ein Abenteuerthema, das das Kind mit Mama verbindet (z.B. Ozean, wenn Mama das Meer liebt)',
-        'Lest die Geschichte am Muttertagmorgen Mama laut vor — ein unbezahlbarer Moment',
+        'Lest die Geschichte am Muttertagsmorgen der Mama laut vor — ein unbezahlbarer Moment',
       ],
       fr: [
         'Papa ou les grands-parents peuvent aider l\'enfant à créer l\'histoire comme surprise',
@@ -634,7 +634,7 @@ export const occasions: OccasionData[] = [
     intro: {
       en: 'St. Nicholas Day on December 6 is a beloved tradition in Switzerland. The Samichlaus visits children, accompanied by Schmutzli, bringing nuts, tangerines, and gifts for those who\'ve been good. A personalized story about this magical visit makes the tradition even more special. Your child meets St. Nicholas in their very own adventure — a beautiful keepsake that captures the wonder of this Swiss celebration.',
       de: 'Der Nikolaustag am 6. Dezember ist eine geliebte Tradition in der Schweiz. Der Samichlaus besucht die Kinder, begleitet vom Schmutzli, und bringt Nüsse, Mandarinen und Geschenke für die Braven. Eine personalisierte Geschichte über diesen magischen Besuch macht die Tradition noch besonderer. Dein Kind trifft den Samichlaus in seinem eigenen Abenteuer — ein schönes Andenken, das den Zauber dieser Schweizer Tradition einfängt.',
-      fr: 'La Saint-Nicolas le 6 décembre est une tradition adorée en Suisse. Le Saint-Nicolas rend visite aux enfants, accompagné du Père Fouettard, apportant noix, mandarines et cadeaux. Une histoire personnalisée de cette visite magique rend la tradition encore plus spéciale. Votre enfant rencontre Saint-Nicolas dans sa propre aventure.',
+      fr: 'La Saint-Nicolas le 6 décembre est une tradition adorée en Suisse. Saint Nicolas rend visite aux enfants, accompagné du Père Fouettard, apportant noix, mandarines et cadeaux. Une histoire personnalisée de cette visite magique rend la tradition encore plus spéciale. Votre enfant rencontre Saint-Nicolas dans sa propre aventure.',
       it: 'Il giorno di San Nicolao, il 6 dicembre, è una tradizione amatissima in Svizzera. Il Samichlaus visita i bambini, accompagnato da Schmutzli, portando noci, mandarini e regali per chi si è comportato bene. Una storia personalizzata su questa visita magica rende la tradizione ancora più speciale. Tuo figlio incontra San Nicolao nella sua propria avventura — un bellissimo ricordo che cattura la meraviglia di questa festa svizzera.',
     },
     tips: {
@@ -679,7 +679,7 @@ export const occasions: OccasionData[] = [
     faq: [
       {
         q: { en: 'Is St. Nicholas the same as Santa?', de: 'Ist der Nikolaus dasselbe wie der Weihnachtsmann?', fr: 'Saint-Nicolas est-il le même que le Père Noël ?', it: 'San Nicolao è lo stesso di Babbo Natale?' },
-        a: { en: 'In Swiss tradition, the Samichlaus (St. Nicholas) visits on December 6 and is distinct from the Christkind (Christ Child) or Santa Claus on December 24/25.', de: 'In der Schweizer Tradition besucht der Samichlaus die Kinder am 6. Dezember und ist verschieden vom Christkind oder Weihnachtsmann am 24./25. Dezember.', fr: 'Dans la tradition suisse, le Saint-Nicolas rend visite le 6 décembre et est distinct du Père Noël du 24/25 décembre.', it: 'Nella tradizione svizzera, il Samichlaus (San Nicolao) visita i bambini il 6 dicembre ed è una figura distinta da Gesù Bambino o Babbo Natale del 24/25 dicembre.' },
+        a: { en: 'In Swiss tradition, the Samichlaus (St. Nicholas) visits on December 6 and is distinct from the Christkind (Christ Child) or Santa Claus on December 24/25.', de: 'In der Schweizer Tradition besucht der Samichlaus die Kinder am 6. Dezember und ist verschieden vom Christkind oder Weihnachtsmann am 24./25. Dezember.', fr: 'Dans la tradition suisse, saint Nicolas rend visite le 6 décembre et est distinct du Père Noël du 24/25 décembre.', it: 'Nella tradizione svizzera, il Samichlaus (San Nicolao) visita i bambini il 6 dicembre ed è una figura distinta da Gesù Bambino o Babbo Natale del 24/25 dicembre.' },
       },
       {
         q: { en: 'Can the story include Samichlaus and Schmutzli?', de: 'Kann die Geschichte Samichlaus und Schmutzli enthalten?', fr: 'L\'histoire peut-elle inclure Saint-Nicolas et le Père Fouettard ?', it: 'La storia può includere Samichlaus e Schmutzli?' },

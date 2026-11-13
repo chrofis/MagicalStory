@@ -127,7 +127,7 @@ export const comparisons: ComparisonData[] = [
       {
         label: { en: 'Reviews / Trust', de: 'Bewertungen / Vertrauen', fr: 'Avis / confiance', it: 'Recensioni / Fiducia' },
         us: { en: 'New (building)', de: 'Neu (im Aufbau)', fr: 'Nouveau (en construction)', it: 'Nuovo (in costruzione)' },
-        them: { en: '4.5/5 Trustpilot, 82K reviews', de: '4.5/5 Trustpilot, 82K Bewertungen', fr: '4.5/5 Trustpilot, 82K avis', it: '4.5/5 Trustpilot, 82K recensioni' },
+        them: { en: '4.5/5 Trustpilot, 82K reviews', de: '4.5/5 Trustpilot, 82’000 Bewertungen', fr: '4.5/5 Trustpilot, 82 000 avis', it: '4.5/5 Trustpilot, 82.000 recensioni' },
         winner: 'them',
       },
       {
@@ -137,7 +137,7 @@ export const comparisons: ComparisonData[] = [
         winner: 'us',
       },
       {
-        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas', it: 'Rigenerare una pagina che non piace' },
+        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren, wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas', it: 'Rigenerare una pagina che non piace' },
         us: { en: 'Yes — unlimited retries', de: 'Ja — unbegrenzte Wiederholungen', fr: 'Oui — essais illimités', it: 'Sì — tentativi illimitati' },
         them: { en: 'Not available (template-based)', de: 'Nicht verfügbar (vorlagenbasiert)', fr: 'Non disponible (basé sur des modèles)', it: 'Non disponibile (basato su modelli)' },
         winner: 'us',
@@ -191,13 +191,13 @@ export const comparisons: ComparisonData[] = [
         'Proven, consistent quality from template-based approach',
       ],
       de: [
-        'Enorme Markenbekanntheit: 11 Mio.+ verkaufte Bücher, unterstützt von Penguin Random House',
+        'Enorme Markenbekanntheit: über 11 Mio. verkaufte Bücher, unterstützt von Penguin Random House',
         '82.000+ Trustpilot-Bewertungen (4,5 Sterne) — unübertroffener Vertrauensbeweis',
         '15+ Sprachen — viel breitere internationale Abdeckung',
         'Bewährte, konstante Qualität durch vorlagenbasierten Ansatz',
       ],
       fr: [
-        'Énorme notoriété : 11M+ livres vendus, soutenu par Penguin Random House',
+        'Énorme notoriété : plus de 11 millions de livres vendus, soutenu par Penguin Random House',
         '82 000+ avis Trustpilot (4,5 étoiles) — preuve sociale inégalée',
         '15+ langues — portée internationale bien plus large',
         'Qualité constante et éprouvée grâce à l\'approche par modèles',
@@ -220,8 +220,8 @@ export const comparisons: ComparisonData[] = [
         q: { en: 'Is Magical Story as good as Wonderbly?', de: 'Ist Magical Story so gut wie Wonderbly?', fr: 'Magical Story est-il aussi bon que Wonderbly ?', it: 'Magical Story è valido quanto Wonderbly?' },
         a: {
           en: 'They take different approaches. Magical Story uses AI to create unique stories, while Wonderbly uses professionally designed templates. Both produce high-quality printed books. Wonderbly has more brand trust (11M+ books sold), while Magical Story offers more personalization (your child\'s photo, 14 art styles, Swiss German).',
-          de: 'Sie verfolgen unterschiedliche Ansätze. Magical Story nutzt KI für einzigartige Geschichten, während Wonderbly professionell gestaltete Vorlagen verwendet. Beide produzieren hochwertige gedruckte Bücher. Wonderbly hat mehr Markenvertrauen (11 Mio.+ Bücher verkauft), während Magical Story mehr Personalisierung bietet (Foto des Kindes, 14 Kunststile, Schweizerdeutsch).',
-          fr: 'Ils ont des approches différentes. Magical Story utilise l\'IA pour créer des histoires uniques, tandis que Wonderbly utilise des modèles professionnels. Les deux produisent des livres imprimés de qualité. Wonderbly a plus de confiance de marque (11M+ livres vendus), tandis que Magical Story offre plus de personnalisation (photo de l\'enfant, 14 styles, suisse allemand).',
+          de: 'Sie verfolgen unterschiedliche Ansätze. Magical Story nutzt KI für einzigartige Geschichten, während Wonderbly professionell gestaltete Vorlagen verwendet. Beide produzieren hochwertige gedruckte Bücher. Wonderbly hat mehr Markenvertrauen (über 11 Mio. Bücher verkauft), während Magical Story mehr Personalisierung bietet (Foto des Kindes, 14 Kunststile, Schweizerdeutsch).',
+          fr: 'Ils ont des approches différentes. Magical Story utilise l\'IA pour créer des histoires uniques, tandis que Wonderbly utilise des modèles professionnels. Les deux produisent des livres imprimés de qualité. Wonderbly a plus de confiance de marque (plus de 11 millions de livres vendus), tandis que Magical Story offre plus de personnalisation (photo de l\'enfant, 14 styles, suisse allemand).',
           it: 'Seguono approcci diversi. Magical Story usa l\'IA per creare storie uniche, mentre Wonderbly usa modelli progettati professionalmente. Entrambi producono libri stampati di alta qualità. Wonderbly ha più fiducia di marchio (oltre 11 milioni di libri venduti), mentre Magical Story offre più personalizzazione (foto di tuo figlio, 14 stili artistici, svizzero tedesco).',
         },
       },
@@ -327,7 +327,7 @@ export const comparisons: ComparisonData[] = [
       {
         label: { en: 'Reviews / Trust', de: 'Bewertungen / Vertrauen', fr: 'Avis / confiance', it: 'Recensioni / Fiducia' },
         us: { en: 'New (building)', de: 'Neu (im Aufbau)', fr: 'Nouveau (en construction)', it: 'Nuovo (in costruzione)' },
-        them: { en: '4.3/5 Trustpilot, 6.6K reviews, 3M+ books', de: '4.3/5 Trustpilot, 6.6K Bewertungen, 3M+ Bücher', fr: '4.3/5 Trustpilot, 6.6K avis, 3M+ livres', it: '4.3/5 Trustpilot, 6.6K recensioni, 3M+ libri' },
+        them: { en: '4.3/5 Trustpilot, 6.6K reviews, 3M+ books', de: '4.3/5 Trustpilot, 6’600 Bewertungen, über 3 Mio. Bücher', fr: '4.3/5 Trustpilot, 6 600 avis, plus de 3 millions de livres', it: '4.3/5 Trustpilot, 6.600 recensioni, oltre 3 milioni di libri' },
         winner: 'them',
       },
       {
@@ -343,7 +343,7 @@ export const comparisons: ComparisonData[] = [
         winner: 'us',
       },
       {
-        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas', it: 'Rigenerare una pagina che non piace' },
+        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren, wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas', it: 'Rigenerare una pagina che non piace' },
         us: { en: 'Yes — unlimited retries', de: 'Ja — unbegrenzte Wiederholungen', fr: 'Oui — essais illimités', it: 'Sì — tentativi illimitati' },
         them: { en: 'Not available (template-based)', de: 'Nicht verfügbar (vorlagenbasiert)', fr: 'Non disponible (basé sur des modèles)', it: 'Non disponibile (basato su modelli)' },
         winner: 'us',
@@ -394,13 +394,13 @@ export const comparisons: ComparisonData[] = [
       ],
       de: [
         'Meister des emotionalen Marketings — ihre Unboxing-Videos rühren Eltern zu Tränen',
-        '3 Mio.+ verkaufte Bücher in 19 Märkten — bewährte Erfolgsgeschichte',
+        'über 3 Mio. verkaufte Bücher in 19 Märkten — bewährte Erfolgsgeschichte',
         'Familienfokus: Haustiere, Grosseltern und Geschwister in einem Buch',
         'Meilenstein-Bücher (Baby, Geburtstag, Hochzeit) mit emotionaler Erzählkunst',
       ],
       fr: [
         'Maîtres du marketing émotionnel — leurs vidéos de déballage font pleurer les parents',
-        '3M+ livres vendus dans 19 marchés — succès prouvé',
+        'plus de 3 millions de livres vendus dans 19 marchés — succès prouvé',
         'Focus famille : animaux, grands-parents et frères et sœurs dans un même livre',
         'Livres d\'étapes (naissance, anniversaire, mariage) avec storytelling émouvant',
       ],
@@ -413,8 +413,8 @@ export const comparisons: ComparisonData[] = [
     },
     verdict: {
       en: 'Hooray Heroes excels at creating emotional gifts with their template-based approach — they\'ve sold 3M+ books for good reason. Magical Story is the choice when you want a story that has never existed before, written specifically for your child with their actual face. For Swiss families, Magical Story also offers Swiss German and town-specific stories that Hooray Heroes cannot match.',
-      de: 'Hooray Heroes ist hervorragend bei emotionalen Geschenken mit ihrem Vorlagen-Ansatz — 3 Mio.+ verkaufte Bücher sprechen für sich. Magical Story ist die Wahl, wenn du eine Geschichte willst, die noch nie existiert hat — speziell für dein Kind geschrieben, mit dem echten Gesicht. Für Schweizer Familien bietet Magical Story zudem Schweizerdeutsch und Ortsgeschichten.',
-      fr: 'Hooray Heroes excelle dans les cadeaux émotionnels avec leur approche par modèles — 3M+ livres vendus pour une bonne raison. Magical Story est le choix quand vous voulez une histoire qui n\'a jamais existé, écrite spécifiquement pour votre enfant avec son vrai visage. Pour les familles suisses, Magical Story offre aussi le suisse allemand et les histoires locales.',
+      de: 'Hooray Heroes ist hervorragend bei emotionalen Geschenken mit ihrem Vorlagen-Ansatz — über 3 Mio. verkaufte Bücher sprechen für sich. Magical Story ist die Wahl, wenn du eine Geschichte willst, die noch nie existiert hat — speziell für dein Kind geschrieben, mit dem echten Gesicht. Für Schweizer Familien bietet Magical Story zudem Schweizerdeutsch und Ortsgeschichten.',
+      fr: 'Hooray Heroes excelle dans les cadeaux émotionnels avec leur approche par modèles — plus de 3 millions de livres vendus pour une bonne raison. Magical Story est le choix quand vous voulez une histoire qui n\'a jamais existé, écrite spécifiquement pour votre enfant avec son vrai visage. Pour les familles suisses, Magical Story offre aussi le suisse allemand et les histoires locales.',
       it: 'Hooray Heroes eccelle nel creare regali emozionali con il suo approccio basato su modelli — non a caso ha venduto oltre 3 milioni di libri. Magical Story è la scelta quando vuoi una storia mai esistita prima, scritta appositamente per tuo figlio con il suo vero volto. Per le famiglie svizzere, Magical Story offre anche lo svizzero tedesco e storie ambientate in città specifiche che Hooray Heroes non può eguagliare.',
     },
     faq: [
@@ -475,7 +475,7 @@ export const comparisons: ComparisonData[] = [
       {
         label: { en: 'How it works', de: 'Funktionsweise', fr: 'Fonctionnement', it: 'Come funziona' },
         us: { en: 'AI generates unique story and illustrations', de: 'KI erstellt einzigartige Geschichte und Illustrationen', fr: 'L\'IA crée une histoire et des illustrations uniques', it: 'L\'IA crea una storia e illustrazioni uniche' },
-        them: { en: 'Template-based with 8,000+ character combinations', de: 'Vorlagenbasiert mit 8,000+ Figurenkombinationen', fr: 'Basé sur des modèles avec 8,000+ combinaisons de personnages', it: 'Basato su modelli con 8,000+ combinazioni di personaggi' },
+        them: { en: 'Template-based with 8,000+ character combinations', de: 'Vorlagenbasiert mit 8’000+ Figurenkombinationen', fr: 'Basé sur des modèles avec 8 000+ combinaisons de personnages', it: 'Basato su modelli con 8.000+ combinazioni di personaggi' },
         winner: 'us',
       },
       {
@@ -551,7 +551,7 @@ export const comparisons: ComparisonData[] = [
         winner: 'us',
       },
       {
-        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas', it: 'Rigenerare una pagina che non piace' },
+        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren, wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas', it: 'Rigenerare una pagina che non piace' },
         us: { en: 'Yes — unlimited retries', de: 'Ja — unbegrenzte Wiederholungen', fr: 'Oui — essais illimités', it: 'Sì — tentativi illimitati' },
         them: { en: 'Not available (template-based)', de: 'Nicht verfügbar (vorlagenbasiert)', fr: 'Non disponible (basé sur des modèles)', it: 'Non disponibile (basato su modelli)' },
         winner: 'us',
@@ -751,7 +751,7 @@ export const comparisons: ComparisonData[] = [
         winner: 'us',
       },
       {
-        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas', it: 'Rigenerare una pagina che non piace' },
+        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren, wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas', it: 'Rigenerare una pagina che non piace' },
         us: { en: 'Yes — unlimited retries', de: 'Ja — unbegrenzte Wiederholungen', fr: 'Oui — essais illimités', it: 'Sì — tentativi illimitati' },
         them: { en: 'Not available (template-based)', de: 'Nicht verfügbar (vorlagenbasiert)', fr: 'Non disponible (basé sur des modèles)', it: 'Non disponibile (basato su modelli)' },
         winner: 'us',
@@ -905,7 +905,7 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Character consistency', de: 'Figurenkonsistenz', fr: 'Cohérence des personnages', it: 'Coerenza dei personaggi' },
-        us: { en: 'Entity repair workflow (multi-pass)', de: 'Entity-Reparatur-Workflow (mehrstufig)', fr: 'Workflow de réparation des entités (multipasse)', it: 'Flusso di riparazione delle entità (a più passaggi)' },
+        us: { en: 'Entity repair workflow (multi-pass)', de: 'Reparatur-Workflow für Figuren (mehrstufig)', fr: 'Workflow de réparation des entités (multipasse)', it: 'Flusso di riparazione delle entità (a più passaggi)' },
         them: { en: 'Standard AI generation', de: 'Standard-KI-Generierung', fr: 'Génération IA standard', it: 'Generazione IA standard' },
         winner: 'us',
       },
@@ -952,7 +952,7 @@ export const comparisons: ComparisonData[] = [
         winner: 'us',
       },
       {
-        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas', it: 'Rigenerare una pagina che non piace' },
+        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren, wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas', it: 'Rigenerare una pagina che non piace' },
         us: { en: 'Yes — unlimited retries', de: 'Ja — unbegrenzte Wiederholungen', fr: 'Oui — essais illimités', it: 'Sì — tentativi illimitati' },
         them: { en: 'Not advertised', de: 'Nicht beworben', fr: 'Non annoncé', it: 'Non pubblicizzato' },
         winner: 'us',
@@ -987,7 +987,7 @@ export const comparisons: ComparisonData[] = [
         'Histoires locales avec des monuments suisses',
         'Histoire complète gratuite (pas seulement 5 pages)',
         'Impression européenne professionnelle via Gelato',
-        'Traitement des données conforme RGPD et nDSG suisse',
+        'Traitement des données conforme RGPD et nLPD suisse',
       ],
       it: [
         'Supporto ai dialetti svizzero tedeschi — Lullaby.ink è focalizzato sull\'inglese',
@@ -1104,7 +1104,7 @@ export const comparisons: ComparisonData[] = [
       },
       {
         label: { en: 'Character consistency', de: 'Figurenkonsistenz', fr: 'Cohérence des personnages', it: 'Coerenza dei personaggi' },
-        us: { en: 'Entity repair workflow (multi-pass)', de: 'Entity-Reparatur-Workflow (mehrstufig)', fr: 'Workflow de réparation des entités (multipasse)', it: 'Flusso di riparazione delle entità (a più passaggi)' },
+        us: { en: 'Entity repair workflow (multi-pass)', de: 'Reparatur-Workflow für Figuren (mehrstufig)', fr: 'Workflow de réparation des entités (multipasse)', it: 'Flusso di riparazione delle entità (a più passaggi)' },
         them: { en: 'Not specified', de: 'Nicht angegeben', fr: 'Non précisé', it: 'Non specificato' },
         winner: 'us',
       },
@@ -1145,7 +1145,7 @@ export const comparisons: ComparisonData[] = [
         winner: 'us',
       },
       {
-        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas', it: 'Rigenerare una pagina che non piace' },
+        label: { en: 'Regenerate a page you don\'t like', de: 'Seite neu generieren, wenn sie nicht gefällt', fr: 'Régénérer une page qui ne vous plaît pas', it: 'Rigenerare una pagina che non piace' },
         us: { en: 'Yes — unlimited retries', de: 'Ja — unbegrenzte Wiederholungen', fr: 'Oui — essais illimités', it: 'Sì — tentativi illimitati' },
         them: { en: 'Not advertised', de: 'Nicht beworben', fr: 'Non annoncé', it: 'Non pubblicizzato' },
         winner: 'us',
@@ -1285,7 +1285,7 @@ export const comparisons: ComparisonData[] = [
       {
         label: { en: 'Price (print)', de: 'Preis (Druck)', fr: 'Prix (imprimé)', it: 'Prezzo (stampa)' },
         us: { en: 'CHF 29-37', de: 'CHF 29-37', fr: 'CHF 29-37', it: 'CHF 29-37' },
-        them: { en: '€29.95-39.95 by age band + €4.95 shipping (DE)', de: '€29.95-39.95 je nach Altersstufe + €4.95 Versand (DE)', fr: '€29.95-39.95 selon la tranche d\'âge + €4.95 de livraison (DE)', it: '€29.95-39.95 in base alla fascia d\'età + €4.95 di spedizione (DE)' },
+        them: { en: '€29.95-39.95 by age band + €4.95 shipping (DE)', de: '29,95-39,95 € je nach Altersstufe + 4,95 € Versand (DE)', fr: '29,95-39,95 € selon la tranche d\'âge + 4,95 € de livraison (DE)', it: '29,95-39,95 € in base alla fascia d\'età + 4,95 € di spedizione (DE)' },
         winner: 'tie',
       },
       {
@@ -1473,13 +1473,13 @@ export const comparisons: ComparisonData[] = [
       {
         label: { en: 'Price (digital)', de: 'Preis (digital)', fr: 'Prix (numérique)', it: 'Prezzo (digitale)' },
         us: { en: 'CHF 9.90 (first story free)', de: 'CHF 9.90 (erste Geschichte gratis)', fr: 'CHF 9.90 (première histoire gratuite)', it: 'CHF 9.90 (prima storia gratis)' },
-        them: { en: '€6.99 ebook', de: '€6.99 E-Book', fr: 'E-book €6.99', it: 'E-book €6.99' },
+        them: { en: '€6.99 ebook', de: '6,99 € E-Book', fr: 'E-book 6,99 €', it: 'E-book 6,99 €' },
         winner: 'them',
       },
       {
         label: { en: 'Price (print)', de: 'Preis (Druck)', fr: 'Prix (imprimé)', it: 'Prezzo (stampa)' },
         us: { en: 'CHF 29-37', de: 'CHF 29-37', fr: 'CHF 29-37', it: 'CHF 29-37' },
-        them: { en: '€27.99 hardcover', de: '€27.99 Hardcover', fr: '€27.99 couverture rigide', it: '€27.99 copertina rigida' },
+        them: { en: '€27.99 hardcover', de: '27,99 € Hardcover', fr: '27,99 € couverture rigide', it: '27,99 € copertina rigida' },
         winner: 'them',
       },
       {
@@ -1718,7 +1718,7 @@ export const comparisons: ComparisonData[] = [
         },
         features: {
           en: ['20+ languages including Romansh', 'Licensed Globi books', '100% recycled paper', '8,000+ character combinations', 'Swiss German dialects'],
-          de: ['20+ Sprachen inkl. Romanisch', 'Lizenzierte Globi-Bücher', '100% Recyclingpapier', '8.000+ Figurenkombinationen', 'Schweizerdeutsch-Dialekte'],
+          de: ['20+ Sprachen inkl. Romanisch', 'Lizenzierte Globi-Bücher', '100% Recyclingpapier', '8’000+ Figurenkombinationen', 'Schweizerdeutsch-Dialekte'],
           fr: ['20+ langues dont le romanche', 'Livres Globi sous licence', 'Papier 100 % recyclé', '8 000+ combinaisons', 'Dialectes suisses allemands'],
           it: ['20+ lingue tra cui il romancio', 'Libri di Globi su licenza', 'Carta 100% riciclata', '8.000+ combinazioni di personaggi', 'Dialetti svizzero tedeschi'],
         },
@@ -1740,15 +1740,15 @@ export const comparisons: ComparisonData[] = [
         },
         highlight: {
           en: 'The global market leader — 11M+ books sold, backed by Penguin Random House',
-          de: 'Der weltweite Marktführer — 11 Mio.+ Bücher verkauft, unterstützt von Penguin Random House',
-          fr: 'Le leader mondial — 11M+ livres vendus, soutenu par Penguin Random House',
+          de: 'Der weltweite Marktführer — über 11 Mio. Bücher verkauft, unterstützt von Penguin Random House',
+          fr: 'Le leader mondial — plus de 11 millions de livres vendus, soutenu par Penguin Random House',
           it: 'Il leader di mercato mondiale — oltre 11 milioni di libri venduti, sostenuto da Penguin Random House',
         },
         features: {
           en: ['11M+ books sold worldwide', '15+ languages', '82K+ Trustpilot reviews (4.5 stars)', 'Penguin Random House backed', 'Professional template design'],
           de: ['11 Mio.+ weltweit verkaufte Bücher', '15+ Sprachen', '82.000+ Trustpilot-Bewertungen (4,5 Sterne)', 'Von Penguin Random House unterstützt', 'Professionelles Vorlagen-Design'],
-          fr: ['11M+ livres vendus dans le monde', '15+ langues', '82 000+ avis Trustpilot (4,5 étoiles)', 'Soutenu par Penguin Random House', 'Design de modèles professionnel'],
-          it: ['11M+ libri venduti nel mondo', '15+ lingue', '82.000+ recensioni Trustpilot (4,5 stelle)', 'Sostenuto da Penguin Random House', 'Design di modelli professionale'],
+          fr: ['plus de 11 millions de livres vendus dans le monde', '15+ langues', '82 000+ avis Trustpilot (4,5 étoiles)', 'Soutenu par Penguin Random House', 'Design de modèles professionnel'],
+          it: ['oltre 11 milioni di libri venduti nel mondo', '15+ lingue', '82.000+ recensioni Trustpilot (4,5 stelle)', 'Sostenuto da Penguin Random House', 'Design di modelli professionale'],
         },
       },
       {
@@ -1796,15 +1796,15 @@ export const comparisons: ComparisonData[] = [
         },
         highlight: {
           en: 'The gift that makes parents cry (in a good way) — 3M+ books sold',
-          de: 'Das Geschenk, das Eltern zum Weinen bringt (vor Freude) — 3 Mio.+ Bücher verkauft',
-          fr: 'Le cadeau qui fait pleurer les parents (de joie) — 3M+ livres vendus',
+          de: 'Das Geschenk, das Eltern zum Weinen bringt (vor Freude) — über 3 Mio. Bücher verkauft',
+          fr: 'Le cadeau qui fait pleurer les parents (de joie) — plus de 3 millions de livres vendus',
           it: 'Il regalo che fa commuovere i genitori (di gioia) — oltre 3 milioni di libri venduti',
         },
         features: {
           en: ['3M+ books sold across 19 markets', 'Family-focused (pets, grandparents, siblings)', 'Milestone books (new baby, birthday, wedding)', '4.3/5 Trustpilot, 6.6K reviews'],
-          de: ['3 Mio.+ Bücher in 19 Märkten verkauft', 'Familienfokus (Haustiere, Grosseltern, Geschwister)', 'Meilenstein-Bücher (Baby, Geburtstag, Hochzeit)', '4,3/5 Trustpilot, 6.600 Bewertungen'],
-          fr: ['3M+ livres vendus dans 19 marchés', 'Focus famille (animaux, grands-parents, frères et sœurs)', 'Livres d\'étapes (naissance, anniversaire, mariage)', '4,3/5 Trustpilot, 6 600 avis'],
-          it: ['3M+ libri venduti in 19 mercati', 'Focus sulla famiglia (animali domestici, nonni, fratelli)', 'Libri per momenti speciali (nuovo bebè, compleanno, matrimonio)', '4,3/5 Trustpilot, 6.600 recensioni'],
+          de: ['über 3 Mio. Bücher in 19 Märkten verkauft', 'Familienfokus (Haustiere, Grosseltern, Geschwister)', 'Meilenstein-Bücher (Baby, Geburtstag, Hochzeit)', '4,3/5 Trustpilot, 6.600 Bewertungen'],
+          fr: ['plus de 3 millions de livres vendus dans 19 marchés', 'Focus famille (animaux, grands-parents, frères et sœurs)', 'Livres d\'étapes (naissance, anniversaire, mariage)', '4,3/5 Trustpilot, 6 600 avis'],
+          it: ['oltre 3 milioni di libri venduti in 19 mercati', 'Focus sulla famiglia (animali domestici, nonni, fratelli)', 'Libri per momenti speciali (nuovo bebè, compleanno, matrimonio)', '4,3/5 Trustpilot, 6.600 recensioni'],
         },
       },
     ],
@@ -1896,7 +1896,7 @@ export const comparisons: ComparisonData[] = [
         },
         features: {
           en: ['Swiss German dialects', 'Town-specific stories', 'Character consistency (entity repair)', 'Free full story', '14 art styles', '170+ themes'],
-          de: ['Schweizerdeutsch-Dialekte', 'Ortsgeschichten', 'Figurenkonsistenz (Entity-Repair)', 'Ganze Geschichte gratis', '14 Kunststile', '170+ Themen'],
+          de: ['Schweizerdeutsch-Dialekte', 'Ortsgeschichten', 'Figurenkonsistenz (mehrstufige Reparatur)', 'Ganze Geschichte gratis', '14 Kunststile', '170+ Themen'],
           fr: ['Dialectes suisses allemands', 'Histoires locales', 'Cohérence des personnages', 'Histoire complète gratuite', '14 styles artistiques', '170+ thèmes'],
           it: ['Dialetti svizzero tedeschi', 'Storie ambientate in città specifiche', 'Coerenza dei personaggi (riparazione entità)', 'Storia completa gratuita', '14 stili artistici', '170+ temi'],
         },
@@ -2114,7 +2114,7 @@ export const comparisons: ComparisonData[] = [
         a: {
           en: 'Reputable platforms like Magical Story use content filtering and human-guided AI prompts to ensure age-appropriate content. Always preview the story before ordering a print. Magical Story is GDPR and Swiss nDSG compliant with Swiss data hosting.',
           de: 'Seriöse Plattformen wie Magical Story nutzen Inhaltsfilter und menschlich geführte KI-Prompts für altersgerechte Inhalte. Schau dir die Geschichte immer an, bevor du ein gedrucktes Buch bestellst. Magical Story ist DSGVO- und nDSG-konform mit Schweizer Datenhosting.',
-          fr: 'Les plateformes réputées comme Magical Story utilisent des filtres de contenu et des prompts IA guidés pour un contenu adapté à l\'âge. Prévisualisez toujours l\'histoire. Magical Story est conforme RGPD et nDSG avec hébergement suisse.',
+          fr: 'Les plateformes réputées comme Magical Story utilisent des filtres de contenu et des prompts IA guidés pour un contenu adapté à l\'âge. Prévisualisez toujours l\'histoire. Magical Story est conforme RGPD et nLPD avec hébergement suisse.',
           it: 'Le piattaforme affidabili come Magical Story usano filtri sui contenuti e prompt IA guidati da persone per garantire contenuti adatti all\'età. Rivedi sempre la storia prima di ordinare una stampa. Magical Story è conforme al GDPR e alla nLPD svizzera, con hosting dei dati in Svizzera.',
         },
       },
@@ -2122,7 +2122,7 @@ export const comparisons: ComparisonData[] = [
         q: { en: 'Which AI book generator has the best character consistency?', de: 'Welcher KI-Generator hat die beste Figurenkonsistenz?', fr: 'Quel générateur IA a la meilleure cohérence des personnages ?', it: 'Quale generatore IA ha la migliore coerenza dei personaggi?' },
         a: {
           en: 'Character consistency — making sure the child looks the same on every page — is the biggest challenge in AI storybooks. Magical Story uses a multi-pass entity repair workflow that evaluates and fixes consistency across all pages, which is the most sophisticated approach currently available.',
-          de: 'Figurenkonsistenz — sicherzustellen, dass das Kind auf jeder Seite gleich aussieht — ist die grösste Herausforderung bei KI-Bilderbüchern. Magical Story nutzt einen Multi-Pass-Entity-Repair-Workflow, der Konsistenz über alle Seiten prüft und korrigiert.',
+          de: 'Figurenkonsistenz — sicherzustellen, dass das Kind auf jeder Seite gleich aussieht — ist die grösste Herausforderung bei KI-Bilderbüchern. Magical Story nutzt einen mehrstufigen Reparatur-Workflow, der Konsistenz über alle Seiten prüft und korrigiert.',
           fr: 'La cohérence des personnages — s\'assurer que l\'enfant a la même apparence sur chaque page — est le plus grand défi. Magical Story utilise un processus de réparation multi-passes qui évalue et corrige la cohérence sur toutes les pages.',
           it: 'La coerenza dei personaggi — assicurarsi che il bambino abbia lo stesso aspetto in ogni pagina — è la sfida più grande nei libri IA. Magical Story usa una procedura di riparazione in più passaggi che valuta e corregge la coerenza su tutte le pagine, l\'approccio più sofisticato attualmente disponibile.',
         },
