@@ -497,7 +497,8 @@ async function runBookReviewRounds(d) {
       const refusedNow = [];
       successes = successes.filter(r => {
         const parent = parentOf.get(r.pageNumber);
-        const verdict = repairFigureVerdict(images.detectionForVersion(parent), r.bboxDetection);
+        const parentDet = images.detectionForVersion(parent);
+        const verdict = repairFigureVerdict(parentDet, r.bboxDetection, d.groupSizesFor ? d.groupSizesFor(null, parent) : new Map());
         if (!verdict.decided) {
           log.warn(`⚠️ [BOOK-REVIEW] Round ${round} p${r.pageNumber}: figure guard could not compare the repair with its parent — ${verdict.reason}; the repair goes to the review unchecked`);
           return true;

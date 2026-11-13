@@ -7,21 +7,13 @@
  */
 require('dotenv').config();
 const { Pool } = require('pg');
-const { repairFigureVerdict, duplicateNames } = require('../../server/lib/figureGuard');
-const { buildCastIndex, resolveEntity } = require('../../server/lib/castResolver');
+const { repairFigureVerdict, duplicateNames, allowedFigureCounts } = require('../../server/lib/figureGuard');
+const { buildCastIndex } = require('../../server/lib/castResolver');
 
 const days = Number(process.argv[2]) || 60;
 const KEYS = ['frontCover', 'backCover', 'initialPage'];
 
-function groupSizes(det, idx) {
-  const m = new Map();
-  for (const c of det?.expectedCharacters || []) {
-    const hit = resolveEntity(c.name, idx);
-    const n = hit && hit.entry && Number.isInteger(hit.entry.count) && hit.entry.count >= 2 ? hit.entry.count : 0;
-    if (n) m.set(c.name, n);
-  }
-  return m;
-}
+const groupSizes = (det, idx) => allowedFigureCounts(det, idx);
 
 (async () => {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
@@ -59,7 +51,7 @@ function groupSizes(det, idx) {
       if (shipped.type === 'repair' && ai > 0) {
         const parent = versions.find(v => v && shipped.parentSource && v.source === shipped.parentSource) || versions[ai - 1];
         const pd = parent?.bboxDetection || parent?.evaluation?.bboxDetection || null;
-        const v = repairFigureVerdict(pd, det);
+        const v = repairFigureVerdict(pd, det, groupSizes(pd, idx));
         repairPicks.push(id);
         if (!v.decided) undecided++;
         else if (v.refuse) refused.push({ id, method: shipped.source, parent: v.parent, child: v.child });

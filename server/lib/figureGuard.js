@@ -50,9 +50,15 @@ function castFigures(detection) {
   });
 }
 
-/** @returns {{cast:number, raw:number}|null} null when the detection cannot be read as a name match */
-function figureCounts(detection) {
-  const cast = castFigures(detection);
+/**
+ * @param {Map<string,number>} [allowedCounts] from allowedFigureCounts; a name allowed Infinity is an animal and is
+ *   not counted: the detector often leaves an animal unlabelled, and counting it refused two 2026-11-13 replay repairs
+ *   that kept every child (a hedgehog and a seagull went unlabelled).
+ * @returns {{cast:number, raw:number}|null} null when the detection cannot be read as a name match
+ */
+function figureCounts(detection, allowedCounts = new Map()) {
+  const all = castFigures(detection);
+  const cast = all && all.filter(f => allowedCounts.get(f.name.trim()) !== Infinity);
   if (!cast) return null;
   return { cast: cast.length, raw: detection.figures.length };
 }
@@ -61,9 +67,9 @@ function figureCounts(detection) {
  * Repair figure guard.
  * @returns {{decided:boolean, refuse:boolean, parent:object|null, child:object|null, reason:string}}
  */
-function repairFigureVerdict(parentDetection, childDetection) {
-  const parent = figureCounts(parentDetection);
-  const child = figureCounts(childDetection);
+function repairFigureVerdict(parentDetection, childDetection, allowedCounts = new Map()) {
+  const parent = figureCounts(parentDetection, allowedCounts);
+  const child = figureCounts(childDetection, allowedCounts);
   if (!parent || !child) {
     return { decided: false, refuse: false, parent, child, reason: !child ? 'the repaired picture has no readable detection' : 'the parent has no readable detection' };
   }
@@ -148,7 +154,24 @@ function duplicateNames(detection, groupSizes = new Map()) {
   return out;
 }
 
+// How many figures each expected name may have on one image, for duplicateNames.
+// A counted group (roster `count` >= 2) may have N. An animal is never a duplicate
+// here: animals are matched against objects, and the identity pass has put an
+// animal's name on several person boxes (two unicorn pages, 2026-11-13 replay).
+function allowedFigureCounts(detection, castIndex) {
+  const { resolveEntity } = require('./castResolver');
+  const sizes = new Map();
+  for (const c of Array.isArray(detection?.expectedCharacters) ? detection.expectedCharacters : []) {
+    const hit = resolveEntity(c.name, castIndex);
+    if (!hit) continue;
+    if (hit.kind === 'animal') { sizes.set(c.name, Infinity); continue; }
+    const n = hit.entry && Number.isInteger(hit.entry.count) && hit.entry.count >= 2 ? hit.entry.count : 0;
+    if (n) sizes.set(c.name, n);
+  }
+  return sizes;
+}
+
 module.exports = {
   UNMATCHED_NAME, SAME_FIGURE_OVERLAP, DUPLICATE_NAME_MARKER,
-  figureCounts, repairFigureVerdict, duplicateNames,
+  figureCounts, repairFigureVerdict, duplicateNames, allowedFigureCounts,
 };

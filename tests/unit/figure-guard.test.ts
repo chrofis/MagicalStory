@@ -162,3 +162,33 @@ describe('book review rounds', () => {
     expect(runRepairMethod).not.toHaveBeenCalled();
   });
 });
+
+describe('allowedFigureCounts: animals are never duplicates (two unicorn pages, 2026-11-13 replay)', () => {
+  const { buildCastIndex } = require('../../server/lib/castResolver.js');
+  const idx = buildCastIndex(
+    { characters: [{ id: 1, name: 'Lio' }, { id: 2, name: 'Noam' }] },
+    { animals: [{ id: 'ANI001', name: 'Silbermond' }], secondaryCharacters: [{ id: 'CHR001', name: 'Guards', count: 3 }] },
+  );
+  it('an animal name on two boxes is not flagged; a cast name still is', () => {
+    const d = det([fig('Silbermond', box(0, 0, 100, 200)), fig('Silbermond', box(300, 0, 400, 200)),
+      fig('Lio', box(500, 0, 600, 200)), fig('Lio', box(700, 0, 800, 200))], ['Lio', 'Silbermond']);
+    const allowed = guard.allowedFigureCounts(d, idx);
+    expect(allowed.get('Silbermond')).toBe(Infinity);
+    expect(guard.duplicateNames(d, allowed)).toEqual([{ name: 'Lio', figures: 2, allowed: 1 }]);
+  });
+  it('a counted group keeps its N', () => {
+    const d = det([], ['Guards']);
+    expect(guard.allowedFigureCounts(d, idx).get('Guards')).toBe(3);
+  });
+});
+
+describe('repair guard counts people only (hedgehog / seagull replay refusals, 2026-11-13)', () => {
+  it('an animal left unlabelled in the repair does not refuse it; a lost child still does', () => {
+    const allowed = new Map([['Seagull', Infinity]]);
+    const parent = det([fig('Lio', box(0, 0, 100, 200)), fig('Noam', box(200, 0, 300, 200)), fig('Seagull', box(120, 100, 180, 200))], ['Lio', 'Noam', 'Seagull']);
+    const keptKids = det([fig('Lio', box(0, 0, 100, 200)), fig('Noam', box(200, 0, 300, 200)), fig('UNKNOWN', box(120, 100, 180, 200))], ['Lio', 'Noam', 'Seagull']);
+    const lostKid = det([fig('Lio', box(0, 0, 100, 200)), fig('Seagull', box(120, 100, 180, 200))], ['Lio', 'Noam', 'Seagull']);
+    expect(guard.repairFigureVerdict(parent, keptKids, allowed).refuse).toBe(false);
+    expect(guard.repairFigureVerdict(parent, lostKid, allowed).refuse).toBe(true);
+  });
+});

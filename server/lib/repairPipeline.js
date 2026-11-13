@@ -1782,15 +1782,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // the Visual-Bible secondaries.
   // Counted groups (roster `count` N) of one detection's expected characters: N figures for one name are by design.
   const groupSizesOfDetection = (detection) => {
-    const { buildCastIndex, resolveEntity } = require('./castResolver');
-    const idx = buildCastIndex(storyData || null, visualBible || null);
-    const sizes = new Map();
-    for (const c of Array.isArray(detection?.expectedCharacters) ? detection.expectedCharacters : []) {
-      const hit = resolveEntity(c.name, idx);
-      const n = hit && hit.entry && Number.isInteger(hit.entry.count) && hit.entry.count >= 2 ? hit.entry.count : 0;
-      if (n) sizes.set(c.name, n);
-    }
-    return sizes;
+    const { buildCastIndex } = require('./castResolver');
+    const { allowedFigureCounts } = require('./figureGuard');
+    return allowedFigureCounts(detection, buildCastIndex(storyData || null, visualBible || null));
   };
 
   const redetectVersionImage = async (r, roundLabel) => {
@@ -2983,7 +2977,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         for (let i = roundSuccess.length - 1; i >= 0; i--) {
           const r = roundSuccess[i];
           const parent = roundParent.get(r.pageNumber);
-          const verdict = repairFigureVerdict(parent ? images().detectionForVersion(parent) : null, r.bboxDetection);
+          const parentDet = parent ? images().detectionForVersion(parent) : null;
+          const verdict = repairFigureVerdict(parentDet, r.bboxDetection, groupSizesOfDetection(parentDet));
           if (!verdict.decided) {
             log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round} P${r.pageNumber}: figure guard could not compare the repair with its parent — ${verdict.reason}`);
             continue;
