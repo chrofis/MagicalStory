@@ -7,7 +7,7 @@
  * The commission is rebuilt from the story record (the job rows are pruned), the same fields
  * routes/admin/jobs.js rerun-full rebuilds. Paid: one trial arc call per story on MODEL_DEFAULTS.trialArcModel.
  *
- *   DBU=<postgres url> node scripts/analysis/trial-setback-replay.js <outDir> [--dry] [--limit=N]
+ *   DBU=<postgres url> node scripts/analysis/trial-setback-replay.js <outDir> [--dry] [--limit=N] [--ids=jobId,jobId] [--cap=USD]
  */
 require('dotenv').config();
 const fs = require('fs');
@@ -28,10 +28,14 @@ async function main() {
   if (!dry && !price) throw new Error(`no price for ${MODEL_DEFAULTS.trialArcModel}`);
   const capUsd = parseFloat((process.argv.find(a => a.startsWith('--cap=')) || '').split('=')[1]) || 0;
   if (!dry && !capUsd) throw new Error('a paid run needs --cap=<USD>');
+  // --ids=a,b: replay only these stored trials (e.g. the ones whose special details name a relative).
+  const idsArg = (process.argv.find(a => a.startsWith('--ids=')) || '').split('=')[1];
+  const ids = idsArg ? idsArg.split(',') : null;
   const pool = new Pool({ connectionString: process.env.DBU, ssl: { rejectUnauthorized: false } });
   const rows = (await pool.query(
     `SELECT id, data FROM stories WHERE (data->>'trialMode')='true'
-       AND jsonb_array_length(COALESCE(data->'sceneImages','[]'))>0 ORDER BY created_at DESC LIMIT $1`, [limit])).rows;
+       AND jsonb_array_length(COALESCE(data->'sceneImages','[]'))>0
+       AND ($2::text[] IS NULL OR id = ANY($2)) ORDER BY created_at DESC LIMIT $1`, [limit, ids])).rows;
   await pool.end();
 
   let spent = 0;

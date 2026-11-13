@@ -45,26 +45,29 @@ function fakeCaller(log: any[], overrides: any = {}) {
 }
 
 describe('trial writer prompts', () => {
-  it('the planner prompt carries the mandatory cast line from the special details, once', () => {
+  it('the planner prompt carries the special details once, as hints, never as a binding cast list', () => {
     const p = PB.buildTrialArcPrompt(input, 6);
-    expect(p.split('MANDATORY CAST & OBJECTS').length - 1).toBe(1);
+    expect(p.split('CHARACTER DETAILS').length - 1).toBe(1);
+    expect(p).toContain('hints, not requirements');
+    expect(p).not.toContain('MANDATORY CAST');
+    expect(p).not.toMatch(/binding\)/);
     expect(p).toContain('Serena: ');
     expect(p).not.toMatch(/\{[A-Z][A-Z0-9_]*\}/);
   });
 
   it('the pages prompt carries the same line and the planner output verbatim as the plan', () => {
     const p = PB.buildTrialPagesPrompt(input, 6, ARC);
-    expect(p).toContain('MANDATORY CAST & OBJECTS');
+    expect(p).toContain('CHARACTER DETAILS');
     expect(p).toContain('---STORY ARC---');
     expect(p).toContain(ARC.slice(0, 300));
     expect(p).toContain(ARC.slice(-300));
     expect(p).not.toMatch(/\{[A-Z][A-Z0-9_]*\}/);
   });
 
-  it('no mandatory line when no character has special details', () => {
+  it('no details line when no character has special details', () => {
     const bare = { ...input, characters: input.characters.map((c: any) => ({ ...c, traits: { strengths: ['Joyeux'] }, customTraits: undefined })) };
-    expect(PB.buildTrialMandatoryCast(bare)).toBe('');
-    expect(PB.buildTrialArcPrompt(bare, 6)).not.toContain('MANDATORY CAST');
+    expect(PB.buildTrialCharacterDetailHints(bare)).toBe('');
+    expect(PB.buildTrialArcPrompt(bare, 6)).not.toContain('CHARACTER DETAILS');
   });
 
   it('the planner writes the arc, bible and cover and no pages; the pages writer the reverse', () => {

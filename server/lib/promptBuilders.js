@@ -13941,14 +13941,15 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
 }
 
 /**
- * The MANDATORY CAST & OBJECTS line of the trial ARC prompt: every named figure,
- * pet, toy and object of the characters' special details, so the planner puts it
- * into the arc and the Visual Bible (the plush elephant in a character's details
- * was dropped from the story by every planner without it; decisions.md
- * 2026-10-10 Flash arc v2). Same character fields the CHARACTERS block renders.
+ * The CHARACTER DETAILS line of both trial prompts: the characters' special details
+ * as hints, not requirements (owner 2026-11-13, docs/decisions.md; replaces the
+ * binding MANDATORY CAST line of 2026-10-10, which forced invented photo-less
+ * relatives and turned a dislike into something that must appear). A toy, pet or
+ * hobby is still encouraged (the plush elephant was dropped by every planner with
+ * no line at all). Same character fields the CHARACTERS block renders.
  * Empty when no character has any.
  */
-function buildTrialMandatoryCast(inputData) {
+function buildTrialCharacterDetailHints(inputData) {
   const items = [];
   for (const c of inputData.characters || []) {
     const t = c.traits; const bits = [];
@@ -13958,8 +13959,8 @@ function buildTrialMandatoryCast(inputData) {
     if (bits.length) items.push(c.name + ': ' + bits.join('; '));
   }
   if (!items.length) return '';
-  return '- **MANDATORY CAST & OBJECTS** (from the characters special details; binding): ' + items.join(' | ') +
-    '. Every named figure, pet, toy and object here, and the object or creature of every activity named, appears in the arc AND in the Visual Bible with a role in the story, on the scenes where it matters (a toy, pet or object gets its own entry; an activity becomes something the character does or uses in the story). The maximums below yield to this.' + '\n';
+  return '- **CHARACTER DETAILS** (from the characters special details; hints, not requirements): ' + items.join(' | ') +
+    '. Use what fits the story. A beloved toy, pet or hobby named here is a good thing to bring in; when the story uses one, a toy, pet or object gets its own Visual Bible entry. A person named here who is not one of the characters is never added to the cast or drawn; the text may mention them. Something a character dislikes or does not do is respected, never shown as liked or done.' + '\n';
 }
 
 /**
@@ -13970,7 +13971,7 @@ function buildTrialArcPrompt(inputData, sceneCount = null) {
   if (!PROMPT_TEMPLATES.storyTrialArc) throw new Error('buildTrialArcPrompt: story-trial-arc template not loaded');
   return fillTemplate(PROMPT_TEMPLATES.storyTrialArc, {
     ...trialFillValues(inputData, sceneCount),
-    MANDATORY_CAST: buildTrialMandatoryCast(inputData),
+    CHARACTER_DETAIL_HINTS: buildTrialCharacterDetailHints(inputData),
   });
 }
 
@@ -13989,7 +13990,7 @@ function buildTrialPagesPrompt(inputData, sceneCount = null, arcText = '') {
     // it every trial page resolved a `wornAs` item to WORN by silence.
     WORN_ITEMS_ROW: WORN_ITEMS_ROW_RULE,
     GARMENT_REMOVED: GARMENT_REMOVED_RULE,
-    MANDATORY_CAST: buildTrialMandatoryCast(inputData),
+    CHARACTER_DETAIL_HINTS: buildTrialCharacterDetailHints(inputData),
   });
 }
 
@@ -14970,7 +14971,7 @@ module.exports = {
   buildStoryBibleFromBeatsPrompt,
   buildTrialArcPrompt,
   buildTrialPagesPrompt,
-  buildTrialMandatoryCast,
+  buildTrialCharacterDetailHints,
   buildSceneTranslationPrompt,
   buildAvailableLandmarksSection,
   buildTrialIdeaCostumeInstructions,

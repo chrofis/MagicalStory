@@ -46,7 +46,7 @@ SHORT story — {PAGES} scenes. Keep it focused:
 
 - **Scenes**: {PAGES}
 - **Characters** (appearance is illustration context for the scene hints, never for the story text): {CHARACTERS}
-{MANDATORY_CAST}- **Story Idea**: {STORY_DETAILS}
+{CHARACTER_DETAIL_HINTS}- **Story Idea**: {STORY_DETAILS}
 
 {CATEGORY_GUIDELINES}
 
