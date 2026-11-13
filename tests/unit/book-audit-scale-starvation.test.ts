@@ -61,7 +61,7 @@ describe('a starved object-scale check is loud and recorded, never silent', () =
 
     const spy = vi.spyOn(globalThis, 'fetch' as any).mockResolvedValue({
       ok: true,
-      json: async () => ({ candidates: [{ content: { parts: [{ text: 'no faults' }] } }], usageMetadata: {} }),
+      json: async () => ({ candidates: [{ content: { parts: [{ text: 'FAULTS: 0' }] } }], usageMetadata: {} }),
     } as any);
     const result = await bookAudit.auditStoryBook(
       { id: 's1', sceneImages: [{ pageNumber: 1, text: 't', imageData: IMG }] },

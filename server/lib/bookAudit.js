@@ -378,10 +378,10 @@ async function judgeChunkOpenRouter(parts, modelId, thinkingLevel) {
   const data = await response.json();
   if (data.error) throw new Error(`book audit openrouter error: ${JSON.stringify(data.error).slice(0, 300)}`);
   const choice = data.choices?.[0];
-  if (choice?.finish_reason && !['stop', 'end_turn'].includes(String(choice.finish_reason))) {
-    log.warn(`⚠️ [BOOK-AUDIT] chunk finished as ${choice.finish_reason} — faults may be missing`);
-  }
+  const finish = choice?.finish_reason ? String(choice.finish_reason) : null;
   return {
+    // A finish other than stop means the list was cut; assertCompleteAuditReply throws on it.
+    truncated: finish && !['stop', 'end_turn'].includes(finish) ? finish : null,
     text: String(choice?.message?.content || '').trim(),
     // completion_tokens already include reasoning on OpenRouter — the old
     // thinking_tokens: reasoning_tokens here priced every reasoning token twice.
@@ -515,7 +515,18 @@ function reviewRulesText(review, templates, fillTemplate) {
  * reference sheet the page judges also use, built by the same resolver), each preceded by its name. Sent once per
  * review call so the reviewer can tell two copies of one cast member apart (docs/decisions.md 2026-11-13).
  * A cast member with no picture is left out; one whose picture cannot be read fails the review loudly.
+ *
+ * Only an AVATAR is a reference picture. The shared resolver falls through to the customer's real photo
+ * (body / face / primary photo) when no avatar is found; that photo of a child is never sent to the reviewer
+ * (pipeline review 2026-11-13, finding 2). Such a cast member counts as "no picture": left out, and logged as
+ * an error so the missing avatar is seen.
  */
+const RAW_PHOTO_TYPES = new Set(['body', 'bodyNoBg', 'face', 'fallback', 'none']);
+function isAvatarReference(ph) {
+  if (ph?.isStyled === true) return true;
+  return !RAW_PHOTO_TYPES.has(String(ph?.photoType || 'none'));
+}
+
 async function buildCastReferenceParts(storyData) {
   const characters = storyData?.characters || [];
   if (!characters.length) return [];
@@ -525,6 +536,10 @@ async function buildCastReferenceParts(storyData) {
   const parts = [];
   for (const ph of photos) {
     if (!ph?.photoUrl || !ph?.name) continue;
+    if (!isAvatarReference(ph)) {
+      log.error(`❌ [BOOK-REVIEW] "${ph.name}" has no avatar (resolver returned a real photo, type ${ph.photoType || 'none'}) — the photo is NOT sent; this cast member has no reference picture in the review`);
+      continue;
+    }
     let dataUri = ph.photoUrl;
     if (!String(dataUri).startsWith('data:image')) {
       const buf = await r2Lib.bytesFromAnyImage(dataUri);
@@ -573,17 +588,15 @@ async function judgeGeminiParts(parts, modelId, thinkingLevel = null) {
   }
   const data = await response.json();
   // A truncated reply loses the tail of the fault list and reads as a clean
-  // audit. Say so out loud rather than under-reporting silently.
+  // audit: report it, and assertCompleteAuditReply throws on it.
   const finish = data.candidates?.[0]?.finishReason;
-  if (finish && finish !== 'STOP') {
-    log.warn(`⚠️ [BOOK-AUDIT] a call finished as ${finish} — output may be truncated`);
-  }
   const text = (data.candidates?.[0]?.content?.parts || [])
     .filter(p => !p.thought)
     .map(p => p.text || '')
     .join('')
     .trim();
   return {
+    truncated: finish && finish !== 'STOP' ? String(finish) : null,
     text,
     usage: geminiUsage(data.usageMetadata),
   };
@@ -755,6 +768,38 @@ function parseBetterVerdicts(raw) {
   return out;
 }
 
+// The closing "FAULTS: <count>" line prompts/book-audit.txt asks for after the list.
+const FAULT_COUNT_RE = /^[ \t>*-]*FAULTS:\s*(\d+)\s*$/gim;
+
+/**
+ * One chunk's reply is only a review when it is complete (pipeline review 2026-11-13,
+ * finding 4). A reply cut off by the vendor (finish reason not stop) or one whose
+ * FAULT lines do not add up to its own closing "FAULTS: <count>" line has lost part of
+ * the fault list; reading it as written would score the unread tail as clean and those
+ * pages would never be repaired. Throws, so the caller's failure path runs: the book
+ * review retries and then records the review as failed; the production audit drops the
+ * chunk loudly. Checked against every stored real reply in evals/ (2026-11-13): the
+ * per-chunk declared count matched the parsed lines in all of them.
+ *
+ * @param {{text:string, truncated?:string|null}} reply  a judge* result
+ * @param {string} label  which chunk, for the error
+ */
+function assertCompleteAuditReply(reply, label) {
+  if (reply.truncated) {
+    throw new Error(`book audit ${label}: reply cut off (finish reason ${reply.truncated}) — the fault list is incomplete`);
+  }
+  const text = String(reply.text || '');
+  const declared = [...text.matchAll(FAULT_COUNT_RE)];
+  if (declared.length === 0) {
+    throw new Error(`book audit ${label}: reply has no closing "FAULTS: <count>" line — cannot tell a clean book from a cut-off list`);
+  }
+  const want = declared.reduce((sum, m) => sum + parseInt(m[1], 10), 0);
+  const got = [...text.matchAll(ROUTED_FAULT_RE)].length;
+  if (want !== got) {
+    throw new Error(`book audit ${label}: reply declares ${want} fault(s) but ${got} FAULT line(s) parse — part of the list is lost or malformed`);
+  }
+}
+
 /**
  * Audit a finished book: every page's text next to the image that shipped with it.
  *
@@ -883,7 +928,7 @@ async function auditStoryBook(storyData, opts = {}) {
     for (const chunk of chunks) {
       try {
         const r = await judgeChunk(template, chunk, modelId, thinkingLevel, review, storyFill);
-        raws.push(r.text);
+        const chunkLabel = `chunk p${chunk[0].pageNumber}-${chunk[chunk.length - 1].pageNumber}`;
         chunkUsage.push({
           pages: `${chunk[0].pageNumber}-${chunk[chunk.length - 1].pageNumber}`,
           ...r.usage,
@@ -893,6 +938,9 @@ async function auditStoryBook(storyData, opts = {}) {
         usage.thinking_tokens += r.usage.thinking_tokens;
         // OpenRouter reports the billed dollars per call; Gemini native does not.
         if (typeof r.usage.cost_usd === 'number') usage.cost_usd = (usage.cost_usd || 0) + r.usage.cost_usd;
+        // After the usage is counted (the call was paid either way): an incomplete reply is not a review.
+        assertCompleteAuditReply(r, chunkLabel);
+        raws.push(r.text);
       } catch (err) {
         // The production audit: one bad chunk must not cost the other chunks'
         // findings. The book review: a chunk that failed is pages nobody read,
@@ -988,6 +1036,7 @@ module.exports = {
   parseRoutes,
   parseRouteTag,
   parseBetterVerdicts,
+  assertCompleteAuditReply,
   collectObjectScale,
   askObjectScale,
   MAX_PAGES_PER_CALL,
