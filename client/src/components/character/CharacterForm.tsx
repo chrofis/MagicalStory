@@ -15,6 +15,7 @@ import type { Character, PhysicalTraits, PhysicalTraitsSource, AgeCategory, Chan
 import { getDisplayPhoto, getFaceThumb, getStandardAvatar, getAvatarInputPhoto } from '@/utils/characterPhotos';
 import type { CustomRelationshipPair } from '@/constants/relationships';
 import { uiLabel } from '@/utils/uiLabels';
+import { characterNameProblem, characterNameHint } from '@/utils/characterName';
 
 // Age category options for the dropdown (no age numbers - we already have real age field)
 const AGE_CATEGORY_OPTIONS: { value: AgeCategory; label: string; labelDe: string; labelFr: string; labelIt: string }[] = [
@@ -751,7 +752,8 @@ export function CharacterForm({
     }
   };
 
-  const canSaveName = character.name && character.name.trim().length >= 2 && character.gender && character.age;
+  const nameProblem = characterNameProblem(character.name || '');
+  const canSaveName = character.name && character.name.trim().length >= 2 && !nameProblem && character.gender && character.age;
 
   const canSaveCharacter =
     character.name &&
@@ -841,6 +843,7 @@ export function CharacterForm({
                   placeholder={t.characterName}
                   autoFocus
                 />
+                {nameProblem && <p className="text-sm text-red-500 mt-1">{characterNameHint(language)}</p>}
               </div>
             </div>
 
@@ -893,7 +896,7 @@ export function CharacterForm({
         </div>
 
         {/* Required fields message */}
-        {!canSaveName && (character.name?.trim().length >= 2) && (
+        {!canSaveName && !nameProblem && (character.name?.trim().length >= 2) && (
           <p className="text-sm text-red-500 text-center">
             {language === 'de' ? 'Bitte Geschlecht und Alter eingeben' :
              language === 'fr' ? 'Veuillez entrer le sexe et l\'âge' :
@@ -1397,10 +1400,9 @@ export function CharacterForm({
                   type="text"
                   value={character.name}
                   onChange={(e) => updateField('name', e.target.value)}
-                  onBlur={() => setIsEditingName(false)}
+                  onBlur={() => { if (!nameProblem) setIsEditingName(false); }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') setIsEditingName(false);
-                    if (e.key === 'Escape') setIsEditingName(false);
+                    if ((e.key === 'Enter' || e.key === 'Escape') && !nameProblem) setIsEditingName(false);
                   }}
                   className="text-xl font-bold text-gray-800 border-b-2 border-indigo-500 bg-transparent focus:outline-none px-0 py-0"
                   autoFocus
@@ -1415,6 +1417,7 @@ export function CharacterForm({
                   <Pencil size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </h3>
               )}
+              {isEditingName && nameProblem && <p className="text-sm text-red-500">{characterNameHint(language)}</p>}
 
             </div>
           </div>

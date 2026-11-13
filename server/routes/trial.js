@@ -17,7 +17,7 @@ const { log } = require('../utils/logger');
 const { stripDataUriPrefix } = require('../lib/r2');
 const { deleteStoryDerivedRows } = require('../lib/userErasure');
 const { lookupIpLocation } = require('../lib/ipLocation');
-const { normalizeCharacterName } = require('../lib/characterName');
+const { splitCharacterName, appendSpecialDetails } = require('../lib/characterName');
 const { trialCharacterListFields } = require('../lib/trialCharacterMeta');
 const { trialSourceWhereClause } = require('../lib/trialSource');
 // Every full-blob characters.data write in this file goes through this —
@@ -1084,7 +1084,11 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
       return res.status(400).json({ error: parsedAge.error });
     }
 
-    const safeName = name ? normalizeCharacterName(name.replace(/[\r\n]/g, '')) : '';
+    // One clean name; text typed after a comma moves to the custom details (decisions.md 2026-11-13).
+    const { name: safeName, moved: nameExtra } = name ? splitCharacterName(name.replace(/[\r\n]/g, '')) : { name: '', moved: '' };
+    if (name && !safeName) {
+      return res.status(400).json({ error: 'Invalid name', code: 'INVALID_NAME' });
+    }
     const adminBypass = isAdminRequest(req);
 
     // Layer 1: Verify Turnstile (skipped for admin testing)
@@ -1144,7 +1148,7 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
       age: parsedAge ? String(parsedAge.years) : '',
       gender: gender || '',
       traits: traits || [],
-      customTraits: customTraits || '',
+      customTraits: appendSpecialDetails(customTraits || '', nameExtra),
       photos: {
         face: strippedFace,
         body: strippedBody,
@@ -1182,11 +1186,17 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
 router.patch('/update-character-details', verifySessionToken, async (req, res) => {
   try {
     const { userId } = req.sessionUser;
-    const { name, age, gender, traits, customTraits } = req.body || {};
+    const { name, age, gender, traits, customTraits: rawCustomTraits } = req.body || {};
 
     if (typeof name !== 'string' || !name.trim() || name.length > 50) {
       return res.status(400).json({ error: 'Invalid name', code: 'INVALID_NAME' });
     }
+    // One clean name; text typed after a comma moves to the custom details (decisions.md 2026-11-13).
+    const { name: cleanName, moved: nameExtra } = splitCharacterName(name.replace(/[\r\n]/g, ''));
+    if (!cleanName) {
+      return res.status(400).json({ error: 'Invalid name', code: 'INVALID_NAME' });
+    }
+    const customTraits = rawCustomTraits == null && !nameExtra ? rawCustomTraits : appendSpecialDetails(rawCustomTraits || '', nameExtra);
     if (gender && !['male', 'female'].includes(gender)) {
       return res.status(400).json({ error: 'Invalid gender', code: 'INVALID_GENDER' });
     }
@@ -1230,7 +1240,7 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
       const c = charData?.characters?.[0];
       if (!c) { missing = 'Character entry missing'; return false; }
       const oldName = c.name;
-      c.name = normalizeCharacterName(name.replace(/[\r\n]/g, '').trim());
+      c.name = cleanName;
       // The sheets are stored under the character's name; a provisional account is named before the visitor types one,
       // so a rename moves them (the story job looks them up by the row's current name).
       if (oldName !== c.name && c.preGeneratedStyledAvatars?.[oldName]) {

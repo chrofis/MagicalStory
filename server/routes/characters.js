@@ -9,7 +9,7 @@ const router = express.Router();
 
 const { dbQuery, withTransaction, isDatabaseMode, logActivity, uploadCharacterPhotosToR2, offloadCharacterImages } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
-const { normalizeCharacterName } = require('../lib/characterName');
+const { normalizeCharacterEntry } = require('../lib/characterName');
 const { normalizePhotos, stripLegacyPhotoFields, normalizeAvatarsForResponse, normalizeCharacterAvatars } = require('../lib/characterPhotos');
 const { expandUserHairOverrideForDisplay } = require('../lib/characterPhysical');
 const { findExistingCharacter, mergePhysicalAndTraitsOnSave } = require('../lib/characterMerge');
@@ -443,9 +443,15 @@ router.post('/', authenticateToken, async (req, res) => {
     // Also strip EXIF (GPS, camera model) from any photos the client just
     // uploaded — see server/lib/imageMetadata.js for the rationale.
     const { stripExifFromPhotos } = require('../lib/imageMetadata');
+    // A name is one clean name: trimmed, one-spaced, cut at a comma with the rest moved to traits.specialDetails
+    // (relationship text typed into the name box, decisions.md 2026-11-13). A typed name that leaves no name
+    // (", Bruder von Tilo") is refused; a blank draft character (name '') is a legitimate saved state and passes.
+    const emptyNamed = (characters || []).find(c => c && typeof c.name === 'string' && c.name.trim() && !normalizeCharacterEntry(c).name);
+    if (emptyNamed) {
+      return res.status(400).json({ error: 'A character needs a name', code: 'CHARACTER_NAME_REQUIRED' });
+    }
     const charactersWithoutAvatars = await Promise.all((characters || []).map(async char => {
-      const { avatars, ...charWithoutAvatars } = char;
-      charWithoutAvatars.name = normalizeCharacterName(charWithoutAvatars.name);
+      const { avatars, ...charWithoutAvatars } = normalizeCharacterEntry(char);
       if (avatars) {
         console.log(`[Characters] POST - Stripping frontend avatars for ${char.name}`);
       }

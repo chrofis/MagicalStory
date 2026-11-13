@@ -80,7 +80,7 @@ describe('the client cannot submit without an age', () => {
   it('canProceed requires a valid age, on the same 1-18 range as the server', () => {
     expect(TRIAL_STEP).toContain('const isValidTrialAge = (raw: string) => /^' + String.fromCharCode(92) + 'd{1,3}$/.test(raw.trim()) && Number(raw) >= 1 && Number(raw) <= 18;');
     expect(TRIAL_STEP).toContain('const ageIsValid = isValidTrialAge(ageRaw);');
-    expect(TRIAL_STEP).toMatch(/const canProceed = characterData\.name\.trim\(\) && characterData\.gender && ageIsValid && hasPhoto;/);
+    expect(TRIAL_STEP).toMatch(/const canProceed = characterData\.name\.trim\(\) && !nameProblem && characterData\.gender && ageIsValid && hasPhoto;/);
   });
 
   it('the inline message is translated on every trial language, not hardcoded English', () => {

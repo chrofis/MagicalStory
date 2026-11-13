@@ -22,7 +22,7 @@ const { log } = require('../utils/logger');
 const { previewImageField } = require('../lib/checkpointImages');
 const { getPool, withTransaction, offloadJsonbImages, inlineOffloadPrefix } = require('../services/database');
 const email = require('../../email');
-const { normalizeCharacterName } = require('../lib/characterName');
+const { normalizeCharacterEntry } = require('../lib/characterName');
 const guards = require('../lib/requestGuards');
 const { CHARACTERS_MAX, TOO_MANY_CHARACTERS } = guards;
 const { settleJobWithRefund, JOB_SAVING_PROGRESS } = require('../lib/jobCredits');
@@ -156,10 +156,11 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
       dedication: sanitizeString(req.body.dedication || '', 500)
     };
     // The wizard sends whole character objects from client state, which can
-    // still hold the raw "LUNA" the user typed; normalise here so the title,
-    // avatar maps and clothing lookups all see one spelling.
+    // still hold the raw "LUNA" the user typed, or a stored "Noah, Freund von Louis"; normalise here so the title,
+    // avatar maps, clothing lookups and every prompt see one clean name (the text after a comma moves to
+    // traits.specialDetails). Old stored rows stay as they are; only this story's snapshot is cleaned.
     if (Array.isArray(inputData.characters)) {
-      inputData.characters = inputData.characters.map(c => (c && typeof c.name === 'string' ? { ...c, name: normalizeCharacterName(c.name) } : c));
+      inputData.characters = inputData.characters.map(normalizeCharacterEntry);
     }
     // At most CHARACTERS_MAX characters IN the story (the wizard sends only included ones).
     // Refused before credits are reserved; the cast, the avatar sheets and every scene brief scale with it.

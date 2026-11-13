@@ -11,6 +11,7 @@ import type { Language } from '@/types/story';
 import { trackTrialStep } from '@/utils/trialFunnel';
 import { classifyAccountCreateFailure } from '@/utils/trialSession';
 import { photoFailureMessage } from '@/utils/apiErrors';
+import { characterNameProblem, characterNameHint } from '@/utils/characterName';
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 // The standard avatar sheet starts once the form has not changed for this long (an age of two digits passes the
@@ -355,10 +356,11 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
   // Shown once the user has a photo (i.e. is actually in the details phase) and
   // has either typed something wrong or left the field behind.
   const showAgeError = hasPhoto && !ageIsValid && ageRaw !== '';
-  const canProceed = characterData.name.trim() && characterData.gender && ageIsValid && hasPhoto;
+  const nameProblem = characterNameProblem(characterData.name);
+  const canProceed = characterData.name.trim() && !nameProblem && characterData.gender && ageIsValid && hasPhoto;
   // The picked face's analysis is still running: every required field is in, only the photo data is missing
   const photoPending = !hasPhoto && !!pickedFaceThumb;
-  const canQueueNext = !!(characterData.name.trim() && characterData.gender && ageIsValid && photoPending);
+  const canQueueNext = !!(characterData.name.trim() && !nameProblem && characterData.gender && ageIsValid && photoPending);
 
   // Shared account creation logic — invoked either by the background prewarm
   // effect (the moment the form first becomes valid) or by handleNext as a
@@ -1044,6 +1046,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
                 hasPhoto && !characterData.name.trim() ? 'border-red-300 bg-red-50/30' : 'border-gray-300'
               }`}
             />
+            {nameProblem && <p className="text-sm text-red-500 mt-1">{characterNameHint(language)}</p>}
           </div>
 
           {/* Age + Gender row */}
