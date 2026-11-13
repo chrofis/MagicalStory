@@ -11,7 +11,7 @@ import { findingText } from '../../../utils/findingText';
 const COVER_LABELS = {
   frontCover: { en: 'Front Cover', de: 'Titelseite', fr: 'Couverture', it: 'Copertina' },
   initialPage: { en: 'Dedication Page', de: 'Widmungsseite', fr: 'Page de dédicace', it: 'Pagina di dedica' },
-  backCover: { en: 'Back Cover', de: 'Rückseite', fr: 'Quatrième de couverture', it: 'Quarta di copertina' },
+  backCover: { en: 'Back Cover', de: 'Rückseite', fr: 'Quatrième de couverture', it: 'Retro di copertina' },
 };
 
 interface ImageHistoryModalProps {

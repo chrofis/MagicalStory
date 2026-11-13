@@ -1791,7 +1791,7 @@ export function StoryDisplay({
           ) : isDetecting ? (
             <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Erkenne...' : language === 'fr' ? 'Détection…' : language === 'it' ? 'Rilevamento...' : 'Detecting...'}</span>
           ) : (
-            <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Users size={14} /> {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer personnage' : language === 'it' ? 'Ripara personaggio' : 'Fix Character'}</span><span className="text-[10px] opacity-60">({CHARACTER_REPAIR_COST} Credits)</span></>
+            <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Users size={14} /> {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer le personnage' : language === 'it' ? 'Ripara il personaggio' : 'Fix Character'}</span><span className="text-[10px] opacity-60">({CHARACTER_REPAIR_COST} Credits)</span></>
           )}
         </button>
         {isOpen && !isRepairing && (
@@ -1799,7 +1799,7 @@ export function StoryDisplay({
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
               <div className="px-5 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
                 <h4 className="text-base font-bold text-gray-800">
-                  {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer personnage' : language === 'it' ? 'Ripara personaggio' : 'Fix Character'}
+                  {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer le personnage' : language === 'it' ? 'Ripara il personaggio' : 'Fix Character'}
                 </h4>
                 <button onClick={() => setCharRepairPopover(null)} className="p-1 hover:bg-gray-200 rounded-lg transition-colors">
                   <X size={18} className="text-gray-500" />
@@ -2496,7 +2496,7 @@ export function StoryDisplay({
           <button
             onClick={() => setTextOverlay(!textOverlay)}
             title={language === 'de'
-              ? 'Vorschau: Geschichte-Text auf den Bildern anzeigen — so sieht das gedruckte Buch aus. Ausschalten zeigt die Illustrationen ohne Text.'
+              ? 'Vorschau: Geschichtentext auf den Bildern anzeigen — so sieht das gedruckte Buch aus. Ausschalten zeigt die Illustrationen ohne Text.'
               : language === 'fr'
               ? 'Aperçu : afficher le texte sur les images — comme dans le livre imprimé. Désactiver montre les illustrations seules.'
               : language === 'it'
@@ -5446,7 +5446,7 @@ export function StoryDisplay({
                     }`}
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : language === 'fr' ? "Modifiez la description de la scène et régénérez depuis le début" : language === 'it' ? 'Modifica la descrizione della scena e rigenera da zero' : 'Edit the scene description and regenerate from scratch'}
                   >
-                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : language === 'it' ? 'Reinventa' : 'Reimagine'}</span>
+                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Neu erfinden' : language === 'fr' ? 'Réimaginer' : language === 'it' ? 'Reinventa' : 'Reimagine'}</span>
                     <span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
@@ -5461,7 +5461,7 @@ export function StoryDisplay({
                   className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
-                  {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : language === 'it' ? 'Scegli immagine' : 'Select Image'} ({getCoverVersions('frontCover').length})
+                  {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir une image' : language === 'it' ? "Scegli un'immagine" : 'Select Image'} ({getCoverVersions('frontCover').length})
                 </button>
               </div>
             )}
@@ -5693,7 +5693,7 @@ export function StoryDisplay({
                     }`}
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : language === 'fr' ? "Modifiez la description de la scène et régénérez depuis le début" : language === 'it' ? 'Modifica la descrizione della scena e rigenera da zero' : 'Edit the scene description and regenerate from scratch'}
                   >
-                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : language === 'it' ? 'Reinventa' : 'Reimagine'}</span>
+                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Neu erfinden' : language === 'fr' ? 'Réimaginer' : language === 'it' ? 'Reinventa' : 'Reimagine'}</span>
                     <span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
@@ -5708,7 +5708,7 @@ export function StoryDisplay({
                   className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
-                  {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : language === 'it' ? 'Scegli immagine' : 'Select Image'} ({getCoverVersions('initialPage').length})
+                  {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir une image' : language === 'it' ? "Scegli un'immagine" : 'Select Image'} ({getCoverVersions('initialPage').length})
                 </button>
               </div>
             )}
@@ -6003,7 +6003,7 @@ export function StoryDisplay({
                                   }`}
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : language === 'fr' ? "Modifiez la description de la scène et régénérez depuis le début" : language === 'it' ? 'Modifica la descrizione della scena e rigenera da zero' : 'Edit the scene description and regenerate from scratch'}
                                 >
-                                  <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : language === 'it' ? 'Reinventa' : 'Reimagine'}</span>
+                                  <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Neu erfinden' : language === 'fr' ? 'Réimaginer' : language === 'it' ? 'Reinventa' : 'Reimagine'}</span>
                                   <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                                 </button>
                               )}
@@ -6030,7 +6030,7 @@ export function StoryDisplay({
                                     className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
                                   >
                                     <Images size={14} />
-                                    {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : language === 'it' ? 'Scegli immagine' : 'Select Image'} ({getImageVersions(pageNumber).length})
+                                    {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir une image' : language === 'it' ? "Scegli un'immagine" : 'Select Image'} ({getImageVersions(pageNumber).length})
                                   </button>
                                 )}
                               </div>
@@ -6588,7 +6588,7 @@ export function StoryDisplay({
                                   }`}
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : language === 'fr' ? "Modifiez la description de la scène et régénérez depuis le début" : language === 'it' ? 'Modifica la descrizione della scena e rigenera da zero' : 'Edit the scene description and regenerate from scratch'}
                                 >
-                                  <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : language === 'it' ? 'Reinventa' : 'Reimagine'}</span>
+                                  <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Neu erfinden' : language === 'fr' ? 'Réimaginer' : language === 'it' ? 'Reinventa' : 'Reimagine'}</span>
                                   <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                                 </button>
                               )}
@@ -6615,7 +6615,7 @@ export function StoryDisplay({
                                     className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
                                   >
                                     <Images size={14} />
-                                    {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : language === 'it' ? 'Scegli immagine' : 'Select Image'} ({getImageVersions(pageNumber).length})
+                                    {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir une image' : language === 'it' ? "Scegli un'immagine" : 'Select Image'} ({getImageVersions(pageNumber).length})
                                   </button>
                                 )}
                               </div>
@@ -7165,7 +7165,7 @@ export function StoryDisplay({
                     }`}
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : language === 'fr' ? "Modifiez la description de la scène et régénérez depuis le début" : language === 'it' ? 'Modifica la descrizione della scena e rigenera da zero' : 'Edit the scene description and regenerate from scratch'}
                   >
-                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : language === 'it' ? 'Reinventa' : 'Reimagine'}</span>
+                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Neu erfinden' : language === 'fr' ? 'Réimaginer' : language === 'it' ? 'Reinventa' : 'Reimagine'}</span>
                     <span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
@@ -7180,7 +7180,7 @@ export function StoryDisplay({
                   className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
                 >
                   <Images size={14} />
-                  {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : language === 'it' ? 'Scegli immagine' : 'Select Image'} ({getCoverVersions('backCover').length})
+                  {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir une image' : language === 'it' ? "Scegli un'immagine" : 'Select Image'} ({getCoverVersions('backCover').length})
                 </button>
               </div>
             )}
@@ -7375,7 +7375,7 @@ export function StoryDisplay({
               </span>
               {originalStory && (
                 <span className="text-xs text-gray-500 hidden sm:inline">
-                  ({language === 'de' ? 'Original gespeichert' : language === 'fr' ? 'Original sauvegardé' : language === 'it' ? 'Originale salvato' : 'Original saved'})
+                  ({language === 'de' ? 'Original gespeichert' : language === 'fr' ? 'Original enregistré' : language === 'it' ? 'Originale salvato' : 'Original saved'})
                 </span>
               )}
             </div>
@@ -7407,8 +7407,8 @@ export function StoryDisplay({
               >
                 <Save size={16} />
                 {isSaving
-                  ? (language === 'de' ? 'Speichern...' : language === 'fr' ? 'Sauvegarde…' : language === 'it' ? 'Salvataggio...' : 'Saving...')
-                  : (language === 'de' ? 'Speichern' : language === 'fr' ? 'Sauvegarder' : language === 'it' ? 'Salva' : 'Save')
+                  ? (language === 'de' ? 'Speichern...' : language === 'fr' ? 'Enregistrement…' : language === 'it' ? 'Salvataggio...' : 'Saving...')
+                  : (language === 'de' ? 'Speichern' : language === 'fr' ? 'Enregistrer' : language === 'it' ? 'Salva' : 'Save')
                 }
               </button>
             </div>
@@ -7447,8 +7447,8 @@ export function StoryDisplay({
                 {coverEditModal.coverType === 'front'
                   ? (language === 'de' ? 'Titelseite' : language === 'fr' ? 'Couverture' : language === 'it' ? 'Copertina' : 'Front Cover')
                   : coverEditModal.coverType === 'initial'
-                  ? (language === 'de' ? 'Einleitungsseite' : language === 'fr' ? 'Page de dédicace' : language === 'it' ? 'Pagina di dedica' : 'Dedication Page')
-                  : (language === 'de' ? 'Rückseite' : language === 'fr' ? 'Dos' : language === 'it' ? 'Retro di copertina' : 'Back Cover')}
+                  ? (language === 'de' ? 'Widmungsseite' : language === 'fr' ? 'Page de dédicace' : language === 'it' ? 'Pagina di dedica' : 'Dedication Page')
+                  : (language === 'de' ? 'Rückseite' : language === 'fr' ? 'Quatrième de couverture' : language === 'it' ? 'Retro di copertina' : 'Back Cover')}
               </h3>
               <p className="text-sm text-gray-500 mt-1">
                 {language === 'de'

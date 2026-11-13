@@ -14,7 +14,7 @@ type Lang = 'en' | 'de' | 'fr' | 'it';
 const TEXT: Record<Lang, { making: string; failed: string; retry: string }> = {
   en: { making: 'Preparing the back cover of your book, this can take about a minute…', failed: 'The back cover could not be made.', retry: 'Try again' },
   de: { making: 'Die Rückseite deines Buchs wird vorbereitet, das kann etwa eine Minute dauern…', failed: 'Die Rückseite konnte nicht erstellt werden.', retry: 'Erneut versuchen' },
-  fr: { making: 'Préparation de la quatrième de couverture de ton livre, cela peut prendre environ une minute…', failed: 'La quatrième de couverture n’a pas pu être créée.', retry: 'Réessayer' },
+  fr: { making: 'Préparation de la quatrième de couverture de votre livre, cela peut prendre environ une minute…', failed: 'La quatrième de couverture n’a pas pu être créée.', retry: 'Réessayer' },
   it: { making: 'Preparazione del retro di copertina del tuo libro, può richiedere circa un minuto…', failed: 'Non è stato possibile creare il retro di copertina.', retry: 'Riprova' },
 };
 

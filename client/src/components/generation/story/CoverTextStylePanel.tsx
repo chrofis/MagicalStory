@@ -99,7 +99,7 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
       await onApply(style);
       if (style === null) { setFontSel('auto'); setLayoutSel('auto'); setColorSel('auto'); setAlignSel('auto'); }
     } catch (e: any) {
-      setError(e?.message || t('Fehler beim Anwenden', "Échec de l'application", 'Failed to apply', "Impossibile applicare"));
+      setError(e?.message || t('Fehler beim Anwenden', "Échec de l'application", 'Failed to apply', "Impossibile applicare lo stile"));
     } finally {
       setBusy(false);
     }
@@ -201,7 +201,7 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
           {/* Colour */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">
-              {t('Farbe', 'Couleur', 'Colour', 'Colore')}
+              {t('Farbe', 'Couleur', 'Color', 'Colore')}
             </label>
             <div className="flex items-center gap-1.5 flex-wrap">
               <button
@@ -244,7 +244,7 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
               onClick={() => apply(null)}
               disabled={busy}
               className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 flex items-center gap-1.5 disabled:opacity-50"
-              title={t('Zurück zu Automatisch', 'Retour à automatique', 'Back to automatic', 'Torna ad automatico')}
+              title={t('Zurück zu Automatisch', 'Retour au mode automatique', 'Back to automatic', "Torna all'automatico")}
             >
               <RotateCcw size={13} />
               {t('Auto', 'Auto', 'Auto', 'Auto')}
