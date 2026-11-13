@@ -139,6 +139,8 @@ async function loadSceneContext(storyId, pageNumber) {
   try {
     characters = rows[0].characters_json ? JSON.parse(rows[0].characters_json) : [];
   } catch { /* run without full character objects */ }
+  // Same stored-VB cleanup the customer regenerate routes apply (docs/decisions.md 2026-11-13).
+  if (visualBible && characters.length) require('./visualBible').filterMainCharactersFromVisualBible(visualBible, characters);
   let characterAvatars = null;
   try {
     characterAvatars = rows[0].character_avatars ? JSON.parse(rows[0].character_avatars) : null;

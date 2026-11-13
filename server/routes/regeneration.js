@@ -162,6 +162,7 @@ const { buildEmptySceneVbGrid } = require('../lib/referenceSheets');
 const { callClaudeAPI } = require('../lib/textModels');
 const {
   getVisualBibleEntriesForPage,
+  filterStoredVisualBibleInRows,
 } = require('../lib/visualBible');
 const { applyStyledAvatars } = require('../lib/styledAvatars');
 const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing, collectEntityAppearances, buildClothingDescription } = require('../lib/entityConsistency');
@@ -226,7 +227,9 @@ async function fetchStoryRowForUser(id, req, columns = '*') {
       && (req.user?.role === 'admin' || (req.user?.impersonating && req.user?.originalAdminId))) {
     result = await getDbPool().query('SELECT ' + columns + ' FROM stories WHERE id = $1', [id]);
   }
-  return result;
+  // Every route here builds image prompts from the stored visualBible: drop cast doubles
+  // (invented secondaries that are really a main cast child) once, at the one loader.
+  return { ...result, rows: filterStoredVisualBibleInRows(result.rows) };
 }
 
 // SPD-2: rehydrate image bytes for a SINGLE scene page instead of the whole

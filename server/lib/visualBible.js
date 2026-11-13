@@ -1768,6 +1768,26 @@ function filterMainCharactersFromVisualBible(visualBible, mainCharacters) {
 }
 
 /**
+ * Regenerate/edit/repair routes read the STORED visualBible to build image prompts.
+ * Stories written before the cast-name fix still hold invented doubles of cast
+ * children; drop them (via filterMainCharactersFromVisualBible, the one filter) on
+ * every story row those routes load. Works on a pg result's rows (data as object or
+ * JSON string); rows without a data column are left alone. Returns the rows.
+ * See docs/decisions.md 2026-11-13.
+ */
+function filterStoredVisualBibleInRows(rows) {
+  for (const row of rows || []) {
+    if (!row || !row.data) continue;
+    const data = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+    if (data && data.visualBible && Array.isArray(data.characters)) {
+      filterMainCharactersFromVisualBible(data.visualBible, data.characters);
+    }
+    row.data = data;
+  }
+  return rows;
+}
+
+/**
  * Parse individual Visual Bible entries from a section
  * Handles multi-language page keywords (pages, Seiten, Page)
  */
@@ -4176,6 +4196,7 @@ module.exports = {
   // Parsing
   parseVisualBible,
   filterMainCharactersFromVisualBible,
+  filterStoredVisualBibleInRows,
   parseVisualBibleEntries,
   dedupeSecondaryCharacterIds,
 

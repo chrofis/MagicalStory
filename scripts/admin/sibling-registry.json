@@ -48,6 +48,13 @@
   ],
   "sets": [
     {
+      "id": "vb-cast-double-filter-writer-vs-stored-loaders",
+      "axis": "story run VB filter vs customer regenerate loader vs Lab loader",
+      "reason": "filterMainCharactersFromVisualBible drops invented VB secondaries that are really a cast child; the story run applies it when the VB is made, and older stored stories still hold the doubles, so the regenerate routes (regeneration.js fetchStoryRowForUser, via filterStoredVisualBibleInRows) and the Lab stored-story loader (testlab.js) apply the same one filter when they load a stored VB (docs/decisions.md 2026-11-13).",
+      "members": ["server/lib/visualBible.js", "server/routes/regeneration.js", "server/lib/testlab.js"],
+      "severity": "block"
+    },
+    {
       "id": "printed-book-layout",
       "axis": "single-story PDF vs combined PDF vs normal checkout vs voucher book checkout",
       "reason": "The CUSTOMER picks the printed-book layout (single = text in the picture, spread = facing pages; gelato.computeBookPageInfo with options.layout, availability and reasons from describeLayouts, decisions.md 2026-10-27 'The customer picks the book layout'). The requested layout travels builder -> /api/book-page-info -> Stripe metadata bookLayout -> resolveBookOrderInputs -> processBookOrder -> generatePrintPdf / generateCombinedBookPdf (options.layout); an unavailable request throws (BookLayoutError), never a silent downgrade. The price is the pricing tier of the CHOSEN layout's own content page count (pageInfo.contentPages, no surcharge, decisions.md 2026-11-11 'Price per layout from the page tiers') in every path that prices a book: create-checkout-session, vouchers book-checkout (the voucher coupon covers all but the hardcover surcharge), BookBuilder, VoucherBookCheckout. A change to who may choose what, or to the surcharge, must land in all of them.",

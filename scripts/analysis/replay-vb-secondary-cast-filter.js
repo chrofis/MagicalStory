@@ -6,6 +6,10 @@
  * NEW = the shipped filter (castResolver). Lists every secondary each variant would drop, so every removal
  * can be eyeballed against the roster (bugs.json vb-secondary-duplicates-cast-named-with-relationship).
  *
+ * Regenerate-time reading (docs/decisions.md 2026-11-13): stored secondaries are what the story run left, so every
+ * NEW drop is an entry a customer redraw would now remove (via regeneration.js fetchStoryRowForUser). Prints story
+ * ids and entry names only, no customer data. Use --n 100000 for every stored story.
+ *
  *   node scripts/analysis/replay-vb-secondary-cast-filter.js [--n 120]
  */
 const path = require('path');
@@ -17,7 +21,10 @@ const N = Number(process.argv.includes('--n') ? process.argv[process.argv.indexO
 
 (async () => {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
-  const { rows } = await pool.query(
+  // read-only session: this script never writes
+  const client = await pool.connect();
+  await client.query('SET default_transaction_read_only = on');
+  const { rows } = await client.query(
     `select id, created_at,
             data::jsonb->'characters' as chars,
             data::jsonb->'visualBible'->'secondaryCharacters' as sec
@@ -26,6 +33,7 @@ const N = Number(process.argv.includes('--n') ? process.argv[process.argv.indexO
         and jsonb_array_length(data::jsonb->'visualBible'->'secondaryCharacters') > 0
         and jsonb_typeof(data::jsonb->'characters') = 'array'
       order by created_at desc limit $1`, [N]);
+  client.release();
   let oldStories = 0; let newStories = 0; let secTotal = 0;
   const removed = [];
   for (const r of rows) {
