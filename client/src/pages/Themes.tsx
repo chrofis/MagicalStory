@@ -38,7 +38,7 @@ const texts: Record<string, {
   },
   de: {
     title: 'Geschichten-Themen',
-    subtitle: 'Entdecke über 170 einzigartige Geschichten-Themen in vier Kategorien. Jedes Thema erschafft ein einzigartiges personalisiertes Abenteuer für dein Kind.',
+    subtitle: 'Entdecke über 170 Geschichten-Themen in vier Kategorien. Jedes Thema erschafft ein ganz eigenes, personalisiertes Abenteuer für dein Kind.',
     popularTitle: 'Beliebte Themen',
     popularSubtitle: 'Unsere beliebtesten Themen aus allen Kategorien',
     browseAll: 'Alle ansehen',
@@ -60,7 +60,7 @@ const texts: Record<string, {
   },
   it: {
     title: 'Temi delle storie',
-    subtitle: 'Scopri oltre 170 temi unici in quattro categorie. Ogni tema crea un\'avventura personalizzata unica per tuo figlio.',
+    subtitle: 'Scopri oltre 170 temi unici in quattro categorie. Ogni tema crea un\'avventura personalizzata unica per il tuo bambino.',
     popularTitle: 'Temi popolari',
     popularSubtitle: 'I nostri temi più amati in tutte le categorie',
     browseAll: 'Vedi tutti',
@@ -120,7 +120,7 @@ export default function Themes() {
         en: 'Help your child overcome everyday challenges with empowering stories',
         de: 'Hilf deinem Kind, alltägliche Herausforderungen mit stärkenden Geschichten zu meistern',
         fr: 'Aidez votre enfant à surmonter les défis quotidiens avec des histoires positives',
-        it: 'Aiuta tuo figlio a superare le sfide quotidiane con storie che infondono fiducia',
+        it: 'Aiuta il tuo bambino a superare le sfide quotidiane con storie che infondono fiducia',
       },
       count: lifeChallenges.length,
       popularIds: popularLifeChallengeIds.slice(0, 6),

@@ -49,7 +49,7 @@ const translations = {
     invalidTitle: 'Ungültiger oder abgelaufener Link',
     invalidDesc: 'Dieser Link ist ungültig oder abgelaufen. Du kannst dich trotzdem anmelden, wenn du ein Passwort hast.',
     goToLogin: 'Zur Anmeldung',
-    successTitle: 'Konto beansprucht!',
+    successTitle: 'Konto aktiviert!',
     successCredits: `+${INITIAL_USER_CREDITS} Credits gutgeschrieben`,
     successCreditsDesc: 'Genug, um eine weitere vollständige Geschichte zu erstellen.',
     successRedirect: 'Weiterleitung zu deinen Geschichten…',
@@ -79,7 +79,7 @@ const translations = {
   it: {
     brand: 'Magical Story',
     loading: 'Verifica del link in corso...',
-    welcomeBack: 'Bentornato',
+    welcomeBack: 'Bentornato/a',
     setPassword: 'Imposta una password per conservare il tuo account.',
     password: 'Nuova password',
     confirmPassword: 'Conferma password',

@@ -47,7 +47,7 @@ const translations = {
     step3Title: 'Drucken & Teilen',
     step3Desc: 'Sofort als PDF herunterladen oder ein gedrucktes Buch bestellen.',
 
-    creditsTitle: 'Deine Startguthaben',
+    creditsTitle: 'Dein Startguthaben',
     creditsAmount: String(INITIAL_USER_CREDITS),
     creditsLabel: 'Gratis-Credits',
     creditsExplain: `Jede Seite kostet ${CREDITS_PER_PAGE} Credits. Eine ${EXAMPLE_STORY_PAGES}-seitige Geschichte = ${EXAMPLE_STORY_CREDITS} Credits.`,
@@ -62,7 +62,7 @@ const translations = {
     subtitle: "Créons votre livre d'histoires personnalisé. Voici comment ça marche :",
 
     step1Title: 'Créer des personnages',
-    step1Desc: "Importez des photos de votre famille et amis. Ajoutez des détails aux personnages pour donner vie à l'histoire.",
+    step1Desc: "Importez des photos de votre famille et de vos amis. Ajoutez des détails aux personnages pour donner vie à l'histoire.",
 
     step2Title: 'Concevoir votre histoire',
     step2Desc: "Choisissez un thème, un style artistique et personnalisez l'histoire. Une fois prêt, nous créons votre histoire et vous envoyons un e-mail.",
@@ -81,7 +81,7 @@ const translations = {
     step: 'Étape',
   },
   it: {
-    welcome: 'Benvenuto su Magical Story!',
+    welcome: 'Benvenuto/a su Magical Story!',
     subtitle: 'Creiamo il tuo libro di storie personalizzato. Ecco come funziona:',
 
     step1Title: 'Crea i personaggi',

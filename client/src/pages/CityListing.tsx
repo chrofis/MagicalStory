@@ -51,7 +51,7 @@ const texts: Record<string, {
   },
   it: {
     title: 'Storie per bambini dalla Svizzera',
-    subtitle: 'Scopri storie personalizzate radicate nella vera storia svizzera e nelle leggende locali. Scegli la tua città e lascia che tuo figlio diventi l\'eroe della sua avventura svizzera.',
+    subtitle: 'Scopri storie personalizzate radicate nella vera storia svizzera e nelle leggende locali. Scegli la tua città e lascia che il tuo bambino diventi l\'eroe della sua avventura svizzera.',
     ctaTitle: 'Crea la tua storia gratuita',
     ctaSubtitle: 'Scegli una città, un\'idea di storia e crea un libro illustrato personalizzato in pochi minuti. La tua prima storia è gratuita.',
     ctaButton: 'Inizia ora',

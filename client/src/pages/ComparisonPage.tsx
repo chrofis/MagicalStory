@@ -64,7 +64,7 @@ const pageTexts: Record<string, {
     feature: 'Eigenschaft',
     magicalStory: 'Magical Story',
     detailedVerdict: 'Unser Fazit',
-    faqTitle: 'Häufig gestellte Fragen',
+    faqTitle: 'Häufige Fragen',
     ctaTitle: 'Teste Magical Story gratis',
     ctaSubtitle: 'Deine erste Geschichte ist gratis — keine Kreditkarte nötig. Überzeuge dich selbst.',
     ctaButton: 'Gratis-Geschichte erstellen',

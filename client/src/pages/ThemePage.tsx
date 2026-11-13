@@ -112,22 +112,22 @@ const pageTexts: Record<string, {
   it: {
     breadcrumbRoot: 'Temi',
     createButton: 'Crea questa storia',
-    whatToExpect: 'Cosa aspettarti',
+    whatToExpect: 'Cosa ti aspetta',
     howItWorks: 'Come funziona',
     howStep1Title: 'Carica una foto',
-    howStep1Desc: 'Carica una foto di tuo figlio. Diventerà l\'eroe illustrato della storia.',
+    howStep1Desc: 'Carica una foto del tuo bambino. Diventerà l\'eroe illustrato della storia.',
     howStep2Title: 'Scegli questo tema',
     howStep2Desc: 'Seleziona questo tema e personalizza le impostazioni della storia come preferisci.',
     howStep3Title: 'Ricevi la tua storia',
     howStep3Desc: 'La tua storia illustrata personalizzata è pronta in pochi minuti. Leggila online o ordina il libro stampato.',
     relatedThemes: 'Temi correlati',
     ctaTitle: 'Rendilo personale',
-    ctaSubtitle: 'Tuo figlio come protagonista della sua storia. Provalo gratis.',
+    ctaSubtitle: 'Il tuo bambino come protagonista della sua storia. Provalo gratis.',
     ctaButton: 'Crea la tua storia gratuita',
     yearLabel: 'Anno',
     personLabel: 'Personaggio storico',
-    heroPitchChallenge: 'Un libro illustrato personalizzato in cui tuo figlio è l\'eroe — e supera da solo questa sfida. La prima storia è gratuita.',
-    heroPitchGeneric: 'Un libro illustrato personalizzato in cui tuo figlio è l\'eroe e vive questa storia in prima persona. La prima storia è gratuita.',
+    heroPitchChallenge: 'Un libro illustrato personalizzato in cui il tuo bambino è l\'eroe — e supera da solo questa sfida. La prima storia è gratuita.',
+    heroPitchGeneric: 'Un libro illustrato personalizzato in cui il tuo bambino è l\'eroe e vive questa storia in prima persona. La prima storia è gratuita.',
     guideLink: 'La nostra guida su questo tema',
   },
 };
@@ -184,25 +184,25 @@ function getExpectBullets(category: CategorySlug, language: string): string[] {
       en: ['Your child as the main character', 'Exciting plot with surprises', 'Beautiful illustrations in your chosen style'],
       de: ['Dein Kind als Hauptfigur', 'Spannende Handlung mit Überraschungen', 'Wunderschöne Illustrationen im gewählten Stil'],
       fr: ['Votre enfant comme personnage principal', 'Une intrigue passionnante avec des surprises', 'De belles illustrations dans le style choisi'],
-      it: ['Tuo figlio come protagonista', 'Una trama avvincente piena di sorprese', 'Bellissime illustrazioni nello stile scelto'],
+      it: ['Il tuo bambino come protagonista', 'Una trama avvincente piena di sorprese', 'Bellissime illustrazioni nello stile scelto'],
     },
     'life-challenges': {
       en: ['Your child facing the challenge with confidence', 'Positive, empowering message', 'Age-appropriate language and situations'],
       de: ['Dein Kind meistert die Herausforderung mit Selbstvertrauen', 'Positive, stärkende Botschaft', 'Altersgerechte Sprache und Situationen'],
       fr: ['Votre enfant affronte le défi avec confiance', 'Un message positif et encourageant', 'Un langage et des situations adaptés à l\'âge'],
-      it: ['Tuo figlio affronta la sfida con sicurezza', 'Un messaggio positivo e incoraggiante', 'Linguaggio e situazioni adatti all\'età'],
+      it: ['Il tuo bambino affronta la sfida con sicurezza', 'Un messaggio positivo e incoraggiante', 'Linguaggio e situazioni adatti all\'età'],
     },
     educational: {
       en: ['Fun learning integrated into the story', 'Your child discovering new concepts', 'Interactive elements on every page'],
       de: ['Spielerisches Lernen in die Geschichte integriert', 'Dein Kind entdeckt neue Konzepte', 'Interaktive Elemente auf jeder Seite'],
       fr: ['Un apprentissage ludique intégré à l\'histoire', 'Votre enfant découvre de nouveaux concepts', 'Des éléments interactifs à chaque page'],
-      it: ['Apprendimento divertente integrato nella storia', 'Tuo figlio scopre nuovi concetti', 'Elementi interattivi in ogni pagina'],
+      it: ['Apprendimento divertente integrato nella storia', 'Il tuo bambino scopre nuovi concetti', 'Elementi interattivi in ogni pagina'],
     },
     historical: {
       en: ['Historically accurate setting and details', 'Your child as a witness to history', 'Educational and entertaining'],
       de: ['Historisch akkurate Kulisse und Details', 'Dein Kind als Zeitzeuge', 'Lehrreich und unterhaltsam'],
       fr: ['Un cadre et des détails historiquement précis', 'Votre enfant comme témoin de l\'histoire', 'Éducatif et divertissant'],
-      it: ['Ambientazione e dettagli storicamente accurati', 'Tuo figlio come testimone della storia', 'Istruttivo e divertente'],
+      it: ['Ambientazione e dettagli storicamente accurati', 'Il tuo bambino come testimone della storia', 'Istruttivo e divertente'],
     },
   };
   return bullets[category]?.[language] || bullets[category]?.en || [];
@@ -365,7 +365,7 @@ export default function ThemePage() {
                   {skills && (
                     <div className="flex-1 min-w-[200px]">
                       <h2 className="text-sm font-semibold text-stone-500 mb-1">
-                        {language === 'de' ? 'Was dein Kind lernt' : language === 'fr' ? 'Ce que votre enfant apprend' : language === 'it' ? 'Cosa impara tuo figlio' : 'What your child learns'}
+                        {language === 'de' ? 'Was dein Kind lernt' : language === 'fr' ? 'Ce que votre enfant apprend' : language === 'it' ? 'Cosa impara il tuo bambino' : 'What your child learns'}
                       </h2>
                       <p className="text-sm text-stone-700">{skills}</p>
                     </div>

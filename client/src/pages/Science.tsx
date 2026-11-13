@@ -134,7 +134,7 @@ const scienceContent: Record<string, {
     giftTitle: 'Il regalo perfetto',
     giftText: 'Cerchi un regalo davvero unico? Un libro per bambini personalizzato è qualcosa che nessun altro bambino possiede. Perfetto per compleanni, Natale, il primo giorno di scuola, o senza nessuna occasione particolare. Un regalo che custodiranno — e che vorranno farsi leggere ogni sera.',
     ctaTitle: 'Crea la sua storia',
-    ctaText: 'Tuo figlio come eroe della propria avventura. Prima storia gratis.',
+    ctaText: 'Il tuo bambino come eroe della propria avventura. Prima storia gratis.',
     ctaButton: 'Inizia ora',
   },
 };

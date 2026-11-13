@@ -114,7 +114,7 @@ const sectionTranslations = {
     localBullet1: 'Spielt in deiner Stadt – echte Orte und Wahrzeichen',
     localBullet2: 'Oder erlebe Geschichte als Held',
     step5: 'Schritt 5',
-    whyLink: 'Erfahre warum es wirkt',
+    whyLink: 'Erfahre, warum es wirkt',
     // CTA
     readyToCreate: 'Bereit für dein eigenes Buch?',
     ctaDesc: 'Lade ein Foto hoch, wähle ein Abenteuer und deine personalisierte Geschichte ist in wenigen Minuten fertig.',
@@ -182,7 +182,7 @@ const sectionTranslations = {
     readyToCreate: 'Prêt à créer votre livre ?',
     ctaDesc: "Importez une photo, choisissez une aventure et votre histoire personnalisée est prête en quelques minutes.",
     // Discover more (pre-footer grid)
-    discoverTitle: 'Découvrir plus',
+    discoverTitle: 'En savoir plus',
     discoverDesc: 'Trouvez de l\'inspiration, des idées cadeaux et des histoires de votre région.',
     discoverThemes: '170+ thèmes',
     discoverThemesDesc: 'Des pirates au premier jour d\'école – toutes les aventures imaginables.',

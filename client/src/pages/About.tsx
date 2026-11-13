@@ -121,7 +121,7 @@ const aboutContent: Record<string, {
       {
         icon: 'shield',
         title: 'Confidentialité d\'abord',
-        text: 'Vos photos sont utilisées uniquement pour créer votre histoire. Nous ne les partageons ou vendons jamais.',
+        text: 'Vos photos sont utilisées uniquement pour créer votre histoire. Nous ne les partageons ni ne les vendons jamais.',
       },
       {
         icon: 'book',
@@ -142,17 +142,17 @@ const aboutContent: Record<string, {
   },
   it: {
     title: 'Chi è Magical Story',
-    tagline: 'Libri per bambini personalizzati in cui tuo figlio è la star.',
+    tagline: 'Libri per bambini personalizzati in cui il tuo bambino è la star.',
     missionTitle: 'Ogni bambino è un eroe',
     missionText: [
-      'Ogni bambino ha una storia che merita di essere raccontata — e merita di esserne l\'eroe. Magical Story trasforma le foto di famiglia in libri per bambini personalizzati in cui tuo figlio è protagonista su ogni pagina.',
+      'Ogni bambino ha una storia che merita di essere raccontata — e merita di esserne l\'eroe. Magical Story trasforma le foto di famiglia in libri per bambini personalizzati in cui il tuo bambino è protagonista su ogni pagina.',
       'Non un libro qualsiasi. Un libro su di lui. Uno che coglie davvero chi è, e che trasforma il momento della lettura in qualcosa che aspetterete entrambi con gioia.',
     ],
     scienceTitle: 'Vedono l\'eroe allo specchio — e sanno che possono farcela anche loro.',
     scienceTagline: 'Piccole storie, grandi momenti.',
     scienceText: [
-      'Nella storia, tuo figlio è l\'eroe — coraggioso, onesto, gentile. E quando si guarda allo specchio, vede lo stesso eroe che lo guarda — e sa che può farcela anche nella vita vera.',
-      'Questa fiducia è il vero regalo. Molto dopo l\'ultima pagina — al primo giorno di scuola o quando è difficile fare la cosa giusta — tuo figlio la affronta già sicuro di chi è.',
+      'Nella storia, il tuo bambino è l\'eroe — coraggioso, onesto, gentile. E quando si guarda allo specchio, vede lo stesso eroe che lo guarda — e sa che può farcela anche nella vita vera.',
+      'Questa fiducia è il vero regalo. Molto dopo l\'ultima pagina — al primo giorno di scuola o quando è difficile fare la cosa giusta — il tuo bambino la affronta già sicuro di chi è.',
       'La ricerca conferma ciò che ogni genitore percepisce: i bambini ricordano di più, si coinvolgono più a fondo e sviluppano una vera fiducia in sé stessi quando sono l\'eroe della storia. Non attraverso lezioni o regole — ma con l\'avventura, le risate e la magia di vedersi su ogni pagina.',
     ],
     scienceLink: 'La scienza dietro tutto questo',
@@ -171,7 +171,7 @@ const aboutContent: Record<string, {
       {
         icon: 'heart',
         title: 'Fatto con cura',
-        text: 'Rivediamo costantemente i nostri risultati per garantire illustrazioni belle, adatte all\'età e fedeli a tuo figlio.',
+        text: 'Rivediamo costantemente i nostri risultati per garantire illustrazioni belle, adatte all\'età e fedeli al tuo bambino.',
       },
     ],
     swissTitle: 'Made in Switzerland',

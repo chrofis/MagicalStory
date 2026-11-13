@@ -269,7 +269,7 @@ const faqContent: Record<string, {
     searchPlaceholder: 'Rechercher une question…',
     noResults: 'Aucune question correspondante. Essayez un autre terme de recherche.',
     contactTitle: 'Encore des questions ?',
-    contactText: 'Nous sommes là pour vous aider. Envoyez-nous un email et nous vous répondrons dans les 24 heures.',
+    contactText: 'Nous sommes là pour vous aider. Envoyez-nous un e-mail et nous vous répondrons dans les 24 heures.',
     contactButton: 'Nous contacter',
     categories: [
       {
@@ -285,7 +285,7 @@ const faqContent: Record<string, {
           },
           {
             question: 'Combien de temps faut-il ?',
-            answer: 'Votre première histoire gratuite est prête en quelques minutes. Un livre entièrement illustré prend environ une heure. Vous recevrez un email quand votre histoire sera prête.',
+            answer: 'Votre première histoire gratuite est prête en quelques minutes. Un livre entièrement illustré prend environ une heure. Vous recevrez un e-mail quand votre histoire sera prête.',
           },
           {
             question: 'Pour quel âge ?',
@@ -398,7 +398,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Come funziona?',
-            answer: 'Carica una foto di tuo figlio, scegli un tema per la storia e generiamo una storia personalizzata completamente illustrata. Tuo figlio appare come personaggio illustrato su ogni pagina, mantenendo il suo aspetto unico in tutto il libro.',
+            answer: 'Carica una foto del tuo bambino, scegli un tema per la storia e generiamo una storia personalizzata completamente illustrata. Il tuo bambino appare come personaggio illustrato su ogni pagina, mantenendo il suo aspetto unico in tutto il libro.',
           },
           {
             question: 'Quanto tempo ci vuole?',

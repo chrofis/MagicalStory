@@ -86,7 +86,7 @@ const pageTexts: Record<string, {
     deliveryTitle: 'Tempi di consegna',
     faqTitle: 'Domande frequenti',
     ctaTitle: 'Crea la tua storia gratuita',
-    ctaSubtitle: 'Tuo figlio come protagonista della sua storia. Provalo gratis — nessun account necessario.',
+    ctaSubtitle: 'Il tuo bambino come protagonista della sua storia. Provalo gratis — nessun account necessario.',
     ctaButton: 'Inizia ora',
     viewTheme: 'Vedi il tema',
     giftLink: 'Idee regalo per questa occasione',
