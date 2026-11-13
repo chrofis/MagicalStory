@@ -877,6 +877,9 @@ export function CharacterForm({
                   min="0"
                   max="120"
                 />
+                {String(character.age ?? '').trim() !== '' && Number(character.age) === 0 && (
+                  <p className="text-[10px] text-gray-500 mt-0.5">{ageLabel(character.age, language)}</p>
+                )}
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">
@@ -1450,6 +1453,9 @@ export function CharacterForm({
                 min="0"
                 max="120"
               />
+              {String(character.age ?? '').trim() !== '' && Number(character.age) === 0 && (
+                <p className="text-[10px] text-gray-500 mt-0.5">{ageLabel(character.age, language)}</p>
+              )}
             </div>
             <div>
               <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">
