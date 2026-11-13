@@ -9,12 +9,18 @@
  *   scripts/admin/fix-glasses-no-words-2026-11-12.js   (characters table)
  *   scripts/admin/append-staging-versions-to-prod.js   (a story's own snapshot in stories.data)
  * The values are the distinct stored values found in production (2026-11-12) that mean "no":
- * only 'nein'. 'Brille', 'schwarze Brille', 'wears glasses' etc. mean YES and are left alone.
+ * the server's none-words (server/lib/traitNone.js; production held only 'nein'). 'Brille', 'schwarze Brille', 'wears glasses' etc. mean YES and are left alone.
  */
 
-const NO_VALUES = ['nein'];          // exact stored values meaning "no"
-const FIELDS = ['glasses', 'other'];
+const { NONE_WORDS } = require('../../server/lib/traitNone');
+
 const SENTINEL = 'none';
+// every sentinel word the ONE server rule (server/lib/traitNone.js) treats as none, except the canonical one
+const NO_VALUES = NONE_WORDS.filter((w) => w !== SENTINEL);
+const FIELDS = ['glasses', 'other', 'facialHair'];
+
+/** A stored value the server rule reads as none but that is not the canonical sentinel (same fold as isNone). */
+const isNoWord = (v) => typeof v === 'string' && NO_VALUES.includes(v.toLowerCase().trim());
 
 /**
  * Every `glasses` / `other` key anywhere under `root` whose value is a stored "no" word.
@@ -32,7 +38,7 @@ function findNoWordFields(root) {
       const v = node[k];
       const p = Array.isArray(node) ? `${pth}[${k}]` : `${pth}.${k}`;
       if (typeof v === 'string') {
-        if (FIELDS.includes(k) && NO_VALUES.includes(v)) hits.push({ path: p, holder: node, key: k, from: v });
+        if (FIELDS.includes(k) && isNoWord(v)) hits.push({ path: p, holder: node, key: k, from: v });
       } else {
         walk(v, p);
       }
@@ -52,4 +58,4 @@ function replaceNoWordFields(root) {
   return hits.map((h) => h.path);
 }
 
-module.exports = { NO_VALUES, FIELDS, SENTINEL, findNoWordFields, replaceNoWordFields };
+module.exports = { isNoWord, NO_VALUES, FIELDS, SENTINEL, findNoWordFields, replaceNoWordFields };

@@ -3473,11 +3473,11 @@ function buildPhysicalTraitsDescription(character) {
   // Facial hair (for males)
   // Already gated by getPlausiblePhysical (male, 13+; decisions 2026-10-09).
   const facialHair = p.facialHair;
-  if (facialHair && facialHair !== 'none') parts.push(facialHair);
+  if (!require('./traitNone').isNone(facialHair)) parts.push(facialHair);
 
   // Other distinctive features
   // 'none' is the form's "no other features" sentinel (decisions 2026-11-12)
-  if (!require('./promptBuilders').isNone(p.other)) parts.push(p.other);
+  if (!require('./traitNone').isNone(p.other)) parts.push(p.other);
 
   return parts.length > 0 ? parts.join(', ') : 'See reference image for physical traits';
 }

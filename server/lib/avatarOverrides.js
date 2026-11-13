@@ -36,10 +36,6 @@ function isSet(v) {
   return v != null && String(v).trim() !== '';
 }
 
-function isNone(v) {
-  return String(v).trim().toLowerCase() === 'none';
-}
-
 /**
  * The user-entered age in whole years, or null when nothing usable was entered.
  * A free-text age ("7 Jahre") yields its leading number; anything outside a
@@ -67,6 +63,7 @@ function declaredAgeJudgeLine(years) {
 }
 
 const { plausiblePhysical } = require('./characterPhysical');
+const { isNone } = require('./traitNone');
 
 /**
  * @param {object}  opts
@@ -115,7 +112,7 @@ function resolveDeclaredAvatarOverrides({ physicalTraits = null, clothing = null
       traitLines.push(`- Glasses: ${t.glasses} — ALWAYS visible on the face`);
       declaredFacts.push(`Glasses: ${t.glasses} — worn on the face`);
     }
-    if (isSet(t.other)) { traitLines.push(`- Other: ${t.other}`); declaredFacts.push(`Other: ${t.other}`); }
+    if (isSet(t.other) && !isNone(t.other)) { traitLines.push(`- Other: ${t.other}`); declaredFacts.push(`Other: ${t.other}`); }
   }
 
   const c = clothing && typeof clothing === 'object' ? clothing : null;

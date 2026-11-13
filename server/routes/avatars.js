@@ -24,6 +24,7 @@ const { editWithGrok } = require('../lib/grok');
 const { scoreAvatarLikeness, failsArcFaceGate, warmArcFace, ARCFACE_MIN } = require('../lib/faceIdentity');
 const { buildHairDescription, getAgeCategory, clampApparentAge } = require('../lib/storyHelpers');
 const { getPlausiblePhysical, plausiblePhysical } = require('../lib/characterPhysical');
+const { isNone } = require('../lib/traitNone');
 const { HAIR_SOURCE_AVATAR, applyAvatarHairToExtraction } = require('../lib/avatarHair');
 const { resolveDeclaredAvatarOverrides } = require('../lib/avatarOverrides');
 const { getFacePhoto } = require('../lib/characterPhotos');
@@ -1265,7 +1266,7 @@ function buildPhysicalTraitsForAvatar(character) {
   if (traits.eyeColor) parts.push(`Eye color: ${traits.eyeColor}`);
   // Already gated by getPlausiblePhysical (male, 13+; decisions 2026-10-09).
   const facialHair = traits.facialHair;
-  if (facialHair && facialHair !== 'none') {
+  if (!isNone(facialHair)) {
     if (facialHair.toLowerCase() === 'clean-shaven') {
       parts.push(`Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`);
     } else {
@@ -1273,10 +1274,10 @@ function buildPhysicalTraitsForAvatar(character) {
     }
   }
   if (traits.skinTone) parts.push(`Skin tone: ${traits.skinTone}`);
-  if (traits.glasses && String(traits.glasses).trim().toLowerCase() !== 'none') {
+  if (!isNone(traits.glasses)) {
     parts.push(`Glasses: ${traits.glasses} — ALWAYS visible on the face`);
   }
-  if (traits.other && traits.other !== 'none') {
+  if (!isNone(traits.other)) {
     parts.push(`Other features: ${traits.other}`);
   }
 

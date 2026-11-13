@@ -19,6 +19,7 @@ const { compressImageToJPEG, callGeminiAPIForImage } = require('./images');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { buildHairDescription, getHeadBodyRatio } = require('./storyHelpers');
 const { getPlausiblePhysical } = require('./characterPhysical');
+const { isNone } = require('./traitNone');
 const { getFacePhoto, getPrimaryPhoto, getStandardAvatar } = require('./characterPhotos');
 const { normalizeClothingCategory } = require('./clothingCategories');
 const { fetchImageBytes } = require('./r2');
@@ -258,17 +259,17 @@ function buildPhysicalTraitsString(character) {
   if (traits.eyeColor) parts.push(`Eye color: ${traits.eyeColor}`);
   // Already gated by getPlausiblePhysical (male, 13+; decisions 2026-10-09).
   const facialHair = traits.facialHair;
-  if (facialHair && facialHair !== 'none') {
+  if (!isNone(facialHair)) {
     if (facialHair.toLowerCase() === 'clean-shaven') {
       parts.push(`Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`);
     } else {
       parts.push(`Facial hair: ${facialHair}`);
     }
   }
-  if (traits.glasses && traits.glasses !== 'none') {
+  if (!isNone(traits.glasses)) {
     parts.push(`Glasses: ${traits.glasses}`);
   }
-  if (traits.other && traits.other !== 'none') {
+  if (!isNone(traits.other)) {
     parts.push(`Other features: ${traits.other}`);
   }
 

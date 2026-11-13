@@ -2042,8 +2042,7 @@ function getTokensPerPage(languageLevel) {
 // ============================================================================
 
 
-const NONE_WORDS = new Set(['none', 'no', 'nein', 'aucun', 'niente', '-', 'keine']);
-const isNone = (v) => !v || NONE_WORDS.has(String(v).toLowerCase().trim());
+const { isNone } = require('./traitNone'); // the ONE none-rule (decisions 2026-11-13)
 
 /**
  * Extract a canonical visual profile from a character object. This is the
@@ -14595,8 +14594,6 @@ module.exports = {
   getReadingLevel,
   trialPageLength,
   getTokensPerPage,
-  NONE_WORDS,
-  isNone,
   extractCharacterVisualProfile,
   buildLabeledPhysicalParts,
   recordedFeatures,
