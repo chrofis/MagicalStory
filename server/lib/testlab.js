@@ -9444,7 +9444,7 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
     : (storyData.userLocation || null);
 
   // ── route mirror: character line ──
-  const charDesc = `${mainChar.name}${mainChar.age ? `, ${mainChar.age} years old` : ''}${mainChar.gender ? `, ${mainChar.gender}` : ''}${mainChar.traits?.length ? ` (${mainChar.traits.join(', ')})` : ''}`;
+  const charDesc = `${mainChar.name}${require('./promptBuilders').ageForPrompt(mainChar.age) ? `, ${require('./promptBuilders').ageForPrompt(mainChar.age)}` : ''}${mainChar.gender ? `, ${mainChar.gender}` : ''}${mainChar.traits?.length ? ` (${mainChar.traits.join(', ')})` : ''}`;
 
   // ── route mirror: category context ──
   let categoryContext = '';

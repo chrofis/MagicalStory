@@ -44,11 +44,12 @@ describe('parseTrialAge — the one server-side range', () => {
     expect(parseTrialAge('1')).toEqual({ ok: true, years: 1 });
     expect(parseTrialAge(7)).toEqual({ ok: true, years: 7 });
     expect(parseTrialAge('18')).toEqual({ ok: true, years: 18 });
-    // 0 is legal in the band machinery (youngestMainAge filters n >= 0) but the
-    // trial has never offered a newborn hero — deliberate, see trialAge.js.
-    expect(parseTrialAge('0').ok).toBe(false);
+    // Age 0 ("under 1 year") is accepted since 2026-11-13 (decisions.md); "0" is a value, not missing.
+    expect(parseTrialAge('0')).toEqual({ ok: true, years: 0 });
+    expect(parseTrialAge(0)).toEqual({ ok: true, years: 0 });
+    expect(parseTrialAge('-1').ok).toBe(false);
     expect(parseTrialAge(String(TRIAL_MAX_AGE + 1)).ok).toBe(false);
-    expect([TRIAL_MIN_AGE, TRIAL_MAX_AGE]).toEqual([1, 18]);
+    expect([TRIAL_MIN_AGE, TRIAL_MAX_AGE]).toEqual([0, 18]);
   });
 });
 
@@ -77,8 +78,8 @@ describe('the server refuses a trial character with no age', () => {
 });
 
 describe('the client cannot submit without an age', () => {
-  it('canProceed requires a valid age, on the same 1-18 range as the server', () => {
-    expect(TRIAL_STEP).toContain('const isValidTrialAge = (raw: string) => /^' + String.fromCharCode(92) + 'd{1,3}$/.test(raw.trim()) && Number(raw) >= 1 && Number(raw) <= 18;');
+  it('canProceed requires a valid age, on the same 0-18 range as the server', () => {
+    expect(TRIAL_STEP).toContain('const isValidTrialAge = (raw: string) => /^' + String.fromCharCode(92) + 'd{1,3}$/.test(raw.trim()) && Number(raw) >= 0 && Number(raw) <= 18;');
     expect(TRIAL_STEP).toContain('const ageIsValid = isValidTrialAge(ageRaw);');
     expect(TRIAL_STEP).toMatch(/const canProceed = characterData\.name\.trim\(\) && !nameProblem && characterData\.gender && ageIsValid && hasPhoto;/);
   });
@@ -128,5 +129,24 @@ describe('the declared age reaches the avatar call on the TRIAL path', () => {
     const none = resolveDeclaredAvatarOverrides({ declaredAge: '' });
     expect(none.ageLine).toBeNull();
     expect(none.ageFact).toBeNull();
+  });
+});
+
+describe('trial age 0 is a baby end to end (2026-11-13)', () => {
+  it('the avatar generator and judge lines say baby, not "0 years old"', () => {
+    const r = resolveDeclaredAvatarOverrides({ declaredAge: parseTrialAge('0').ok ? 0 : null });
+    expect(r.declaredAge).toBe(0);
+    expect(r.ageLine).toMatch(/baby/);
+    expect(r.ageLine).not.toMatch(/0 years old/);
+    expect(r.ageFact).toMatch(/baby/);
+    expect(declaredAgeBlock({ age: '0' })).toMatch(/baby/);
+    expect(declaredAgeBlock({ age: '0' })).not.toMatch(/0 years old/);
+  });
+  it('the trial form accepts 0 and labels it', () => {
+    expect(TRIAL_STEP).toMatch(/Number\(raw\) >= 0 && Number\(raw\) <= 18/);
+    expect(TRIAL_STEP).toMatch(/ageLabel\(ageRaw, language\)/);
+  });
+  it('a 0 in the idea character line is written through ageForPrompt', () => {
+    expect(TRIAL_ROUTE).toMatch(/ageForPrompt\(mainChar\.age\)/);
   });
 });

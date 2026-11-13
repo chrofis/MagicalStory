@@ -50,16 +50,22 @@ function normalizeDeclaredAge(age) {
   return years;
 }
 
+/** "7 years old"; age 0 is "under 1 year old (a baby)" (ageForPrompt, the one wording; lazy: promptBuilders loads services/prompts). */
+function yearsText(years) {
+  if (years === 0) return require('./promptBuilders').ageForPrompt(0);
+  return `${years} years old`;
+}
+
 /** The generator's wording for a declared age. */
 function declaredAgeGeneratorLine(years) {
   return years === null || years === undefined
     ? null
-    : `- Age: ${years} years old — build the body, limb length and head-to-body ratio for this declared age. The age the reference photo suggests does not set the body.`;
+    : `- Age: ${yearsText(years)} — build the body, limb length and head-to-body ratio for this declared age. The age the reference photo suggests does not set the body.`;
 }
 
 /** The judge's wording for the same declared age. */
 function declaredAgeJudgeLine(years) {
-  return years === null || years === undefined ? null : `${years} years old`;
+  return years === null || years === undefined ? null : yearsText(years);
 }
 
 const { plausiblePhysical } = require('./characterPhysical');

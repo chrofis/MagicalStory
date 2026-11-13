@@ -14,18 +14,15 @@
  * behaviour the ruling removed. The age also drives the age-band plot rules
  * (AGE_BANDS / focusAge) and the topic age windows (TOPIC_AGE_WINDOWS).
  *
- * Range: whole years 1-18. The trial has rejected anything outside 1-18 since
- * it shipped and this change only makes the field REQUIRED — it does not widen
- * the accepted input. Age 0 stays rejected here deliberately: the downstream
- * band machinery does accept it (`youngestMainAge` filters `n >= 0`,
- * AGE_BANDS[0] = 'routine'), but the trial funnel has never offered a
- * newborn hero and admitting one is a separate product decision, not a
- * side effect of making the field mandatory.
+ * Range: whole years 0-18. Age 0 ("under 1 year") is accepted since 2026-11-13, as in the
+ * full character form (docs/decisions.md): the band machinery accepts it (`youngestMainAge`
+ * filters `n >= 0`, AGE_BANDS[0] = 'routine', getAgeCategory 0 = infant) and every prompt
+ * writes it through ageForPrompt. "0" is a value, never "missing".
  */
 
 const { clampApparentAge } = require('./promptBuilders');
 
-const TRIAL_MIN_AGE = 1;
+const TRIAL_MIN_AGE = 0;
 const TRIAL_MAX_AGE = 18;
 
 /**

@@ -1,5 +1,5 @@
 /**
- * Age and height as the character save accepts them (docs/decisions.md 2026-11-13).
+ * Age, height and gender as the character save accepts them (docs/decisions.md 2026-11-13).
  *
  * Age 0 is a real age ("under 1 year"): "0" is not "missing". Height is whole centimetres 40-250:
  * a height typed "1.10" (metres) was stored and later read as 1 cm, so a non-integer or a value
@@ -26,6 +26,15 @@ function ageProblem(raw) {
   return Number.isFinite(n) && n >= 0 && n <= AGE_MAX ? null : 'CHARACTER_AGE_INVALID';
 }
 
+// The values the form offers. A draft may have none yet. Stored production rows hold only these (counted
+// 2026-11-13: male 136, female 128, empty 8), so no legacy value needs to pass.
+const GENDERS = ['male', 'female', 'other'];
+
+function genderProblem(raw) {
+  if (blank(raw)) return null;
+  return typeof raw === 'string' && GENDERS.includes(raw) ? null : 'CHARACTER_GENDER_INVALID';
+}
+
 const storedHeight = c => c?.physical?.height ?? c?.height;
 
 /**
@@ -44,6 +53,9 @@ function findVitalsProblem(characters, existing = []) {
       [ageProblem(c.age), c.age, old?.age],
       [heightProblem(storedHeight(c)), storedHeight(c), storedHeight(old)],
     ];
+    // Gender has no legacy values to forgive: refused outright, whatever is stored.
+    const genderCode = genderProblem(c.gender);
+    if (genderCode) return { code: genderCode, characterId: c.id, name: c.name || '' };
     for (const [code, value, oldValue] of checks) {
       if (code && String(value ?? '').trim() !== String(oldValue ?? '').trim()) {
         return { code, characterId: c.id, name: c.name || '' };
@@ -53,4 +65,4 @@ function findVitalsProblem(characters, existing = []) {
   return null;
 }
 
-module.exports = { HEIGHT_MIN_CM, HEIGHT_MAX_CM, AGE_MAX, heightProblem, ageProblem, findVitalsProblem };
+module.exports = { HEIGHT_MIN_CM, HEIGHT_MAX_CM, AGE_MAX, GENDERS, heightProblem, ageProblem, genderProblem, findVitalsProblem };

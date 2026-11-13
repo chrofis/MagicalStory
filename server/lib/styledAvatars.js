@@ -237,8 +237,8 @@ function buildPhysicalTraitsString(character) {
   // Age and body proportions — critical for correct child vs adult rendering.
   // Ratio comes from getHeadBodyRatio() in storyHelpers so avatar generation
   // and image evaluation share a single source of truth.
-  const age = character?.age ? parseInt(character.age, 10) : null;
-  if (age) {
+  const age = character?.age !== undefined && character?.age !== null && String(character.age).trim() !== '' ? parseInt(character.age, 10) : null;
+  if (Number.isFinite(age)) {
     let ageCategory;
     if (age <= 3) ageCategory = 'toddler';
     else if (age <= 6) ageCategory = 'young child';
@@ -247,7 +247,7 @@ function buildPhysicalTraitsString(character) {
     else if (age <= 17) ageCategory = 'teenager';
     else ageCategory = 'adult';
     const headToBody = getHeadBodyRatio(age);
-    parts.push(`Age: ${age} years old (${ageCategory}) — head-to-body ratio ${headToBody}`);
+    parts.push(`Age: ${age === 0 ? 'under 1 year old (a baby)' : `${age} years old`} (${ageCategory}) — head-to-body ratio ${headToBody}`);
   }
 
   // Use detailed hair description from storyHelpers (handles detailedHairAnalysis)

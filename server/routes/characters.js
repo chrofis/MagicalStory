@@ -457,7 +457,9 @@ router.post('/', authenticateToken, async (req, res) => {
       const stored = (await dbQuery('SELECT data FROM characters WHERE id = $1', [`characters_${req.user.id}`]))[0]?.data?.characters || [];
       const bad = findVitalsProblem(characters, stored);
       if (bad) {
-        const what = bad.code === 'CHARACTER_HEIGHT_INVALID' ? 'height must be whole centimetres between 40 and 250' : 'age must be a number between 0 and 120';
+        const what = bad.code === 'CHARACTER_HEIGHT_INVALID' ? 'height must be whole centimetres between 40 and 250'
+          : bad.code === 'CHARACTER_GENDER_INVALID' ? 'gender must be male, female or other'
+          : 'age must be a number between 0 and 120';
         return res.status(400).json({ error: `${bad.name || 'Character'}: ${what}`, code: bad.code, characterId: bad.characterId });
       }
     }

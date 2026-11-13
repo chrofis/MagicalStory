@@ -4,7 +4,7 @@ import { heightProblem as clientHeightProblem, heightHint, ageLabel, agedNoun } 
 import { relationshipAgeConflict, relationshipAgeConflictText, relationshipTypes } from '../../client/src/constants/relationships';
 
 const require_ = createRequire(import.meta.url);
-const { findVitalsProblem, heightProblem, ageProblem } = require_('../../server/lib/characterVitals');
+const { findVitalsProblem, heightProblem, ageProblem, genderProblem } = require_('../../server/lib/characterVitals');
 const { relationshipSentence } = require_('../../server/lib/relationships');
 const { ageForPrompt, buildRelationshipLines } = require_('../../server/lib/promptBuilders');
 
@@ -109,5 +109,17 @@ describe('warning when a younger character is parent/grandparent of an older one
   });
   it('has the warning text in four languages', () => {
     for (const l of ['de', 'fr', 'it', 'en'] as const) expect(relationshipAgeConflictText(l).length).toBeGreaterThan(20);
+  });
+});
+
+describe('gender is checked on save (decisions 2026-11-13)', () => {
+  it('accepts the form values and empty, refuses anything else', () => {
+    for (const ok of ['male', 'female', 'other', '', undefined, null]) expect(genderProblem(ok as any), String(ok)).toBeNull();
+    for (const bad of ['boy', 'girl', 'männlich', 'Male', 5, {}]) expect(genderProblem(bad as any), String(bad)).toBe('CHARACTER_GENDER_INVALID');
+  });
+  it('findVitalsProblem reports it with the character, even if the same value is stored', () => {
+    const r = findVitalsProblem([{ id: 1, name: 'Ana', gender: 'boy' }], [{ id: 1, gender: 'boy' }]);
+    expect(r).toEqual({ code: 'CHARACTER_GENDER_INVALID', characterId: 1, name: 'Ana' });
+    expect(findVitalsProblem([{ id: 1, name: 'Ana', gender: 'female', age: '0' }], [])).toBeNull();
   });
 });

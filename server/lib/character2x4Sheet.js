@@ -463,7 +463,7 @@ function declaredAgeBlock(character) {
   const { getAgeCategory, getAgeMarkers } = require('./promptBuilders');
   const markers = getAgeMarkers(getAgeCategory(age));
   if (!markers) return '';
-  return ` This person is ${age} years old: ${markers}. That stated age decides the proportions in every cell — it outranks any impression of age taken from the photo, and the figure is never drawn older or taller than it.`;
+  return ` This person is ${age === 0 ? require('./promptBuilders').ageForPrompt(0) : `${age} years old`}: ${markers}. That stated age decides the proportions in every cell — it outranks any impression of age taken from the photo, and the figure is never drawn older or taller than it.`;
 }
 
 /**

@@ -2504,8 +2504,9 @@ router.post('/generate-ideas-stream', verifySessionToken, trialIdeasLimiter, asy
 
     // Build a simple character description
     const mainChar = characters?.[0];
+    const { ageForPrompt } = require('../lib/promptBuilders');
     const charDesc = mainChar
-      ? `${mainChar.name}${mainChar.age ? `, ${mainChar.age} years old` : ''}${mainChar.gender ? `, ${mainChar.gender}` : ''}${mainChar.traits?.length ? ` (${mainChar.traits.join(', ')})` : ''}`
+      ? `${mainChar.name}${ageForPrompt(mainChar.age) ? `, ${ageForPrompt(mainChar.age)}` : ''}${mainChar.gender ? `, ${mainChar.gender}` : ''}${mainChar.traits?.length ? ` (${mainChar.traits.join(', ')})` : ''}`
       : 'a child';
 
     // Determine category context

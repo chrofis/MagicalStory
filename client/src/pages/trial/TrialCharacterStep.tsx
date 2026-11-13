@@ -11,6 +11,7 @@ import type { Language } from '@/types/story';
 import { trackTrialStep } from '@/utils/trialFunnel';
 import { classifyAccountCreateFailure } from '@/utils/trialSession';
 import { photoFailureMessage } from '@/utils/apiErrors';
+import { ageLabel } from '@/utils/characterVitals';
 import { characterNameProblem, characterNameHint } from '@/utils/characterName';
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
@@ -18,8 +19,8 @@ const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 // validity check at its first digit, and the account is created on that instant).
 const STANDARD_AVATAR_QUIET_MS = 2000;
 
-/** Whole years 1-18, matching the server's parseTrialAge; the server rejects the same values independently. */
-const isValidTrialAge = (raw: string) => /^\d{1,3}$/.test(raw.trim()) && Number(raw) >= 1 && Number(raw) <= 18;
+/** Whole years 0-18 (0 = "under 1 year", shown with ageLabel), matching the server's parseTrialAge; the server rejects the same values independently. */
+const isValidTrialAge = (raw: string) => /^\d{1,3}$/.test(raw.trim()) && Number(raw) >= 0 && Number(raw) <= 18;
 
 // ─── Localized strings ──────────────────────────────────────────────────────
 
@@ -84,7 +85,7 @@ const strings: Record<string, {
     next: 'Next',
     nextNoPhoto: 'Add photo and details to continue',
     nextNoDetails: 'Add details to continue',
-    ageRequired: 'Please enter an age between 1 and 18',
+    ageRequired: 'Please enter an age between 0 and 18',
     continueLabel: 'Continue',
     back: 'Back',
     consentBefore: "I'm the child's guardian (or have their consent), and I accept the ",
@@ -124,7 +125,7 @@ const strings: Record<string, {
     next: 'Weiter',
     nextNoPhoto: 'Foto und Details hinzufügen, um fortzufahren',
     nextNoDetails: 'Details hinzufügen, um fortzufahren',
-    ageRequired: 'Bitte ein Alter zwischen 1 und 18 eingeben',
+    ageRequired: 'Bitte ein Alter zwischen 0 und 18 eingeben',
     continueLabel: 'Weiter',
     back: 'Zurück',
     consentBefore: 'Ich bin erziehungsberechtigt (oder habe die Zustimmung) und akzeptiere die ',
@@ -164,7 +165,7 @@ const strings: Record<string, {
     next: 'Suivant',
     nextNoPhoto: 'Ajoutez la photo et les détails pour continuer',
     nextNoDetails: 'Ajoutez les détails pour continuer',
-    ageRequired: 'Merci d’indiquer un âge entre 1 et 18 ans',
+    ageRequired: 'Merci d’indiquer un âge entre 0 et 18 ans',
     continueLabel: 'Continuer',
     back: 'Retour',
     consentBefore: "Je suis le tuteur de l'enfant (ou j'ai son consentement) et j'accepte les ",
@@ -204,7 +205,7 @@ const strings: Record<string, {
     next: 'Avanti',
     nextNoPhoto: 'Aggiungi foto e dettagli per continuare',
     nextNoDetails: 'Aggiungi i dettagli per continuare',
-    ageRequired: 'Inserisci un’età tra 1 e 18 anni',
+    ageRequired: 'Inserisci un’età tra 0 e 18 anni',
     continueLabel: 'Continua',
     back: 'Indietro',
     consentBefore: 'Sono il tutore del bambino (o ho il suo consenso) e accetto i ',
@@ -349,7 +350,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
   // the avatar generator builds the body from and the avatar judge scores
   // against (de8753cc1), and it picks the age band and the topic window — with
   // no age, that chain silently falls back to the behaviour the ruling removed.
-  // Whole years 1-18, matching the server's parseTrialAge; the server rejects
+  // Whole years 0-18, matching the server's parseTrialAge; the server rejects
   // the same values independently, this is only the fast feedback.
   const ageRaw = String(characterData.age || '').trim();
   const ageIsValid = isValidTrialAge(ageRaw);
@@ -1055,7 +1056,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t.ageLabel} <span className="text-red-400">*</span></label>
               <input
                 type="number"
-                min={1}
+                min={0}
                 max={18}
                 value={characterData.age}
                 onChange={(e) => updateField('age', e.target.value)}
@@ -1065,6 +1066,9 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
                   hasPhoto && !ageIsValid ? 'border-red-300 bg-red-50/30' : 'border-gray-300'
                 }`}
               />
+              {ageIsValid && ageRaw === '0' && (
+                <p className="mt-1 text-xs text-gray-500">{ageLabel(ageRaw, language)}</p>
+              )}
               {showAgeError && (
                 <p className="mt-1 text-xs text-red-600">{t.ageRequired}</p>
               )}
