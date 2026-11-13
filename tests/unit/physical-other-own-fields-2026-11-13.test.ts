@@ -40,9 +40,9 @@ describe('clean-physical-other buildChange', () => {
     expect(buildChange({ other: 'oval face with a slight smile' }, {}, traits('none')).newOther).toBe('none');
     expect(buildChange({ other: 'oval face' }, {}, traits('')).newOther).toBe('none');
   });
-  it('fills glasses / facialHair only where the stored value is absent', () => {
+  it('fills facialHair only where the stored value is absent, and never fills glasses (the customer switch decides)', () => {
     const c = buildChange({ other: 'wears glasses' }, {}, traits('none', { glasses: 'round black glasses', facialHair: 'stubble' }));
-    expect(c.set).toEqual({ glasses: 'round black glasses', facialHair: 'stubble' });
+    expect(c.set).toEqual({ facialHair: 'stubble' });
     const kept = buildChange({ other: 'wears glasses', glasses: 'none', facialHair: 'none' }, {}, traits('none', { glasses: 'round glasses', facialHair: 'stubble' }));
     expect(kept.set).toEqual({});
   });
@@ -54,6 +54,12 @@ describe('clean-physical-other buildChange', () => {
     expect(buildChange({ other: 'none' }, {}, traits('x')).skip).toBeTruthy();
     expect(buildChange({ other: 'freckles', glasses: 'none', facialHair: 'none' }, {}, traits('freckles')).skip).toBe('unchanged');
     expect(buildChange({ other: 'freckles' }, {}, { glasses: 'none' }).skip).toBeTruthy();
+  });
+  it('finds a stored character whose id is a number from the text id in the plan', () => {
+    const { findCharIndex } = require('../../scripts/admin/clean-physical-other.js');
+    expect(findCharIndex([{ id: 1 }, { id: 1781304374465 }], '1781304374465')).toBe(1);
+    expect(findCharIndex([{ id: '4' }], '4')).toBe(0);
+    expect(findCharIndex([{ id: 5 }], '4')).toBe(-1);
   });
   it('prices a call from its token usage', () => {
     expect(costOf({ inputTokens: 1_000_000, outputTokens: 0, thinkingTokens: 0 })).toBeCloseTo(0.3);

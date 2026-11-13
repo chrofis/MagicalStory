@@ -12,7 +12,7 @@
  *
  * Usage
  *   node scripts/admin/clean-physical-other.js [--ids=charId,charId] [--limit=N] [--max-spend=USD]
- *        [--exclude-user=userId,userId] [--plan-out=file]          (dry run: reads production, calls the
+ *        [--exclude-user=userId,userId] [--plan-out=file] [--skip-plan=earlierPlan]          (dry run: reads production, calls the
  *                                                                    model, writes the plan file, writes NO row)
  *   node scripts/admin/clean-physical-other.js --write --plan=file [--exclude-user=...]
  *                                                                   (applies a reviewed plan, no model call;
@@ -44,9 +44,9 @@ const list = (v) => (v ? v.split(',').map(s => s.trim()).filter(Boolean) : []);
  * What the new photo reading means for one stored character. Pure: `physical` / `sources` are the
  * stored values, `traits` the new analysis `traits` object.
  * - other: the model's new distinctive markings ('none' when it lists none).
- * - glasses / facialHair: filled from the reading ONLY where the stored character has no value at all
+ * - facialHair: filled from the reading ONLY where the stored character has no value at all
  *   (a stored value, extracted or typed, is never overridden), so a fact the old text carried is not lost
- *   when it leaves `other`.
+ *   when it leaves `other`. Glasses are never filled: the customer's glasses switch decides (owner, 2026-11-13).
  */
 function buildChange(physical, sources, traits) {
   const p = physical || {};
@@ -57,12 +57,17 @@ function buildChange(physical, sources, traits) {
   if (raw === undefined || raw === null) return { skip: 'new reading has no distinctive markings field' };
   const newOther = isNone(raw) ? NONE : String(raw).trim();
   const set = {};
-  for (const f of ['glasses', 'facialHair']) {
+  for (const f of ['facialHair']) {
     const v = traits[f];
     if (p[f] === undefined && src[f] !== 'user' && v !== undefined && v !== null && String(v).trim() !== '') set[f] = String(v).trim();
   }
   if (newOther === String(p.other).trim() && !Object.keys(set).length) return { skip: 'unchanged' };
   return { oldOther: p.other, newOther, set };
+}
+
+// The plan holds ids as text (read with ->>'id'); stored character ids are numbers or strings.
+function findCharIndex(chars, charId) {
+  return (chars || []).findIndex(c => c && String(c.id) === String(charId));
 }
 
 function costOf(usage) {
@@ -120,6 +125,11 @@ async function dryRun() {
       }
       cands = cands.filter(c => flagged.has(c.char_id));
     }
+    // --skip-plan=<file>: continue an earlier dry run that stopped at its spend cap.
+    if (arg('skip-plan')) {
+      const seen = new Set(JSON.parse(fs.readFileSync(arg('skip-plan'), 'utf8')).plan.map(e => String(e.charId)));
+      cands = cands.filter(c => !seen.has(c.char_id));
+    }
     cands = cands.slice(0, limit);
     console.log(`${cands.length} of ${total} characters with a non-empty other flagged for re-reading (not typed by the customer)`);
     for (const c of cands) {
@@ -160,7 +170,7 @@ async function write() {
     for (const p of todo) {
       const row = await client.query('SELECT data FROM characters WHERE id = $1 FOR UPDATE', [p.rowId]);
       const chars = row.rows[0]?.data?.characters || [];
-      const idx = chars.findIndex(c => c.id === p.charId);
+      const idx = findCharIndex(chars, p.charId);
       const phys = idx >= 0 ? chars[idx].physical : null;
       if (!phys || phys.other !== p.oldOther || chars[idx].physicalTraitsSource?.other === 'user') { stale++; continue; }
       backup.push({ rowId: p.rowId, userId: p.userId, charId: p.charId, physical: phys, physicalTraitsSource: chars[idx].physicalTraitsSource || null });
@@ -184,4 +194,4 @@ async function write() {
 if (require.main === module) {
   (process.argv.includes('--write') ? write() : dryRun()).catch(e => { console.error('ERR:', e.message); process.exit(1); });
 }
-module.exports = { buildChange, costOf };
+module.exports = { buildChange, costOf, findCharIndex };
