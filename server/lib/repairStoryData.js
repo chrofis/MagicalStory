@@ -30,6 +30,7 @@ const { COVER_PAGE_NUMBERS } = require('./coverKeys');
 function buildRepairStoryData({ inputData, characterAvatars, sceneDescriptions, fullStoryText, writerText, visualBible, clothingRequirements, pageClothing, coverHints, rawImages, textPositionOf, coverImages, title }) {
   return {
     characters: inputData.characters,
+    mainCharacters: inputData.mainCharacters, // the review's "main character" (finding 3, 2026-11-13)
     // The story's page shape: every repair/iterate redraw reads it via
     // layout.resolveStoryPageAspect, which refuses to guess. Without it every
     // repair round threw "no usable layout.imageAspect" (prod showcase

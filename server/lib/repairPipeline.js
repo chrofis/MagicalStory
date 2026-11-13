@@ -2053,7 +2053,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // log.errors on a starved call. `characters` too (2026-09-24): the reader's
     // per-page cast is resolved through the evaluator's roster, which indexes them.
     return auditStoryBook(
-      { id: consolidatorStoryId, visualBible: storyData?.visualBible || visualBible || null, characters: storyData?.characters || [], sceneImages: auditPages },
+      { id: consolidatorStoryId, visualBible: storyData?.visualBible || visualBible || null, characters: storyData?.characters || [], mainCharacters: storyData?.mainCharacters, sceneImages: auditPages },
       { usageTracker });
   };
 
@@ -3270,7 +3270,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       }
       if (auditPages.length === 0) return null;
       return auditStoryBook(
-        { id: consolidatorStoryId, visualBible: storyData?.visualBible || visualBible || null, characters: storyData?.characters || [], artStyle, clothingRequirements: storyData?.clothingRequirements || null, sceneImages: auditPages },
+        { id: consolidatorStoryId, visualBible: storyData?.visualBible || visualBible || null, characters: storyData?.characters || [], mainCharacters: storyData?.mainCharacters, artStyle, clothingRequirements: storyData?.clothingRequirements || null, sceneImages: auditPages },
         { usageTracker, modelId: MODEL_DEFAULTS.bookReviewModel, bookReview: { title: bookTitle } });
     };
     // maxRegenAttempts 0 = an evaluate-only run: the book is reviewed and nothing is repaired.

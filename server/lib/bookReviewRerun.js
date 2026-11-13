@@ -108,6 +108,8 @@ async function buildRerunInputs(stored, loadOriginal) {
   const warnings = [];
   const inputData = {
     characters: stored.characters || [],
+    // The declared main character(s): the review names "the main character" from them (finding 3, 2026-11-13).
+    mainCharacters: stored.mainCharacters,
     layout: stored.layout,
     artStyle: stored.artStyle,
     language: stored.language,
