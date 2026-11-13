@@ -4837,6 +4837,24 @@
       "rootCause": "provenanceProblems and planAppends compared full image URLs (production bucket vs staging bucket) and the same version index, but an appended row lives at a new production index with adminFix.stagingVersion pointing at its staging source. Fixed with one helper isSameImageRow that matches by adminFix.stagingVersion.",
       "status": "fixed",
       "fixedIn": "f4fdbec4e"
+    },
+    {
+      "id": "character-save-merges-same-name",
+      "title": "Saving characters merges a character with a different same-named (or nameless) one: it gets the other one's avatars and its own new face photo can be replaced",
+      "reportedAt": "2026-11-13",
+      "source": "Wizard adversarial review 2026-11-13: server/routes/characters.js:491 find(id OR c.name === newChar.name); production has 1 user with two same-named characters sharing one face URL, and 8 nameless drafts on 7 users that a blank new character (name '') would match.",
+      "rootCause": "Name fallback in the POST merge (and the DB-only keeper) instead of id-only matching.",
+      "status": "fixed",
+      "fixedIn": "PENDING"
+    },
+    {
+      "id": "character-save-cannot-clear-field",
+      "title": "A user cannot clear a character field: an emptied physical trait, Sonstiges text, strengths/flaws/challenges or special details comes back from the DB on save",
+      "reportedAt": "2026-11-13",
+      "source": "Wizard adversarial review 2026-11-13: server/routes/characters.js ~513-553 keeps the DB value whenever the new value is empty.",
+      "rootCause": "Merge treats an empty value sent by the form as \"missing\"; only keys absent from the payload should be preserved.",
+      "status": "fixed",
+      "fixedIn": "PENDING"
     }
   ]
 }

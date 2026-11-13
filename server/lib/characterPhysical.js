@@ -325,5 +325,6 @@ module.exports = {
   clearUserHairOverride,
   expandUserHairOverrideForDisplay,
   FIELD_MAPPINGS,
-  LEGACY_FIELDS
+  LEGACY_FIELDS,
+  HAIR_OVERRIDE_FIELD_TO_DETAILED_KEY
 };

@@ -330,7 +330,7 @@ describe('Avatar Merge Logic', () => {
       expect(preservedCount).toBe(2);
     });
 
-    it('matches characters by name when ID differs', () => {
+    it('does NOT match characters by name when ID differs (character-save-merges-same-name)', () => {
       const newChars = [
         { id: 100, name: 'Alice', age: '8' } // Different ID
       ];
@@ -341,7 +341,7 @@ describe('Avatar Merge Logic', () => {
 
       const { characters } = mergeCharacters(newChars, existingChars);
 
-      expect(characters[0].photo_url).toBe('alice-photo');
+      expect(characters[0].photo_url).toBeUndefined();
     });
 
     it('returns empty array for null input', () => {

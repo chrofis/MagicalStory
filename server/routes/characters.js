@@ -11,8 +11,8 @@ const { dbQuery, withTransaction, isDatabaseMode, logActivity, uploadCharacterPh
 const { authenticateToken } = require('../middleware/auth');
 const { normalizeCharacterName } = require('../lib/characterName');
 const { normalizePhotos, stripLegacyPhotoFields, normalizeAvatarsForResponse, normalizeCharacterAvatars } = require('../lib/characterPhotos');
-const { normalizePhysical, stripLegacyPhysicalFields, expandUserHairOverrideForDisplay } = require('../lib/characterPhysical');
-const { normalizeTraits, stripLegacyTraitFields } = require('../lib/characterTraits');
+const { expandUserHairOverrideForDisplay } = require('../lib/characterPhysical');
+const { findExistingCharacter, mergePhysicalAndTraitsOnSave } = require('../lib/characterMerge');
 
 // Reduce a row to the shape the client expects: faceThumbnails /
 // bodyThumbnails objects keyed by slot, holding the R2 URL string.
@@ -486,9 +486,10 @@ router.post('/', authenticateToken, async (req, res) => {
       // NOTE: We use charactersWithoutAvatars - frontend avatars have been stripped
       let preservedCount = 0;
       const mergedCharacters = (charactersWithoutAvatars || []).map(newChar => {
-        // Compare IDs as strings to handle type mismatch (SQL returns string, frontend sends number)
-        const newCharIdStr = String(newChar.id);
-        const existingChar = dbCharacters.find(c => String(c.id) === newCharIdStr || c.name === newChar.name);
+        // Match by ID ONLY (compared as strings: SQL returns string, frontend sends number).
+        // Never by name: same-named / nameless characters are different characters.
+        // docs/decisions.md 2026-11-13 "Character save matches by id only".
+        const existingChar = findExistingCharacter(dbCharacters, newChar);
         if (!existingChar) {
           console.log(`[Characters] POST - No existing DB data found for ${newChar.name} (id: ${newChar.id})`);
           return newChar;
@@ -500,63 +501,11 @@ router.post('/', authenticateToken, async (req, res) => {
         // Preserve and normalize character fields from DB
         const preservedFields = [];
 
-        // --- PHYSICAL TRAITS ---
-        // First normalize both existing and new to ensure legacy fields are migrated
-        normalizePhysical(existingChar);
-        normalizePhysical(mergedChar);
-
-        // Merge physical traits - keep existing values for any missing/empty fields in new
-        const existingPhysical = existingChar.physical || {};
-        const newPhysical = mergedChar.physical || {};
-
-        if (Object.keys(existingPhysical).length > 0) {
-          const merged = { ...existingPhysical };
-          for (const [key, value] of Object.entries(newPhysical)) {
-            // Only use new value if it's truthy (not null, undefined, or empty string)
-            if (value !== null && value !== undefined && value !== '') {
-              merged[key] = value;
-            }
-          }
-          mergedChar.physical = merged;
-          if (Object.keys(existingPhysical).some(k => !newPhysical[k])) {
-            preservedFields.push('physical');
-            hasChanges = true;
-          }
+        // --- PHYSICAL TRAITS + CHARACTER TRAITS --- (sent keys win, even empty; absent keys keep the DB value)
+        if (mergePhysicalAndTraitsOnSave(existingChar, mergedChar, newChar).preservedPhysical) {
+          preservedFields.push('physical');
+          hasChanges = true;
         }
-
-        // Strip legacy physical fields - physical.* is the single source of truth
-        stripLegacyPhysicalFields(mergedChar);
-
-        // --- CHARACTER TRAITS ---
-        // Normalize both to ensure legacy fields are migrated
-        normalizeTraits(existingChar);
-        normalizeTraits(mergedChar);
-
-        // Merge traits - keep existing values for any missing fields in new
-        const existingTraits = existingChar.traits || {};
-        const newTraits = mergedChar.traits || {};
-
-        if (Object.keys(existingTraits).length > 0) {
-          const merged = { ...newTraits };
-          // For arrays, merge keeping existing if new is empty
-          if (existingTraits.strengths?.length > 0 && (!merged.strengths || merged.strengths.length === 0)) {
-            merged.strengths = existingTraits.strengths;
-          }
-          if (existingTraits.flaws?.length > 0 && (!merged.flaws || merged.flaws.length === 0)) {
-            merged.flaws = existingTraits.flaws;
-          }
-          if (existingTraits.challenges?.length > 0 && (!merged.challenges || merged.challenges.length === 0)) {
-            merged.challenges = existingTraits.challenges;
-          }
-          // For strings, keep existing if new is empty
-          if (existingTraits.specialDetails && !merged.specialDetails) {
-            merged.specialDetails = existingTraits.specialDetails;
-          }
-          mergedChar.traits = merged;
-        }
-
-        // Strip legacy trait fields - traits.* is the single source of truth
-        stripLegacyTraitFields(mergedChar);
 
         // --- CLOTHING ---
         // Preserve clothing data (legacy text field)
@@ -665,9 +614,6 @@ router.post('/', authenticateToken, async (req, res) => {
         const dbId = String(dbChar.id);
         // Not in frontend array by ID
         if (frontendIds.has(dbId)) return false;
-        // Not matched by name either (the merge above uses name fallback)
-        const matchedByName = charactersWithoutAvatars.some(fc => fc.name === dbChar.name);
-        if (matchedByName) return false;
         return true;
       });
       if (dbOnlyCharacters.length > 0) {

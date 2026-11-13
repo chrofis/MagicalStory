@@ -20,6 +20,7 @@
 
 const { fetchImageBytes } = require('./r2');
 const { AVATAR_SLOTS } = require('./clothingCategories');
+const { sameCharacterId } = require('./characterMerge');
 
 const _avatarFetchCache = new Map();
 async function _getOrFetch(url) {
@@ -446,7 +447,7 @@ function mergeFreshAvatars(storyCharacters, freshCharacters, artStyleId, logFn) 
   if (!Array.isArray(freshCharacters) || freshCharacters.length === 0) return storyCharacters;
   return storyCharacters.map(storyChar => {
     if (hasUsableAvatar(storyChar, artStyleId)) return storyChar;
-    const freshChar = freshCharacters.find(fc => fc.id === storyChar.id || fc.name === storyChar.name);
+    const freshChar = freshCharacters.find(fc => sameCharacterId(fc, storyChar));
     if (freshChar?.avatars) {
       if (logFn) logFn(`Using fresh avatars for ${storyChar.name}`);
       return { ...storyChar, avatars: freshChar.avatars };

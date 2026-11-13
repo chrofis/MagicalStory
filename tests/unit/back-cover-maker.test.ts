@@ -180,10 +180,10 @@ describe('backCoverMaker', () => {
   });
 
   it('a character with no avatar and no character of today throws a clear error', async () => {
-    const story: any = { artStyle: 'watercolor', characters: [{ name: 'Liana', avatars: {} }] };
+    const story: any = { artStyle: 'watercolor', characters: [{ id: 1, name: 'Liana', avatars: {} }] };
     await expect(maker.charactersForCover('s1', story, ['Liana'], { loadFreshCharacters: async () => [] }))
       .rejects.toThrow(/Liana has no avatar stored with the story and no character of today/);
-    const fresh = [{ name: 'Liana', avatars: { standard: 'https://images.example/a.jpg' } }];
+    const fresh = [{ id: 1, name: 'Liana', avatars: { standard: 'https://images.example/a.jpg' } }];
     const merged = await maker.charactersForCover('s1', story, ['Liana'], { loadFreshCharacters: async () => fresh });
     expect(merged[0].avatars.standard).toContain('a.jpg');
   });
