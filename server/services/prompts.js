@@ -267,6 +267,8 @@ async function loadPromptTemplates() {
     ['coverEvaluationNotes', 'cover-evaluation-notes.txt'],
     ['rewriteBlockedScene', 'rewrite-blocked-scene.txt'],
     ['characterAnalysis', 'character-analysis.txt'],
+    // Screens stored `physical.other` notes for facts that have a field of their own (scripts/admin/clean-physical-other.js).
+    ['physicalOtherScreen', 'physical-other-screen.txt'],
     ['avatarHairRead', 'avatar-hair-read.txt'],
     // The day outfit read off a character's avatar (backCoverMaker.fillStandardOutfits).
     ['avatarOutfitRead', 'avatar-outfit-read.txt'],

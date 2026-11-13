@@ -28,9 +28,9 @@ Return a JSON object with this exact structure:
     "face": "<PERMANENT anatomical facial features as a short comma-separated list. Use only anatomical descriptors: jawline (sharp/angular/soft/rounded/square), chin (prominent/recessed/neutral/dimpled/pointed), nose (straight/aquiline/concave/curved bridge; pointed/bulbous/upturned/rounded tip), cheekbones (high/medium/low), lip fullness (thin/medium/full). Example: 'square jawline, prominent chin, aquiline nose with rounded tip, high cheekbones, full lips'. Forbidden words and phrases: 'typical of', 'young', 'old', 'child', 'baby', 'baby-faced', 'youthful', 'mature', 'weathered', 'soft features typical', 'developing', 'adolescent', 'juvenile', 'aged', 'wrinkled', 'fresh-faced'. No age cues whatsoever — only geometry. No expressions.>",
     "eyeColor": "<eye color (e.g. blue, brown, green, hazel, gray)>",
     "hairColor": "<MUST be one of: black | dark brown | brown | light brown | chestnut | auburn | red | strawberry blonde | dark blonde | blonde | light blonde | platinum blonde | gray | silver | white | salt and pepper>",
-    "glasses": "<describe glasses if worn: frame shape, color, style (e.g. 'round black-framed glasses', 'rectangular silver wireframe glasses'). Use 'none' if no glasses visible>",
+    "glasses": "<describe glasses worn on the face: frame shape, color, style (e.g. 'round black-framed glasses', 'rectangular silver wireframe glasses'). Use 'none' if no glasses are worn on the face; glasses held, on the head or hanging from the neck are not recorded anywhere>",
     "facialHair": "<MUST be one of: none | clean-shaven | stubble | mustache | goatee | short beard | full beard | long beard> (the person's facial hair, reported ONLY here)",
-    "distinctive markings": "<scars, moles, freckles, jewelry, piercings, braces or 'none'. Facial hair is NOT listed here: it has its own field above>"
+    "distinctive markings": "<only marks that have no field of their own: scars, moles, freckles, birthmarks, jewelry, piercings, braces. Never glasses, face shape, expression or smile, age, hair, eyes or skin tone: each of those is recorded in its own field or not at all. Facial hair is NOT listed here: it has its own field above. 'none' if no such mark is visible>"
   },
   "detailedHairAnalysis": {
     "texture": "<fine | medium | thick | coarse>",

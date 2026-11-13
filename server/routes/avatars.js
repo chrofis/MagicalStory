@@ -431,10 +431,10 @@ async function _extractTraitsWithGeminiOnce(imageData, languageInstruction = '')
         const rawResponse = text;
         if (result.traits) {
           log.debug('📸 [GEMINI] Extracted traits:', result.traits);
-          return { ...result, _rawResponse: rawResponse };
+          return { ...result, _rawResponse: rawResponse, _usage: { inputTokens, outputTokens, thinkingTokens } };
         } else {
           log.debug('📸 [GEMINI] Extracted traits (flat format):', result);
-          return { traits: result, _rawResponse: rawResponse };
+          return { traits: result, _rawResponse: rawResponse, _usage: { inputTokens, outputTokens, thinkingTokens } };
         }
       } else {
         // JSON was truncated (no closing brace) — salvage partial traits via key-value extraction
@@ -2957,4 +2957,8 @@ module.exports.processAvatarJobInBackground = processAvatarJobInBackground;
 module.exports.adoptRetryAvatar = adoptRetryAvatar;
 module.exports.getClothingStylePrompt = getClothingStylePrompt;
 module.exports.extractTraitsWithGemini = extractTraitsWithGemini;
+// The single photo read without the 2-of-3 panel review: scripts that replay the analysis over stored
+// photos (scripts/admin/clean-physical-other.js) pay for one call per photo, and the panel only
+// reviews enum fields.
+module.exports.extractTraitsWithGeminiOnce = _extractTraitsWithGeminiOnce;
 module.exports.buildPhysicalTraitsForAvatar = buildPhysicalTraitsForAvatar;

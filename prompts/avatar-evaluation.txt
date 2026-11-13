@@ -97,7 +97,7 @@ Return a JSON object with this EXACT structure:
     "facialHair": "<MUST be one of: none | clean-shaven | stubble | mustache | goatee | short beard | full beard | long beard> (use 'none' for females/children)",
     "face": "<brief description of face shape, distinguishing features>",
     "glasses": "<describe glasses if worn: frame shape, color, style. Use 'none' if no glasses>",
-    "other": "<scars, moles, freckles, piercings, birthmarks, or 'none'>"
+    "other": "<only marks that have no field of their own: scars, moles, freckles, piercings, birthmarks. Never glasses, facial hair, face shape or expression. 'none' if no such mark is visible>"
   },
   "clothing": {
     "upperBody": "<e.g. 'red t-shirt' - OR null if fullBody is set>",

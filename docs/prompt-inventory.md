@@ -289,6 +289,7 @@ was deliberately deleted — callers guard and fall back to `imageEvaluation`. B
 | avatar-ace-prompt.txt | avatars.js | Runware ACE++ avatars (route exists; ACE++ has no prod pipeline caller) |
 | avatar-evaluation.txt | avatars.js `evaluateAvatarFaceMatch` | Avatar face-match eval |
 | character-analysis.txt | avatars.js `extractTraitsWithGemini` | Photo trait extraction |
+| physical-other-screen.txt | scripts/admin/clean-physical-other.js | One-off: flags stored `other` notes that state a fact with its own field |
 | sheet-garment-gone-check.txt | character2x4Sheet.js `checkGarmentGone` (via `evaluateVariantSheet`) | One question per garment a wardrobe-state variant takes off: is it visible in any cell? The variant image alone, no reference (2026-10-04, owner). Fills `{GARMENT}` and `{PARTS}` (`GARMENT_PARTS`, the same words as `GARMENT_OFF_SHEET_RULE` the redress generator gets). Gemini Flash via `askSheetJudge`. A failed call rejects the variant |
 | sheet-kept-garment-check.txt | character2x4Sheet.js `checkKeptGarment` | One question per garment a wardrobe-state variant must KEEP: is it visible in each of body cells 5-8? Head cells excluded (cropped above the waist). Variant image alone. Fills `{GARMENT}`. Gemini Flash via `askSheetJudge`. |
 | experiments/sheet-head-box-measure.txt | scripts/analysis/measure-sheet-heads.js (Lab measurement, never in a server path) | Reads crown, chin and feet heights off ONE body cell so the Lab can state head-to-height (hat ignored). Measurement only: never in a production path |

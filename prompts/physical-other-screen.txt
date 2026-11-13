@@ -1,0 +1,9 @@
+Each entry below is the free-text "other features" note stored for one person. That note is meant to hold only marks that have no field of their own: scars, moles, freckles, birthmarks, jewelry, piercings, tattoos, braces.
+
+Name every entry whose note states any of these, which are recorded in fields of their own: glasses (worn, held or hanging), facial hair, face shape, an expression or smile, age, hair, eye colour, skin tone, build.
+
+Entries:
+{ENTRIES}
+
+Return EXACTLY this JSON:
+{"ids": ["<id of each entry that states one of those>"]}
