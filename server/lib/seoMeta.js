@@ -745,7 +745,7 @@ const PRODUCT_JSON_LD_BY_LANG = {
   },
   it: {
     name: 'Libro per bambini personalizzato',
-    description: "Libro illustrato con l'IA e tuo figlio come protagonista. Oltre 170 temi, 14 stili, 4 lingue.",
+    description: "Libro illustrato con l'IA e il tuo bambino come protagonista. Oltre 170 temi, 14 stili, 4 lingue.",
   },
 };
 
@@ -932,7 +932,7 @@ const FAQ_BY_LANG = {
         "name": "Come funziona Magical Story?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Carica una foto di tuo figlio, scegli un tema per la storia e ottieni in pochi minuti una storia personalizzata completamente illustrata. Tuo figlio appare come protagonista in ogni pagina."
+          "text": "Carica una foto del tuo bambino, scegli un tema per la storia e ottieni in pochi minuti una storia personalizzata completamente illustrata. Il tuo bambino appare come protagonista in ogni pagina."
         }
       },
       {
@@ -1020,7 +1020,7 @@ function buildProductJsonLdForTheme(themeName, category, themeId, lang) {
     },
     it: {
       name: `Libro per bambini personalizzato: ${themeName}`,
-      description: `Libro ${themeName} illustrato con l'IA e tuo figlio come protagonista.`,
+      description: `Libro ${themeName} illustrato con l'IA e il tuo bambino come protagonista.`,
       offer: 'Prima storia gratuita. Cartonato da CHF 37.',
     },
   }[lang] || {
@@ -1468,10 +1468,10 @@ function buildHreflang(routePath) {
 
 function buildCategoryDescription(catName, lang) {
   const templates = {
-    en: `Browse ${catName} for your child. Create a personalized illustrated book in minutes with Magical Story.`,
-    de: `Entdecke ${catName} für dein Kind. Erstelle in Minuten ein personalisiertes illustriertes Buch mit Magical Story.`,
-    fr: `Découvrez les ${catName} pour votre enfant. Créez un livre illustré personnalisé en quelques minutes avec Magical Story.`,
-    it: `Scopri ${catName} per il tuo bambino. Crea in pochi minuti un libro illustrato personalizzato con Magical Story.`,
+    en: `Browse ${catName} for your child. Create a personalized illustrated book with Magical Story.`,
+    de: `Entdecke ${catName} für dein Kind. Erstelle ein personalisiertes illustriertes Buch mit Magical Story.`,
+    fr: `Découvrez les ${catName} pour votre enfant. Créez un livre illustré personnalisé avec Magical Story.`,
+    it: `Scopri ${catName} per il tuo bambino. Crea un libro illustrato personalizzato con Magical Story.`,
   };
   return pickLang(templates, lang);
 }

@@ -126,9 +126,9 @@ export const storyTypes: StoryType[] = [
 
   // Heroes & Helpers / Professions (firefighter, doctor, police, detective)
   { id: 'fireman', name: { en: 'Brave Firefighter', de: 'Tapferer Feuerwehrmann', fr: 'Pompier courageux', it: 'Pompiere Coraggioso' }, emoji: '🚒', group: 'professions' },
-  { id: 'doctor', name: { en: 'Helpful Doctor', de: 'Hilfreicher Arzt', fr: 'Docteur Serviable', it: 'Dottore Premuroso' }, emoji: '👨‍⚕️', group: 'professions' },
+  { id: 'doctor', name: { en: 'Helpful Doctor', de: 'Hilfreicher Arzt', fr: 'Docteur serviable', it: 'Dottore Premuroso' }, emoji: '👨‍⚕️', group: 'professions' },
   { id: 'police', name: { en: 'Police Officer', de: 'Polizist', fr: 'Policier', it: 'Agente di Polizia' }, emoji: '👮', group: 'professions' },
-  { id: 'detective', name: { en: 'Detective Mystery', de: 'Detektiv-Geheimnis', fr: 'Mystère détective', it: 'Mistero del Detective' }, emoji: '🔍', group: 'professions' },
+  { id: 'detective', name: { en: 'Detective Mystery', de: 'Detektiv-Geheimnis', fr: 'Enquête et mystère', it: 'Mistero del Detective' }, emoji: '🔍', group: 'professions' },
 
   // Seasonal (christmas, new year, easter, halloween, mother's day, father's day)
   { id: 'christmas', name: { en: 'Christmas Story', de: 'Weihnachts-Geschichte', fr: 'Histoire de Noël', it: 'Storia di Natale' }, emoji: '🎄', group: 'seasonal', season: SEASON_WINDOWS['christmas'] },
@@ -136,8 +136,8 @@ export const storyTypes: StoryType[] = [
   { id: 'newyear', name: { en: 'New Year Story', de: 'Neujahrs-Geschichte', fr: 'Histoire du nouvel an', it: 'Storia di Capodanno' }, emoji: '🎆', group: 'seasonal', season: SEASON_WINDOWS['newyear'] },
   { id: 'easter', name: { en: 'Easter Story', de: 'Oster-Geschichte', fr: 'Histoire de Pâques', it: 'Storia di Pasqua' }, emoji: '🐰', group: 'seasonal', season: SEASON_WINDOWS['easter'] },
   { id: 'halloween', name: { en: 'Halloween Story', de: 'Halloween-Geschichte', fr: 'Histoire d\'Halloween', it: 'Storia di Halloween' }, emoji: '🎃', group: 'seasonal', season: SEASON_WINDOWS['halloween'] },
-  { id: 'mothers-day', name: { en: 'Mother\'s Day Story', de: 'Geschichte zum Muttertag', fr: 'Histoire fête des mères', it: 'Storia per la Festa della Mamma' }, emoji: '💐', group: 'seasonal', season: SEASON_WINDOWS['mothers-day'] },
-  { id: 'fathers-day', name: { en: 'Father\'s Day Story', de: 'Geschichte zum Vatertag', fr: 'Histoire fête des pères', it: 'Storia per la Festa del Papà' }, emoji: '🧢', group: 'seasonal', season: SEASON_WINDOWS['fathers-day'] },
+  { id: 'mothers-day', name: { en: 'Mother\'s Day Story', de: 'Geschichte zum Muttertag', fr: 'Histoire pour la fête des mères', it: 'Storia per la Festa della Mamma' }, emoji: '💐', group: 'seasonal', season: SEASON_WINDOWS['mothers-day'] },
+  { id: 'fathers-day', name: { en: 'Father\'s Day Story', de: 'Geschichte zum Vatertag', fr: 'Histoire pour la fête des pères', it: 'Storia per la Festa del Papà' }, emoji: '🧢', group: 'seasonal', season: SEASON_WINDOWS['fathers-day'] },
 
   // Custom - user creates their own theme
   { id: 'custom', name: { en: 'Create Your Own', de: 'Eigenes Thema', fr: 'Créer le vôtre', it: 'Crea la tua storia' }, emoji: '✨', group: 'custom' },
@@ -382,14 +382,14 @@ export const popularHistoricalEventIds = [
 
 export const historicalEventGroups: HistoricalEventGroup[] = [
   { id: 'popular', name: { en: 'Popular', de: 'Beliebt', fr: 'Populaires', it: 'Popolari' }, icon: '⭐' },
-  { id: 'swiss', name: { en: 'Swiss History', de: 'Schweizer Geschichte', fr: 'Histoire Suisse', it: 'Storia Svizzera' }, icon: '🇨🇭' },
+  { id: 'swiss', name: { en: 'Swiss History', de: 'Schweizer Geschichte', fr: 'Histoire suisse', it: 'Storia Svizzera' }, icon: '🇨🇭' },
   { id: 'exploration', name: { en: 'Exploration & Discovery', de: 'Entdeckungen', fr: 'Exploration & découverte', it: 'Esplorazione e Scoperta' }, icon: '🧭' },
   { id: 'science', name: { en: 'Science & Medicine', de: 'Wissenschaft & Medizin', fr: 'Science & médecine', it: 'Scienza e Medicina' }, icon: '🔬' },
   { id: 'invention', name: { en: 'Inventions', de: 'Erfindungen', fr: 'Inventions', it: 'Invenzioni' }, icon: '💡' },
   { id: 'rights', name: { en: 'Human Rights & Freedom', de: 'Menschenrechte & Freiheit', fr: 'Droits humains & liberté', it: 'Diritti Umani e Libertà' }, icon: '✊' },
-  { id: 'construction', name: { en: 'Great Constructions', de: 'Grosse Bauwerke', fr: 'Grandes Constructions', it: 'Grandi Costruzioni' }, icon: '🏗️' },
+  { id: 'construction', name: { en: 'Great Constructions', de: 'Grosse Bauwerke', fr: 'Grandes constructions', it: 'Grandi Costruzioni' }, icon: '🏗️' },
   { id: 'culture', name: { en: 'Culture & Arts', de: 'Kultur & Kunst', fr: 'Culture & Arts', it: 'Cultura e Arte' }, icon: '🎭' },
-  { id: 'archaeology', name: { en: 'Archaeological Discoveries', de: 'Archäologische Entdeckungen', fr: 'Découvertes Archéologiques', it: 'Scoperte Archeologiche' }, icon: '🏺' },
+  { id: 'archaeology', name: { en: 'Archaeological Discoveries', de: 'Archäologische Entdeckungen', fr: 'Découvertes archéologiques', it: 'Scoperte Archeologiche' }, icon: '🏺' },
 ];
 
 export const historicalEvents: HistoricalEvent[] = [

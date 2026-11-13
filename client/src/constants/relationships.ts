@@ -139,7 +139,7 @@ export function relationshipAgeConflict(
 }
 
 const AGE_CONFLICT_TEXT: Record<Language, string> = {
-  de: 'Bitte prüfen: Nach den Altersangaben passt diese Beziehung nicht (ein jüngerer Mensch kann nicht Elternteil oder Grosselternteil eines älteren sein). Sie können trotzdem weitermachen.',
+  de: 'Bitte prüfen: Nach den Altersangaben passt diese Beziehung nicht (ein jüngerer Mensch kann nicht Elternteil oder Grosselternteil eines älteren sein). Du kannst trotzdem weitermachen.',
   fr: 'À vérifier : d’après les âges indiqués, cette relation ne convient pas (une personne plus jeune ne peut pas être le parent ou le grand-parent d’une plus âgée). Vous pouvez quand même continuer.',
   it: 'Da controllare: secondo le età indicate questa relazione non torna (una persona più giovane non può essere genitore o nonno/a di una più anziana). Puoi comunque continuare.',
   en: 'Please check: going by the ages entered, this relationship does not fit (a younger person cannot be the parent or grandparent of an older one). You can still continue.',

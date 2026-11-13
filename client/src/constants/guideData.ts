@@ -201,7 +201,7 @@ export const guides: GuideArticle[] = [
           en: 'No. A written description — age, hair, eye color, a favorite jacket — is enough to keep a character consistent, and some parents prefer not to upload a child\'s photo at all. A photo mainly helps when you want the character to be recognizably your child rather than simply a child who matches the description.',
           de: 'Nein. Eine schriftliche Beschreibung — Alter, Haare, Augenfarbe, eine Lieblingsjacke — reicht, um eine Figur konsistent zu halten, und manche Eltern laden bewusst kein Kinderfoto hoch. Ein Foto hilft vor allem dann, wenn die Figur erkennbar dein Kind sein soll und nicht einfach ein Kind, das zur Beschreibung passt.',
           fr: 'Non. Une description écrite — âge, cheveux, couleur des yeux, une veste préférée — suffit à garder un personnage cohérent, et certains parents préfèrent ne pas téléverser de photo. La photo sert surtout à ce que le personnage soit reconnaissable comme votre enfant.',
-          it: 'No. Una descrizione scritta — età, capelli, colore degli occhi, una giacca preferita — basta a mantenere un personaggio coerente, e alcuni genitori preferiscono non caricare affatto la foto del figlio. Una foto aiuta soprattutto quando vuoi che il personaggio sia riconoscibile come tuo figlio, e non semplicemente un bambino che corrisponde alla descrizione.',
+          it: 'No. Una descrizione scritta — età, capelli, colore degli occhi, una giacca preferita — basta a mantenere un personaggio coerente, e alcuni genitori preferiscono non caricare affatto la foto del figlio. Una foto aiuta soprattutto quando vuoi che il personaggio sia riconoscibile come il tuo bambino, e non semplicemente un bambino che corrisponde alla descrizione.',
         },
       },
       {
@@ -256,7 +256,7 @@ export const guides: GuideArticle[] = [
       en: 'Two products are sold under the same words. In one, an author wrote a story years ago and your child\'s name is inserted into it. In the other, a story is written for the situation you describe and has never existed before. Both are legitimate, they suit different occasions, and the marketing copy rarely tells you which one you are buying.',
       de: 'Unter denselben Worten werden zwei Produkte verkauft. Beim einen hat vor Jahren ein Autor eine Geschichte geschrieben, in die der Name deines Kindes eingesetzt wird. Beim anderen wird eine Geschichte für die von dir beschriebene Situation geschrieben, die es vorher nicht gab. Beides ist legitim, beides passt zu unterschiedlichen Anlässen — und der Werbetext verrät selten, was davon du kaufst.',
       fr: 'Deux produits sont vendus sous les mêmes mots. Dans l\'un, un auteur a écrit une histoire il y a des années et le prénom de votre enfant y est inséré. Dans l\'autre, une histoire est écrite pour la situation que vous décrivez. Les deux sont légitimes et conviennent à des occasions différentes — et la publicité dit rarement lequel vous achetez.',
-      it: 'Sotto le stesse parole vengono venduti due prodotti diversi. Nell\'uno, un autore ha scritto una storia anni fa e il nome di tuo figlio viene inserito al suo interno. Nell\'altro, una storia viene scritta per la situazione che descrivi tu e non è mai esistita prima. Entrambi sono legittimi, si adattano a occasioni diverse, e il testo pubblicitario raramente ti dice quale dei due stai comprando.',
+      it: 'Sotto le stesse parole vengono venduti due prodotti diversi. Nell\'uno, un autore ha scritto una storia anni fa e il nome del tuo bambino viene inserito al suo interno. Nell\'altro, una storia viene scritta per la situazione che descrivi tu e non è mai esistita prima. Entrambi sono legittimi, si adattano a occasioni diverse, e il testo pubblicitario raramente ti dice quale dei due stai comprando.',
     },
     sections: [
       {
@@ -315,7 +315,7 @@ export const guides: GuideArticle[] = [
           it: [
             'I modelli sono curati, illustrati e corretti da persone, a volte nel corso di anni. Il ritmo è affidabile, le illustrazioni sono coerenti perché disegnate da una persona, e sai esattamente cosa arriverà.',
             'Questo li rende adatti quando il libro è un regalo per un bambino che non conosci bene, quando deve essere piacevolmente rassicurante piuttosto che specifico, e quando vuoi un oggetto fisico di qualità prevedibile per un battesimo o un compleanno.',
-            'Sono anche la scelta più sicura se l\'idea di una macchina che scrive qualcosa per tuo figlio non ti convince — una posizione del tutto ragionevole.',
+            'Sono anche la scelta più sicura se l\'idea di una macchina che scrive qualcosa per il tuo bambino non ti convince — una posizione del tutto ragionevole.',
           ],
         },
       },
@@ -362,7 +362,7 @@ export const guides: GuideArticle[] = [
           en: 'Sentence for sentence, a template that a human editor worked on for months is usually smoother. The trade is polish against relevance: a slightly less elegant story about the thing your child is actually going through generally beats a beautifully written story about nothing in particular. Services that let you edit the text afterwards narrow the gap considerably.',
           de: 'Satz für Satz ist eine Vorlage, an der ein Lektorat monatelang gearbeitet hat, meist runder. Der Tausch heisst Politur gegen Relevanz: Eine etwas weniger elegante Geschichte über das, was dein Kind gerade durchmacht, schlägt in der Regel eine schön geschriebene Geschichte über nichts Bestimmtes. Dienste, bei denen du den Text nachbearbeiten kannst, verkleinern den Abstand deutlich.',
           fr: 'Phrase par phrase, un modèle travaillé pendant des mois par un éditeur est généralement plus fluide. L\'échange, c\'est le poli contre la pertinence : une histoire un peu moins élégante sur ce que votre enfant traverse vaut mieux qu\'une belle histoire sur rien en particulier.',
-          it: 'Frase per frase, un modello su cui un redattore ha lavorato per mesi è di solito più scorrevole. Lo scambio è tra rifinitura e pertinenza: una storia leggermente meno elegante su ciò che tuo figlio sta davvero vivendo generalmente batte una storia scritta magnificamente su nulla in particolare. I servizi che ti permettono di modificare il testo in seguito riducono notevolmente il divario.',
+          it: 'Frase per frase, un modello su cui un redattore ha lavorato per mesi è di solito più scorrevole. Lo scambio è tra rifinitura e pertinenza: una storia leggermente meno elegante su ciò che il tuo bambino sta davvero vivendo generalmente batte una storia scritta magnificamente su nulla in particolare. I servizi che ti permettono di modificare il testo in seguito riducono notevolmente il divario.',
         },
       },
       {

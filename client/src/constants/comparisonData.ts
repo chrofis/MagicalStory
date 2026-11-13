@@ -49,13 +49,13 @@ export const comparisons: ComparisonData[] = [
       en: 'Honest comparison of Magical Story and Wonderbly. AI-generated unique stories vs template-based personalization. Which one is right for your child?',
       de: 'Ehrlicher Vergleich von Magical Story und Wonderbly. KI-generierte Unikate vs. vorlagenbasierte Personalisierung. Was passt zu deinem Kind?',
       fr: 'Comparaison honnête entre Magical Story et Wonderbly. Histoires uniques générées par IA vs personnalisation par modèles. Lequel convient à votre enfant ?',
-      it: 'Confronto onesto tra Magical Story e Wonderbly. Storie uniche generate dall\'IA vs personalizzazione basata su modelli. Quale fa per tuo figlio?',
+      it: 'Confronto onesto tra Magical Story e Wonderbly. Storie uniche generate dall\'IA vs personalizzazione basata su modelli. Quale fa per il tuo bambino?',
     },
     intro: {
       en: 'Both Magical Story and Wonderbly create personalized children\'s books, but they work very differently. Wonderbly (formerly Lost My Name) uses pre-designed templates where your child\'s name and basic appearance are inserted into a pre-written story. Magical Story uses AI to generate an entirely new story and illustrations from scratch. Here\'s an honest comparison to help you choose.',
       de: 'Sowohl Magical Story als auch Wonderbly erstellen personalisierte Kinderbücher, aber sie funktionieren sehr unterschiedlich. Wonderbly (früher Lost My Name) verwendet vorgefertigte Vorlagen, in die der Name und das Aussehen deines Kindes eingefügt werden. Magical Story nutzt KI, um eine komplett neue Geschichte mit Illustrationen von Grund auf zu erstellen. Hier ist ein ehrlicher Vergleich.',
       fr: 'Magical Story et Wonderbly créent tous deux des livres pour enfants personnalisés, mais de manière très différente. Wonderbly (anciennement Lost My Name) utilise des modèles préconçus où le nom et l\'apparence de votre enfant sont insérés. Magical Story utilise l\'IA pour générer une histoire et des illustrations entièrement nouvelles. Voici une comparaison honnête.',
-      it: 'Magical Story e Wonderbly creano entrambi libri per bambini personalizzati, ma funzionano in modo molto diverso. Wonderbly (già Lost My Name) usa modelli preconfezionati in cui il nome e l\'aspetto di base di tuo figlio vengono inseriti in una storia già scritta. Magical Story usa l\'IA per generare da zero una storia e illustrazioni completamente nuove. Ecco un confronto onesto per aiutarti a scegliere.',
+      it: 'Magical Story e Wonderbly creano entrambi libri per bambini personalizzati, ma funzionano in modo molto diverso. Wonderbly (già Lost My Name) usa modelli preconfezionati in cui il nome e l\'aspetto di base del tuo bambino vengono inseriti in una storia già scritta. Magical Story usa l\'IA per generare da zero una storia e illustrazioni completamente nuove. Ecco un confronto onesto per aiutarti a scegliere.',
     },
     features: [
       {
@@ -176,7 +176,7 @@ export const comparisons: ComparisonData[] = [
       ],
       it: [
         'Ogni storia è davvero unica — trama, scene e dialoghi generati dall\'IA',
-        'Il vero volto di tuo figlio appare in ogni illustrazione',
+        'Il vero volto del tuo bambino appare in ogni illustrazione',
         '170+ temi tra cui sfide di vita, educazione e storia svizzera',
         '14 stili artistici tra cui scegliere (acquerello, 3D, anime e altro)',
         'Storie nei dialetti svizzero tedeschi',
@@ -222,7 +222,7 @@ export const comparisons: ComparisonData[] = [
           en: 'They take different approaches. Magical Story uses AI to create unique stories, while Wonderbly uses professionally designed templates. Both produce high-quality printed books. Wonderbly has more brand trust (11M+ books sold), while Magical Story offers more personalization (your child\'s photo, 14 art styles, Swiss German).',
           de: 'Sie verfolgen unterschiedliche Ansätze. Magical Story nutzt KI für einzigartige Geschichten, während Wonderbly professionell gestaltete Vorlagen verwendet. Beide produzieren hochwertige gedruckte Bücher. Wonderbly hat mehr Markenvertrauen (über 11 Mio. Bücher verkauft), während Magical Story mehr Personalisierung bietet (Foto des Kindes, 14 Kunststile, Schweizerdeutsch).',
           fr: 'Ils ont des approches différentes. Magical Story utilise l\'IA pour créer des histoires uniques, tandis que Wonderbly utilise des modèles professionnels. Les deux produisent des livres imprimés de qualité. Wonderbly a plus de confiance de marque (plus de 11 millions de livres vendus), tandis que Magical Story offre plus de personnalisation (photo de l\'enfant, 14 styles, suisse allemand).',
-          it: 'Seguono approcci diversi. Magical Story usa l\'IA per creare storie uniche, mentre Wonderbly usa modelli progettati professionalmente. Entrambi producono libri stampati di alta qualità. Wonderbly ha più fiducia di marchio (oltre 11 milioni di libri venduti), mentre Magical Story offre più personalizzazione (foto di tuo figlio, 14 stili artistici, svizzero tedesco).',
+          it: 'Seguono approcci diversi. Magical Story usa l\'IA per creare storie uniche, mentre Wonderbly usa modelli progettati professionalmente. Entrambi producono libri stampati di alta qualità. Wonderbly ha più fiducia di marchio (oltre 11 milioni di libri venduti), mentre Magical Story offre più personalizzazione (foto del tuo bambino, 14 stili artistici, svizzero tedesco).',
         },
       },
       {
@@ -237,10 +237,10 @@ export const comparisons: ComparisonData[] = [
       {
         q: { en: 'How does print quality compare?', de: 'Wie vergleicht sich die Druckqualität?', fr: 'Comment se compare la qualité d\'impression ?', it: 'Come si confronta la qualità di stampa?' },
         a: {
-          en: 'Both use professional print-on-demand. Magical Story prints hardcover books in A4 or square format via Gelato (European printers). Wonderbly has its own established printing infrastructure. Both deliver high-quality results.',
-          de: 'Beide nutzen professionellen Print-on-Demand. Magical Story druckt Hardcover-Bücher im A4- oder Quadratformat über Gelato (europäische Druckereien). Wonderbly hat eine eigene etablierte Druckinfrastruktur. Beide liefern hochwertige Ergebnisse.',
-          fr: 'Les deux utilisent l\'impression à la demande professionnelle. Magical Story imprime des livres à couverture rigide au format A4 ou carré (20 × 20 cm) via Gelato (imprimeurs européens). Wonderbly dispose de sa propre infrastructure d\'impression. Les deux offrent des résultats de qualité.',
-          it: 'Entrambi usano la stampa su richiesta professionale. Magical Story stampa libri rilegati in formato A4 o quadrato (20 × 20 cm) tramite Gelato (stampatori europei). Wonderbly ha una propria infrastruttura di stampa consolidata. Entrambi offrono risultati di alta qualità.',
+          en: 'Both use professional print-on-demand. Magical Story prints A4 hardcover books via Gelato (European printers). Wonderbly has its own established printing infrastructure. Both deliver high-quality results.',
+          de: 'Beide nutzen professionellen Print-on-Demand. Magical Story druckt A4-Hardcover-Bücher über Gelato (europäische Druckereien). Wonderbly hat eine eigene etablierte Druckinfrastruktur. Beide liefern hochwertige Ergebnisse.',
+          fr: 'Les deux utilisent l\'impression à la demande professionnelle. Magical Story imprime des livres à couverture rigide au format A4 via Gelato (imprimeurs européens). Wonderbly dispose de sa propre infrastructure d\'impression. Les deux offrent des résultats de qualité.',
+          it: 'Entrambi usano la stampa su richiesta professionale. Magical Story stampa libri rilegati in formato A4 tramite Gelato (stampatori europei). Wonderbly ha una propria infrastruttura di stampa consolidata. Entrambi offrono risultati di alta qualità.',
         },
       },
     ],
@@ -267,7 +267,7 @@ export const comparisons: ComparisonData[] = [
       en: 'Hooray Heroes has perfected the art of emotional personalized books — their UGC-driven marketing regularly makes parents cry happy tears. Magical Story takes a different approach: AI-generated stories that are written from scratch for your child. Both create beautiful gifts, but in very different ways.',
       de: 'Hooray Heroes hat die Kunst emotionaler personalisierter Bücher perfektioniert — ihr UGC-Marketing rührt Eltern regelmässig zu Freudentränen. Magical Story geht einen anderen Weg: KI-generierte Geschichten, die von Grund auf für dein Kind geschrieben werden. Beide schaffen wunderschöne Geschenke, aber auf sehr unterschiedliche Weise.',
       fr: 'Hooray Heroes a perfectionné l\'art des livres personnalisés émouvants — leur marketing UGC fait régulièrement pleurer les parents de joie. Magical Story adopte une approche différente : des histoires générées par IA, écrites de zéro pour votre enfant. Les deux créent de beaux cadeaux, mais de manière très différente.',
-      it: 'Hooray Heroes ha perfezionato l\'arte dei libri personalizzati emozionali — il loro marketing basato sui contenuti degli utenti fa regolarmente commuovere i genitori di gioia. Magical Story adotta un approccio diverso: storie generate dall\'IA, scritte da zero per tuo figlio. Entrambi creano regali meravigliosi, ma in modi molto diversi.',
+      it: 'Hooray Heroes ha perfezionato l\'arte dei libri personalizzati emozionali — il loro marketing basato sui contenuti degli utenti fa regolarmente commuovere i genitori di gioia. Magical Story adotta un approccio diverso: storie generate dall\'IA, scritte da zero per il tuo bambino. Entrambi creano regali meravigliosi, ma in modi molto diversi.',
     },
     features: [
       {
@@ -379,7 +379,7 @@ export const comparisons: ComparisonData[] = [
       ],
       it: [
         'Ogni storia è davvero unica — non un modello con un nome inserito',
-        'Il vero volto di tuo figlio in ogni illustrazione',
+        'Il vero volto del tuo bambino in ogni illustrazione',
         '170+ temi contro 55+ titoli — molta più varietà',
         '14 stili artistici per storia',
         'Supporto ai dialetti svizzero tedeschi e storie ambientate in città specifiche',
@@ -415,7 +415,7 @@ export const comparisons: ComparisonData[] = [
       en: 'Hooray Heroes excels at creating emotional gifts with their template-based approach — they\'ve sold 3M+ books for good reason. Magical Story is the choice when you want a story that has never existed before, written specifically for your child with their actual face. For Swiss families, Magical Story also offers Swiss German and town-specific stories that Hooray Heroes cannot match.',
       de: 'Hooray Heroes ist hervorragend bei emotionalen Geschenken mit ihrem Vorlagen-Ansatz — über 3 Mio. verkaufte Bücher sprechen für sich. Magical Story ist die Wahl, wenn du eine Geschichte willst, die noch nie existiert hat — speziell für dein Kind geschrieben, mit dem echten Gesicht. Für Schweizer Familien bietet Magical Story zudem Schweizerdeutsch und Ortsgeschichten.',
       fr: 'Hooray Heroes excelle dans les cadeaux émotionnels avec leur approche par modèles — plus de 3 millions de livres vendus pour une bonne raison. Magical Story est le choix quand vous voulez une histoire qui n\'a jamais existé, écrite spécifiquement pour votre enfant avec son vrai visage. Pour les familles suisses, Magical Story offre aussi le suisse allemand et les histoires locales.',
-      it: 'Hooray Heroes eccelle nel creare regali emozionali con il suo approccio basato su modelli — non a caso ha venduto oltre 3 milioni di libri. Magical Story è la scelta quando vuoi una storia mai esistita prima, scritta appositamente per tuo figlio con il suo vero volto. Per le famiglie svizzere, Magical Story offre anche lo svizzero tedesco e storie ambientate in città specifiche che Hooray Heroes non può eguagliare.',
+      it: 'Hooray Heroes eccelle nel creare regali emozionali con il suo approccio basato su modelli — non a caso ha venduto oltre 3 milioni di libri. Magical Story è la scelta quando vuoi una storia mai esistita prima, scritta appositamente per il tuo bambino con il suo vero volto. Per le famiglie svizzere, Magical Story offre anche lo svizzero tedesco e storie ambientate in città specifiche che Hooray Heroes non può eguagliare.',
     },
     faq: [
       {
@@ -424,7 +424,7 @@ export const comparisons: ComparisonData[] = [
           en: 'Magical Story focuses on your child as the hero. You can include additional characters, but Hooray Heroes specializes in multi-person family books (siblings, grandparents, pets) which they do very well.',
           de: 'Magical Story konzentriert sich auf dein Kind als Held. Du kannst zusätzliche Charaktere einbeziehen, aber Hooray Heroes ist spezialisiert auf Familienbücher (Geschwister, Grosseltern, Haustiere), was sie sehr gut machen.',
           fr: 'Magical Story se concentre sur votre enfant comme héros. Vous pouvez inclure d\'autres personnages, mais Hooray Heroes est spécialisé dans les livres familiaux (frères et sœurs, grands-parents, animaux) qu\'ils font très bien.',
-          it: 'Magical Story si concentra su tuo figlio come eroe. Puoi includere personaggi aggiuntivi, ma Hooray Heroes è specializzato nei libri familiari con più persone (fratelli, nonni, animali domestici), cosa che fanno molto bene.',
+          it: 'Magical Story si concentra sul tuo bambino come eroe. Puoi includere personaggi aggiuntivi, ma Hooray Heroes è specializzato nei libri familiari con più persone (fratelli, nonni, animali domestici), cosa che fanno molto bene.',
         },
       },
       {
@@ -590,7 +590,7 @@ export const comparisons: ComparisonData[] = [
       ],
       it: [
         'Ogni storia è davvero unica — generata dall\'IA, non da un modello',
-        'Il vero volto di tuo figlio nelle illustrazioni',
+        'Il vero volto del tuo bambino nelle illustrazioni',
         '170+ temi — molti più del catalogo fisso di Librio',
         'Storie ambientate in città specifiche con monumenti locali',
         '14 stili artistici per storia',
@@ -627,7 +627,7 @@ export const comparisons: ComparisonData[] = [
       en: 'Librio is the trusted Swiss classic — beautiful template books with sustainability at heart and the beloved Globi character. Magical Story creates stories that have never existed before, featuring your child\'s actual face and set in their own town. These two Swiss brands complement each other: a Globi book from Librio AND a personalized adventure from Magical Story make a wonderful combination.',
       de: 'Librio ist der vertrauenswürdige Schweizer Klassiker — schöne Vorlagenbücher mit Nachhaltigkeit im Herzen und dem beliebten Globi. Magical Story erschafft Geschichten, die es noch nie gab, mit dem echten Gesicht deines Kindes in seiner eigenen Stadt. Diese beiden Schweizer Marken ergänzen sich: ein Globi-Buch von Librio UND ein personalisiertes Abenteuer von Magical Story sind eine wunderbare Kombination.',
       fr: 'Librio est le classique suisse de confiance — de beaux livres modèles avec la durabilité au cœur et le personnage Globi adoré. Magical Story crée des histoires qui n\'ont jamais existé, avec le vrai visage de votre enfant dans sa propre ville. Ces deux marques suisses se complètent : un livre Globi de Librio ET une aventure personnalisée de Magical Story forment une belle combinaison.',
-      it: 'Librio è il classico svizzero di fiducia — bei libri a modello con la sostenibilità nel cuore e l\'amato personaggio Globi. Magical Story crea storie mai esistite prima, con il vero volto di tuo figlio ambientate nella sua stessa città. Questi due marchi svizzeri si completano a vicenda: un libro di Globi di Librio E un\'avventura personalizzata di Magical Story formano una combinazione meravigliosa.',
+      it: 'Librio è il classico svizzero di fiducia — bei libri a modello con la sostenibilità nel cuore e l\'amato personaggio Globi. Magical Story crea storie mai esistite prima, con il vero volto del tuo bambino ambientate nella sua stessa città. Questi due marchi svizzeri si completano a vicenda: un libro di Globi di Librio E un\'avventura personalizzata di Magical Story formano una combinazione meravigliosa.',
     },
     faq: [
       {
@@ -654,7 +654,7 @@ export const comparisons: ComparisonData[] = [
           en: 'No, Globi is a licensed character exclusive to Librio. Magical Story creates original stories where your child is the hero — every story is unique and doesn\'t use licensed characters.',
           de: 'Nein, Globi ist eine lizenzierte Figur exklusiv bei Librio. Magical Story erstellt originale Geschichten, in denen dein Kind der Held ist — jede Geschichte ist einzigartig und verwendet keine lizenzierten Figuren.',
           fr: 'Non, Globi est un personnage sous licence exclusif à Librio. Magical Story crée des histoires originales où votre enfant est le héros — chaque histoire est unique et n\'utilise pas de personnages sous licence.',
-          it: 'No, Globi è un personaggio su licenza esclusivo di Librio. Magical Story crea storie originali in cui tuo figlio è l\'eroe — ogni storia è unica e non usa personaggi su licenza.',
+          it: 'No, Globi è un personaggio su licenza esclusivo di Librio. Magical Story crea storie originali in cui il tuo bambino è l\'eroe — ogni storia è unica e non usa personaggi su licenza.',
         },
       },
     ],
@@ -675,13 +675,13 @@ export const comparisons: ComparisonData[] = [
       en: 'Magical Story vs Framily: AI-generated unique stories vs licensed character books (PAW Patrol, Peppa Pig, Disney). Which is right for your child?',
       de: 'Magical Story vs Framily: KI-Unikate vs. lizenzierte Kinderbücher (PAW Patrol, Peppa Pig, Disney). Was passt zu deinem Kind?',
       fr: 'Magical Story vs Framily : histoires uniques par IA vs livres de personnages sous licence (PAW Patrol, Peppa Pig, Disney). Lequel pour votre enfant ?',
-      it: 'Magical Story vs Framily: storie uniche generate dall\'IA vs libri con personaggi su licenza (PAW Patrol, Peppa Pig, Disney). Quale fa per tuo figlio?',
+      it: 'Magical Story vs Framily: storie uniche generate dall\'IA vs libri con personaggi su licenza (PAW Patrol, Peppa Pig, Disney). Quale fa per il tuo bambino?',
     },
     intro: {
       en: 'Framily lets your child meet their favorite characters — PAW Patrol, Peppa Pig, Disney, and Janosch — in a personalized book. Magical Story makes your child THE hero in a completely unique AI-generated story. Framily is for when your child wants to meet Chase. Magical Story is for when your child wants to BE the hero.',
       de: 'Bei Framily trifft dein Kind seine Lieblingsfiguren — PAW Patrol, Peppa Pig, Disney und Janosch — in einem personalisierten Buch. Bei Magical Story wird dein Kind zum HELDEN einer komplett einzigartigen KI-Geschichte. Framily ist ideal, wenn dein Kind Chase treffen möchte. Magical Story, wenn es selbst der Held sein will.',
       fr: 'Framily permet à votre enfant de rencontrer ses personnages préférés — PAW Patrol, Peppa Pig, Disney et Janosch — dans un livre personnalisé. Magical Story fait de votre enfant LE héros d\'une histoire unique générée par IA. Framily quand votre enfant veut rencontrer Chase. Magical Story quand il veut ÊTRE le héros.',
-      it: 'Con Framily tuo figlio incontra i suoi personaggi preferiti — PAW Patrol, Peppa Pig, Disney e Janosch — in un libro personalizzato. Con Magical Story tuo figlio diventa L\'eroe di una storia completamente unica generata dall\'IA. Framily è ideale quando tuo figlio vuole incontrare Chase. Magical Story quando vuole ESSERE l\'eroe.',
+      it: 'Con Framily il tuo bambino incontra i suoi personaggi preferiti — PAW Patrol, Peppa Pig, Disney e Janosch — in un libro personalizzato. Con Magical Story il tuo bambino diventa L\'eroe di una storia completamente unica generata dall\'IA. Framily è ideale quando il tuo bambino vuole incontrare Chase. Magical Story quando vuole ESSERE l\'eroe.',
     },
     features: [
       {
@@ -786,9 +786,9 @@ export const comparisons: ComparisonData[] = [
         'Support du suisse allemand et histoires locales',
       ],
       it: [
-        'Tuo figlio È l\'eroe — non una spalla accanto a un personaggio su licenza',
+        'Il tuo bambino È l\'eroe — non una spalla accanto a un personaggio su licenza',
         'Storie uniche generate dall\'IA — non ci sono due libri uguali',
-        'Il vero volto di tuo figlio in ogni illustrazione',
+        'Il vero volto del tuo bambino in ogni illustrazione',
         '170+ temi con libertà creativa illimitata',
         'Supporto ai dialetti svizzero tedeschi e storie ambientate in città specifiche',
       ],
@@ -819,7 +819,7 @@ export const comparisons: ComparisonData[] = [
       en: 'Framily is perfect when your child is a PAW Patrol or Peppa Pig fan — they\'ll love seeing themselves alongside their favorite characters. Magical Story is for when you want your child to be the star of their own original adventure, with their real face in the illustrations and a story no other child has ever read. Different needs, both great gifts.',
       de: 'Framily ist perfekt, wenn dein Kind ein PAW Patrol- oder Peppa Pig-Fan ist — es wird lieben, sich neben seinen Lieblingsfiguren zu sehen. Magical Story ist die Wahl, wenn dein Kind der Star seines eigenen originalen Abenteuers sein soll, mit dem echten Gesicht in den Illustrationen und einer Geschichte, die kein anderes Kind je gelesen hat.',
       fr: 'Framily est parfait quand votre enfant est fan de PAW Patrol ou Peppa Pig — il adorera se voir aux côtés de ses personnages préférés. Magical Story est pour quand vous voulez que votre enfant soit la star de sa propre aventure originale, avec son vrai visage et une histoire qu\'aucun autre enfant n\'a jamais lue.',
-      it: 'Framily è perfetto se tuo figlio è fan di PAW Patrol o Peppa Pig — adorerà vedersi accanto ai suoi personaggi preferiti. Magical Story è la scelta quando vuoi che tuo figlio sia la star della sua avventura originale, con il vero volto nelle illustrazioni e una storia che nessun altro bambino ha mai letto. Esigenze diverse, entrambi ottimi regali.',
+      it: 'Framily è perfetto se il tuo bambino è fan di PAW Patrol o Peppa Pig — adorerà vedersi accanto ai suoi personaggi preferiti. Magical Story è la scelta quando vuoi che il tuo bambino sia la star della sua avventura originale, con il vero volto nelle illustrazioni e una storia che nessun altro bambino ha mai letto. Esigenze diverse, entrambi ottimi regali.',
     },
     faq: [
       {
@@ -828,7 +828,7 @@ export const comparisons: ComparisonData[] = [
           en: 'No, Magical Story creates original stories without licensed characters. Your child is the hero in their own unique adventure. For licensed character books, Framily is the specialist.',
           de: 'Nein, Magical Story erstellt originale Geschichten ohne lizenzierte Figuren. Dein Kind ist der Held in seinem eigenen einzigartigen Abenteuer. Für Bücher mit lizenzierten Figuren ist Framily der Spezialist.',
           fr: 'Non, Magical Story crée des histoires originales sans personnages sous licence. Votre enfant est le héros de sa propre aventure unique. Pour les livres avec personnages sous licence, Framily est le spécialiste.',
-          it: 'No, Magical Story crea storie originali senza personaggi su licenza. Tuo figlio è l\'eroe della sua avventura unica. Per i libri con personaggi su licenza, Framily è lo specialista.',
+          it: 'No, Magical Story crea storie originali senza personaggi su licenza. Il tuo bambino è l\'eroe della sua avventura unica. Per i libri con personaggi su licenza, Framily è lo specialista.',
         },
       },
       {
@@ -1069,7 +1069,7 @@ export const comparisons: ComparisonData[] = [
       en: 'LoveToRead.ai focuses on education: reading-level matching for K-5 and rapid story generation in about 30 seconds. Magical Story focuses on deep personalization: your child\'s photo, Swiss German, town-specific stories, and character consistency. Both use AI, but for different priorities.',
       de: 'LoveToRead.ai konzentriert sich auf Bildung: Lesestufen-Matching für K-5 und schnelle Geschichtenerstellung in etwa 30 Sekunden. Magical Story fokussiert auf tiefe Personalisierung: das Foto deines Kindes, Schweizerdeutsch, Ortsgeschichten und Figurenkonsistenz. Beide nutzen KI, aber mit unterschiedlichen Prioritäten.',
       fr: 'LoveToRead.ai se concentre sur l\'éducation : adaptation au niveau de lecture K-5 et génération rapide en environ 30 secondes. Magical Story se concentre sur la personnalisation profonde : la photo de votre enfant, le suisse allemand, les histoires locales et la cohérence des personnages.',
-      it: 'LoveToRead.ai si concentra sull\'educazione: adattamento al livello di lettura K-5 e generazione rapida della storia in circa 30 secondi. Magical Story si concentra sulla personalizzazione profonda: la foto di tuo figlio, lo svizzero tedesco, le storie ambientate in città specifiche e la coerenza dei personaggi. Entrambi usano l\'IA, ma con priorità diverse.',
+      it: 'LoveToRead.ai si concentra sull\'educazione: adattamento al livello di lettura K-5 e generazione rapida della storia in circa 30 secondi. Magical Story si concentra sulla personalizzazione profonda: la foto del tuo bambino, lo svizzero tedesco, le storie ambientate in città specifiche e la coerenza dei personaggi. Entrambi usano l\'IA, ma con priorità diverse.',
     },
     features: [
       {
@@ -1231,7 +1231,7 @@ export const comparisons: ComparisonData[] = [
           en: 'If you need German, French, or Swiss German stories — Magical Story is a good fit. We also offer town-specific stories, 14 art styles, character consistency verification, and your child\'s actual face in illustrations. LoveToRead is English-only.',
           de: 'Wenn du deutsche, französische oder schweizerdeutsche Geschichten brauchst — passt Magical Story gut. Wir bieten auch Ortsgeschichten, 14 Kunststile, Figurenkonsistenz-Prüfung und das echte Gesicht deines Kindes.',
           fr: 'Si vous avez besoin d\'histoires en allemand, français ou suisse allemand — Magical Story est un bon choix. Nous offrons aussi des histoires locales, 14 styles artistiques et le vrai visage de votre enfant.',
-          it: 'Se hai bisogno di storie in tedesco, francese o svizzero tedesco — Magical Story fa al caso tuo. Offriamo anche storie ambientate in città specifiche, 14 stili artistici, verifica della coerenza dei personaggi e il vero volto di tuo figlio nelle illustrazioni. LoveToRead è solo in inglese.',
+          it: 'Se hai bisogno di storie in tedesco, francese o svizzero tedesco — Magical Story fa al caso tuo. Offriamo anche storie ambientate in città specifiche, 14 stili artistici, verifica della coerenza dei personaggi e il vero volto del tuo bambino nelle illustrazioni. LoveToRead è solo in inglese.',
         },
       },
     ],
@@ -1385,7 +1385,7 @@ export const comparisons: ComparisonData[] = [
       en: 'If you are in Germany, write only in German and want a fixed page count for your child\'s age, BuchHeldenWelt is a solid choice with a wider range of illustration styles. If you need German, English, French or Italian, want Swiss settings, want more than a handful of characters, or simply want to see a finished story before paying anything, Magical Story fits better. Both write original stories rather than templates — this is a genuine choice between two AI tools, not between AI and a name swap.',
       de: 'Wer in Deutschland lebt, nur auf Deutsch schreibt und eine feste Seitenzahl für das Alter des Kindes möchte, ist bei BuchHeldenWelt gut aufgehoben — mit mehr Illustrationsstilen als bei uns. Wer Deutsch, Englisch, Französisch oder Italienisch braucht, Schweizer Schauplätze möchte, mehr als eine Handvoll Figuren einsetzen will oder einfach eine fertige Geschichte sehen möchte, bevor er etwas bezahlt, ist bei Magical Story besser aufgehoben. Beide schreiben eigene Geschichten statt Vorlagen — hier geht es um die Wahl zwischen zwei KI-Werkzeugen, nicht zwischen KI und ausgetauschtem Namen.',
       fr: 'Si vous êtes en Allemagne, écrivez uniquement en allemand et voulez un nombre de pages fixe, BuchHeldenWelt est un choix solide avec plus de styles d\'illustration. Si vous avez besoin d\'allemand, d\'anglais, de français ou d\'italien, de décors suisses, de plus de personnages, ou simplement de voir une histoire terminée avant de payer, Magical Story convient mieux. Les deux écrivent des histoires originales — c\'est un choix entre deux outils IA, pas entre l\'IA et un prénom remplacé.',
-      it: 'Se sei in Germania, scrivi solo in tedesco e vuoi un numero di pagine fisso per l\'età di tuo figlio, BuchHeldenWelt è una scelta solida con una gamma più ampia di stili di illustrazione. Se hai bisogno di tedesco, inglese, francese o italiano, vuoi ambientazioni svizzere, vuoi più di una manciata di personaggi, o semplicemente vuoi vedere una storia finita prima di pagare qualsiasi cosa, Magical Story si adatta meglio. Entrambi scrivono storie originali invece di usare modelli — è una scelta autentica tra due strumenti IA, non tra IA e un nome sostituito.',
+      it: 'Se sei in Germania, scrivi solo in tedesco e vuoi un numero di pagine fisso per l\'età del tuo bambino, BuchHeldenWelt è una scelta solida con una gamma più ampia di stili di illustrazione. Se hai bisogno di tedesco, inglese, francese o italiano, vuoi ambientazioni svizzere, vuoi più di una manciata di personaggi, o semplicemente vuoi vedere una storia finita prima di pagare qualsiasi cosa, Magical Story si adatta meglio. Entrambi scrivono storie originali invece di usare modelli — è una scelta autentica tra due strumenti IA, non tra IA e un nome sostituito.',
     },
     faq: [
       {
@@ -1455,7 +1455,7 @@ export const comparisons: ComparisonData[] = [
       en: 'An honest AI-vs-AI comparison, and one where the competitor wins several rounds. Magisches Kinderbuch generates a custom story from your child\'s name, age and interests, offers 26 languages, and sells an ebook at €6.99 — cheaper than our digital story. It also has features we do not: an audiobook read-aloud and printable coloring pages. Where Magical Story pulls ahead is character count, Swiss localization and a genuinely free first story.',
       de: 'Ein ehrlicher KI-gegen-KI-Vergleich — und einer, den der Mitbewerber in mehreren Punkten gewinnt. Magisches Kinderbuch erzeugt eine massgeschneiderte Geschichte aus Name, Alter und Interessen, bietet 26 Sprachen und ein eBook für 6,99 € — günstiger als unsere digitale Geschichte. Dazu gibt es Funktionen, die wir nicht haben: Hörbuch-Vorlesefunktion und Ausmalbilder. Magical Story liegt vorn bei Figurenzahl, Schweizer Lokalisierung und einer wirklich kostenlosen ersten Geschichte.',
       fr: 'Une comparaison honnête IA contre IA, que le concurrent remporte sur plusieurs points. Magisches Kinderbuch génère une histoire sur mesure à partir du prénom, de l\'âge et des centres d\'intérêt, propose 26 langues et un livre numérique à 6,99 € — moins cher que notre histoire numérique. Il offre aussi un livre audio et des coloriages, que nous n\'avons pas. Magical Story devance sur le nombre de personnages, la localisation suisse et une première histoire réellement gratuite.',
-      it: 'Un confronto onesto tra IA e IA, in cui il concorrente vince diverse manche. Magisches Kinderbuch genera una storia su misura dal nome, dall\'età e dagli interessi di tuo figlio, offre 26 lingue e vende un ebook a 6,99 € — più economico della nostra storia digitale. Ha anche funzionalità che noi non abbiamo: un audiolibro con lettura ad alta voce e pagine da colorare stampabili. Magical Story è avanti per numero di personaggi, localizzazione svizzera e una prima storia davvero gratuita.',
+      it: 'Un confronto onesto tra IA e IA, in cui il concorrente vince diverse manche. Magisches Kinderbuch genera una storia su misura dal nome, dall\'età e dagli interessi del tuo bambino, offre 26 lingue e vende un ebook a 6,99 € — più economico della nostra storia digitale. Ha anche funzionalità che noi non abbiamo: un audiolibro con lettura ad alta voce e pagine da colorare stampabili. Magical Story è avanti per numero di personaggi, localizzazione svizzera e una prima storia davvero gratuita.',
     },
     features: [
       {
@@ -1770,7 +1770,7 @@ export const comparisons: ComparisonData[] = [
           en: 'Perfect when your child wants to meet their favorite characters',
           de: 'Perfekt, wenn dein Kind seine Lieblingsfiguren treffen möchte',
           fr: 'Parfait quand votre enfant veut rencontrer ses personnages préférés',
-          it: 'Perfetto quando tuo figlio vuole incontrare i suoi personaggi preferiti',
+          it: 'Perfetto quando il tuo bambino vuole incontrare i suoi personaggi preferiti',
         },
         features: {
           en: ['PAW Patrol, Peppa Pig, Disney, Janosch', 'DE, FR, IT languages', 'Strong DACH market presence', 'Children love familiar characters'],
@@ -1815,7 +1815,7 @@ export const comparisons: ComparisonData[] = [
           en: 'It depends on your priorities. For unique AI-generated stories with your child\'s face: Magical Story. For sustainability and Globi: Librio. For proven quality and global brand trust: Wonderbly. For licensed characters like PAW Patrol: Framily. For emotional family gifts: Hooray Heroes.',
           de: 'Es kommt auf deine Prioritäten an. Für einzigartige KI-Geschichten mit dem Gesicht deines Kindes: Magical Story. Für Nachhaltigkeit und Globi: Librio. Für bewährte Qualität: Wonderbly. Für lizenzierte Figuren: Framily. Für emotionale Geschenke: Hooray Heroes.',
           fr: 'Cela dépend de vos priorités. Pour des histoires IA uniques avec le visage de votre enfant : Magical Story. Pour la durabilité et Globi : Librio. Pour la qualité éprouvée : Wonderbly. Pour les personnages sous licence : Framily. Pour les cadeaux émotionnels : Hooray Heroes.',
-          it: 'Dipende dalle tue priorità. Per storie IA uniche con il volto di tuo figlio: Magical Story. Per sostenibilità e Globi: Librio. Per qualità comprovata e fiducia di marchio globale: Wonderbly. Per personaggi su licenza come PAW Patrol: Framily. Per regali di famiglia emozionali: Hooray Heroes.',
+          it: 'Dipende dalle tue priorità. Per storie IA uniche con il volto del tuo bambino: Magical Story. Per sostenibilità e Globi: Librio. Per qualità comprovata e fiducia di marchio globale: Wonderbly. Per personaggi su licenza come PAW Patrol: Framily. Per regali di famiglia emozionali: Hooray Heroes.',
         },
       },
       {
