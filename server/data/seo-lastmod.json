@@ -8,7 +8,7 @@
       "sources": [
         "client/src/pages/LandingPage.tsx"
       ],
-      "lastmod": "2026-11-10"
+      "lastmod": "2026-11-13"
     },
     "pricing": {
       "routes": [
@@ -27,7 +27,7 @@
       "sources": [
         "client/src/pages/FAQ.tsx"
       ],
-      "lastmod": "2026-11-03"
+      "lastmod": "2026-11-13"
     },
     "about": {
       "routes": [
@@ -36,7 +36,7 @@
       "sources": [
         "client/src/pages/About.tsx"
       ],
-      "lastmod": "2026-10-05"
+      "lastmod": "2026-11-13"
     },
     "contact": {
       "routes": [
@@ -54,7 +54,7 @@
       "sources": [
         "client/src/pages/TermsOfService.tsx"
       ],
-      "lastmod": "2026-11-03"
+      "lastmod": "2026-11-13"
     },
     "privacy": {
       "routes": [
@@ -63,7 +63,7 @@
       "sources": [
         "client/src/pages/PrivacyPolicy.tsx"
       ],
-      "lastmod": "2026-11-03"
+      "lastmod": "2026-11-13"
     },
     "impressum": {
       "routes": [
@@ -72,7 +72,7 @@
       "sources": [
         "client/src/pages/Impressum.tsx"
       ],
-      "lastmod": "2026-11-03"
+      "lastmod": "2026-11-13"
     },
     "science": {
       "routes": [
@@ -81,7 +81,7 @@
       "sources": [
         "client/src/pages/Science.tsx"
       ],
-      "lastmod": "2026-10-05"
+      "lastmod": "2026-11-13"
     },
     "kinderbuch-erstellen": {
       "routes": [
@@ -90,7 +90,7 @@
       "sources": [
         "client/src/pages/HowItWorks.tsx"
       ],
-      "lastmod": "2026-11-03"
+      "lastmod": "2026-11-13"
     },
     "themes": {
       "routes": [
@@ -118,7 +118,7 @@
         "client/src/pages/CityPage.tsx",
         "server/data/swiss-cities.json"
       ],
-      "lastmod": "2026-10-07"
+      "lastmod": "2026-11-13"
     },
     "anlass": {
       "routes": [

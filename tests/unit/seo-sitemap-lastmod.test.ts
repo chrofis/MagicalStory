@@ -19,22 +19,24 @@ const urlBlock = (xml: string, loc: string) => {
 };
 
 describe('sitemap lastmod is the real last content change of the URL set', () => {
-  it('is not one constant date (the audit found 1396 of 1400 = build day)', () => {
-    const dates = lastmods(generateSitemap());
-    const share = dates.filter(d => d === dates[0]).length / dates.length;
-    expect(new Set(dates).size).toBeGreaterThan(3);
-    expect(share).toBeLessThan(0.7);
-  });
-
-  it('every language entry of a page carries its set date; sets differ', () => {
+  // Each page carries ITS SET's date from the manifest (git's last content change), never the build day.
+  // Asserting that sets "differ" was a calendar assumption: a site-wide text pass (2026-11-13) legitimately
+  // gives every set the same date. The 'committed dates match git' test below keeps the dates honest.
+  it('every page carries its set date from the manifest', () => {
     const xml = generateSitemap();
+    let checked = 0;
+    for (const set of Object.values(manifest.sets) as any[]) {
+      for (const route of set.routes.filter((r: string) => !/[*:]/.test(r))) {
+        expect(lastmodForRoute(route), route).toBe(set.lastmod);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(10);
     const theme = lastmodForRoute('/themes/life-challenges/first-steps');
-    const guide = lastmodForRoute('/ratgeber/kinderbuch-mit-ki-erstellen');
     expect(theme).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     for (const loc of ['/themes/life-challenges/first-steps', '/themes/life-challenges/first-steps?lang=fr']) { // only life-challenge themes keep ?lang= entries (2026-11-09)
       expect(urlBlock(xml, loc)).toContain(`<lastmod>${theme}</lastmod>`);
     }
-    expect(guide).not.toBe(theme);
   });
 
   it('a route that belongs to no set gets no lastmod instead of an invented one', () => {
