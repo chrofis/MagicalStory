@@ -3,6 +3,7 @@ import { Edit2, Trash2, Check, AlertTriangle, Star, Plus } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { Character } from '@/types/character';
 import { getDisplayPhoto } from '@/utils/characterPhotos';
+import { genderLabel, ageLabel } from '@/utils/characterVitals';
 import { pickMainCharacters, mainLimit, MAX_CHARACTERS_PER_STORY } from '@/utils/mainCharacters';
 
 // Character role in story: 'out' = not in story, 'in' = side character, 'main' = main character
@@ -197,8 +198,7 @@ export function CharacterList({
                           {isMain && <Star size={14} className="text-indigo-500 fill-indigo-600 flex-shrink-0" />}
                         </h4>
                         <p className="text-xs text-gray-500">
-                          {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other},{' '}
-                          {char.age} {language === 'de' ? 'J' : language === 'fr' ? 'ans' : language === 'it' ? 'a' : 'y'}
+                          {genderLabel(char.gender, language)}, {ageLabel(char.age, language)}
                         </p>
                       </div>
                       <div className="flex gap-1 flex-shrink-0">

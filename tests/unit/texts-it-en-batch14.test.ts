@@ -97,10 +97,12 @@ describe('Italian copy uses tu', () => {
     expect(bad).toEqual([]);
   });
 
-  it('translations: gender "other" is Altro, character counter has no personagg{s}', async () => {
+  // The third gender label went with the third gender choice (decisions 2026-11-13: male or female only;
+  // an unset gender reads "Genere mancante" via genderLabel in utils/characterVitals).
+  it('translations: no third gender label, character counter has no personagg{s}', async () => {
     const t = (await import(C + 'translations')) as any;
     const it = (t.translations ?? t.default).it;
-    expect(it.other).toBe('Altro');
+    expect(it.other).toBeUndefined();
     expect(it.charactersCreated).not.toContain('{s}');
   });
 

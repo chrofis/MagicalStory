@@ -58,7 +58,6 @@ export interface TranslationStrings {
   gender: string;
   male: string;
   female: string;
-  other: string;
   age: string;
   strengths: string;
   weaknesses: string;
@@ -234,7 +233,6 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     gender: 'Gender',
     male: 'Male',
     female: 'Female',
-    other: 'Unknown',
     age: 'Age',
     strengths: 'Strengths',
     weaknesses: 'Weaknesses',
@@ -408,7 +406,6 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     gender: 'Geschlecht',
     male: 'Männlich',
     female: 'Weiblich',
-    other: 'Unbekannt',
     age: 'Alter',
     strengths: 'Stärken',
     weaknesses: 'Schwächen',
@@ -582,7 +579,6 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     gender: 'Genre',
     male: 'Masculin',
     female: 'Féminin',
-    other: 'Inconnu',
     age: 'Âge',
     strengths: 'Forces',
     weaknesses: 'Faiblesses',
@@ -756,7 +752,6 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     gender: 'Genere',
     male: 'Maschile',
     female: 'Femminile',
-    other: 'Sconosciuto',
     age: 'Età',
     strengths: 'Punti di forza',
     weaknesses: 'Punti deboli',

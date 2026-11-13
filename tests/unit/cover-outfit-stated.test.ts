@@ -67,7 +67,9 @@ describe('the book review reads the same cover outfit sentence', () => {
     expect(tpl).toContain('{COVER_OUTFIT_RULE}');
     const { reviewRulesText } = require('../../server/lib/bookAudit.js');
     const { fillTemplate } = require('../../server/services/prompts.js');
-    const text = reviewRulesText({ title: 'Le titre' }, { bookReviewRules: tpl }, fillTemplate);
+    // The review without cast pictures needs its own rule text (cast-reference pictures, decisions 2026-11-13).
+    const noRefs = fs.readFileSync(path.join(__dirname, '../../prompts/book-review-no-cast-refs.txt'), 'utf8');
+    const text = reviewRulesText({ title: 'Le titre' }, { bookReviewRules: tpl, bookReviewNoCastRefs: noRefs }, fillTemplate);
     expect(text).toContain(COVER_OUTFIT_RULE);
     expect(text).not.toContain('{COVER_OUTFIT_RULE}');
   });

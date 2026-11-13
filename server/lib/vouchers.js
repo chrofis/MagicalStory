@@ -221,6 +221,7 @@ async function voidVoucher(db, id) {
 
 const PDF_STRINGS = {
   de: {
+    fileName: 'Magical-Story-Gutschein.pdf',
     title: 'Geschenkgutschein', subtitle: 'Personalisierte Geschichten und gedrucktes Buch',
     contains: (c, p) => `${c} Credits für bis zu ${c / 10} Geschichtenseiten und ein Buch mit bis zu ${p} Seiten inklusive Versand (CH): Softcover gratis, Hardcover gegen CHF 10 Aufpreis.`,
     expiry: d => `Gültig bis ${d}`, noExpiry: 'Unbefristet gültig',
@@ -228,6 +229,7 @@ const PDF_STRINGS = {
     code: 'Dein Code',
   },
   en: {
+    fileName: 'Magical-Story-Gift-Voucher.pdf',
     title: 'Gift voucher', subtitle: 'Personalized stories and a printed book',
     contains: (c, p) => `${c} credits for up to ${c / 10} story pages and a book of up to ${p} pages incl. shipping (CH): softcover free, hardcover for CHF 10 extra.`,
     expiry: d => `Valid until ${d}`, noExpiry: 'No expiry date',
@@ -235,6 +237,7 @@ const PDF_STRINGS = {
     code: 'Your code',
   },
   fr: {
+    fileName: 'Magical-Story-Bon-Cadeau.pdf',
     title: 'Bon cadeau', subtitle: 'Histoires personnalisées et livre imprimé',
     contains: (c, p) => `${c} crédits pour ${c / 10} pages d'histoire au maximum et un livre de ${p} pages maximum, livraison (CH) incluse : couverture souple offerte, couverture rigide avec supplément de CHF 10.`,
     expiry: d => `Valable jusqu'au ${d}`, noExpiry: 'Sans date limite',
@@ -242,6 +245,7 @@ const PDF_STRINGS = {
     code: 'Votre code',
   },
   it: {
+    fileName: 'Magical-Story-Buono-Regalo.pdf',
     title: 'Buono regalo', subtitle: 'Storie personalizzate e libro stampato',
     contains: (c, p) => `${c} crediti per un massimo di ${c / 10} pagine di storia e un libro di massimo ${p} pagine, spedizione (CH) inclusa: copertina morbida gratis, copertina rigida con supplemento di CHF 10.`,
     expiry: d => `Valido fino al ${d}`, noExpiry: 'Senza scadenza',
@@ -253,6 +257,11 @@ const PDF_STRINGS = {
 function pdfLang(language) {
   const l = String(language || 'de').toLowerCase().slice(0, 2);
   return PDF_STRINGS[l] ? l : 'en';
+}
+
+/** The PDF's download / attachment name in the card's language (a German name on a French card reads as a mistake). */
+function voucherPdfFilename(language) {
+  return PDF_STRINGS[pdfLang(language)].fileName;
 }
 
 async function renderVoucherPdf({ code, url, credits, expiresAt, language }) {
@@ -287,5 +296,5 @@ async function renderVoucherPdf({ code, url, credits, expiresAt, language }) {
 module.exports = {
   VoucherError, generateCode, normalizeCode, hashCode, encryptCode, decryptCode, redemptionUrl,
   isExpired, publicView, assertRedeemable, createVoucher, lookupByCode, redeem, claimBookCredit,
-  releaseBookCredit, getBookCreditAvailable, bookCouponCents, renderVoucherPdf, listForAdmin, voidVoucher,
+  releaseBookCredit, getBookCreditAvailable, bookCouponCents, renderVoucherPdf, voucherPdfFilename, listForAdmin, voidVoucher,
 };

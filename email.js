@@ -695,14 +695,6 @@ async function sendOrderConfirmationEmail(customerEmail, customerName, orderDeta
   }
 }
 
-// Attachment name in the buyer's language (a German name on a French email reads as a mistake).
-const VOUCHER_PDF_FILENAMES = {
-  ENGLISH: 'Magical-Story-Gift-Voucher.pdf',
-  GERMAN: 'Magical-Story-Gutschein.pdf',
-  FRENCH: 'Magical-Story-Bon-Cadeau.pdf',
-  ITALIAN: 'Magical-Story-Buono-Regalo.pdf',
-};
-
 /**
  * Send a gift voucher (QR + printable PDF card) to the buyer, or to an address chosen by an admin.
  * @param {string} toEmail
@@ -730,7 +722,7 @@ async function sendVoucherEmail(toEmail, language, { code, url, pdfBuffer, expir
     subject: fillTemplate(template.subject, values),
     text: fillTemplate(template.text, values),
     html: fillTemplate(template.html, values, { html: true }),
-    attachments: [{ filename: VOUCHER_PDF_FILENAMES[normalizeLanguage(language)], content: pdfBuffer }],
+    attachments: [{ filename: require('./server/lib/vouchers').voucherPdfFilename(language), content: pdfBuffer }],
   }, { language });
   if (error) throw new Error('voucher email failed: ' + (error.message || JSON.stringify(error)));
   console.log(`📧 Voucher email sent to ${toEmail} (${language}), id: ${data.id}`);

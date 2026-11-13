@@ -146,7 +146,7 @@ router.get('/vouchers/mine/:id/pdf', authenticateToken, async (req, res) => {
     const pdf = await vouchers.renderVoucherPdf({
       code, url: vouchers.redemptionUrl(code), credits: row.credits, expiresAt: row.expires_at, language: row.language,
     });
-    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="Magical-Story-Gutschein.pdf"' });
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${vouchers.voucherPdfFilename(row.language)}"` });
     res.send(pdf);
   } catch (err) {
     log.error('❌ [VOUCHER] pdf failed:', err);

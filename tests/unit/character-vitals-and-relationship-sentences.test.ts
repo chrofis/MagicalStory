@@ -133,3 +133,24 @@ describe('the forms offer male and female only (owner 2026-11-13)', () => {
     expect(read('pages/trial/TrialCharacterStep.tsx')).not.toMatch(/value: 'other'/);
   });
 });
+
+describe('one gender label everywhere (owner 2026-11-13)', () => {
+  const fs = require_('fs'); const path = require_('path');
+  const read = (f: string) => fs.readFileSync(path.join(__dirname, '../../client/src', f), 'utf8');
+  it('the character list uses the shared label, never a third word for an unset gender', () => {
+    const list = read('components/character/CharacterList.tsx');
+    expect(list).toMatch(/genderLabel\(char\.gender, language\)/);
+    expect(list).not.toMatch(/t\.other/);
+  });
+});
+
+describe('the voucher PDF is named in the card language, one map for mail and download', () => {
+  const { voucherPdfFilename } = require_('../../server/lib/vouchers');
+  it.each([['de', 'Magical-Story-Gutschein.pdf'], ['fr', 'Magical-Story-Bon-Cadeau.pdf'], ['it', 'Magical-Story-Buono-Regalo.pdf'], ['en', 'Magical-Story-Gift-Voucher.pdf']])('%s', (l, name) => {
+    expect(voucherPdfFilename(l)).toBe(name);
+  });
+  it('the download route no longer hard-codes the German name', () => {
+    const fs = require_('fs'); const path = require_('path');
+    expect(fs.readFileSync(path.join(__dirname, '../../server/routes/vouchers.js'), 'utf8')).not.toMatch(/Gutschein\.pdf/);
+  });
+});
