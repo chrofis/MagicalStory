@@ -67,7 +67,7 @@ const strings: Record<string, {
     title: 'Wähle dein Thema',
     subtitle: 'Welches Abenteuer willst du erschaffen?',
     pickCategory: 'Wähle eine Geschichtsart',
-    pickTheme: 'Wähle ein Thema',
+    pickTheme: 'Wähle ein Abenteuer-Thema',
     pickTopic: 'Wähle ein Thema',
     pickStyle: 'Welche Art von Geschichte?',
     back: 'Zurück',

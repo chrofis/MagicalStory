@@ -185,7 +185,7 @@ const translations = {
     waitingForStory: 'Votre histoire est presque terminée. Vous serez redirigé automatiquement.',
     verifiedWaiting: 'E-mail vérifié ! Votre histoire est encore en cours de création…',
     upsellTitle: 'Ceci est une histoire d\'essai. Avec un compte gratuit, vous pouvez créer des histoires complètes :',
-    upsellDesc: 'Avec un compte complet, vous débloquez :',
+    upsellDesc: '',
     upsellFeatures: [
       'Plusieurs personnages dans une même histoire',
       'Des histoires plus longues',
@@ -239,7 +239,7 @@ const translations = {
       'Storie più lunghe con più pagine',
       'Diversi stili di disegno',
       'Qualità delle immagini superiore',
-      'Ordinala come libro stampato',
+      'Ordinabile come libro stampato',
     ],
     rotationTrialIntro: 'Questa è una storia di prova — dovrebbe essere pronta in pochi minuti. Le storie di prova sono brevi. Una storia completa richiede più tempo, ma offre molte più pagine e scene più ricche.',
     storyReadyKicker: 'La tua storia è pronta da leggere',
