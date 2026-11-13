@@ -80,7 +80,7 @@ Les obligations de supprimer ou de bloquer l'utilisation d'informations conform√
     ]
   },
   it: {
-    title: 'Note Legali (Impressum)',
+    title: 'Note legali (Impressum)',
     lastUpdated: 'Ultimo aggiornamento: gennaio 2025',
     sections: [
       {
