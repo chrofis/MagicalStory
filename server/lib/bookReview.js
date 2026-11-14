@@ -565,8 +565,11 @@ async function runBookReviewRounds(d) {
 
   if (auditRecords.length) auditRecords[auditRecords.length - 1].finalRound = true;
   // No book ships with a wrong title (owner, 2026-11-01): the review still reads the picked front cover's title wrong.
+  // Also when a later re-review failed (pipeline review 2026-11-13, finding 13): the picked cover's faults are then the
+  // last review that DID read it, and a title it read wrong is still wrong. An unreviewed redraw carries no faults
+  // (and passed verifyTitleRender before it was shown), so it does not trip this.
   const front = pagesWithImage.some(i => i.pageNumber === -1) ? d.selectBestVersion(d.pageVersions.get(-1) || []) : null;
-  if (!reviewFailure && front && hasTitleFault(-1, front.reviewFaults)) {
+  if (front && hasTitleFault(-1, front.reviewFaults)) {
     const fault = front.reviewFaults.find(f => String(f.type || '').toLowerCase() === 'required_text');
     throw new Error(`[BOOK-REVIEW] The front cover's title is still wrong after every repair round — the story is stopped, no book ships with a wrong title: ${fault.detail || fault.line || ''}`);
   }

@@ -58,6 +58,22 @@ describe('the review loop', () => {
   it('a front cover whose title is still wrong after the rounds stops the story', async () => {
     await expect(runBookReviewRounds(base({}))).rejects.toThrow(/title is still wrong/);
   });
+  it('a failed re-review does not let a cover with a known wrong title ship (finding 13, 2026-11-13)', async () => {
+    // Page 2 is repaired fine, so a re-review runs; the cover's title redraws all fail; the re-review then fails.
+    // The picked cover is the one the first review read wrong: the story must still stop.
+    const pageFault = { type: 'scale', severity: 'MAJOR', route: { kind: 'TOUCHUP' }, detail: 'cat too big' };
+    let reviews = 0;
+    const over = {
+      rawImages: [{ pageNumber: -1, imageData: 'cover' }, { pageNumber: 2, imageData: 'p2' }],
+      pageVersions: new Map([[-1, [version([titleFault])]], [2, [version([pageFault])]]]),
+      reviewBook: async () => (reviews++ === 0
+        ? { byRoute: { IMG: [{ ...titleFault, page: -1 }, { ...pageFault, page: 2 }], TEXT: [] }, pagesRead: [-1, 2], raw: '', betterVerdicts: {} }
+        : null),
+      runRepairMethod: async ({ img }: any) => ({ pageNumber: img.pageNumber, imageData: img.pageNumber === 2 ? 'p2-fixed' : 'bad' }),
+    };
+    await expect(runBookReviewRounds(base(over))).rejects.toThrow(/title is still wrong/);
+    expect(reviews).toBeGreaterThan(1); // the re-review really ran and failed
+  });
   it('the re-review rules say a misspelled title never wins the comparison', () => {
     const s = fs.readFileSync(path.join(__dirname, '../../prompts/book-review-rereview.txt'), 'utf8');
     expect(s).toMatch(/title is spelled wrong is never better than one whose title is right/);
