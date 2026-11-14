@@ -7404,7 +7404,10 @@ async function _processStoryJobImpl(jobId, opts = {}) {
       inputData.layout = resolveLayout(inputData.languageLevel, inputData.layoutOverride);
       log.info(`📐 [PROCESS] Layout for level=${inputData.languageLevel}: mode=${inputData.layout.mode}, aspect=${inputData.layout.imageAspect}, textInImage=${inputData.layout.textInImage}`);
     } catch (e) {
-      log.warn(`📐 [PROCESS] resolveLayout failed: ${e.message} — layout not stamped`);
+      // NO FALLBACK (pipeline review 2026-11-13, finding 11): an unstamped layout made
+      // buildImagePrompt fall through to textInImage=true, a book in the wrong layout.
+      // The job fails (and is refunded by the catch below) instead.
+      throw new Error(`resolveLayout failed for level=${inputData.languageLevel}: ${e.message} — the job cannot know its page layout`);
     }
 
     // Stamp the resolved SEASON the same way, and for the same reason: every
@@ -7425,7 +7428,9 @@ async function _processStoryJobImpl(jobId, opts = {}) {
       }
       inputData.season = resolved;
     } catch (e) {
-      log.warn(`🍁 [PROCESS] resolveSeason failed: ${e.message} — season not stamped`);
+      // NO FALLBACK (finding 11): an unstamped season left every brief and image prompt
+      // with no season (the exact silent drop this stamp exists to prevent).
+      throw new Error(`resolveSeason failed: ${e.message} — the job cannot know its season`);
     }
 
     // Debug: Log inputData values when job starts processing
