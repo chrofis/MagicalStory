@@ -619,7 +619,42 @@ function methodOfSource(source) {
   return s;
 }
 
+/**
+ * The book review's TEXT faults that still apply to the book as it ships (pipeline review 2026-11-13, finding 8).
+ * Every review files TEXT faults against the picture it was shown; a TEXT fault often asks the words to match the
+ * picture ("say the toggles would not fasten, not the zip"). When a later round REPLACED that page's picture (the
+ * re-review judged the repaired one better: BETTER NEW), the earlier fault was written against a picture that no
+ * longer ships, and is dropped. Untouched pages keep every round's faults: a later round's silence means nothing
+ * (the reviewer is not shown its earlier faults). Typed data only: round, repairedPages, betterVerdicts.
+ *
+ * @param {Array<{round:number, textFaults?:Array, repairedPages?:number[], betterVerdicts?:Object}>} rounds
+ * @returns {{faults:Array, dropped:Array<{fault:object, round:number, replacedInRound:number}>}}
+ */
+function shippingTextFaults(rounds) {
+  const replacedIn = new Map();
+  for (const r of rounds || []) {
+    for (const page of r?.repairedPages || []) {
+      if (r.betterVerdicts?.[page] === 'NEW') replacedIn.set(page, Math.max(replacedIn.get(page) ?? -1, r.round));
+    }
+  }
+  const faults = [];
+  const dropped = [];
+  const seen = new Set();
+  for (const r of rounds || []) {
+    for (const f of r?.textFaults || []) {
+      const line = String(f?.line || '').trim();
+      if (!line || seen.has(line)) continue;
+      const at = replacedIn.get(f.page);
+      if (at != null && r.round < at) { dropped.push({ fault: f, round: r.round, replacedInRound: at }); continue; }
+      seen.add(line);
+      faults.push(f);
+    }
+  }
+  return { faults, dropped };
+}
+
 module.exports = {
+  shippingTextFaults,
   bookReviewActive,
   chooseMethod,
   buildFixableIssues,

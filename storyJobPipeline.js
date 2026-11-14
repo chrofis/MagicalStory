@@ -5939,17 +5939,11 @@ ${trialWriter.pagesPrompt}`;
         // final by now, so the round may not move a passage between pages
         // (runPostAuditTextRound's scope note and its code-side scope gate).
         if (pipelineBookAuditRounds) {
-          const auditTextFaults = [];
-          const seenFaultLines = new Set();
-          for (const r of pipelineBookAuditRounds) {
-            for (const f of r.textFaults || []) {
-              const line = String(f?.line || '').trim();
-              // The same fault can survive into a later round's audit; it is one
-              // fault, and sending it twice would ask for the page twice.
-              if (!line || seenFaultLines.has(line)) continue;
-              seenFaultLines.add(line);
-              auditTextFaults.push(f);
-            }
+          // Every round's TEXT faults, deduped by line, minus those written against a picture a later
+          // round replaced (bookReview.shippingTextFaults, review finding 8, 2026-11-14).
+          const { faults: auditTextFaults, dropped: staleTextFaults } = require('./server/lib/bookReview').shippingTextFaults(pipelineBookAuditRounds);
+          for (const d of staleTextFaults) {
+            genLog.info('text_fault_stale', `p${d.fault.page}: a round-${d.round} TEXT fault was written against a picture round ${d.replacedInRound} replaced — not sent to the text round`, null, { line: d.fault.line });
           }
           if (auditTextFaults.length > 0) {
             const { extractRefinablePages, runPostAuditTextRound } = require('./server/lib/textRefine');
