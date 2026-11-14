@@ -301,6 +301,25 @@ describe('char_repair stage: no params = the production repair round', () => {
     expect(r.imageType).toBe('scene');
   });
 
+  it('the book review\'s FACE / FIGURE scope is obeyed; FACE with no detected face is refused, never redrawn as the whole figure (2026-11-14)', async () => {
+    const scene = storedScene();
+    STORY = storyFor(scene, layout);
+    const call = (detection: any, forceTarget: string) => buildCharFixCall({
+      storyData: STORY, characters: STORY.characters, artStyle: STORY.artStyle, img: scene,
+      decision: { charName: 'Mira', issueTypes: ['clothing'], forceTarget }, currentImageData: PX,
+      bestEval: { bboxDetection: detection, matches: undefined }, entityReport: STORY.finalChecksReport.entity, jobKey: STORY.id,
+    });
+    // face detected: FACE is head-only even for a body-type fault; FIGURE is the whole figure
+    expect((await call(scene.bboxDetection, 'face')).useFaceOnly).toBe(true);
+    expect((await call(scene.bboxDetection, 'body')).useFaceOnly).toBe(false);
+    // no face detected on the figure: FACE is refused with a reason
+    const noFaces = JSON.parse(JSON.stringify(scene.bboxDetection));
+    for (const f of (noFaces.figures || [])) { delete f.faceBox; delete f.face_box; }
+    for (const k of Object.keys(noFaces)) if (/face/i.test(k) && k !== 'figures') delete noFaces[k];
+    const refused = await call(noFaces, 'face');
+    expect(refused.failure?.error).toMatch(/head-only repair of Mira asked for, but no face was detected/);
+  });
+
   it('the clothing text is the run\'s (requirement signature + page worn state), not buildClothingDescription', async () => {
     const scene = storedScene();
     STORY = storyFor(scene, layout);

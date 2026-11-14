@@ -140,6 +140,12 @@ async function buildCharFixCall({ storyData, characters, artStyle, img, decision
   // `decision.forceTarget` ('face' | 'body') is set by the Test Lab's explicit whiteoutTarget knob and by
   // the book review's FACE:<Name> / FIGURE:<Name> route (owner, 2026-11-14: the reviewer names the scope).
   const forceTarget = byFigure ? 'body' : (decision.forceTarget || null);
+  // AN EXPLICIT HEAD-ONLY REPAIR NEEDS A DETECTED FACE (2026-11-14). resolveRepairAxes draws a face target with no
+  // face box as the whole figure; for a scope someone NAMED (the reviewer's FACE:<Name>, the Lab knob) that silently
+  // redraws body, pose and outfit that were right. Refused, loudly: the fault stays for the re-review to see.
+  if (forceTarget === 'face' && !faceBbox) {
+    return { failure: { error: `head-only repair of ${charName} asked for, but no face was detected on the figure — not redrawn as the whole figure` } };
+  }
   const repairAxes = resolveRepairAxes({ hasFaceBbox: !!faceBbox, issueTypes: decision.issueTypes || null, ...(forceTarget ? { forceTarget } : {}) });
   const useFaceOnly = repairAxes.faceOnly;
   // THE FIGURE BOX, for a face repair too — the face goes separately as
