@@ -19,16 +19,19 @@ const scoring = require('../../server/lib/scoring.js');
 describe('the fault line carries an optional FIX ROUTE (bookAudit.parseRoutes)', () => {
   const raw = [
     'FAULT[IMG][MAJOR][wrong_action][TOUCHUP]: p3 — Remove the second hat.',
-    'FAULT[IMG][CRITICAL][clothing][CHAR:Anna Maria]: p4 — Redraw her in the red coat.',
+    'FAULT[IMG][CRITICAL][clothing][FIGURE:Anna Maria]: p4 — Redraw her in the red coat.',
     'FAULT[IMG][CATASTROPHIC][setting][NEW]: p5 — Draw the harbour, not the forest. | background: keep',
     'FAULT[IMG][CRITICAL][required_text][NEW]: p-1 — The title is misspelled. | background: keep',
     '  > FAULT[TEXT][MINOR]: p7 — The sentence repeats.',
   ].join('\n');
   const parsed = bookAudit.parseRoutes(raw);
 
-  it('reads the three route forms into a structured value', () => {
+  it('reads the route forms into a structured value', () => {
     expect(parsed.IMG[0].route).toEqual({ kind: 'TOUCHUP' });
-    expect(parsed.IMG[1].route).toEqual({ kind: 'CHAR', charName: 'Anna Maria' });
+    expect(parsed.IMG[1].route).toEqual({ kind: 'CHAR', charName: 'Anna Maria', target: 'body' });
+    expect(bookAudit.parseRouteTag('FACE: Anna')).toEqual({ kind: 'CHAR', charName: 'Anna', target: 'face' });
+    // the pre-2026-11-14 grammar still parses for stored reports, with no scope
+    expect(bookAudit.parseRouteTag('CHAR:Anna')).toEqual({ kind: 'CHAR', charName: 'Anna', target: null });
     expect(parsed.IMG[2].route).toEqual({ kind: 'NEW', background: { keep: true } });
     expect(parsed.IMG[2].detail).toBe('Draw the harbour, not the forest.');
     expect(parsed.IMG[0].type).toBe('wrong_action');
@@ -65,6 +68,8 @@ describe('the fault line carries an optional FIX ROUTE (bookAudit.parseRoutes)',
     const readerLine = new Function(`${m}; return readerLine;`)();
     expect(readerLine({ line: 'FAULT[IMG][MAJOR][scale][TOUCHUP]: p3 — shrink it' })).toBe('FAULT[IMG][MAJOR][scale]: p3 — shrink it');
     expect(readerLine({ line: 'FAULT[IMG][MAJOR][scale][CHAR:Anna Maria]: p3 — x' })).toBe('FAULT[IMG][MAJOR][scale]: p3 — x');
+    expect(readerLine({ line: 'FAULT[IMG][MAJOR][hair][FACE:Anna Maria]: p3 — x' })).toBe('FAULT[IMG][MAJOR][hair]: p3 — x');
+    expect(readerLine({ line: 'FAULT[IMG][MAJOR][clothing][FIGURE:Anna]: p3 — x' })).toBe('FAULT[IMG][MAJOR][clothing]: p3 — x');
     expect(readerLine({ line: 'FAULT[IMG][MAJOR][scale]: p3 — shrink it' })).toBe('FAULT[IMG][MAJOR][scale]: p3 — shrink it');
   });
 });
@@ -72,28 +77,41 @@ describe('the fault line carries an optional FIX ROUTE (bookAudit.parseRoutes)',
 describe('the route tag picks the repair method (replaces decideRepairMethod in this mode)', () => {
   const f = (route: any, extra: any = {}) => ({ page: 3, severity: 'MAJOR', type: 'wrong_action', detail: 'Fix it.', line: 'L', route, ...extra });
 
-  it('TOUCHUP -> inpaint, NEW -> iterate, CHAR -> char-fix', () => {
+  it('TOUCHUP -> inpaint, NEW -> iterate, FACE / FIGURE -> char-fix with the reviewer\'s scope', () => {
     expect(review.chooseMethod([f({ kind: 'TOUCHUP' })]).method).toBe('inpaint');
     expect(review.chooseMethod([f({ kind: 'NEW' })]).method).toBe('iterate');
-    const c = review.chooseMethod([f({ kind: 'CHAR', charName: 'Anna' }, { type: 'face_drift' })]);
-    expect(c).toMatchObject({ method: 'char-fix', charName: 'Anna', issueTypes: ['face_drift'] });
+    const c = review.chooseMethod([f({ kind: 'CHAR', charName: 'Anna', target: 'face' }, { type: 'face_drift' })]);
+    expect(c).toMatchObject({ method: 'char-fix', charName: 'Anna', issueTypes: ['face_drift'], target: 'face' });
+    expect(review.chooseMethod([f({ kind: 'CHAR', charName: 'Anna', target: 'body' })]).target).toBe('body');
   });
 
-  it('one method per page: NEW beats CHAR beats TOUCHUP, and a redraw is told every fault', () => {
-    const faults = [f({ kind: 'TOUCHUP' }), f({ kind: 'CHAR', charName: 'Anna' }), f({ kind: 'NEW' })];
+  it('the old scope-less CHAR route is refused for a live repair, never guessed from the type', () => {
+    const pick = review.chooseMethod([f({ kind: 'CHAR', charName: 'Anna', target: null }, { type: 'hair' })]);
+    expect(pick.method).toBeNull();
+    expect(pick.unroutable[0].routeError).toMatch(/FACE:<Name>.*FIGURE:<Name>/);
+  });
+
+  it('NEW beats everything and the redraw is told every fault', () => {
+    const faults = [f({ kind: 'TOUCHUP' }), f({ kind: 'CHAR', charName: 'Anna', target: 'face' }), f({ kind: 'NEW' })];
     const pick = review.chooseMethod(faults);
     expect(pick.method).toBe('iterate');
     expect(pick.faults).toHaveLength(3);
-    expect(review.chooseMethod(faults.slice(0, 2)).method).toBe('char-fix');
   });
 
-  it('with several named characters the worst-weighted one is repaired first', () => {
+  it('without NEW, every fix is chained in one round: characters worst first, then the touch-up (owner 2026-11-14)', () => {
     const pick = review.chooseMethod([
-      f({ kind: 'CHAR', charName: 'Ben' }, { severity: 'MINOR' }),
-      f({ kind: 'CHAR', charName: 'Anna' }, { severity: 'CRITICAL' }),
+      f({ kind: 'TOUCHUP' }),
+      f({ kind: 'CHAR', charName: 'Ben', target: 'face' }, { severity: 'MINOR' }),
+      f({ kind: 'CHAR', charName: 'Anna', target: 'face' }, { severity: 'CRITICAL' }),
+      f({ kind: 'CHAR', charName: 'anna', target: 'body' }, { severity: 'MINOR', type: 'clothing' }),
     ]);
-    expect(pick.charName).toBe('Anna');
-    expect(pick.faults).toHaveLength(1);
+    expect(pick.method).toBe('chain');
+    expect(pick.steps.map((s: any) => [s.method, s.charName || null, s.target || null])).toEqual([
+      ['char-fix', 'Anna', 'body'], // named FACE and FIGURE: the whole figure covers the head
+      ['char-fix', 'Ben', 'face'],
+      ['inpaint', null, null],
+    ]);
+    expect(pick.steps[0].faults).toHaveLength(2);
   });
 
   it('a fault with no route is reported unroutable and NOT sent anywhere (no fallback router)', () => {
@@ -216,7 +234,7 @@ describe('D1: a failed review is retried once, then the book ships unrepaired', 
         rawImages: imgs, pageVersions,
         selectBestVersion: (vs: any[]) => vs[0],
         maxRepairRounds: 2, reviewBook, runRepairMethod,
-        buildRoundVersion: (r: any, p: any) => ({ imageData: r.imageData, source: r.source, method: r.method || null, ...p }),
+        buildRoundVersion: (r: any, p: any) => ({ imageData: r.imageData, source: r.source, method: r.method || null, chainSteps: r.chainSteps || null, ...p }),
         redetect: vi.fn(async () => ({ figures: [] })),
         inheritSceneContract: () => {},
         auditRecord: (a: any, round: number) => ({ round, faults: a.faults }),
@@ -272,13 +290,35 @@ describe('D1: a failed review is retried once, then the book ships unrepaired', 
     expect(out.auditRecords[1].finalRound).toBe(true);
   });
 
-  it('a CHAR route reaches the char-fix path with the named character', async () => {
+  it('a FACE route reaches the char-fix path with the named character and the head-only target', async () => {
     const reviewBook = vi.fn()
-      .mockResolvedValueOnce(audit('FAULT[IMG][CRITICAL][face_drift][CHAR:Anna]: p2 — Redraw Anna\'s face.'))
+      .mockResolvedValueOnce(audit('FAULT[IMG][CRITICAL][face_drift][FACE:Anna]: p2 — Redraw Anna\'s face.'))
       .mockResolvedValue(audit(''));
     const { deps, runRepairMethod } = mkDeps(reviewBook, { maxRepairRounds: 1 });
     await review.runBookReviewRounds(deps);
-    expect(runRepairMethod.mock.calls[0][0]).toMatchObject({ method: 'char-fix', decision: { charName: 'Anna', issueTypes: ['face_drift'] } });
+    expect(runRepairMethod.mock.calls[0][0]).toMatchObject({ method: 'char-fix', decision: { charName: 'Anna', issueTypes: ['face_drift'], forceTarget: 'face' } });
+  });
+
+  it('a chained page: each step repairs the previous step\'s picture, no step reroutes to a redraw, the last picture is the version', async () => {
+    const reviewBook = vi.fn()
+      .mockResolvedValueOnce(audit([
+        'FAULT[IMG][MAJOR][clothing][FIGURE:Anna]: p2 — Draw Anna in her red coat.',
+        'FAULT[IMG][MINOR][object_presence][TOUCHUP]: p2 — Remove the second lamp.',
+      ].join('\n')))
+      .mockResolvedValue(audit(''));
+    const { deps, runRepairMethod, pageVersions } = mkDeps(reviewBook, { maxRepairRounds: 1 });
+    await review.runBookReviewRounds(deps);
+    const calls = runRepairMethod.mock.calls.map((c: any) => c[0]);
+    expect(calls.map((c: any) => c.method)).toEqual(['char-fix', 'inpaint']);
+    expect(calls[0].recolourInput).toBeNull();
+    expect(calls[1].recolourInput).toBeTruthy();
+    expect(calls.every((c: any) => c.allowIterateReroute === false)).toBe(true);
+    const versions = pageVersions.get(2)! as any[];
+    expect(versions[versions.length - 1].chainSteps.map((s: any) => s.step)).toEqual(['FIGURE Anna', 'TOUCHUP']);
+    // the real version builder and the persisted record carry the steps
+    const rp = fs.readFileSync(path.join(process.cwd(), 'server/lib/repairPipeline.js'), 'utf8');
+    expect(rp).toMatch(/chainSteps: repairResult\.chainSteps \|\| null,/);
+    expect(rp).toMatch(/chainSteps: v\.chainSteps \|\| null,/);
   });
 
   it('a re-review that fails keeps the previous version: the unreviewed repair cannot win', async () => {
@@ -339,7 +379,9 @@ describe('auditStoryBook builds the review request (fetch stubbed, nothing leave
     const text = textOf(sent[0]);
     expect(text).toContain('[<TYPE>][<ROUTE>]: p<N>');
     expect(text).toContain('TOUCHUP');
-    expect(text).toContain('CHAR:<Name>');
+    expect(text).toContain('FACE:<Name>');
+    expect(text).toContain('FIGURE:<Name>');
+    expect(text).not.toContain('CHAR:<Name>');
     expect(text).toContain('The book\'s title is "The Brave Fox"');
     expect(text).toContain('No reference pictures of the characters are given to you');
     expect(text).not.toContain('PREVIOUS PICTURE');

@@ -87,7 +87,7 @@ function SCALE_COLLECTIONS_PRESENT(vb) {
 // before it still parses. The type group is `[a-z_]+` and the regex is
 // case-insensitive, so a line that omits the type would swallow `[TOUCHUP]` as
 // its type — parseRoutes moves it back.
-const ROUTED_FAULT_RE = /^[ \t>*-]*FAULT\[(IMG|TEXT)\](?:\[(MINOR|MAJOR|CRITICAL|CATASTROPHIC)\])?(?:\[([a-z_]+)\])?(?:\[(TOUCHUP|NEW|CHAR:[^\]\r\n]*)\])?:\s*(?:p(-?\d+))?\s*(.*)$/gim;
+const ROUTED_FAULT_RE = /^[ \t>*-]*FAULT\[(IMG|TEXT)\](?:\[(MINOR|MAJOR|CRITICAL|CATASTROPHIC)\])?(?:\[([a-z_]+)\])?(?:\[(TOUCHUP|NEW|FACE:[^\]\r\n]*|FIGURE:[^\]\r\n]*|CHAR:[^\]\r\n]*)\])?:\s*(?:p(-?\d+))?\s*(.*)$/gim;
 
 // THE BACKGROUND DECISION of a NEW line (owner, 2026-11-07, docs/decisions.md
 // "A re-render keeps the page's plate"): a NEW fault ends with
@@ -711,15 +711,23 @@ function collectObjectScale(raws, askedByObject, notEvaluated) {
 /**
  * A fault's fix route as a structured value, or null when the line carries none
  * (a stored line from before the route existed, or a TEXT line).
- * @returns {{kind:'TOUCHUP'|'NEW'|'CHAR', charName?:string}|null}
+ *
+ * The reviewer names the character repair's scope (owner, 2026-11-14): `FACE:<Name>` redraws that character's head
+ * only, `FIGURE:<Name>` the whole figure. Both are a CHAR route carrying `target` ('face' | 'body'), which the
+ * character repair obeys as its forceTarget. `CHAR:<Name>` is the grammar before 2026-11-14: it still PARSES (stored
+ * reports must read forever) but carries no target, and bookReview.chooseMethod refuses it for a live repair (never guessed from the type).
+ * @returns {{kind:'TOUCHUP'|'NEW'|'CHAR', charName?:string, target?:'face'|'body'|null}|null}
  */
 function parseRouteTag(tag) {
   const t = String(tag || '').trim();
   if (!t) return null;
   const upper = t.toUpperCase();
   if (upper === 'TOUCHUP' || upper === 'NEW') return { kind: upper };
-  const m = t.match(/^CHAR:\s*(.+)$/i);
-  if (m && m[1].trim()) return { kind: 'CHAR', charName: m[1].trim() };
+  const m = t.match(/^(FACE|FIGURE|CHAR):\s*(.+)$/i);
+  if (m && m[2].trim()) {
+    const scope = m[1].toUpperCase();
+    return { kind: 'CHAR', charName: m[2].trim(), target: scope === 'FACE' ? 'face' : scope === 'FIGURE' ? 'body' : null };
+  }
   return null;
 }
 

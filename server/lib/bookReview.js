@@ -14,7 +14,8 @@
  *
  *   TOUCHUP     -> the existing inpaint path (executeInpaintAction)
  *   NEW         -> the existing iterate path (executeIterateAction)
- *   CHAR:<Name> -> the existing char-fix path (executeCharFixAction)
+ *   FACE:<Name> / FIGURE:<Name> -> the char-fix path (executeCharFixAction), head only / whole figure (2026-11-14;
+ *   CHAR:<Name> before that, parsed for stored reports, refused live)
  *
  * The route tag REPLACES decideRepairMethod and its overrides in this mode.
  * Flow (owner D4): review -> repair -> re-review (each repaired page shown with
@@ -76,45 +77,72 @@ function pinBackground(freshFaults) {
 }
 
 /**
- * Which ONE repair method a page gets this round, from its faults' route tags.
- * One method per page per round (as in the per-page loop). Precedence: a page
- * the reviewer wants drawn again (NEW) is redrawn whatever else is wrong with it;
- * else a named character is repaired; else the local touch-up. The faults left
- * out of this round's method stay on the page for the next review.
+ * What a page gets this round, from its faults' route tags. Precedence: a page the reviewer wants drawn again (NEW)
+ * is redrawn, and the redraw is told every fault. Otherwise the page's fixes are CHAINED in one round (owner,
+ * 2026-11-14: with one repair round, a fix that waited for "the next review" was never done): every named
+ * character's repair (worst first), then the touch-up, each on the previous step's picture.
  *
- * A fault with no route cannot be sent anywhere. It is NOT guessed at (no
- * fallback to the old router): it is reported in `unroutable` and the caller logs it.
+ * A character route carries its scope: FACE:<Name> (head only) or FIGURE:<Name> (whole figure), obeyed as the
+ * repair's target; a character named both ways gets the whole figure (it covers the head). The old scope-less
+ * CHAR:<Name> and a fault with no route are NOT guessed at: they come back in `unroutable` and the caller logs them.
  *
  * @param {Array} faults IMG faults of ONE page (bookAudit.parseRoutes entries)
- * @returns {{method:'iterate'|'inpaint'|'char-fix'|null, faults:Array, charName:string|null, issueTypes:string[], unroutable:Array, reason:string}}
+ * @returns {{method:'iterate'|'inpaint'|'char-fix'|'chain'|null, steps:Array, faults:Array, charName:string|null,
+ *   issueTypes:string[], target?:string, unroutable:Array, reason:string, backgroundPin?:object}}
  */
 function chooseMethod(faults) {
-  const routed = (faults || []).filter(f => f && f.route);
-  const unroutable = (faults || []).filter(f => f && !f.route);
+  const unroutable = [];
+  const routed = [];
+  for (const f of faults || []) {
+    if (!f) continue;
+    if (!f.route) { unroutable.push(f); continue; }
+    if (f.route.kind === 'CHAR' && !f.route.target) {
+      unroutable.push({ ...f, routeError: 'CHAR:<Name> names no scope — the route is FACE:<Name> (head only) or FIGURE:<Name> (whole figure)' });
+      continue;
+    }
+    routed.push(f);
+  }
   if (routed.length === 0) {
-    return { method: null, faults: [], charName: null, issueTypes: [], unroutable, reason: 'no routed fault' };
+    return { method: null, steps: [], faults: [], charName: null, issueTypes: [], unroutable, reason: 'no routed fault' };
   }
   const fresh = routed.filter(f => f.route.kind === 'NEW');
   if (fresh.length > 0) {
     // A redraw answers every fault on the page, so it is told all of them.
+    const step = { method: 'iterate', faults: routed, backgroundPin: pinBackground(fresh) };
     return {
-      method: 'iterate', faults: routed, charName: null, issueTypes: [], unroutable,
-      backgroundPin: pinBackground(fresh), reason: `NEW picture (${fresh.length} fault(s) routed NEW)`,
+      method: 'iterate', steps: [step], faults: routed, charName: null, issueTypes: [], unroutable,
+      backgroundPin: step.backgroundPin, reason: `NEW picture (${fresh.length} fault(s) routed NEW)`,
     };
   }
-  const chars = routed.filter(f => f.route.kind === 'CHAR');
-  if (chars.length > 0) {
-    // Worst-weighted named character first; the others wait for the next review.
-    const target = [...chars].sort((a, b) => sevRank(severityOf(b)) - sevRank(severityOf(a)))[0].route.charName;
-    const mine = chars.filter(f => f.route.charName.toLowerCase() === target.toLowerCase());
-    return {
-      method: 'char-fix', faults: mine, charName: target,
+  const steps = [];
+  const byName = new Map();
+  for (const f of routed.filter(x => x.route.kind === 'CHAR')) {
+    const key = f.route.charName.toLowerCase();
+    if (!byName.has(key)) byName.set(key, []);
+    byName.get(key).push(f);
+  }
+  const worst = (fs) => Math.max(...fs.map(f => sevRank(severityOf(f))));
+  for (const mine of [...byName.values()].sort((a, b) => worst(b) - worst(a))) {
+    steps.push({
+      method: 'char-fix', faults: mine, charName: mine[0].route.charName,
+      target: mine.some(f => f.route.target === 'body') ? 'body' : 'face',
       issueTypes: [...new Set(mine.map(f => f.type).filter(Boolean))],
-      unroutable, reason: `CHAR repair of ${target}`,
-    };
+    });
   }
   const touch = routed.filter(f => f.route.kind === 'TOUCHUP');
-  return { method: 'inpaint', faults: touch, charName: null, issueTypes: [], unroutable, reason: `TOUCHUP (${touch.length} fault(s))` };
+  if (touch.length) steps.push({ method: 'inpaint', faults: touch });
+  const first = steps[0];
+  if (steps.length === 1) {
+    return {
+      method: first.method, steps, faults: first.faults, charName: first.charName || null, issueTypes: first.issueTypes || [],
+      ...(first.target ? { target: first.target } : {}), unroutable,
+      reason: first.method === 'char-fix' ? `${first.target === 'face' ? 'FACE' : 'FIGURE'} repair of ${first.charName}` : `TOUCHUP (${touch.length} fault(s))`,
+    };
+  }
+  return {
+    method: 'chain', steps, faults: routed, charName: null, issueTypes: [], unroutable,
+    reason: `chain: ${steps.map(st => (st.method === 'char-fix' ? `${st.target === 'face' ? 'FACE' : 'FIGURE'} ${st.charName}` : 'TOUCHUP')).join(' -> ')}`,
+  };
 }
 
 /** The findings the iterate rewrite and the inpaint editor read, one per fault. */
@@ -408,25 +436,61 @@ async function runBookReviewRounds(d) {
       const pageNumber = img.pageNumber;
       parentOf.set(pageNumber, best);
       const failed = (error, extra = {}) => ({ pageNumber, imageData: null, method: choice.method, error, ...extra });
-      try {
+      // THE CHAIN: each step repairs the previous step's picture (recolourInput is every executor's input override).
+      // A step that fails is recorded and the next one works on the last good picture; the re-review then judges the
+      // final picture against the one before the round. No step reroutes to a redraw (that would drop the earlier
+      // steps' work). All steps failing is a failed repair.
+      const runChain = async (steps) => {
+        let input = null;
+        let last = null;
+        const chainSteps = [];
+        for (const step of steps) {
+          const { latestEval, decision } = stepInputs(step);
+          let r;
+          try {
+            r = await d.runRepairMethod({ img, method: step.method, latestEval, decision, round, recolourInput: input, failed, allowIterateReroute: false });
+          } catch (err) {
+            r = { imageData: null, error: err.message };
+          }
+          const label = step.method === 'char-fix' ? `${step.target === 'face' ? 'FACE' : 'FIGURE'} ${step.charName}` : 'TOUCHUP';
+          if (r?.imageData) {
+            input = r.imageData;
+            last = step.method === 'inpaint' ? { ...r, reviewPlan: latestEval.consolidatedPlan } : { ...r };
+            chainSteps.push({ step: label, method: step.method, ok: true });
+          } else {
+            log.warn(`📖 [BOOK-REVIEW] Round ${round} p${pageNumber}: chain step ${label} failed (${r?.error || 'no result'}) — the next step works on the last good picture`);
+            chainSteps.push({ step: label, method: step.method, ok: false, error: r?.error || 'no result' });
+          }
+        }
+        if (!last) return failed(`every chained repair failed: ${chainSteps.map(c => `${c.step}: ${c.error}`).join('; ')}`, { chainSteps });
+        return { ...last, chainSteps };
+      };
+      // The inputs of one repair step (a step is the whole choice unless the page's fixes are chained).
+      const stepInputs = (step) => {
         let latestEval;
-        if (choice.method === 'inpaint') {
-          const plan = buildTouchupPlan(choice.faults);
-          latestEval = { fixableIssues: buildFixableIssues(choice.faults), consolidatedPlan: plan, reasoning: 'book review touch-up', pageNumber };
-        } else if (choice.method === 'iterate' || choice.method === 'title-redraw') {
-          latestEval = { fixableIssues: buildFixableIssues(choice.faults), consolidatedPlan: null, reasoning: 'book review: draw the picture again', pageNumber, backgroundPin: choice.backgroundPin || null };
+        if (step.method === 'inpaint') {
+          latestEval = { fixableIssues: buildFixableIssues(step.faults), consolidatedPlan: buildTouchupPlan(step.faults), reasoning: 'book review touch-up', pageNumber };
+        } else if (step.method === 'iterate' || step.method === 'title-redraw') {
+          latestEval = { fixableIssues: buildFixableIssues(step.faults), consolidatedPlan: null, reasoning: 'book review: draw the picture again', pageNumber, backgroundPin: step.backgroundPin || null };
         } else {
           latestEval = best.evaluation || null;
         }
-        const decision = choice.method === 'char-fix'
-          ? { charName: choice.charName, issueTypes: choice.issueTypes, severity: choice.faults.map(severityOf).sort((a, b) => sevRank(b) - sevRank(a))[0].toUpperCase() }
+        const decision = step.method === 'char-fix'
+          // forceTarget: the reviewer's FACE / FIGURE scope, obeyed by the character repair (charFixCall).
+          ? { charName: step.charName, issueTypes: step.issueTypes, forceTarget: step.target, severity: step.faults.map(severityOf).sort((a, b) => sevRank(b) - sevRank(a))[0].toUpperCase() }
           : { reason: choice.reason };
+        return { latestEval, decision };
+      };
+      try {
         if (choice.method === 'title-redraw') {
+          const { latestEval } = stepInputs({ method: 'title-redraw', faults: choice.faults });
           return await redrawTitle({
             img, latestEval, round, failed, title: d.title, attempts: d.titleRedraws,
             runRepairMethod: d.runRepairMethod, verifyTitle: d.verifyTitle,
           });
         }
+        if (choice.method === 'chain') return await runChain(choice.steps);
+        const { latestEval, decision } = stepInputs(choice.steps[0]);
         const result = await d.runRepairMethod({ img, method: choice.method, latestEval, decision, round, recolourInput: null, failed });
         if (result && choice.method === 'inpaint') result.reviewPlan = latestEval.consolidatedPlan;
         return result;

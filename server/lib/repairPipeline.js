@@ -2214,6 +2214,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // version's pixels this one edited. Dropped here it occurred zero
       // times in the stored story, so no repair chain was auditable.
       parentSource: repairResult.parentSource || null,
+      // A chained book-review repair (bookReview runChain, 2026-11-14): which steps ran on this picture, in order,
+      // and which failed. Without it the version reads as the last step's source alone.
+      chainSteps: repairResult.chainSteps || null,
       description: repairResult.description || null,
       // THE REWRITTEN CONTRACT TRAVELS WITH THE VERSION (2026-09-13).
       // executeIterateAction already returns the cast it re-derived from
@@ -2264,7 +2267,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // method differently: iterate / inpaint (with its no-op re-route) / char-fix,
   // each returning the round-result shape the version builders read.
   // `failed(error, extra)` builds the caller's failure result.
-  const runRepairMethod = async ({ img, method, latestEval, decision, round, recolourInput, failed }) => {
+  // allowIterateReroute=false: a chained book-review step (bookReview runChain) never turns a no-op inpaint into a
+  // redraw, which would drop the earlier steps' work.
+  const runRepairMethod = async ({ img, method, latestEval, decision, round, recolourInput, failed, allowIterateReroute = true }) => {
     const pageNumber = img.pageNumber;
     const iterateOutcome = async () => {
       const result = await executeIterateAction(img, latestEval);
@@ -2342,7 +2347,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // region it was asked to change is, pixel for pixel, unchanged. A
       // second inpaint repeats it; the page redo is the other method. Once
       // per page, and only while no iterate has been tried on it.
-      if (inpaintResult?.noop) {
+      if (inpaintResult?.noop && allowIterateReroute) {
         const triedIterate = (pageVersions.get(pageNumber) || []).some(v => String(v?.source || '').startsWith('iterate-') || String(v?.source || '').startsWith('composite-iterate-'));
         if (!triedIterate) {
           log.warn(`🪃 [UNIFIED PIPELINE] Round ${round} page ${pageNumber}: the inpaint changed nothing inside its target — re-routing to iterate`);
@@ -4183,6 +4188,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // -- `parentSource` occurred zero times in the stored story, so a repair
       // chain could not be read back from the record at all.
       parentSource: v.parentSource || null,
+      // The steps of a chained book-review repair (2026-11-14), persisted with the version (see buildRoundVersion).
+      chainSteps: v.chainSteps || null,
       sceneMetadata: v.sceneMetadata || null,
       // Declared-or-unknown, never a coincidence of truthiness: `|| null`
       // leaves an empty array intact (it is truthy), so a version could ship

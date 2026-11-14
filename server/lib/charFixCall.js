@@ -137,8 +137,8 @@ async function buildCharFixCall({ storyData, characters, artStyle, img, decision
   // the ACTUAL detected face box. A figure repainted INTO another character is
   // a whole-figure redraw, never a face patch.
   const { resolveRepairAxes } = require('./faceRepair');
-  // `decision.forceTarget` ('face' | 'body') is set only by the Test Lab's
-  // explicit whiteoutTarget knob; the run's decisions never carry it.
+  // `decision.forceTarget` ('face' | 'body') is set by the Test Lab's explicit whiteoutTarget knob and by
+  // the book review's FACE:<Name> / FIGURE:<Name> route (owner, 2026-11-14: the reviewer names the scope).
   const forceTarget = byFigure ? 'body' : (decision.forceTarget || null);
   const repairAxes = resolveRepairAxes({ hasFaceBbox: !!faceBbox, issueTypes: decision.issueTypes || null, ...(forceTarget ? { forceTarget } : {}) });
   const useFaceOnly = repairAxes.faceOnly;

@@ -135,11 +135,9 @@ describe('resolveIteratePlate: keep, redo and the rewriter', () => {
     })).rejects.toThrow(landmarkScene.PlateRequiredError);
     expect(loads).toBe(0);
   });
-  it('a cast-0 page ignores the pin and keeps its exemption; a cover keeps its own behaviour', async () => {
+  it('a cast-0 page ignores the pin and keeps its exemption (a cover obeys it since 2026-11-14: cover-background-pin test)', async () => {
     const a = await images.resolveIteratePlate({ ...base, iterateSceneMetadata: CASTLESS.sceneMetadata, backgroundPin: { keep: true }, effectiveSinglePass: true });
     expect(a.sceneBackground).toBeNull();
-    const b = await images.resolveIteratePlate({ ...base, pageNumber: -1, backgroundPin: { keep: false, change: 'x' }, effectiveSinglePass: true });
-    expect(b.sceneBackground).toBeNull();
   });
   it('singlePassScene still frees a non-landmark page when no pin asks for a plate', async () => {
     const r = await images.resolveIteratePlate({ ...base, effectiveSinglePass: true, sceneBackgroundIn: STORED });
@@ -171,10 +169,10 @@ describe("the reviewer's background tag (bookAudit.parseRoutes)", () => {
       expect(f.routeError).toMatch(/background/);
     }
   });
-  it('TOUCHUP and CHAR lines need no tag; one written there is cut off the instruction', () => {
+  it('TOUCHUP, FACE and FIGURE lines need no tag; one written there is cut off the instruction', () => {
     expect(parse('FAULT[IMG][MAJOR][clothing][TOUCHUP]: p3 — Remove the hat.').route).toEqual({ kind: 'TOUCHUP' });
-    const f = parse('FAULT[IMG][MAJOR][clothing][CHAR:Anna]: p3 — Redraw her coat. | background: keep');
-    expect(f.route).toEqual({ kind: 'CHAR', charName: 'Anna' });
+    const f = parse('FAULT[IMG][MAJOR][clothing][FIGURE:Anna]: p3 — Redraw her coat. | background: keep');
+    expect(f.route).toEqual({ kind: 'CHAR', charName: 'Anna', target: 'body' });
     expect(f.detail).toBe('Redraw her coat.');
   });
   it('the review prompt asks for exactly the forms the parser reads', async () => {

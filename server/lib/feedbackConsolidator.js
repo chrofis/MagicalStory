@@ -384,11 +384,11 @@ const ID_PREFIX = Object.freeze({
 
 /** The text a reader finding is rendered with; a finding without one is not shown. */
 function readerLine(f) {
-  // The book review's FIX ROUTE bracket ([TOUCHUP] / [NEW] / [CHAR:<Name>]) is a
+  // The book review's FIX ROUTE bracket ([TOUCHUP] / [NEW] / [FACE:<Name>] / [FIGURE:<Name>]; [CHAR:<Name>] before 2026-11-14) is a
   // routing tag for the review's own repair loop, never evidence for the
   // consolidator: it is dropped from the line the consolidator reads. A line
   // without one (every production audit line) passes through unchanged.
-  return String(f?.line || f?.detail || '').replace(/\[(?:TOUCHUP|NEW|CHAR:[^\]\r\n]*)\](?=:)/i, '').trim();
+  return String(f?.line || f?.detail || '').replace(/\[(?:TOUCHUP|NEW|FACE:[^\]\r\n]*|FIGURE:[^\]\r\n]*|CHAR:[^\]\r\n]*)\](?=:)/i, '').trim();
 }
 
 /**
