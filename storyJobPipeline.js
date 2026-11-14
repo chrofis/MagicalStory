@@ -6538,9 +6538,14 @@ ${trialWriter.pagesPrompt}`;
     const missingCovers = (!skipImages && !skipCovers)
       ? coverTypesFor(inputData).filter(ct => !coverImages?.[ct]?.imageData)
       : [];
-    if (missingImages.length > 0) {
-      log.error(`❌ [UNIFIED] Shipping with ${missingImages.length} imageless page(s): ${missingImages.join(', ')}`);
-      genLog.error('pages_missing_images', `Story ships with no image on page(s) ${missingImages.join(', ')}`);
+    if (missingImages.length > 0 && !skipImages) {
+      genLog.error('pages_missing_images', `Story has no image on page(s) ${missingImages.join(', ')} — the job fails and is refunded`);
+      // A BOOK WITH A MISSING PAGE PICTURE FAILS AND IS REFUNDED (owner, 2026-11-14; supersedes the
+      // 2026-08-29 "ship with a stored flag", docs/decisions.md). The render already got its one retry
+      // (Phase 5a); the throw reaches this function's catch (fail + full refund) and the job catch saves
+      // the finished pages as a [PARTIAL] story from the checkpoints. skipImages runs have no pictures by
+      // design and never get here.
+      throw new Error(`No image on page(s) ${missingImages.join(', ')} after the retry — the book is incomplete; the job fails and is refunded`);
     }
     if (missingCovers.length > 0) {
       log.error(`❌ [UNIFIED] Shipping without cover(s): ${missingCovers.join(', ')}`);

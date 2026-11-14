@@ -33322,6 +33322,7 @@ page silently. Earlier face-specific wording superseded; CLAUDE.md updated.
 **Status:** ✅ active
 
 ## 2026-08-29 — A missing image is a loud failure: one retry, then a stored flag (never a silent ship)
+> **Superseded for PAGES on 2026-11-14** ("A book with a missing page picture fails and is refunded"): the retry stays, but a page still without a picture now fails and refunds the job instead of shipping with the flag. Covers are unchanged.
 **Context:** `job_1787959478282_bz19gm36h` completed and shipped pages 1 and 3
 with `imageVersions[0].imageData = ''` — no `story_images` scene row, no eval,
 no score, and the book audit silently skipped both pages. The only trace of the
@@ -69728,3 +69729,9 @@ Replaces: 2026-10-27 "The customer picks the printed-book layout" and 2026-10-27
 **Decision:** both gender selects in CharacterForm offer male and female only, with a "Bitte wählen" placeholder shown red while empty; the form already refuses to save a character without a gender (`canSaveName`). `Character.gender` is typed `'male' | 'female'`. `findVitalsProblem` refuses `other` (and anything but male/female) with `CHARACTER_GENDER_INVALID`; an empty gender still passes because the wizard saves a draft right after the photo upload, before the pick. The Italian "unknown" label (still shown in the character list for the 8 legacy characters without a gender) reads "Sconosciuto".
 **Considered:** refusing an empty gender on the server (breaks the draft save after the photo upload).
 **Touched files:** client/src/components/character/CharacterForm.tsx, client/src/types/character.ts, client/src/services/characterService.ts, client/src/pages/StoryWizard.tsx, client/src/constants/translations.ts, server/lib/characterVitals.js, server/routes/characters.js, tests/unit/character-vitals-and-relationship-sentences.test.ts.
+
+## 2026-11-14 · A book with a missing page picture fails and is refunded (supersedes 2026-08-29 "ship with a stored flag")
+**Context:** pipeline review 2026-11-13 (docs/audits/pipeline-review-2026-11-13-fable.md, finding 6): a page whose render and its one retry both failed shipped without a picture, at 100%, with no refund; only `data.missingImages` and a genLog error recorded it. The whole-book review could not see it either (imageless pages are filtered out before the review). The owner, asked to keep the 2026-08-29 rule, ship with a per-page refund, or fail: "Fail and refund".
+**Decision:** after the Phase 5a retry, a non-`skipImages` run with any page still without bytes throws in `processUnifiedStoryJob` just before the save gate. Its catch fails the job with a full refund (trial: the slot is given back, settleJobWithRefund), and the job catch saves the finished pages as a [PARTIAL] story from the checkpoints. The one retry (2026-08-29 guard 1) stays. Missing COVERS are unchanged (still logged as `covers_missing` and shipped); the owner's answer named page pictures only.
+**Rationale:** a book with a hole in it is not the product the customer paid for; a loud failure with a refund is honest, a quietly incomplete book is not (NO FALLBACKS).
+**Touched files:** storyJobPipeline.js, tests/unit/missing-page-image-fails-2026-11-14.test.ts, docs/decisions.md.
