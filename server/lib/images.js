@@ -4367,7 +4367,7 @@ async function ensureStoryPagePlate({
  * singlePassScene (a dev setting) leaves a non-landmark page without one; a
  * landmark page and a book-review pin always plate.
  *
- * Who decides keep or redo:
+ * Who decides keep or redo (pages AND full-story covers; only cast-0 has no plate):
  *  - `backgroundPin` (the book review, from the reviewer's `background:` tag):
  *    {keep:true} redraws on the stored plate; {keep:false, change} paints a new
  *    plate from the page's stored plate description plus the change, and the
@@ -4411,14 +4411,17 @@ async function resolveIteratePlate({
 
   const iteratePageRef = { sceneMetadata: iterateSceneMetadata, sceneCharacters };
   const castless = landmarkPhotoIsPageScene(iteratePageRef);
-  // Covers keep their own plate behaviour (decisions 2026-11-07: out of scope).
+  // A full-story cover is a page (decisions 2026-09-24) and obeys the book
+  // review's keep / redo exactly as a page does (decisions 2026-11-14). Without a
+  // pin a cover keeps its own plate behaviour (plated only when a landmark needs
+  // one); only a pin makes a cover mustPlate.
   const isCover = pageNumber < 0;
-  const pin = (castless || isCover) ? null : backgroundPin;
+  const pin = castless ? null : backgroundPin;
   if (backgroundPin && !pin) {
-    log.info(`🎬 [ITERATE] Page ${pageNumber}: ${castless ? 'cast-0 page has no plate' : 'a cover keeps its own plate behaviour'} - background decision not applied`);
+    log.info(`🎬 [ITERATE] Page ${pageNumber}: cast-0 page has no plate - background decision not applied`);
   }
   const landmarkNeedsPlate = pageNeedsPlate(iteratePageRef, pageLandmarkPhotos);
-  const mustPlate = !castless && (landmarkNeedsPlate || (!isCover && (!effectiveSinglePass || !!pin)));
+  const mustPlate = !castless && (landmarkNeedsPlate || !!pin || (!isCover && !effectiveSinglePass));
 
   let sceneBackground = sceneBackgroundIn;
   if (effectiveSinglePass && !mustPlate) {
@@ -5621,7 +5624,9 @@ async function renderPageFromBrief(c) {
 
   // Resolve empty scene background (resolveIteratePlate — plate or fail).
   // The page's STORED plate description (before this rewrite) is what a background redo repaints.
-  const storedPlatePrompt = parentSceneMetadata.emptyScenePrompt
+  // A full-story cover also keeps the plate text its render used on its own record (coverImages[key].emptyScenePrompt).
+  const storedPlatePrompt = (coverRecord?.emptyScenePrompt || null)
+    || parentSceneMetadata.emptyScenePrompt
     || getStoryHelpers().resolvePagePlate({ pageNumber, sceneMetadata: parentSceneMetadata, visualBible, outlinePlate: null })?.text
     || null;
   const { sceneBackground, iteratePageRef, freshPlate } = await resolveIteratePlate({
