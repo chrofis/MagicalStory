@@ -1655,7 +1655,8 @@ function resolveExpectedCastNames(opts = {}) {
   const { canonicalName } = getCastResolver();
   const byLower = new Map();
   for (const n of cast.names) byLower.set(canonicalName(n), n);
-  return { names: cast.names, byLower, declared: cast.declared };
+  // population: the brief's normalised value (same field the render reads), for the book review's BRIEF line.
+  return { names: cast.names, byLower, declared: cast.declared, population: cast.population };
 }
 
 /**

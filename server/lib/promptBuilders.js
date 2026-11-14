@@ -9691,6 +9691,19 @@ function pageGroups(metadata, visualBible) {
   return out;
 }
 
+/**
+ * Who else the painter was told to put in the picture, for a page of this `population`: the SAME sentence(s)
+ * buildRequiredCastRule hands the painter, without the joining punctuation. The book review reads it on the page's
+ * BRIEF line so it judges unnamed people by what the picture was drawn from (generator = critic; pipeline review
+ * 2026-11-13 finding 5, owner 2026-11-14: "Eval must be same as creation of image").
+ */
+function requiredCastBackgroundText(population) {
+  if (!Object.prototype.hasOwnProperty.call(REQUIRED_CAST_BACKGROUND, population)) {
+    throw new Error(`requiredCastBackgroundText: unknown population "${population}"`);
+  }
+  return REQUIRED_CAST_BACKGROUND[population].replace(/^[,.]\s*(and\s+)?/, '').trim();
+}
+
 /** The REQUIRED CAST line for a page of this `population` (normalised); `groups` = pageGroups(). */
 function buildRequiredCastRule(population, groups = []) {
   const tail = REQUIRED_CAST_BACKGROUND[population] || REQUIRED_CAST_BACKGROUND.cast_only;
@@ -14860,6 +14873,7 @@ module.exports = {
   NO_CHARACTER_MARKING_RULE,
   HANDS_HOLD_ONLY_NAMED_RULE,
   buildRequiredCastRule,
+  requiredCastBackgroundText,
   pageGroups,
   COMPOSITION_HEADER,
   COMPOSITION_FACING_BULLET,

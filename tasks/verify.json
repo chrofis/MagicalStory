@@ -11605,6 +11605,22 @@
           "note": "4 production stories copied to staging (4txcgqfdd, xunnxuagh, 9xigyv8u6, 8l1dv50lk; all with avatars stored). First build (b720cb11e): 2/4 right; 4txcgqfdd drawn adult (raw photo apparentAge), xunnxuagh adult + painted VB type \"Spielzeugwaffe\" (bug back-cover-maker-wrong-age-and-object-label). After 76698096d: 4/4 right by eye (same child, age, outfit, story place, magicalstory.ch line, no stray text). Square preview of 4txcgqfdd: 31 pages, cover spread shows made back + front. Negative: cyc9lol5y (no front cover) -> 500 \"has no front cover\". Not covered by a paid run: a story whose avatar comes from today's character table. Spend USD 0.46 reported (+ square covers)."
         }
       ]
+    },
+    {
+      "id": "book-review-background-people-brief",
+      "title": "The book review judges unnamed people by the painter's own population sentence",
+      "commits": [],
+      "addedAt": "2026-11-14",
+      "claim": "In a staging full story, every page's book-review BRIEF line carries 'who else the painter was told to add: <the page's REQUIRED CAST background sentence>', and the review files no extra_character fault for distant unnamed passers-by on a page whose population is sparse, ambient or crowd, while it still files one for an unnamed person on a cast_only page.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Free first: replay auditPageBrief/briefLine over 20 stored staging stories' pages (positives: sparse/ambient/crowd pages; negatives: cast_only) and confirm the line matches buildRequiredCastRule's tail for the page's population. Then a Test Lab book-review stage (stored story, cents) on 4 stored books whose earlier reviews filed extra_character for background people (bookAuditRounds raw): count extra_character faults on non-cast_only pages before vs after. Pipeline review 2026-11-13 finding 5; decisions.md 2026-11-14."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

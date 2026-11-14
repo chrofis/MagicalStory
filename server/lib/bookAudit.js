@@ -267,7 +267,11 @@ function auditPageBrief(scene, storyData = null) {
       extraNames: scene.outlineCharacters || [],
       storyData,
     });
-    return { cast: roster.names, sceneIntent, outfits: auditPageOutfits(scene, roster.names, storyData), heightLine: auditPageHeightLine(roster.names, storyData) };
+    return {
+      cast: roster.names, sceneIntent, outfits: auditPageOutfits(scene, roster.names, storyData), heightLine: auditPageHeightLine(roster.names, storyData),
+      // Who else the painter was told to add: the same population and the same sentence the render used.
+      background: require('./promptBuilders').requiredCastBackgroundText(roster.population),
+    };
   } catch (err) {
     log.error(`❌ [BOOK-AUDIT] p${scene.pageNumber}: cast roster failed (${err.message}) — the reader gets no cast for this page`);
     return { cast: null, sceneIntent };
@@ -322,6 +326,7 @@ function briefLine(heading, brief) {
   const parts = [];
   if (brief.sceneIntent) parts.push(`the moment drawn: ${brief.sceneIntent.replace(/[.\s]+$/, '')}`);
   if (brief.cast !== null) parts.push(`drawn with: ${brief.cast.length ? brief.cast.join(', ') : 'nobody — no character is in this picture by design'}`);
+  if (brief.background) parts.push(`who else the painter was told to add: ${brief.background.replace(/[.\s]+$/, '')}`);
   const worn = Object.entries(brief.outfits || {}).map(([n, d]) => `${n}: ${d}`);
   if (worn.length) parts.push(`what each wears: ${worn.join('; ')}`);
   if (brief.heightLine) parts.push(brief.heightLine);

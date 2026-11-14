@@ -48,6 +48,19 @@
   ],
   "sets": [
     {
+      "id": "required-cast-background-vs-book-review-brief",
+      "axis": "generator-vs-critic",
+      "reason": "Who else is in a picture comes from the page's `population` (cast_only, sparse, ambient, crowd, wildlife, creature_crowd). The painter is told REQUIRED_CAST_BACKGROUND[population] on its REQUIRED CAST line (promptBuilders.buildRequiredCastRule); the whole-book review reads the SAME sentence on the page's BRIEF line (bookAudit.auditPageBrief via promptBuilders.requiredCastBackgroundText, briefLine 'who else the painter was told to add'), and prompts/book-audit.txt says how to judge it. Before 2026-11-14 the reviewer got the cast only and flagged correct passers-by as extra characters, paying redraws (pipeline review 2026-11-13 finding 5; owner: 'Eval must be same as creation of image'). Change the wording, the population values or the judging rule on one side and the other drifts.",
+      "generators": [
+        "server/lib/promptBuilders.js"
+      ],
+      "critics": [
+        "server/lib/bookAudit.js",
+        "prompts/book-audit.txt"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "vb-cast-double-filter-writer-vs-stored-loaders",
       "axis": "story run VB filter vs customer regenerate loader vs Lab loader",
       "reason": "filterMainCharactersFromVisualBible drops invented VB secondaries that are really a cast child; the story run applies it when the VB is made, and older stored stories still hold the doubles, so the regenerate routes (regeneration.js fetchStoryRowForUser, via filterStoredVisualBibleInRows) and the Lab stored-story loader (testlab.js) apply the same one filter when they load a stored VB (docs/decisions.md 2026-11-13).",
