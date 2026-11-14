@@ -11621,6 +11621,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "book-review-face-figure-chain-covers",
+      "title": "Book review: FACE/FIGURE routes, chained fixes in one round, covers obey keep/redo",
+      "commits": [],
+      "addedAt": "2026-11-14",
+      "claim": "In a staging full story the reviewer writes FACE:<Name> / FIGURE:<Name> (no CHAR:), a FACE fault is repaired head-only and a FIGURE fault as the whole figure (char-fix log 'FACE'/'BODY'), a page with character and touch-up faults gets all of them in round 1 as one version with chainSteps, and a cover NEW line with background: redo gets a new plate while keep reuses the cover's plate.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Test Lab book-review stage on 4 stored books whose earlier reviews had CHAR lines and pages with more than one fault (cents): read the raw review (FACE/FIGURE used, no CHAR), the round-1 versions' chainSteps and the char-fix FACE/BODY log lines; on a cover NEW line, the ITERATE log says 'background redo - painting a new plate' or 'reusing empty scene'. Owner decisions 2026-11-14 (decisions.md)."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
