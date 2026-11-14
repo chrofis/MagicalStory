@@ -3286,13 +3286,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       verifyTitle: require('./coverTitlePaint').verifyTitleRender,
       buildRoundVersion,
       redetect: redetectVersionImage,
-      nameMapFor: (img, version) => require('./repairLogic').buildPageRepairNameMap({
-        storyData,
-        sceneDescription: version?.description || img.sceneDescription || img.description || '',
-        detectedFigures: images().detectionForVersion(version)?.figures || null,
-        pageNumber: img.pageNumber,
-        artStyle,
-      }),
       groupSizesFor: (img, version) => groupSizesOfDetection(images().detectionForVersion(version)),
       inheritSceneContract,
       auditRecord,

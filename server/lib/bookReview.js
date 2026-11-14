@@ -131,45 +131,27 @@ function buildFixableIssues(faults) {
 }
 
 /**
- * The plan the inpaint editor executes, built from the reviewer's sentences —
- * no consolidator call. A sentence naming exactly ONE cast / bible figure
- * (castResolver.namesMentioned over the page's repair name map) becomes that
- * figure's per-character fix, so the edit is confined to its box; every other
- * sentence joins the scene fix. The editor strips names from both itself
- * (nameRepairText), so the image model never reads one.
+ * The plan the inpaint editor executes, built from the reviewer's sentences — no consolidator call. Every TOUCHUP
+ * sentence joins ONE scene fix, verbatim (owner, 2026-11-14: "We just have a repair where we input text"). The code no
+ * longer guesses from a name in the sentence which figure the edit is confined to: "remove the hat beside <Name>"
+ * confined the edit to that figure's box and the hat was never touched (pipeline review 2026-11-13, finding 10;
+ * CLAUDE.md: code never reads finding prose to decide). The editor strips names itself (nameRepairText), so the image
+ * model never reads one.
  *
  * @param {Array} faults TOUCHUP faults of one page
- * @param {{names:string[], fallbackByName:Map<string,string>}|null} nameMap repairLogic.buildRepairNameMap
  */
-function buildTouchupPlan(faults, nameMap) {
-  const { namesMentioned } = require('./castResolver');
-  const perChar = [];
-  const scene = [];
-  for (const f of faults || []) {
-    const names = nameMap ? namesMentioned(f.detail, nameMap.names) : [];
-    if (names.length === 1) {
-      perChar.push({
-        characterName: names[0],
-        visual_identifier: nameMap.fallbackByName.get(names[0].toLowerCase()) || null,
-        fix_instruction: f.detail,
-        severity: severityOf(f).toUpperCase(),
-        types: f.type ? [f.type] : [],
-        issues: [f.detail],
-      });
-    } else {
-      scene.push(f);
-    }
-  }
+function buildTouchupPlan(faults) {
+  const scene = faults || [];
   const worst = scene.reduce((w, f) => (sevRank(severityOf(f)) > sevRank(w) ? severityOf(f) : w), 'minor');
   return {
-    deduped_issues: (faults || []).map(toDedupedIssue),
+    deduped_issues: scene.map(toDedupedIssue),
     scene_fix: scene.length ? {
       instruction: scene.map(f => f.detail).join(' '),
       severity: worst.toUpperCase(),
       types: [...new Set(scene.map(f => f.type).filter(Boolean))],
       preserve: [],
     } : null,
-    per_character_fixes: perChar,
+    per_character_fixes: [],
     dropped_issues: [],
     source: FINDING_SOURCES.BOOK_REVIEW,
     // The reviewer chose TOUCHUP: inpaint obeys for every type (docs/decisions.md 2026-10-31).
@@ -278,7 +260,6 @@ function groupFaultsByPage(imgFaults) {
  * @param {(img:string,title:string)=>Promise<{matches:boolean,problem:string}>} d.verifyTitle  coverTitlePaint.verifyTitleRender
  * @param {(r:object, p:object)=>object} d.buildRoundVersion
  * @param {(r:object, label:string)=>Promise<object>} d.redetect  fresh detection for a repaired image
- * @param {(img:object, version:object)=>object|null} d.nameMapFor repairLogic.buildRepairNameMap for the page
  * @param {(r:object, parent:object)=>void} d.inheritSceneContract
  * @param {(audit:object, round:number)=>object} d.auditRecord  the pipeline's compact round record
  * @param {Function} [d.onProgress]
@@ -430,7 +411,7 @@ async function runBookReviewRounds(d) {
       try {
         let latestEval;
         if (choice.method === 'inpaint') {
-          const plan = buildTouchupPlan(choice.faults, d.nameMapFor(img, best));
+          const plan = buildTouchupPlan(choice.faults);
           latestEval = { fixableIssues: buildFixableIssues(choice.faults), consolidatedPlan: plan, reasoning: 'book review touch-up', pageNumber };
         } else if (choice.method === 'iterate' || choice.method === 'title-redraw') {
           latestEval = { fixableIssues: buildFixableIssues(choice.faults), consolidatedPlan: null, reasoning: 'book review: draw the picture again', pageNumber, backgroundPin: choice.backgroundPin || null };

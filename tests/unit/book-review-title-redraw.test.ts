@@ -50,7 +50,7 @@ describe('the review loop', () => {
       reviewBook: async () => ({ byRoute: { IMG: [{ ...titleFault, page: -1 }], TEXT: [] }, pagesRead: [-1], raw: '', betterVerdicts: {} }),
       runRepairMethod: async () => ({ pageNumber: -1, imageData: 'bad' }),
       verifyTitle: async () => ({ matches: false, problem: 'still wrong' }),
-      buildRoundVersion: (r: any, x: any) => ({ ...r, ...x }), redetect: async () => null, nameMapFor: () => ({}),
+      buildRoundVersion: (r: any, x: any) => ({ ...r, ...x }), redetect: async () => null,
       inheritSceneContract: () => {}, auditRecord: () => ({}),
       ...over,
     };

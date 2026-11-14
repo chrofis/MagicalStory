@@ -102,17 +102,22 @@ describe('the route tag picks the repair method (replaces decideRepairMethod in 
     expect(pick.unroutable).toHaveLength(1);
   });
 
-  it('the TOUCHUP plan: a sentence naming ONE figure becomes that figure\'s fix, the rest is the scene fix', () => {
-    const nameMap = { names: ['Anna', 'Ben'], fallbackByName: new Map([['anna', 'the girl in the red coat'], ['ben', 'the boy']]) };
+  it('the TOUCHUP plan: every sentence goes verbatim into ONE scene fix; no figure is guessed from a name (owner 2026-11-14)', () => {
     const plan = review.buildTouchupPlan([
       f({ kind: 'TOUCHUP' }, { detail: 'Lower Anna\'s raised hand.' }),
       f({ kind: 'TOUCHUP' }, { detail: 'Remove the second lantern.', severity: 'MINOR' }),
-      f({ kind: 'TOUCHUP' }, { detail: 'Move Anna next to Ben.' }),
-    ], nameMap);
-    expect(plan.per_character_fixes).toHaveLength(1);
-    expect(plan.per_character_fixes[0]).toMatchObject({ characterName: 'Anna', visual_identifier: 'the girl in the red coat', fix_instruction: 'Lower Anna\'s raised hand.' });
-    expect(plan.scene_fix.instruction).toBe('Remove the second lantern. Move Anna next to Ben.');
+      f({ kind: 'TOUCHUP' }, { detail: 'Remove the extra hat lying beside Anna.' }),
+    ]);
+    // the old code confined "beside Anna" to Anna's box, so the hat was never removed
+    expect(plan.per_character_fixes).toEqual([]);
+    expect(plan.scene_fix.instruction).toBe('Lower Anna\'s raised hand. Remove the second lantern. Remove the extra hat lying beside Anna.');
     expect(plan.deduped_issues).toHaveLength(3);
+  });
+
+  it('nothing in the book review reads a name out of a fault sentence any more', () => {
+    const src = fs.readFileSync(path.join(process.cwd(), 'server/lib/bookReview.js'), 'utf8');
+    expect(src).not.toMatch(/namesMentioned/);
+    expect(src).not.toMatch(/nameMapFor/);
   });
 });
 
@@ -213,7 +218,6 @@ describe('D1: a failed review is retried once, then the book ships unrepaired', 
         maxRepairRounds: 2, reviewBook, runRepairMethod,
         buildRoundVersion: (r: any, p: any) => ({ imageData: r.imageData, source: r.source, method: r.method || null, ...p }),
         redetect: vi.fn(async () => ({ figures: [] })),
-        nameMapFor: () => null,
         inheritSceneContract: () => {},
         auditRecord: (a: any, round: number) => ({ round, faults: a.faults }),
         ...extra,

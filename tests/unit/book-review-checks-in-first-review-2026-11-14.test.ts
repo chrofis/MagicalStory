@@ -32,7 +32,7 @@ describe('the book review: one repair round, checks in the first review', () => 
       },
       runRepairMethod: async ({ img }: any) => ({ pageNumber: img.pageNumber, imageData: `fixed${calls.length}` }),
       verifyTitle: async () => ({ matches: true, problem: '' }),
-      buildRoundVersion: (r: any, x: any) => ({ ...r, ...x }), redetect: async () => null, nameMapFor: () => ({}),
+      buildRoundVersion: (r: any, x: any) => ({ ...r, ...x }), redetect: async () => null,
       inheritSceneContract: () => {}, auditRecord: () => ({}),
     });
     expect(calls.length).toBe(2);

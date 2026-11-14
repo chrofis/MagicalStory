@@ -90,10 +90,10 @@ secrets from the files (history keeps them, so rotation is what matters).
 | 4 | FIXED e46e99f7: cut-off or count-mismatched review reply fails |
 | 5 | FIXED f8976911: BRIEF line carries the painter's population sentence; Lab check pending (verify `book-review-background-people-brief`) |
 | 6 | FIXED 71cab547: missing page picture fails + refunds (owner; supersedes 2026-08-29 for pages) |
-| 7 | BY DESIGN (follow-up deep-dive): pictures are drawn from briefs written before the text; refine failure is loud and owner-decided (2026-08-05, 09-14). Optional: raise `text_refine_failed` to error |
+| 7 | BY DESIGN: pictures are drawn from briefs written before the text; a failed rewrite keeps the original text, which is the owner's wanted behaviour ("if text is worse we take the old one"). No change |
 | 8 | FIXED 5db82b3b: TEXT faults written against a replaced picture are dropped |
 | 9 | CHANGED 7ecde23a (owner): review -> repair -> re-review; size check in the first review only |
-| 10 | MOSTLY NOT A BUG: the FAULT/BETTER/count lines are a closed grammar. One free-text reader remains: `bookReview.buildTouchupPlan` picks the touch-up region from a cast name found in the sentence (a typed `[TOUCHUP:<Name>]` would replace it; prompt change, owner to decide). `sceneBriefCheck` population word list is the other candidate. JSON output: not worth it |
+| 10 | FIXED (owner: plain text): the FAULT/BETTER/count lines are a closed grammar and stay; the one free-text reader, `buildTouchupPlan` picking the edited figure from a name in the sentence, is removed: every touch-up sentence is one scene instruction. JSON output: not worth it. `sceneBriefCheck` population word list remains a candidate |
 | 11 | FIXED f9b2f7d2: failed layout/season stamp fails the job |
 | 12 | NOT A BUG: cast references are used only to count duplicates; "likeness not checked" is accurate |
 | 13 | FIXED 3cfccd26: a failed re-review no longer skips the wrong-title stop |

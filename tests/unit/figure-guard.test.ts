@@ -112,7 +112,7 @@ describe('book review rounds', () => {
         maxRepairRounds: 1, reviewBook, runRepairMethod,
         buildRoundVersion: (r: any, p: any) => ({ imageData: r.imageData, source: r.source, method: r.method, bboxDetection: r.bboxDetection, ...p }),
         redetect: vi.fn(async () => redetectResult),
-        nameMapFor: () => null, inheritSceneContract: () => {},
+        inheritSceneContract: () => {},
         auditRecord: (a: any, round: number) => ({ round, faults: a.faults }),
         ...extra,
       },

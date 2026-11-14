@@ -227,7 +227,7 @@ describe('bookReview.chooseMethod pins the background for the redraw', () => {
     await review.runBookReviewRounds({
       rawImages: imgs, pageVersions, selectBestVersion: (vs: any[]) => vs[vs.length - 1], maxRepairRounds: 1, reviewBook, runRepairMethod,
       buildRoundVersion: (r: any, p: any) => ({ imageData: r.imageData, source: r.source, ...p }),
-      redetect: async () => ({ figures: [] }), nameMapFor: () => null, inheritSceneContract: () => {},
+      redetect: async () => ({ figures: [] }), inheritSceneContract: () => {},
       auditRecord: (a: any, round: number) => ({ round, faults: a.faults }),
     });
     expect(calls).toHaveLength(1);

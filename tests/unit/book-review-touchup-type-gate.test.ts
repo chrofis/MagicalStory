@@ -18,7 +18,7 @@ const fault = (type: string, detail: string) => ({
 describe('book-review TOUCHUP plan vs the inpaint type filter', () => {
   for (const type of ['wrong_state', 'wrong_action', 'clothing', 'hair', 'scale']) {
     it(`a reviewer-routed ${type} fix is not filtered out`, () => {
-      const plan = buildTouchupPlan([fault(type, 'Make the lantern lit.')], null);
+      const plan = buildTouchupPlan([fault(type, 'Make the lantern lit.')]);
       expect(plan.scene_fix.types).toEqual([type]);
       expect(typesAreInpaintable(plan.scene_fix.types, plan)).toBe(true);
     });
