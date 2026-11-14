@@ -79,3 +79,23 @@ The GitHub repository is public. Tracked files contain the production Railway DB
 `tests/manual/test-gemini-real.js`), customer PII under `inbox/` and `tasks/`, and reference photos. Owner to:
 make the repo private, rotate the DB password, revoke the Google keys, check DB access logs; then remove the
 secrets from the files (history keeps them, so rotation is what matters).
+
+## Status 2026-11-14 (branch `claude/pipeline-fixes-2026-11-13`, not on staging yet)
+
+| # | Status |
+|---|---|
+| 1 | FIXED 5e42e242: save gate stops on any non-processing status |
+| 2 | FIXED e46e99f7: a real photo is never a cast reference (member left out, logged) |
+| 3 | FIXED 5c5a8586: mainCharacters reaches the review (3 drop sites) |
+| 4 | FIXED e46e99f7: cut-off or count-mismatched review reply fails |
+| 5 | FIXED f8976911: BRIEF line carries the painter's population sentence; Lab check pending (verify `book-review-background-people-brief`) |
+| 6 | FIXED 71cab547: missing page picture fails + refunds (owner; supersedes 2026-08-29 for pages) |
+| 7 | BY DESIGN (follow-up deep-dive): pictures are drawn from briefs written before the text; refine failure is loud and owner-decided (2026-08-05, 09-14). Optional: raise `text_refine_failed` to error |
+| 8 | FIXED 5db82b3b: TEXT faults written against a replaced picture are dropped |
+| 9 | CHANGED 7ecde23a (owner): review -> repair -> re-review; size check in the first review only |
+| 10 | MOSTLY NOT A BUG: the FAULT/BETTER/count lines are a closed grammar. One free-text reader remains: `bookReview.buildTouchupPlan` picks the touch-up region from a cast name found in the sentence (a typed `[TOUCHUP:<Name>]` would replace it; prompt change, owner to decide). `sceneBriefCheck` population word list is the other candidate. JSON output: not worth it |
+| 11 | FIXED f9b2f7d2: failed layout/season stamp fails the job |
+| 12 | NOT A BUG: cast references are used only to count duplicates; "likeness not checked" is accurate |
+| 13 | FIXED 3cfccd26: a failed re-review no longer skips the wrong-title stop |
+
+Still open from the action plan: emotion on the reviewer's BRIEF line, creature height, text-names-element check, contact enum, action spec, lettering style.
