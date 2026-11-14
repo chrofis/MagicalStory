@@ -184,7 +184,8 @@ describe('flag gating: every environment runs the book review', () => {
 
   it('the review model and the round budget are code constants', () => {
     expect(require('../../server/config/models.js').MODEL_DEFAULTS.bookReviewModel).toBe('anthropic/claude-opus-5.5');
-    expect(runtimeMod().runtime('bookReviewRepairRounds')).toBe(2);
+    // owner 2026-11-14: review -> repair -> re-review (the third review is removed)
+    expect(runtimeMod().runtime('bookReviewRepairRounds')).toBe(1);
   });
 });
 

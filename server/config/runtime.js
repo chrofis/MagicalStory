@@ -158,10 +158,11 @@ const SETTINGS = {
   // decideRepairMethod picks; no environment runs it now.
   pageJudgeMode: 'book_review',
 
-  // Repair rounds of the book review: review -> repair -> re-review -> repair ->
-  // final review (owner decision D4). Only read when pageJudgeMode is
+  // Repair rounds of the book review: review -> repair -> re-review (owner,
+  // 2026-11-14: "remove round 3"; was 2 rounds, D4 review -> repair ->
+  // re-review -> repair -> final review). Only read when pageJudgeMode is
   // 'book_review'.
-  bookReviewRepairRounds: 2,
+  bookReviewRepairRounds: 1,
 
   // Re-plan rounds of the beats page-plan check (check -> re-plan -> recheck). ONE round:
   // stored data showed round 2 discarded in 13 of 15 stories and, when kept, changing

@@ -3261,7 +3261,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       }
     }
     const bookTitle = String(storyData?.title || '').trim();
-    const reviewBook = async (versionByPage, previousByPage) => {
+    const reviewBook = async (versionByPage, previousByPage, { firstReview } = {}) => {
       const { auditStoryBook, buildAuditPages } = require('./bookAudit');
       const auditPages = buildAuditPages(rawImages, (pageNumber) => versionByPage.get(pageNumber) || null);
       for (const pg of auditPages) {
@@ -3271,7 +3271,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       if (auditPages.length === 0) return null;
       return auditStoryBook(
         { id: consolidatorStoryId, visualBible: storyData?.visualBible || visualBible || null, characters: storyData?.characters || [], mainCharacters: storyData?.mainCharacters, artStyle, clothingRequirements: storyData?.clothingRequirements || null, sceneImages: auditPages },
-        { usageTracker, modelId: MODEL_DEFAULTS.bookReviewModel, bookReview: { title: bookTitle } });
+        // The object-size check runs in the FIRST review only (owner, 2026-11-14); it fires no repair, and a
+        // re-review paid for it again on Opus in every round with only the last result surfaced (review finding 9).
+        { usageTracker, modelId: MODEL_DEFAULTS.bookReviewModel, bookReview: { title: bookTitle }, objectScale: firstReview === true });
     };
     // maxRegenAttempts 0 = an evaluate-only run: the book is reviewed and nothing is repaired.
     bookReviewOutcome = await bookReview.runBookReviewRounds({

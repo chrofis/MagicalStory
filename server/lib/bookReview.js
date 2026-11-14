@@ -271,7 +271,7 @@ function groupFaultsByPage(imgFaults) {
  * @param {Map<number,Array>} d.pageVersions       page -> versions
  * @param {(versions:Array)=>object} d.selectBestVersion
  * @param {number} d.maxRepairRounds               0 = review only
- * @param {(shown:Map, previous:Map)=>Promise<object|null>} d.reviewBook one auditStoryBook call; null = failed
+ * @param {(shown:Map, previous:Map, opts:{firstReview:boolean})=>Promise<object|null>} d.reviewBook one auditStoryBook call; null = failed
  * @param {(a:object)=>Promise<object>} d.runRepairMethod  repairPipeline.runRepairMethod
  * @param {string} d.title                          the book title (the front cover's lettering)
  * @param {number} d.titleRedraws                   redraws per round for a cover whose title is wrong
@@ -303,9 +303,11 @@ async function runBookReviewRounds(d) {
   };
 
   // D1: ONE retry, then give up loudly. Never the old judges.
-  const reviewWithRetry = async (shown, previous, label) => {
+  // `firstReview`: the checks that run once per book (the object-size check) run in the FIRST review only
+  // (owner, 2026-11-14: "All checks must run in round 1"); a re-review reads the repaired pictures.
+  const reviewWithRetry = async (shown, previous, label, { firstReview = false } = {}) => {
     for (let attempt = 1; attempt <= 2; attempt++) {
-      const audit = await d.reviewBook(shown, previous);
+      const audit = await d.reviewBook(shown, previous, { firstReview });
       if (audit) return audit;
       log.error(`❌ [BOOK-REVIEW] ${label}: the review call failed (attempt ${attempt} of 2)`);
     }
@@ -363,7 +365,7 @@ async function runBookReviewRounds(d) {
 
   // ── Round 0: the first review, before any repair ───────────────────────
   const shown0 = pickedByPage();
-  const first = await reviewWithRetry(shown0, new Map(), 'round 0');
+  const first = await reviewWithRetry(shown0, new Map(), 'round 0', { firstReview: true });
   if (!first) {
     const failure = 'book review failed — not reviewed (2 attempts); the book ships unrepaired';
     log.error(`❌ [BOOK-REVIEW] ${failure}`);
