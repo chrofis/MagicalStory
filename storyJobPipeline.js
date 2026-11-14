@@ -6160,6 +6160,10 @@ ${trialWriter.pagesPrompt}`;
                 coverImages[coverKey].imageVersions = img.imageVersions;
               }
               if (img.imageData) coverImages[coverKey].imageData = img.imageData;
+              // THE COVER'S PLATE, as the repair left it (2026-11-14): a book-review `background: redo` paints a new
+              // one onto img.emptySceneImage (repairPipeline). Copied back so it is stored as the cover's plate
+              // (database.saveCoverPlate); a cover the repair did not re-plate keeps the one it was rendered on.
+              coverImages[coverKey].emptySceneImage = img.emptySceneImage ?? coverImages[coverKey].emptySceneImage ?? null;
               // The scene contract of the version that SHIPPED, not of the one
               // this cover started as. A page gets this for free (its stored
               // record IS the pipeline mapping); a cover is copied back field

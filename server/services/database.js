@@ -2334,6 +2334,11 @@ async function persistStoryToDatabase(storyId, storyData, { firstSave = false } 
           storyId, storyData?.coverImages?.[coverType], coverPageNumber,
         );
       }
+      // THE COVER'S PLATE as its `empty_scene` row (2026-11-14), the row a page's plate already gets and the one
+      // loadStoredPagePlate reads under the cover's negative page number. Without it a stored cover had no plate:
+      // the book review's `background: keep` on a later redraw painted a new one from the text, and a `redo`
+      // plate lived for its run only.
+      imagesSaved += await saveCoverPlate(storyId, coverPageNumber, coverData);
       if (coverData.imageData) {
         // Same v0 single-writer rule as scenes: skip the top-level v0 task
         // when imageVersions[0] (the original) will write version_index 0.
@@ -2609,6 +2614,22 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
  * {coverImages,<coverType>} touches nothing but this cover.
  * Returns false when the cover key does not exist (caller falls back).
  */
+/**
+ * A cover's plate (`emptySceneImage`, a data URI) -> its `empty_scene` story_images row under the cover's negative
+ * page number, exactly as a scene page's plate is stored; the inline bytes leave the blob and `hasEmptySceneImage`
+ * marks the row. A value that is not image bytes (an old blob's offloaded URL) is left where it is.
+ * @returns {Promise<number>} rows written (0 or 1)
+ */
+async function saveCoverPlate(storyId, coverPageNumber, coverData, write = saveStoryImage) {
+  if (coverPageNumber == null || !coverData) return 0;
+  const plate = coverData.emptySceneImage;
+  if (typeof plate !== 'string' || !plate.startsWith('data:image')) return 0;
+  await write(storyId, 'empty_scene', coverPageNumber, plate);
+  coverData.hasEmptySceneImage = true;
+  delete coverData.emptySceneImage;
+  return 1;
+}
+
 async function saveCoverData(storyId, coverType, coverData) {
   if (!isDatabaseMode()) {
     throw new Error('Database mode required');
@@ -2621,6 +2642,8 @@ async function saveCoverData(storyId, coverType, coverData) {
   await persistFigureMasks(storyId, coverData, COVER_PAGE_NUMBERS[coverType] ?? null);
 
   const dataForStorage = JSON.parse(JSON.stringify(coverData));
+  // The cover's plate as its empty_scene row, as the full save does (saveCoverPlate).
+  await saveCoverPlate(storyId, COVER_PAGE_NUMBERS[coverType] ?? null, dataForStorage);
 
   // Version bytes → story_images (cover rows: image_type = coverType, NULL page)
   if (Array.isArray(dataForStorage.imageVersions)) {
@@ -4039,6 +4062,7 @@ async function getStyleLabRunImages(storyId, pageNumber, runId) {
 }
 
 module.exports = {
+  saveCoverPlate,
   initializePool,
   initializeDatabase,
   dbQuery,
